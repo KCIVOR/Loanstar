@@ -1,0 +1,38 @@
+<!-- @dsCard group="Components" viewport="700x360" name="Navigation — Sidebar, TopBar, PageHeader" subtitle="Portal chrome: sidebar nav, top bar, page header" -->
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8" />
+<link rel="stylesheet" href="../../styles.css" />
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" crossorigin></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" crossorigin></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" crossorigin></script>
+<script src="../../_ds_bundle.js"></script>
+<style>body{margin:0;padding:0;background:var(--surface-page);font-family:var(--font-body);}</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const { Sidebar, TopBar, PageHeader, Button } = window.LoanStarDesignSystem_9cf112;
+const items = [
+  { id: 'dashboard', label: 'Dashboard', icon: 'M1.5 1.5h4v4h-4v-4zM8.5 1.5h4v4h-4v-4zM1.5 8.5h4v4h-4v-4zM8.5 8.5h4v4h-4v-4z' },
+  { id: 'my-loan', label: 'My Loan', icon: 'M1 3.5h12v7a1 1 0 01-1 1H2a1 1 0 01-1-1V3.5zM1 6.5h12' },
+  { id: 'documents', label: 'Documents', icon: 'M3 2.5h6l3 3v8a1 1 0 01-1 1H3a1 1 0 01-1-1v-10a1 1 0 011-1zM9 2.5v3h3' },
+];
+function Demo() {
+  return (
+    <div style={{ display: 'flex', height: 340, border: '1px solid var(--color-neutral-200)', borderRadius: 6, overflow: 'hidden' }}>
+      <Sidebar items={items} activeId="dashboard" />
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+        <TopBar title="Dashboard" subtitle="June 16, 2026" actions={<Button size="sm">Apply New Loan</Button>} />
+        <div style={{ padding: 20 }}>
+          <PageHeader title="Loan Application" description="LN-2026-00142" />
+        </div>
+      </div>
+    </div>
+  );
+}
+ReactDOM.createRoot(document.getElementById('root')).render(<Demo />);
+</script>
+</body>
+</html>

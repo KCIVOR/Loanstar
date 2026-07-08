@@ -1,26 +1,224 @@
 @import "tailwindcss";
 
+/* LoanStar brand fonts.
+   Plus Jakarta Sans: headings + body. JetBrains Mono: amounts, loan IDs, OTP digits
+   (substitutes the source mockups' "SF Mono", which has no distributable web font). */
+@font-face {
+  font-family: "Plus Jakarta Sans";
+  font-style: normal;
+  font-weight: 300 800;
+  font-display: swap;
+  src: url(https://fonts.gstatic.com/s/plusjakartasans/v13/LDIbaomQNQcsA88c7O9yZ4KMCoOg4Ko_QkP2AY9pXjTA9E1u4pmUdt4Xz3RAlhE.woff2)
+    format("woff2");
+}
+
+@font-face {
+  font-family: "JetBrains Mono";
+  font-style: normal;
+  font-weight: 400 700;
+  font-display: swap;
+  src: url(https://fonts.gstatic.com/s/jetbrainsmono/v18/tDbY2o-flEEny0FZhsfKu5WU4zr3E_BX0PnT8RD8yKxfSJk.woff2)
+    format("woff2");
+}
+
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  /* Primary — trust, authority, interactive */
+  --color-primary-50: #eff6ff;
+  --color-primary-100: #dbeafe;
+  --color-primary-200: #bfdbfe;
+  --color-primary-300: #93c5fd;
+  --color-primary-400: #60a5fa;
+  --color-primary-500: #2563eb;
+  --color-primary-600: #1a56db; /* main brand blue — buttons, links, active states */
+  --color-primary-700: #1444b8; /* hover */
+  --color-primary-800: #1e3a8a;
+  --color-primary-900: #1e2f5e;
+
+  /* Neutral — slate scaffolding */
+  --color-neutral-0: #ffffff;
+  --color-neutral-50: #f8fafc;
+  --color-neutral-100: #f1f5f9;
+  --color-neutral-200: #e2e8f0;
+  --color-neutral-300: #cbd5e1;
+  --color-neutral-400: #94a3b8;
+  --color-neutral-500: #64748b;
+  --color-neutral-600: #475569;
+  --color-neutral-700: #334155;
+  --color-neutral-800: #1e293b;
+  --color-neutral-900: #0f172a;
+
+  /* Semantic */
+  --color-success-50: #ecfdf5;
+  --color-success-100: #dcfce7;
+  --color-success-200: #a7f3d0;
+  --color-success-600: #059669;
+  --color-success-700: #047857;
+  --color-success-text-strong: #065f46;
+
+  --color-warning-50: #fffbeb;
+  --color-warning-100: #fef3c7;
+  --color-warning-200: #fde68a;
+  --color-warning-600: #d97706;
+  --color-warning-700: #b45309;
+  --color-warning-text-strong: #92400e;
+
+  --color-danger-50: #fef2f2;
+  --color-danger-100: #ffe4e6;
+  --color-danger-200: #fecaca;
+  --color-danger-600: #dc2626;
+  --color-danger-700: #b91c1c;
+  --color-danger-text-strong: #991b1b;
+
+  --color-info-50: #f0f9ff;
+  --color-info-100: #e0f2fe;
+  --color-info-200: #bae6fd;
+  --color-info-600: #0ea5e9;
+  --color-info-700: #0369a1;
+  --color-info-text-strong: #0c4a6e;
+
+  /* Role accent colors — used for staff portal nav identity per workflow module */
+  --color-role-csa: #1e3a8a;
+  --color-role-cig: #312e81;
+  --color-role-committee: #4c1d95;
+  --color-role-lra: #064e3b;
+  --color-role-ar: #0f172a;
+  --color-role-collector: #164e63;
+  --color-role-remedial: #7f1d1d;
+  --color-role-agent: #78350f;
+  --color-role-borrower: #2563eb;
+
+  /* Semantic aliases */
+  --surface-page: var(--color-neutral-50);
+  --surface-card: var(--color-neutral-0);
+  --surface-sunken: var(--color-neutral-100);
+  --border-default: var(--color-neutral-200);
+  --border-strong: var(--color-neutral-300);
+  --text-heading: var(--color-neutral-900);
+  --text-body: var(--color-neutral-600);
+  --text-muted: var(--color-neutral-400);
+  --text-label: var(--color-neutral-700);
+  --link-color: var(--color-primary-600);
+  --link-hover-color: var(--color-primary-700);
+
+  /* Fonts */
+  --font-heading: "Plus Jakarta Sans", system-ui, sans-serif;
+  --font-body: "Plus Jakarta Sans", system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, "SF Mono", monospace;
+
+  /* Spacing — 4px base grid */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+  --space-12: 48px;
+  --space-16: 64px;
+
+  /* Radius */
+  --radius-xs: 2px; /* badges, tooltips */
+  --radius-sm: 4px; /* buttons, inputs, chips */
+  --radius-md: 6px; /* cards, panels, modals */
+  --radius-lg: 10px; /* feature cards, images */
+  --radius-full: 9999px; /* pills, avatars, toggles */
+
+  /* Shadow */
+  --shadow-xs: 0 1px 2px rgba(15, 23, 42, 0.06);
+  --shadow-sm: 0 1px 3px rgba(15, 23, 42, 0.08);
+  --shadow-md: 0 4px 8px rgba(15, 23, 42, 0.07);
+  --shadow-lg: 0 12px 24px rgba(15, 23, 42, 0.08);
+
+  --background: var(--surface-page);
+  --foreground: var(--text-heading);
 }
 
 @theme inline {
+  --color-primary-50: var(--color-primary-50);
+  --color-primary-100: var(--color-primary-100);
+  --color-primary-200: var(--color-primary-200);
+  --color-primary-300: var(--color-primary-300);
+  --color-primary-400: var(--color-primary-400);
+  --color-primary-500: var(--color-primary-500);
+  --color-primary-600: var(--color-primary-600);
+  --color-primary-700: var(--color-primary-700);
+  --color-primary-800: var(--color-primary-800);
+  --color-primary-900: var(--color-primary-900);
+
+  --color-neutral-0: var(--color-neutral-0);
+  --color-neutral-50: var(--color-neutral-50);
+  --color-neutral-100: var(--color-neutral-100);
+  --color-neutral-200: var(--color-neutral-200);
+  --color-neutral-300: var(--color-neutral-300);
+  --color-neutral-400: var(--color-neutral-400);
+  --color-neutral-500: var(--color-neutral-500);
+  --color-neutral-600: var(--color-neutral-600);
+  --color-neutral-700: var(--color-neutral-700);
+  --color-neutral-800: var(--color-neutral-800);
+  --color-neutral-900: var(--color-neutral-900);
+
+  --color-success-50: var(--color-success-50);
+  --color-success-100: var(--color-success-100);
+  --color-success-200: var(--color-success-200);
+  --color-success-600: var(--color-success-600);
+  --color-success-700: var(--color-success-700);
+
+  --color-warning-50: var(--color-warning-50);
+  --color-warning-100: var(--color-warning-100);
+  --color-warning-200: var(--color-warning-200);
+  --color-warning-600: var(--color-warning-600);
+  --color-warning-700: var(--color-warning-700);
+
+  --color-danger-50: var(--color-danger-50);
+  --color-danger-100: var(--color-danger-100);
+  --color-danger-200: var(--color-danger-200);
+  --color-danger-600: var(--color-danger-600);
+  --color-danger-700: var(--color-danger-700);
+
+  --color-info-50: var(--color-info-50);
+  --color-info-100: var(--color-info-100);
+  --color-info-200: var(--color-info-200);
+  --color-info-600: var(--color-info-600);
+  --color-info-700: var(--color-info-700);
+
+  --color-role-csa: var(--color-role-csa);
+  --color-role-cig: var(--color-role-cig);
+  --color-role-committee: var(--color-role-committee);
+  --color-role-lra: var(--color-role-lra);
+  --color-role-ar: var(--color-role-ar);
+  --color-role-collector: var(--color-role-collector);
+  --color-role-remedial: var(--color-role-remedial);
+  --color-role-agent: var(--color-role-agent);
+  --color-role-borrower: var(--color-role-borrower);
+
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+  --font-heading: var(--font-heading);
+  --font-body: var(--font-body);
+  --font-mono: var(--font-mono);
+  --font-sans: var(--font-body);
+
+  --radius-xs: var(--radius-xs);
+  --radius-sm: var(--radius-sm);
+  --radius-md: var(--radius-md);
+  --radius-lg: var(--radius-lg);
+  --radius-full: var(--radius-full);
+
+  --shadow-xs: var(--shadow-xs);
+  --shadow-sm: var(--shadow-sm);
+  --shadow-md: var(--shadow-md);
+  --shadow-lg: var(--shadow-lg);
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--surface-page);
+  color: var(--text-heading);
+  font-family: var(--font-body);
+}
+
+::selection {
+  background: var(--color-primary-100);
+  color: var(--color-primary-800);
 }

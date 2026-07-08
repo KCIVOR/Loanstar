@@ -1,0 +1,87 @@
+/* LoanStar — Color tokens
+   Source of truth: docs mockups "LoanStar Design System.dc.html" + 5 screen mockups
+   (KCIVOR/Loanstar, docs/LoanStar (1)/). Ground truth wins over docs/LoanStar_System_Design.md
+   where the two differ (e.g. primary-600 is #1A56DB in the built mockups, not #2563EB). */
+
+:root {
+  /* Primary — trust, authority, interactive */
+  --color-primary-50:  #EFF6FF;
+  --color-primary-100: #DBEAFE;
+  --color-primary-200: #BFDBFE;
+  --color-primary-300: #93C5FD;
+  --color-primary-400: #60A5FA;
+  --color-primary-500: #2563EB;
+  --color-primary-600: #1A56DB; /* ★ main brand blue — buttons, links, active states */
+  --color-primary-700: #1444B8; /* hover */
+  --color-primary-800: #1E3A8A;
+  --color-primary-900: #1E2F5E;
+
+  /* Neutral — slate scaffolding */
+  --color-neutral-0:   #FFFFFF;
+  --color-neutral-50:  #F8FAFC;
+  --color-neutral-100: #F1F5F9;
+  --color-neutral-200: #E2E8F0;
+  --color-neutral-300: #CBD5E1;
+  --color-neutral-400: #94A3B8;
+  --color-neutral-500: #64748B;
+  --color-neutral-600: #475569;
+  --color-neutral-700: #334155;
+  --color-neutral-800: #1E293B;
+  --color-neutral-900: #0F172A;
+
+  /* Semantic */
+  --color-success-50:  #ECFDF5;
+  --color-success-100: #DCFCE7;
+  --color-success-200: #A7F3D0;
+  --color-success-600: #059669;
+  --color-success-700: #047857;
+  --color-success-text-strong: #065F46;
+
+  --color-warning-50:  #FFFBEB;
+  --color-warning-100: #FEF3C7;
+  --color-warning-200: #FDE68A;
+  --color-warning-600:  #D97706;
+  --color-warning-700:  #B45309;
+  --color-warning-text-strong: #92400E;
+
+  --color-danger-50:   #FEF2F2;
+  --color-danger-100:  #FFE4E6;
+  --color-danger-200:  #FECACA;
+  --color-danger-600:  #DC2626;
+  --color-danger-700:  #B91C1C;
+  --color-danger-text-strong: #991B1B;
+
+  --color-info-50:     #F0F9FF;
+  --color-info-100:    #E0F2FE;
+  --color-info-200:    #BAE6FD;
+  --color-info-600:    #0EA5E9;
+  --color-info-700:    #0369A1;
+  --color-info-text-strong: #0C4A6E;
+
+  /* Role accent colors — reference palette for staff-portal identity per module.
+     Documented in docs/LoanStar_System_Design.md; not all are expressed in the
+     built mockups yet, which currently favor the unified primary blue. Use when
+     building additional portal surfaces (CIG, Committee, AR, Remedial, Agent…). */
+  --color-role-csa:       #1E3A8A;
+  --color-role-cig:       #312E81;
+  --color-role-committee: #4C1D95;
+  --color-role-lra:       #064E3B;
+  --color-role-ar:        #0F172A;
+  --color-role-collector: #164E63;
+  --color-role-remedial:  #7F1D1D;
+  --color-role-agent:     #78350F;
+  --color-role-borrower:  #2563EB;
+
+  /* Semantic aliases */
+  --surface-page:     var(--color-neutral-50);
+  --surface-card:      var(--color-neutral-0);
+  --surface-sunken:    var(--color-neutral-100);
+  --border-default:    var(--color-neutral-200);
+  --border-strong:     var(--color-neutral-300);
+  --text-heading:      var(--color-neutral-900);
+  --text-body:         var(--color-neutral-600);
+  --text-muted:        var(--color-neutral-400);
+  --text-label:        var(--color-neutral-700);
+  --link-color:        var(--color-primary-600);
+  --link-hover-color:  var(--color-primary-700);
+}

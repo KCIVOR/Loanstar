@@ -1,0 +1,26 @@
+<!-- @dsCard group="Colors" viewport="700x220" name="Role Accents (reference)" subtitle="Per-portal identity — documented, not yet built into screens" -->
+<!DOCTYPE html>
+<html><head><meta charset="utf-8"><link rel="stylesheet" href="../styles.css">
+<style>body{margin:0;padding:20px;font-family:var(--font-body);background:#fff;}
+.grid{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;}
+.card{border:1px solid var(--color-neutral-200);border-radius:6px;overflow:hidden;}
+.bar{height:34px;}
+.body{padding:8px 10px;}
+.name{font-size:11px;font-weight:700;color:var(--color-neutral-900);}
+.val{font-size:9px;color:var(--color-neutral-400);font-family:var(--font-mono);}
+.note{grid-column:1/-1;font-size:11px;color:var(--color-neutral-500);margin-top:6px;line-height:1.5;}
+</style></head>
+<body>
+<div class="grid">
+  <div class="card"><div class="bar" style="background:#1E3A8A"></div><div class="body"><div class="name">CSA</div><div class="val">#1E3A8A</div></div></div>
+  <div class="card"><div class="bar" style="background:#312E81"></div><div class="body"><div class="name">CIG</div><div class="val">#312E81</div></div></div>
+  <div class="card"><div class="bar" style="background:#4C1D95"></div><div class="body"><div class="name">Committee</div><div class="val">#4C1D95</div></div></div>
+  <div class="card"><div class="bar" style="background:#064E3B"></div><div class="body"><div class="name">LRA</div><div class="val">#064E3B</div></div></div>
+  <div class="card"><div class="bar" style="background:#0F172A"></div><div class="body"><div class="name">AR</div><div class="val">#0F172A</div></div></div>
+  <div class="card"><div class="bar" style="background:#164E63"></div><div class="body"><div class="name">Collector</div><div class="val">#164E63</div></div></div>
+  <div class="card"><div class="bar" style="background:#7F1D1D"></div><div class="body"><div class="name">Remedial</div><div class="val">#7F1D1D</div></div></div>
+  <div class="card"><div class="bar" style="background:#78350F"></div><div class="body"><div class="name">Agent</div><div class="val">#78350F</div></div></div>
+  <div class="card"><div class="bar" style="background:#2563EB"></div><div class="body"><div class="name">Borrower</div><div class="val">#2563EB</div></div></div>
+  <div class="note">From docs/LoanStar_System_Design.md §2 — intended as top-navbar accent per staff portal. The 5 built mockups currently use the unified primary blue throughout; apply these when building CIG/Committee/AR/Remedial/Agent surfaces.</div>
+</div>
+</body></html>

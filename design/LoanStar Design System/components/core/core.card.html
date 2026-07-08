@@ -1,0 +1,55 @@
+<!-- @dsCard group="Components" viewport="700x640" name="Core — Button, Badge, Card, Alert" subtitle="Buttons, status pills, card surfaces, inline alerts" -->
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8" />
+<link rel="stylesheet" href="../../styles.css" />
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" crossorigin></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" crossorigin></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" crossorigin></script>
+<script src="../../_ds_bundle.js"></script>
+<style>body{margin:0;padding:20px;background:var(--surface-page);font-family:var(--font-body);}</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const { Button, Badge, Card, StatCard, Alert } = window.LoanStar;
+
+function Demo() {
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+        <Button variant="primary">Apply for Loan</Button>
+        <Button variant="secondary">View Schedule</Button>
+        <Button variant="outline">Download PDF</Button>
+        <Button variant="ghost">Cancel</Button>
+        <Button variant="danger">Withdraw</Button>
+        <Button variant="success">Confirm Payment</Button>
+        <Button variant="primary" loading>Processing</Button>
+        <Button variant="primary" disabled>Disabled</Button>
+      </div>
+      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+        <Badge status="approved">Approved</Badge>
+        <Badge status="active">Active</Badge>
+        <Badge status="pending">Pending Review</Badge>
+        <Badge status="denied">Rejected</Badge>
+        <Badge status="overdue">Overdue</Badge>
+        <Badge status="closed">Closed</Badge>
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12 }}>
+        <StatCard label="Active Loans" value="1,247" trend="↑ +12%" sub="vs last month" />
+        <Card variant="highlight" style={{ fontSize: 13, color: 'var(--color-neutral-700)' }}>Highlight card for callouts and CIG notices.</Card>
+        <Card variant="gradient" style={{ fontSize: 13 }}>Gradient hero surface (loan balance cards).</Card>
+      </div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+        <Alert variant="success" title="Application Approved">Your loan of ₱150,000 has been approved.</Alert>
+        <Alert variant="warning" title="Payment Due in 3 Days">₱7,540.50 is due on July 15.</Alert>
+        <Alert variant="error" title="Documents Incomplete">Valid government ID is missing.</Alert>
+      </div>
+    </div>
+  );
+}
+ReactDOM.createRoot(document.getElementById('root')).render(<Demo />);
+</script>
+</body>
+</html>

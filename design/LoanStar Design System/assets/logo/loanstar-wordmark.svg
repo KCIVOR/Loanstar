@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 36" width="160" height="36">
+  <defs>
+    <linearGradient id="loanstarGrad2" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#1A56DB"></stop>
+      <stop offset="100%" stop-color="#1444B8"></stop>
+    </linearGradient>
+  </defs>
+  <rect width="36" height="36" rx="6" fill="url(#loanstarGrad2)"></rect>
+  <path d="M18 3L20.16 8.04L25.5 8.84L21.75 12.46L22.73 18L18 15.38L13.27 18L14.25 12.46L10.5 8.84L15.84 8.04L18 3Z" fill="white"></path>
+  <text x="46" y="24" font-family="Plus Jakarta Sans, system-ui, sans-serif" font-size="20" font-weight="800" letter-spacing="-0.5" fill="#0F172A">LoanStar</text>
+</svg>

@@ -1,0 +1,51 @@
+<!-- @dsCard group="Components" viewport="700x680" name="Loan — Timeline, Checklist, Signature, Stepper, Amortization" subtitle="Domain components for the loan workflow" -->
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8" />
+<link rel="stylesheet" href="../../styles.css" />
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" crossorigin></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" crossorigin></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" crossorigin></script>
+<script src="../../_ds_bundle.js"></script>
+<style>body{margin:0;padding:20px;background:var(--surface-page);font-family:var(--font-body);}</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const { StatusTimeline, DocumentChecklist, SignatureConfirm, Stepper, AmortizationTable } = window.LoanStarDesignSystem_9cf112;
+
+const docs = [
+  { name: 'Valid Government ID', filename: 'gov_id.pdf', status: 'confirmed' },
+  { name: 'Income Tax Return', filename: 'itr_2025.pdf', status: 'uploaded' },
+  { name: 'Certificate of Employment', status: 'pending' },
+];
+const schedule = [
+  { num: '01', dueDate: 'Aug 15, 2026', principal: '₱5,290.50', interest: '₱2,250.00', payment: '₱7,540.50', status: 'paid' },
+  { num: '02', dueDate: 'Sep 15, 2026', principal: '₱5,369.61', interest: '₱2,170.89', payment: '₱7,540.50', status: 'due' },
+  { num: '03', dueDate: 'Oct 15, 2026', principal: '₱5,449.95', interest: '₱2,090.55', payment: '₱7,540.50', status: 'upcoming' },
+];
+
+function Demo() {
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+      <div style={{ background: '#fff', border: '1px solid var(--color-neutral-200)', borderRadius: 6, padding: 24 }}>
+        <StatusTimeline steps={['Intake','Verification','Committee','Negotiation','Release','Monitoring']} currentIndex={2} />
+      </div>
+      <div style={{ background: '#fff', border: '1px solid var(--color-neutral-200)', borderRadius: 6, padding: 24 }}>
+        <Stepper steps={['Personal Info','Loan Details','Documents','Review','Submit']} currentIndex={1} />
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+        <div style={{ background: '#fff', border: '1px solid var(--color-neutral-200)', borderRadius: 6, padding: 18 }}>
+          <DocumentChecklist documents={docs} />
+        </div>
+        <SignatureConfirm docName="Promissory Note" docType="Loan Agreement" />
+      </div>
+      <AmortizationTable rows={schedule} />
+    </div>
+  );
+}
+ReactDOM.createRoot(document.getElementById('root')).render(<Demo />);
+</script>
+</body>
+</html>

@@ -1,0 +1,5 @@
+/* LoanStar Design System — global stylesheet entry point.
+   Keep this file as @import lines only; everything it reaches is shipped to consumers. */
+@import "tokens/colors.css";
+@import "tokens/typography.css";
+@import "tokens/spacing.css";

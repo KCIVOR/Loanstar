@@ -1,0 +1,390 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:'Plus Jakarta Sans',system-ui,sans-serif;background:#F8FAFC;}
+input,button,select{font-family:'Plus Jakarta Sans',system-ui,sans-serif;}
+::-webkit-scrollbar{width:4px;height:4px;}
+::-webkit-scrollbar-thumb{background:#CBD5E1;border-radius:2px;}
+</style>
+</helmet>
+
+<div style="display:flex;height:100vh;overflow:hidden;font-family:'Plus Jakarta Sans',system-ui,sans-serif;">
+
+  <!-- SIDEBAR -->
+  <aside style="width:228px;flex-shrink:0;background:#FFFFFF;border-right:1px solid #E2E8F0;display:flex;flex-direction:column;overflow-y:auto;z-index:50;">
+    <div style="padding:20px 20px 16px;border-bottom:1px solid #F1F5F9;flex-shrink:0;">
+      <div style="display:flex;align-items:center;gap:10px;">
+        <div style="width:36px;height:36px;background:linear-gradient(135deg,#1A56DB,#1444B8);border-radius:6px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+          <svg width="18" height="18" viewBox="0 0 18 18" fill="none"><path d="M9 1.5L11.2 6.7 16.5 7.4 12.75 11.1 13.8 16.5 9 13.9 4.2 16.5 5.25 11.1 1.5 7.4 6.8 6.7z" fill="white"/></svg>
+        </div>
+        <div>
+          <div style="font-size:15px;font-weight:800;color:#0F172A;letter-spacing:-0.4px;">LoanStar</div>
+          <div style="font-size:10px;color:#94A3B8;font-weight:600;letter-spacing:0.06em;text-transform:uppercase;">Admin Portal</div>
+        </div>
+      </div>
+    </div>
+    <nav style="padding:10px;flex:1;">
+      <div style="font-size:9.5px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:#94A3B8;padding:8px 10px 4px;">Main Menu</div>
+      <sc-for list="{{ navItems }}" as="item" hint-placeholder-count="7">
+        <div onClick="{{ item.onClick }}" style="display:flex;align-items:center;gap:9px;padding:8px 10px;border-radius:5px;cursor:pointer;background:{{ item.bg }};margin-bottom:1px;" style-hover="background:#F8FAFC;">
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none" style="flex-shrink:0;"><path d="{{ item.icon }}" stroke="{{ item.color }}" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          <span style="font-size:13px;font-weight:{{ item.fw }};color:{{ item.color }};">{{ item.label }}</span>
+          <sc-if value="{{ item.hasBadge }}" hint-placeholder-val="{{ false }}">
+            <span style="margin-left:auto;background:#FEF2F2;color:#DC2626;font-size:10px;font-weight:700;padding:1px 6px;border-radius:9px;">{{ item.badge }}</span>
+          </sc-if>
+        </div>
+      </sc-for>
+    </nav>
+    <div style="padding:14px 16px;border-top:1px solid #F1F5F9;flex-shrink:0;display:flex;align-items:center;gap:10px;">
+      <div style="width:34px;height:34px;border-radius:50%;background:linear-gradient(135deg,#1A56DB,#0EA5E9);display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:13px;font-weight:700;color:#FFFFFF;">M</div>
+      <div style="flex:1;min-width:0;">
+        <div style="font-size:13px;font-weight:600;color:#0F172A;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">Maria Santos</div>
+        <div style="font-size:11px;color:#94A3B8;">Branch Manager</div>
+      </div>
+      <a href="Login.dc.html" title="Sign out" style="color:#94A3B8;display:flex;" style-hover="color:#DC2626;">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M6 2H3a1 1 0 00-1 1v10a1 1 0 001 1h3M11 11l3-3-3-3M14 8H6"/></svg>
+      </a>
+    </div>
+  </aside>
+
+  <!-- MAIN -->
+  <main style="flex:1;overflow-y:auto;background:#F8FAFC;min-width:0;">
+
+    <!-- TOP BAR -->
+    <header style="height:60px;background:#FFFFFF;border-bottom:1px solid #E2E8F0;position:sticky;top:0;z-index:40;padding:0 32px;display:flex;align-items:center;justify-content:space-between;">
+      <div>
+        <div style="font-size:18px;font-weight:700;color:#0F172A;letter-spacing:-0.3px;">Dashboard</div>
+        <div style="font-size:12px;color:#94A3B8;">June 16, 2026 · Good morning, Maria</div>
+      </div>
+      <div style="display:flex;align-items:center;gap:12px;">
+        <div style="position:relative;">
+          <input type="text" placeholder="Search loans, borrowers…" style="width:220px;height:36px;padding:0 12px 0 36px;background:#F8FAFC;border:1.5px solid #E2E8F0;border-radius:4px;font-size:13px;color:#334155;outline:none;" style-focus="border-color:#1A56DB;background:#FFFFFF;" />
+          <svg style="position:absolute;left:10px;top:50%;transform:translateY(-50%);pointer-events:none;" width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="#94A3B8" stroke-width="1.5" stroke-linecap="round"><circle cx="6" cy="6" r="4.5"/><path d="M9.5 9.5l3 3"/></svg>
+        </div>
+        <div style="position:relative;cursor:pointer;">
+          <div style="width:36px;height:36px;background:#F8FAFC;border:1.5px solid #E2E8F0;border-radius:4px;display:flex;align-items:center;justify-content:center;" style-hover="background:#F1F5F9;">
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="#475569" stroke-width="1.5"><path d="M8 2a5 5 0 014.9 4l.6 3H2.5l.6-3A5 5 0 018 2zM6 12.5a2 2 0 004 0"/></svg>
+          </div>
+          <div style="position:absolute;top:-3px;right:-3px;width:16px;height:16px;background:#DC2626;border-radius:50%;border:2px solid #FFFFFF;display:flex;align-items:center;justify-content:center;">
+            <span style="font-size:9px;font-weight:700;color:#FFFFFF;">5</span>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <!-- CONTENT -->
+    <div style="padding:28px 32px;max-width:1300px;">
+
+      <!-- KPI CARDS -->
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:24px;">
+        <sc-for list="{{ kpis }}" as="kpi" hint-placeholder-count="4">
+          <div style="background:#FFFFFF;border:1px solid #E2E8F0;border-radius:6px;padding:22px;box-shadow:0 1px 3px rgba(15,23,42,0.05);" style-hover="box-shadow:0 4px 8px rgba(15,23,42,0.07);">
+            <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:16px;">
+              <div style="font-size:11px;font-weight:600;color:#64748B;text-transform:uppercase;letter-spacing:0.05em;">{{ kpi.label }}</div>
+              <div style="width:38px;height:38px;border-radius:8px;background:{{ kpi.iconBg }};display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                <svg width="18" height="18" viewBox="0 0 14 14" fill="none"><path d="{{ kpi.iconPath }}" stroke="{{ kpi.iconColor }}" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              </div>
+            </div>
+            <div style="font-size:32px;font-weight:700;color:#0F172A;letter-spacing:-1px;font-variant-numeric:tabular-nums;margin-bottom:10px;line-height:1;">{{ kpi.value }}</div>
+            <div style="display:flex;align-items:center;gap:8px;">
+              <span style="background:{{ kpi.trendBg }};color:{{ kpi.trendColor }};font-size:11px;font-weight:700;padding:2px 8px;border-radius:3px;">{{ kpi.trend }}</span>
+              <span style="font-size:11px;color:#94A3B8;">{{ kpi.change }}</span>
+            </div>
+          </div>
+        </sc-for>
+      </div>
+
+      <!-- CHARTS ROW -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:24px;">
+
+        <!-- Bar Chart: Monthly Disbursements -->
+        <div style="background:#FFFFFF;border:1px solid #E2E8F0;border-radius:6px;padding:22px;box-shadow:0 1px 3px rgba(15,23,42,0.04);">
+          <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:20px;">
+            <div>
+              <div style="font-size:14px;font-weight:700;color:#0F172A;margin-bottom:3px;">Monthly Disbursements</div>
+              <div style="font-size:12px;color:#94A3B8;">Jan – Jun 2026</div>
+            </div>
+            <div style="background:#EFF6FF;color:#1A56DB;font-size:11px;font-weight:700;padding:4px 10px;border-radius:4px;">₱138.1M total</div>
+          </div>
+          {{ disbChart }}
+        </div>
+
+        <!-- Line Chart: Collection Rate -->
+        <div style="background:#FFFFFF;border:1px solid #E2E8F0;border-radius:6px;padding:22px;box-shadow:0 1px 3px rgba(15,23,42,0.04);">
+          <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:20px;">
+            <div>
+              <div style="font-size:14px;font-weight:700;color:#0F172A;margin-bottom:3px;">Collection Rate Trend</div>
+              <div style="font-size:12px;color:#94A3B8;">% of due payments collected on time</div>
+            </div>
+            <div style="background:#ECFDF5;color:#059669;font-size:11px;font-weight:700;padding:4px 10px;border-radius:4px;">↑ +1.2pp</div>
+          </div>
+          {{ collChart }}
+        </div>
+
+      </div>
+
+      <!-- ANALYTICS ROW -->
+      <div style="display:grid;grid-template-columns:1fr 1.6fr;gap:16px;margin-bottom:24px;">
+
+        <!-- Donut: Loan Status Mix -->
+        <div style="background:#FFFFFF;border:1px solid #E2E8F0;border-radius:6px;padding:22px;box-shadow:0 1px 3px rgba(15,23,42,0.04);">
+          <div style="font-size:14px;font-weight:700;color:#0F172A;margin-bottom:4px;">Loan Status Mix</div>
+          <div style="font-size:12px;color:#94A3B8;margin-bottom:20px;">1,247 total loans</div>
+          <div style="display:flex;align-items:center;gap:24px;">
+            <div style="position:relative;flex-shrink:0;">
+              <div style="{{ donutStyle }}"></div>
+              <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);text-align:center;">
+                <div style="font-size:24px;font-weight:700;color:#0F172A;font-variant-numeric:tabular-nums;letter-spacing:-0.5px;">1,247</div>
+                <div style="font-size:10px;color:#94A3B8;font-weight:500;">Total</div>
+              </div>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:10px;flex:1;">
+              <sc-for list="{{ donutLegend }}" as="item" hint-placeholder-count="4">
+                <div style="display:flex;align-items:center;gap:8px;">
+                  <div style="width:8px;height:8px;border-radius:2px;background:{{ item.color }};flex-shrink:0;"></div>
+                  <div style="flex:1;">
+                    <div style="font-size:12px;font-weight:600;color:#334155;">{{ item.label }}</div>
+                    <div style="font-size:11px;color:#94A3B8;">{{ item.pct }}</div>
+                  </div>
+                  <div style="font-size:14px;font-weight:700;color:#0F172A;font-variant-numeric:tabular-nums;">{{ item.count }}</div>
+                </div>
+              </sc-for>
+            </div>
+          </div>
+        </div>
+
+        <!-- Pipeline: Active Stages -->
+        <div style="background:#FFFFFF;border:1px solid #E2E8F0;border-radius:6px;padding:22px;box-shadow:0 1px 3px rgba(15,23,42,0.04);">
+          <div style="font-size:14px;font-weight:700;color:#0F172A;margin-bottom:4px;">Active Pipeline</div>
+          <div style="font-size:12px;color:#94A3B8;margin-bottom:22px;">Applications currently in processing stages</div>
+          <sc-for list="{{ pipeline }}" as="row" hint-placeholder-count="5">
+            <div style="margin-bottom:16px;">
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+                <div style="display:flex;align-items:center;gap:8px;">
+                  <div style="width:6px;height:6px;border-radius:50%;background:{{ row.color }};flex-shrink:0;"></div>
+                  <span style="font-size:12px;font-weight:600;color:#334155;">{{ row.stage }}</span>
+                </div>
+                <div style="display:flex;align-items:center;gap:8px;">
+                  <span style="font-size:10px;color:#94A3B8;background:#F1F5F9;padding:2px 7px;border-radius:3px;font-weight:600;">{{ row.role }}</span>
+                  <span style="font-size:14px;font-weight:700;color:#0F172A;font-variant-numeric:tabular-nums;min-width:28px;text-align:right;">{{ row.count }}</span>
+                </div>
+              </div>
+              <div style="height:6px;background:#F1F5F9;border-radius:3px;overflow:hidden;">
+                <div style="height:100%;background:{{ row.color }};border-radius:3px;width:{{ row.barPct }};"></div>
+              </div>
+            </div>
+          </sc-for>
+        </div>
+
+      </div>
+
+      <!-- APPLICATIONS TABLE -->
+      <div style="background:#FFFFFF;border:1px solid #E2E8F0;border-radius:6px;overflow:hidden;box-shadow:0 1px 3px rgba(15,23,42,0.04);">
+        <div style="padding:16px 20px;border-bottom:1px solid #E2E8F0;display:flex;align-items:center;justify-content:space-between;">
+          <div style="font-size:14px;font-weight:700;color:#0F172A;">Recent Applications</div>
+          <div style="display:flex;gap:2px;background:#F1F5F9;padding:3px;border-radius:5px;">
+            <button onClick="{{ onTabAll }}" style="height:30px;padding:0 14px;border:none;border-radius:3px;font-size:12px;font-weight:600;cursor:pointer;background:{{ tabAllBg }};color:{{ tabAllColor }};">All</button>
+            <button onClick="{{ onTabPending }}" style="height:30px;padding:0 14px;border:none;border-radius:3px;font-size:12px;font-weight:600;cursor:pointer;background:{{ tabPendingBg }};color:{{ tabPendingColor }};">Pending</button>
+            <button onClick="{{ onTabActive }}" style="height:30px;padding:0 14px;border:none;border-radius:3px;font-size:12px;font-weight:600;cursor:pointer;background:{{ tabActiveBg }};color:{{ tabActiveColor }};">Active</button>
+            <button onClick="{{ onTabOverdue }}" style="height:30px;padding:0 14px;border:none;border-radius:3px;font-size:12px;font-weight:600;cursor:pointer;background:{{ tabOverdueBg }};color:{{ tabOverdueColor }};">Overdue</button>
+          </div>
+        </div>
+        <div style="display:grid;grid-template-columns:140px 1fr 110px 110px 90px 100px 80px;padding:9px 20px;background:#F8FAFC;border-bottom:1px solid #E2E8F0;">
+          <div style="font-size:10px;font-weight:700;color:#64748B;text-transform:uppercase;letter-spacing:0.07em;">Loan ID</div>
+          <div style="font-size:10px;font-weight:700;color:#64748B;text-transform:uppercase;letter-spacing:0.07em;">Borrower</div>
+          <div style="font-size:10px;font-weight:700;color:#64748B;text-transform:uppercase;letter-spacing:0.07em;text-align:right;">Amount</div>
+          <div style="font-size:10px;font-weight:700;color:#64748B;text-transform:uppercase;letter-spacing:0.07em;">Stage</div>
+          <div style="font-size:10px;font-weight:700;color:#64748B;text-transform:uppercase;letter-spacing:0.07em;">Date</div>
+          <div style="font-size:10px;font-weight:700;color:#64748B;text-transform:uppercase;letter-spacing:0.07em;">Status</div>
+          <div style="font-size:10px;font-weight:700;color:#64748B;text-transform:uppercase;letter-spacing:0.07em;">Action</div>
+        </div>
+        <sc-for list="{{ appRows }}" as="row" hint-placeholder-count="6">
+          <div style="display:grid;grid-template-columns:140px 1fr 110px 110px 90px 100px 80px;padding:12px 20px;border-bottom:1px solid #F8FAFC;align-items:center;" style-hover="background:#FAFBFC;">
+            <div style="font-size:12px;font-weight:600;color:#334155;font-family:monospace;">{{ row.id }}</div>
+            <div style="display:flex;align-items:center;gap:9px;">
+              <div style="width:28px;height:28px;border-radius:50%;background:{{ row.avatarBg }};display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:#FFFFFF;flex-shrink:0;">{{ row.initials }}</div>
+              <span style="font-size:13px;font-weight:500;color:#334155;">{{ row.name }}</span>
+            </div>
+            <div style="font-size:13px;font-weight:600;color:#0F172A;text-align:right;font-variant-numeric:tabular-nums;">{{ row.amount }}</div>
+            <div style="font-size:12px;color:#64748B;">{{ row.stage }}</div>
+            <div style="font-size:12px;color:#94A3B8;">{{ row.date }}</div>
+            <div><span style="background:{{ row.statusBg }};color:{{ row.statusColor }};font-size:11px;font-weight:700;padding:3px 9px;border-radius:3px;letter-spacing:0.02em;">{{ row.statusLabel }}</span></div>
+            <div><button style="height:28px;padding:0 12px;background:#F1F5F9;color:#475569;border:none;border-radius:3px;font-size:11px;font-weight:600;cursor:pointer;" style-hover="background:#EFF6FF;color:#1A56DB;">View</button></div>
+          </div>
+        </sc-for>
+      </div>
+
+    </div>
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+class Component extends DCLogic {
+  state = { activeNav: 'dashboard', activeTab: 'all' };
+
+  renderVals() {
+    const { activeNav, activeTab } = this.state;
+
+    // ── Bar chart: Monthly Disbursements ──
+    const disbData = [
+      {m:'Jan',v:18.2},{m:'Feb',v:22.1},{m:'Mar',v:19.8},
+      {m:'Apr',v:25.4},{m:'May',v:28.1},{m:'Jun',v:24.3},
+    ];
+    const maxD=30, cH=130, bW=36, slotW=56, startX=12;
+    const gridY=[0,32,65,98,130];
+    const gridLines = gridY.map(y =>
+      React.createElement('line',{key:`g${y}`,x1:0,y1:y,x2:360,y2:y,stroke:y===130?'#E2E8F0':'#F1F5F9',strokeWidth:1})
+    );
+    const bars = disbData.flatMap((d,i)=>{
+      const bH=Math.round((d.v/maxD)*cH);
+      const x=startX+i*slotW;
+      const y=cH-bH;
+      const isLast=i===5;
+      const items=[
+        React.createElement('rect',{key:`r${i}`,x,y,width:bW,height:bH,fill:isLast?'#1A56DB':'#BFDBFE',rx:3}),
+        React.createElement('text',{key:`l${i}`,x:x+bW/2,y:155,textAnchor:'middle',fontSize:11,fill:isLast?'#1A56DB':'#94A3B8',fontFamily:'Plus Jakarta Sans,system-ui',fontWeight:isLast?'700':'400'},d.m),
+      ];
+      if(isLast) items.push(React.createElement('text',{key:'top',x:x+bW/2,y:y-7,textAnchor:'middle',fontSize:11,fill:'#1A56DB',fontWeight:'700',fontFamily:'Plus Jakarta Sans,system-ui'},`₱${d.v}M`));
+      return items;
+    });
+    const disbChart = React.createElement('svg',{viewBox:'0 0 360 165',style:{width:'100%',height:'165px',overflow:'visible'}},[...gridLines,...bars]);
+
+    // ── Line chart: Collection Rate ──
+    const collData=[91.2,92.5,93.1,91.8,94.8,94.2];
+    const months=['Jan','Feb','Mar','Apr','May','Jun'];
+    const minR=88,maxR=97,lcW=340,lcH=120;
+    const pts=collData.map((v,i)=>({
+      x:Math.round(20+(i/5)*(lcW-40)),
+      y:Math.round(lcH-((v-minR)/(maxR-minR))*lcH),
+      v,m:months[i]
+    }));
+    const polyStr=pts.map(p=>`${p.x},${p.y}`).join(' ');
+    const areaStr=`20,${lcH} ${polyStr} ${lcW-20},${lcH}`;
+    const collChartChildren=[
+      React.createElement('defs',{key:'defs'},
+        React.createElement('linearGradient',{id:'cg',x1:'0',y1:'0',x2:'0',y2:'1'},
+          React.createElement('stop',{key:'s1',offset:'0%',stopColor:'#1A56DB',stopOpacity:0.14}),
+          React.createElement('stop',{key:'s2',offset:'100%',stopColor:'#1A56DB',stopOpacity:0})
+        )
+      ),
+      ...[0,30,60,90,120].map(y=>React.createElement('line',{key:`gl${y}`,x1:0,y1:y,x2:lcW,y2:y,stroke:y===120?'#E2E8F0':'#F1F5F9',strokeWidth:1})),
+      React.createElement('polygon',{key:'area',points:areaStr,fill:'url(#cg)'}),
+      React.createElement('polyline',{key:'line',points:polyStr,fill:'none',stroke:'#1A56DB',strokeWidth:2.5,strokeLinecap:'round',strokeLinejoin:'round'}),
+      ...pts.flatMap((p,i)=>[
+        React.createElement('circle',{key:`d${i}`,cx:p.x,cy:p.y,r:4,fill:'#FFFFFF',stroke:'#1A56DB',strokeWidth:2}),
+        React.createElement('text',{key:`lt${i}`,x:p.x,y:148,textAnchor:'middle',fontSize:11,fill:i===5?'#1A56DB':'#94A3B8',fontFamily:'Plus Jakarta Sans,system-ui',fontWeight:i===5?'700':'400'},p.m),
+        React.createElement('text',{key:`lv${i}`,x:p.x,y:p.y-10,textAnchor:'middle',fontSize:10,fill:'#64748B',fontFamily:'Plus Jakarta Sans,system-ui'},(i===4||i===5)?`${p.v}%`:null),
+      ]).filter(Boolean)
+    ];
+    const collChart=React.createElement('svg',{viewBox:`0 0 ${lcW} 160`,style:{width:'100%',height:'160px',overflow:'visible'}},collChartChildren);
+
+    // ── Donut ──
+    const donutData=[
+      {label:'Active',count:856,color:'#1A56DB',pct:'68.6%'},
+      {label:'Pending',count:218,color:'#D97706',pct:'17.5%'},
+      {label:'Overdue',count:73,color:'#DC2626',pct:'5.8%'},
+      {label:'Closed',count:100,color:'#CBD5E1',pct:'8.0%'},
+    ];
+    let cumDeg=0;
+    const gradParts=donutData.map(d=>{
+      const deg=(d.count/1247)*360;
+      const part=`${d.color} ${cumDeg.toFixed(1)}deg ${(cumDeg+deg).toFixed(1)}deg`;
+      cumDeg+=deg; return part;
+    });
+    const donutStyle={
+      width:'148px',height:'148px',borderRadius:'50%',
+      background:`conic-gradient(${gradParts.join(', ')})`,
+      flexShrink:0,position:'relative',
+    };
+    const donutLegend=donutData.map(d=>({...d,pct:d.pct}));
+
+    // ── Pipeline ──
+    const pipelineData=[
+      {stage:'Intake & Verification',count:48,role:'CSA',color:'#1A56DB'},
+      {stage:'Credit Investigation',count:32,role:'CIG',color:'#0EA5E9'},
+      {stage:'Committee Review',count:24,role:'Committee',color:'#D97706'},
+      {stage:'Negotiation & Docs',count:18,role:'LRA',color:'#059669'},
+      {stage:'Briefing & Release',count:12,role:'LRA',color:'#8B5CF6'},
+    ];
+    const pipeline=pipelineData.map(d=>({...d,barPct:`${Math.round((d.count/60)*100)}%`}));
+
+    // ── KPIs ──
+    const kpis=[
+      {label:'Active Loans',value:'1,247',trend:'↑ +12%',trendBg:'#ECFDF5',trendColor:'#059669',change:'vs last month',iconBg:'#EFF6FF',iconColor:'#1A56DB',iconPath:'M1.5 1.5h4v4h-4v-4zM8.5 1.5h4v4h-4v-4zM1.5 8.5h4v4h-4v-4zM8.5 8.5h4v4h-4v-4z'},
+      {label:'Disbursed (Jun)',value:'₱24.3M',trend:'↑ +8.3%',trendBg:'#ECFDF5',trendColor:'#059669',change:'vs Jun 2025',iconBg:'#ECFDF5',iconColor:'#059669',iconPath:'M7 1.5a5.5 5.5 0 100 11 5.5 5.5 0 000-11zM7 4v.5M7 9.5V10M5 7h1.5L7 5.5 7.5 7H9'},
+      {label:'Collection Rate',value:'94.2%',trend:'↑ +1.2pp',trendBg:'#ECFDF5',trendColor:'#059669',change:'vs last month',iconBg:'#ECFDF5',iconColor:'#059669',iconPath:'M2.5 7l3 3 6-6'},
+      {label:'Overdue Loans',value:'73',trend:'↓ −5',trendBg:'#FEF2F2',trendColor:'#DC2626',change:'vs last month',iconBg:'#FEF2F2',iconColor:'#DC2626',iconPath:'M7 2.5L1.5 12.5h11zM7 6.5v3M7 11v.5'},
+    ];
+
+    // ── Nav items ──
+    const navDefs=[
+      {id:'dashboard',label:'Dashboard',icon:'M1.5 1.5h4v4h-4v-4zM8.5 1.5h4v4h-4v-4zM1.5 8.5h4v4h-4v-4zM8.5 8.5h4v4h-4v-4z',href:null,badge:null},
+      {id:'applications',label:'Applications',icon:'M2 3.5h10M2 7h10M2 10.5h7',href:'Staff Operations.dc.html',badge:null},
+      {id:'active-loans',label:'Active Loans',icon:'M1 3.5h12v7a1 1 0 01-1 1H2a1 1 0 01-1-1v-7zM1 6.5h12',href:null,badge:null},
+      {id:'collections',label:'Collections',icon:'M2 11.5V8M5 11.5V5M8 11.5V7M11 11.5V3',href:null,badge:null},
+      {id:'borrowers',label:'Borrowers',icon:'M7 2.5a2 2 0 100 4 2 2 0 000-4zM2.5 12c0-2.4 2-4 4.5-4s4.5 1.6 4.5 4',href:'Borrower Portal.dc.html',badge:null},
+      {id:'reports',label:'Reports',icon:'M2 12L5 8l3 2.5L11 5l1.5 1.5',href:null,badge:null},
+      {id:'overdue',label:'Overdue',icon:'M7 2.5L1.5 12.5h11zM7 6.5v2.5M7 11v.5',href:null,badge:'73'},
+    ];
+    const navItems=navDefs.map(n=>({
+      ...n,
+      bg:activeNav===n.id?'#EFF6FF':'transparent',
+      color:activeNav===n.id?'#1A56DB':'#475569',
+      fw:activeNav===n.id?'600':'500',
+      hasBadge:!!n.badge,
+      onClick:()=>{ this.setState({activeNav:n.id}); if(n.href) window.location.href=n.href; },
+    }));
+
+    // ── Table ──
+    const avatarColors=['#1A56DB','#059669','#D97706','#8B5CF6','#DC2626','#0EA5E9'];
+    const allApps=[
+      {id:'LN-2026-00248',name:'Maria Santos',amount:'₱80,000',stage:'Committee',date:'Jun 15',status:'pending'},
+      {id:'LN-2026-00247',name:'Jose Reyes',amount:'₱150,000',stage:'Release',date:'Jun 15',status:'approved'},
+      {id:'LN-2026-00246',name:'Ana Garcia',amount:'₱50,000',stage:'CIG',date:'Jun 14',status:'active'},
+      {id:'LN-2026-00245',name:'Pedro Cruz',amount:'₱200,000',stage:'Intake',date:'Jun 14',status:'pending'},
+      {id:'LN-2026-00244',name:'Rosa Mendoza',amount:'₱75,000',stage:'Monitoring',date:'Jun 13',status:'active'},
+      {id:'LN-2026-00243',name:'Miguel Bautista',amount:'₱120,000',stage:'Monitoring',date:'Jun 12',status:'active'},
+      {id:'LN-2026-00242',name:'Luz Villanueva',amount:'₱30,000',stage:'Release',date:'Jun 12',status:'pending'},
+      {id:'LN-2026-00241',name:'Carlos Aquino',amount:'₱45,000',stage:'CIG',date:'Jun 11',status:'overdue'},
+    ];
+    const filtered=activeTab==='all'?allApps:allApps.filter(a=>a.status===activeTab||(activeTab==='approved'&&a.status==='approved'));
+    const statusCfg={pending:{bg:'#FFFBEB',color:'#D97706',label:'Pending'},approved:{bg:'#ECFDF5',color:'#059669',label:'Approved'},active:{bg:'#EFF6FF',color:'#1A56DB',label:'Active'},overdue:{bg:'#FEF2F2',color:'#DC2626',label:'Overdue'}};
+    const appRows=filtered.map((a,i)=>({
+      ...a,
+      initials:a.name.split(' ').map(w=>w[0]).join('').slice(0,2),
+      avatarBg:avatarColors[i%avatarColors.length],
+      statusBg:statusCfg[a.status]?.bg||'#F1F5F9',
+      statusColor:statusCfg[a.status]?.color||'#64748B',
+      statusLabel:statusCfg[a.status]?.label||a.status,
+    }));
+
+    const mkTab=t=>({bg:activeTab===t?'#FFFFFF':'transparent',color:activeTab===t?'#0F172A':'#64748B'});
+    const ta=mkTab('all'),tp=mkTab('pending'),tac=mkTab('active'),to=mkTab('overdue');
+
+    return {
+      navItems, kpis, disbChart, collChart, donutStyle, donutLegend,
+      pipeline, appRows,
+      tabAllBg:ta.bg,tabAllColor:ta.color,
+      tabPendingBg:tp.bg,tabPendingColor:tp.color,
+      tabActiveBg:tac.bg,tabActiveColor:tac.color,
+      tabOverdueBg:to.bg,tabOverdueColor:to.color,
+      onTabAll:()=>this.setState({activeTab:'all'}),
+      onTabPending:()=>this.setState({activeTab:'pending'}),
+      onTabActive:()=>this.setState({activeTab:'active'}),
+      onTabOverdue:()=>this.setState({activeTab:'overdue'}),
+    };
+  }
+}
+</script>
+</body>
+</html>

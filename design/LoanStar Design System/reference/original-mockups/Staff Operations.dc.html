@@ -1,0 +1,393 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:'Plus Jakarta Sans',system-ui,sans-serif;background:#F8FAFC;}
+input,button,select{font-family:'Plus Jakarta Sans',system-ui,sans-serif;}
+::-webkit-scrollbar{width:4px;}::-webkit-scrollbar-thumb{background:#CBD5E1;border-radius:2px;}
+@keyframes pulse{0%,100%{opacity:1;}50%{opacity:0.4;}}
+</style>
+</helmet>
+
+<div style="display:flex;height:100vh;overflow:hidden;font-family:'Plus Jakarta Sans',system-ui,sans-serif;">
+
+  <!-- SIDEBAR -->
+  <aside style="width:246px;flex-shrink:0;background:#FFFFFF;border-right:1px solid #E2E8F0;display:flex;flex-direction:column;overflow-y:auto;">
+    <div style="padding:20px 18px 17px;border-bottom:1px solid #F1F5F9;">
+      <div style="display:flex;align-items:center;gap:10px;">
+        <div style="width:36px;height:36px;background:linear-gradient(135deg,#1A56DB,#1444B8);border-radius:8px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+          <svg width="18" height="18" viewBox="0 0 18 18" fill="none"><path d="M9 1.5L11.2 6.7 16.5 7.4 12.75 11.1 13.8 16.5 9 13.9 4.2 16.5 5.25 11.1 1.5 7.4 6.8 6.7z" fill="white"/></svg>
+        </div>
+        <div style="min-width:0;">
+          <div style="font-size:15px;font-weight:800;color:#0F172A;letter-spacing:-0.4px;line-height:1.2;">LoanStar</div>
+          <div style="font-size:10px;color:#94A3B8;font-weight:600;letter-spacing:0.06em;text-transform:uppercase;">Staff Portal</div>
+        </div>
+      </div>
+    </div>
+    <nav style="padding:16px 12px;flex:1;">
+      <div style="font-size:10px;font-weight:700;letter-spacing:0.09em;text-transform:uppercase;color:#94A3B8;padding:0 8px 8px;">My Queue</div>
+      <sc-for list="{{ sideNavItems }}" as="item" hint-placeholder-count="3">
+        <div onClick="{{ item.onClick }}" style="display:flex;align-items:center;gap:10px;padding:8px;border-radius:8px;cursor:pointer;background:{{ item.bg }};margin-bottom:2px;transition:background 0.12s;" style-hover="background:#F8FAFC;">
+          <div style="width:30px;height:30px;border-radius:8px;background:{{ item.iconBg }};display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:background 0.12s;">
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="{{ item.icon }}" stroke="{{ item.iconColor }}" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </div>
+          <span style="font-size:13px;font-weight:{{ item.fw }};color:{{ item.color }};flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">{{ item.label }}</span>
+          <span style="background:{{ item.badgeBg }};color:{{ item.badgeColor }};font-size:11px;font-weight:700;padding:2px 8px;border-radius:5px;flex-shrink:0;min-width:24px;text-align:center;">{{ item.count }}</span>
+        </div>
+      </sc-for>
+      <div style="font-size:10px;font-weight:700;letter-spacing:0.09em;text-transform:uppercase;color:#94A3B8;padding:18px 8px 8px;">Navigation</div>
+      <a href="Admin Dashboard.dc.html" style="display:flex;align-items:center;gap:10px;padding:8px;border-radius:8px;cursor:pointer;text-decoration:none;" style-hover="background:#F8FAFC;">
+        <div style="width:30px;height:30px;border-radius:8px;background:#F1F5F9;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M1.5 1.5h4v4h-4v-4zM8.5 1.5h4v4h-4v-4zM1.5 8.5h4v4h-4v-4zM8.5 8.5h4v4h-4v-4z" stroke="#64748B" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </div>
+        <span style="font-size:13px;font-weight:500;color:#475569;flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">Admin Dashboard</span>
+      </a>
+    </nav>
+    <div style="padding:14px;border-top:1px solid #F1F5F9;flex-shrink:0;">
+      <div style="display:flex;align-items:center;gap:10px;">
+        <div style="position:relative;flex-shrink:0;">
+          <div style="width:34px;height:34px;border-radius:50%;background:linear-gradient(135deg,#059669,#0EA5E9);display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;color:#FFFFFF;">A</div>
+          <div style="position:absolute;bottom:-1px;right:-1px;width:10px;height:10px;background:#059669;border:2px solid #FFFFFF;border-radius:50%;"></div>
+        </div>
+        <div style="flex:1;min-width:0;">
+          <div style="font-size:13px;font-weight:600;color:#0F172A;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">Ana Reyes</div>
+          <div title="{{ currentRoleLabel }}" style="font-size:11px;color:#94A3B8;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">{{ currentRoleLabel }}</div>
+        </div>
+        <a href="Login.dc.html" title="Sign out" style="color:#94A3B8;flex-shrink:0;display:flex;padding:7px;border-radius:6px;" style-hover="color:#DC2626;background:#FEF2F2;">
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M5.5 2H2.5a1 1 0 00-1 1v8a1 1 0 001 1h3M9.5 10l3-3-3-3M12.5 7H5"/></svg>
+        </a>
+      </div>
+    </div>
+  </aside>
+
+  <!-- MAIN -->
+  <main style="flex:1;display:flex;flex-direction:column;overflow:hidden;min-width:0;">
+
+    <!-- TOP BAR -->
+    <header style="height:64px;background:#FFFFFF;border-bottom:1px solid #E2E8F0;flex-shrink:0;padding:0 28px;display:flex;align-items:center;justify-content:space-between;gap:20px;">
+      <div style="min-width:0;flex-shrink:1;overflow:hidden;">
+        <div style="display:flex;align-items:center;gap:8px;min-width:0;">
+          <span style="font-size:17px;font-weight:700;color:#0F172A;letter-spacing:-0.3px;white-space:nowrap;flex-shrink:0;">Operations Queue</span>
+          <span style="width:4px;height:4px;border-radius:50%;background:#CBD5E1;flex-shrink:0;"></span>
+          <span style="font-size:12px;font-weight:700;color:#1A56DB;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0;">{{ currentRoleLabel }}</span>
+        </div>
+        <div style="font-size:12px;color:#94A3B8;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">{{ queueSummary }}</div>
+      </div>
+      <div style="display:flex;align-items:center;gap:16px;flex-shrink:0;">
+        <!-- Role Switcher -->
+        <div style="display:flex;gap:2px;background:#F1F5F9;padding:3px;border-radius:9px;">
+          <sc-for list="{{ roleTabs }}" as="tab" hint-placeholder-count="5">
+            <button onClick="{{ tab.onClick }}" title="{{ tab.stage }}" style="display:flex;align-items:center;justify-content:center;gap:6px;height:34px;width:{{ tab.width }};padding:0 {{ tab.padX }};border:none;border-radius:7px;font-size:12px;font-weight:700;cursor:pointer;background:{{ tab.bg }};color:{{ tab.color }};box-shadow:{{ tab.shadow }};white-space:nowrap;transition:all 0.15s;">
+              <svg width="13" height="13" viewBox="0 0 14 14" fill="none" style="flex-shrink:0;"><path d="{{ tab.icon }}" stroke="{{ tab.color }}" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              <sc-if value="{{ tab.active }}" hint-placeholder-val="{{ false }}">{{ tab.label }}</sc-if>
+            </button>
+          </sc-for>
+        </div>
+        <div style="width:1px;height:26px;background:#E2E8F0;flex-shrink:0;"></div>
+        <div style="position:relative;cursor:pointer;">
+          <div style="width:36px;height:36px;background:#F8FAFC;border:1.5px solid #E2E8F0;border-radius:8px;display:flex;align-items:center;justify-content:center;" style-hover="background:#F1F5F9;">
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="#475569" stroke-width="1.5"><path d="M8 2a5 5 0 014.9 4l.6 3H2.5l.6-3A5 5 0 018 2zM6 12.5a2 2 0 004 0"/></svg>
+          </div>
+          <div style="position:absolute;top:-3px;right:-3px;width:15px;height:15px;background:#DC2626;border-radius:50%;border:2px solid #FFFFFF;display:flex;align-items:center;justify-content:center;">
+            <span style="font-size:8px;font-weight:700;color:#FFFFFF;">4</span>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <!-- SUMMARY STATS -->
+    <div style="background:#FFFFFF;border-bottom:1px solid #E2E8F0;flex-shrink:0;padding:12px 24px;display:flex;gap:24px;">
+      <sc-for list="{{ stats }}" as="stat" hint-placeholder-count="3">
+        <div style="display:flex;align-items:center;gap:10px;">
+          <div style="width:8px;height:8px;border-radius:50%;background:{{ stat.color }};flex-shrink:0;"></div>
+          <div><span style="font-size:13px;font-weight:700;color:#0F172A;font-variant-numeric:tabular-nums;">{{ stat.value }}</span><span style="font-size:12px;color:#64748B;margin-left:5px;">{{ stat.label }}</span></div>
+        </div>
+      </sc-for>
+    </div>
+
+    <!-- SPLIT LAYOUT: Queue + Detail -->
+    <div style="flex:1;display:grid;grid-template-columns:360px 1fr;overflow:hidden;">
+
+      <!-- QUEUE -->
+      <div style="border-right:1px solid #E2E8F0;overflow-y:auto;background:#FFFFFF;">
+        <div style="padding:12px 16px;border-bottom:1px solid #F1F5F9;position:sticky;top:0;background:#FFFFFF;z-index:10;">
+          <div style="position:relative;">
+            <input type="text" placeholder="Search applications…" style="width:100%;height:36px;padding:0 12px 0 34px;background:#F8FAFC;border:1.5px solid #E2E8F0;border-radius:4px;font-size:13px;color:#334155;outline:none;" style-focus="border-color:#1A56DB;background:#FFFFFF;" />
+            <svg style="position:absolute;left:10px;top:50%;transform:translateY(-50%);pointer-events:none;" width="13" height="13" viewBox="0 0 13 13" fill="none" stroke="#94A3B8" stroke-width="1.5" stroke-linecap="round"><circle cx="5.5" cy="5.5" r="4"/><path d="M9 9l2.5 2.5"/></svg>
+          </div>
+        </div>
+        <sc-for list="{{ queueItems }}" as="app" hint-placeholder-count="6">
+          <div onClick="{{ app.onClick }}" style="padding:14px 16px;border-bottom:1px solid #F8FAFC;cursor:pointer;background:{{ app.bg }};position:relative;" style-hover="background:#F8FAFC;">
+            <sc-if value="{{ app.isSelected }}" hint-placeholder-val="{{ false }}">
+              <div style="position:absolute;left:0;top:6px;bottom:6px;width:3px;background:#1A56DB;border-radius:0 2px 2px 0;"></div>
+            </sc-if>
+            <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px;">
+              <div style="display:flex;align-items:center;gap:8px;">
+                <div style="width:30px;height:30px;border-radius:50%;background:{{ app.avatarBg }};display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:#FFFFFF;flex-shrink:0;">{{ app.initials }}</div>
+                <div>
+                  <div style="font-size:13px;font-weight:600;color:#0F172A;">{{ app.name }}</div>
+                  <div style="font-size:11px;color:#94A3B8;font-family:monospace;">{{ app.id }}</div>
+                </div>
+              </div>
+              <span style="background:{{ app.statusBg }};color:{{ app.statusColor }};font-size:10px;font-weight:700;padding:3px 8px;border-radius:3px;">{{ app.statusLabel }}</span>
+            </div>
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-top:4px;">
+              <span style="font-size:13px;font-weight:700;color:#0F172A;font-variant-numeric:tabular-nums;">{{ app.amount }}</span>
+              <span style="font-size:11px;color:#94A3B8;">{{ app.date }}</span>
+            </div>
+            <div style="margin-top:5px;">
+              <span style="background:#F1F5F9;color:#64748B;font-size:10px;font-weight:600;padding:2px 8px;border-radius:3px;">{{ app.purpose }}</span>
+            </div>
+          </div>
+        </sc-for>
+      </div>
+
+      <!-- DETAIL PANEL -->
+      <div style="overflow-y:auto;background:#F8FAFC;padding:24px;">
+        <sc-if value="{{ hasSelected }}" hint-placeholder-val="{{ true }}">
+          <div>
+            <!-- Application Header -->
+            <div style="background:#FFFFFF;border:1px solid #E2E8F0;border-radius:6px;padding:20px 24px;margin-bottom:16px;">
+              <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:16px;">
+                <div>
+                  <div style="font-size:11px;font-weight:700;color:#94A3B8;letter-spacing:0.07em;text-transform:uppercase;margin-bottom:4px;">Application ID</div>
+                  <div style="font-size:20px;font-weight:700;color:#0F172A;letter-spacing:-0.3px;">{{ selectedApp.name }}</div>
+                  <div style="font-size:13px;color:#64748B;font-family:monospace;margin-top:3px;">{{ selectedApp.id }}</div>
+                </div>
+                <div style="text-align:right;">
+                  <span style="background:{{ selectedApp.statusBg }};color:{{ selectedApp.statusColor }};font-size:12px;font-weight:700;padding:5px 12px;border-radius:4px;">{{ selectedApp.statusLabel }}</span>
+                  <div style="font-size:12px;color:#94A3B8;margin-top:6px;">Filed {{ selectedApp.date }}</div>
+                </div>
+              </div>
+              <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px;padding-top:16px;border-top:1px solid #F1F5F9;">
+                <div><div style="font-size:11px;color:#94A3B8;font-weight:500;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:4px;">Loan Amount</div><div style="font-size:22px;font-weight:700;color:#0F172A;font-variant-numeric:tabular-nums;letter-spacing:-0.5px;">{{ selectedApp.amount }}</div></div>
+                <div><div style="font-size:11px;color:#94A3B8;font-weight:500;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:4px;">Purpose</div><div style="font-size:16px;font-weight:600;color:#0F172A;">{{ selectedApp.purpose }}</div></div>
+                <div><div style="font-size:11px;color:#94A3B8;font-weight:500;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:4px;">Term</div><div style="font-size:16px;font-weight:600;color:#0F172A;">{{ selectedApp.term }}</div></div>
+              </div>
+            </div>
+
+            <!-- Borrower Info + Documents -->
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px;">
+              <div style="background:#FFFFFF;border:1px solid #E2E8F0;border-radius:6px;padding:18px;">
+                <div style="font-size:12px;font-weight:700;color:#94A3B8;text-transform:uppercase;letter-spacing:0.07em;margin-bottom:14px;">Borrower Information</div>
+                <sc-for list="{{ selectedApp.info }}" as="field" hint-placeholder-count="5">
+                  <div style="display:flex;justify-content:space-between;padding:7px 0;border-bottom:1px solid #F8FAFC;">
+                    <span style="font-size:12px;color:#64748B;">{{ field.label }}</span>
+                    <span style="font-size:12px;font-weight:600;color:#334155;text-align:right;max-width:160px;">{{ field.value }}</span>
+                  </div>
+                </sc-for>
+              </div>
+              <div style="background:#FFFFFF;border:1px solid #E2E8F0;border-radius:6px;padding:18px;">
+                <div style="font-size:12px;font-weight:700;color:#94A3B8;text-transform:uppercase;letter-spacing:0.07em;margin-bottom:14px;">Document Checklist</div>
+                <sc-for list="{{ selectedApp.docs }}" as="doc" hint-placeholder-count="5">
+                  <div style="display:flex;align-items:center;gap:10px;padding:7px 0;border-bottom:1px solid #F8FAFC;">
+                    <div style="width:18px;height:18px;border-radius:3px;background:{{ doc.iconBg }};display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                      <svg width="10" height="8" viewBox="0 0 10 8" fill="none"><path d="{{ doc.iconPath }}" stroke="{{ doc.iconColor }}" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                    </div>
+                    <span style="font-size:12px;color:{{ doc.textColor }};flex:1;">{{ doc.label }}</span>
+                    <span style="font-size:10px;font-weight:600;color:{{ doc.statusColor }};">{{ doc.status }}</span>
+                  </div>
+                </sc-for>
+              </div>
+            </div>
+
+            <!-- Notes + Actions -->
+            <div style="background:#FFFFFF;border:1px solid #E2E8F0;border-radius:6px;padding:18px;margin-bottom:16px;">
+              <div style="font-size:12px;font-weight:700;color:#94A3B8;text-transform:uppercase;letter-spacing:0.07em;margin-bottom:10px;">Add Note / Remarks</div>
+              <textarea style="width:100%;height:72px;padding:10px 12px;background:#F8FAFC;border:1.5px solid #E2E8F0;border-radius:4px;font-size:13px;color:#334155;outline:none;resize:none;line-height:1.5;" placeholder="Enter remarks for this application…" style-focus="border-color:#1A56DB;background:#FFFFFF;"></textarea>
+            </div>
+
+            <!-- Action Buttons -->
+            <div style="display:flex;gap:10px;flex-wrap:wrap;">
+              <sc-for list="{{ actionBtns }}" as="btn" hint-placeholder-count="3">
+                <button onClick="{{ btn.onClick }}" style="height:42px;padding:0 20px;background:{{ btn.bg }};color:{{ btn.color }};border:{{ btn.border }};border-radius:4px;font-size:13px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:7px;" style-hover="opacity:0.88;">
+                  <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="{{ btn.icon }}" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                  {{ btn.label }}
+                </button>
+              </sc-for>
+            </div>
+          </div>
+        </sc-if>
+        <sc-if value="{{ !hasSelected }}" hint-placeholder-val="{{ false }}">
+          <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;opacity:0.5;">
+            <svg width="48" height="48" viewBox="0 0 48 48" fill="none"><rect x="8" y="8" width="32" height="32" rx="4" stroke="#CBD5E1" stroke-width="2"/><path d="M16 20h16M16 26h10" stroke="#CBD5E1" stroke-width="2" stroke-linecap="round"/></svg>
+            <div style="font-size:14px;font-weight:600;color:#94A3B8;margin-top:12px;">Select an application</div>
+            <div style="font-size:12px;color:#CBD5E1;margin-top:4px;">Click any item in the queue to review</div>
+          </div>
+        </sc-if>
+      </div>
+
+    </div>
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+class Component extends DCLogic {
+  state = { activeRole: 'csa', selectedId: 'LN-2026-00248', activeSideNav: 'pending' };
+
+  renderVals() {
+    const { activeRole, selectedId, activeSideNav } = this.state;
+
+    const roles = [
+      { id:'csa', label:'CSA', stage:'Intake & Verification', icon:'M2 3h10v5.5l-1.8 2.2H3.8L2 8.5V3zM2 8.5h2.7l.9 1.3h1.8l.9-1.3H12' },
+      { id:'cig', label:'CIG', stage:'Credit Investigation', icon:'M12 12l-3-3M10 6a4 4 0 11-8 0 4 4 0 018 0z' },
+      { id:'committee', label:'Committee', stage:'Committee Review', icon:'M4 2.5h6a1 1 0 011 1V12a1 1 0 01-1 1H4a1 1 0 01-1-1V3.5a1 1 0 011-1zM5.5 1.3h3v2h-3zM4.5 8l1.5 1.5L9 6' },
+      { id:'lra', label:'LRA', stage:'Negotiation', icon:'M3 2h6l3 3v7a1 1 0 01-1 1H3a1 1 0 01-1-1V3a1 1 0 011-1zM9 2v3h3M5 7.5h4M5 9.5h2.5' },
+      { id:'collection', label:'Collection', stage:'Monitoring', icon:'M2 11.5V8M5 11.5V5M8 11.5V7M11 11.5V3' },
+    ];
+    const currentRole = roles.find(r => r.id === activeRole) || roles[0];
+
+    const roleTabs = roles.map(r => {
+      const active = activeRole === r.id;
+      return {
+        ...r,
+        active,
+        bg: active ? '#FFFFFF' : 'transparent',
+        color: active ? '#1A56DB' : '#64748B',
+        shadow: active ? '0 1px 3px rgba(15,23,42,0.12)' : 'none',
+        width: active ? 'auto' : '34px',
+        padX: active ? '13px' : '0px',
+        onClick: () => this.setState({ activeRole: r.id, selectedId: null }),
+      };
+    });
+
+    // Queue data per role
+    const allApps = {
+      csa: [
+        { id:'LN-2026-00248', name:'Maria Santos', amount:'₱80,000', status:'pending', purpose:'Business', date:'Jun 15', term:'18 months',
+          info:[{label:'Date of Birth',value:'Mar 12, 1985'},{label:'Address',value:'123 Rizal St, Manila'},{label:'Employment',value:'Business Owner'},{label:'Monthly Income',value:'₱45,000'},{label:'Contact',value:'+63 912 345 6789'}],
+          docs:[{label:'Valid Gov ID',status:'Submitted',iconBg:'#ECFDF5',iconPath:'M1 4l3 3 5-6',iconColor:'#059669',textColor:'#334155',statusColor:'#059669'},{label:'Income Tax Return',status:'Submitted',iconBg:'#ECFDF5',iconPath:'M1 4l3 3 5-6',iconColor:'#059669',textColor:'#334155',statusColor:'#059669'},{label:'COE / Business Permit',status:'Submitted',iconBg:'#ECFDF5',iconPath:'M1 4l3 3 5-6',iconColor:'#059669',textColor:'#334155',statusColor:'#059669'},{label:'Utility Bill',status:'Missing',iconBg:'#FEF2F2',iconPath:'M2 2l6 6M8 2L2 8',iconColor:'#DC2626',textColor:'#DC2626',statusColor:'#DC2626'},{label:'Collateral Docs',status:'Submitted',iconBg:'#ECFDF5',iconPath:'M1 4l3 3 5-6',iconColor:'#059669',textColor:'#334155',statusColor:'#059669'}]
+        },
+        { id:'LN-2026-00245', name:'Pedro Cruz', amount:'₱200,000', status:'pending', purpose:'Real Estate', date:'Jun 14', term:'36 months',
+          info:[{label:'Date of Birth',value:'Jul 8, 1978'},{label:'Address',value:'456 Mabini Ave, QC'},{label:'Employment',value:'Self-employed'},{label:'Monthly Income',value:'₱80,000'},{label:'Contact',value:'+63 917 987 6543'}],
+          docs:[{label:'Valid Gov ID',status:'Submitted',iconBg:'#ECFDF5',iconPath:'M1 4l3 3 5-6',iconColor:'#059669',textColor:'#334155',statusColor:'#059669'},{label:'Income Tax Return',status:'Missing',iconBg:'#FEF2F2',iconPath:'M2 2l6 6M8 2L2 8',iconColor:'#DC2626',textColor:'#DC2626',statusColor:'#DC2626'},{label:'Title / Collateral',status:'Submitted',iconBg:'#ECFDF5',iconPath:'M1 4l3 3 5-6',iconColor:'#059669',textColor:'#334155',statusColor:'#059669'},{label:'Utility Bill',status:'Submitted',iconBg:'#ECFDF5',iconPath:'M1 4l3 3 5-6',iconColor:'#059669',textColor:'#334155',statusColor:'#059669'},{label:'Bank Statements',status:'Missing',iconBg:'#FEF2F2',iconPath:'M2 2l6 6M8 2L2 8',iconColor:'#DC2626',textColor:'#DC2626',statusColor:'#DC2626'}]
+        },
+      ],
+      cig: [
+        { id:'LN-2026-00246', name:'Ana Garcia', amount:'₱50,000', status:'active', purpose:'Education', date:'Jun 14', term:'12 months',
+          info:[{label:'Date of Birth',value:'Sep 3, 1992'},{label:'Address',value:'789 Luna St, Pasig'},{label:'Employment',value:'Teacher — DepEd'},{label:'Monthly Income',value:'₱28,000'},{label:'Contact',value:'+63 905 111 2222'}],
+          docs:[{label:'Valid Gov ID',status:'Verified',iconBg:'#ECFDF5',iconPath:'M1 4l3 3 5-6',iconColor:'#059669',textColor:'#334155',statusColor:'#059669'},{label:'Income Tax Return',status:'Verified',iconBg:'#ECFDF5',iconPath:'M1 4l3 3 5-6',iconColor:'#059669',textColor:'#334155',statusColor:'#059669'},{label:'Certificate of Employment',status:'Verified',iconBg:'#ECFDF5',iconPath:'M1 4l3 3 5-6',iconColor:'#059669',textColor:'#334155',statusColor:'#059669'},{label:'Character References',status:'Pending visit',iconBg:'#FFFBEB',iconPath:'M1 4.5l2 2M6 2v5',iconColor:'#D97706',textColor:'#D97706',statusColor:'#D97706'},{label:'Credit Check',status:'In progress',iconBg:'#EFF6FF',iconPath:'M1 4.5l2 2M6 2v5',iconColor:'#1A56DB',textColor:'#334155',statusColor:'#1A56DB'}]
+        },
+      ],
+      committee: [
+        { id:'LN-2026-00248', name:'Maria Santos', amount:'₱80,000', status:'pending', purpose:'Business', date:'Jun 15', term:'18 months',
+          info:[{label:'Recommended by',value:'CIG — Ana Reyes'},{label:'CIG Score',value:'B+'},{label:'Credit Risk',value:'Low-Medium'},{label:'Collateral',value:'Vehicle (Toyota Vios 2021)'},{label:'Guarantor',value:'Rodrigo Santos (Spouse)'}],
+          docs:[{label:'CIG Report',status:'Complete',iconBg:'#ECFDF5',iconPath:'M1 4l3 3 5-6',iconColor:'#059669',textColor:'#334155',statusColor:'#059669'},{label:'Application Form',status:'Complete',iconBg:'#ECFDF5',iconPath:'M1 4l3 3 5-6',iconColor:'#059669',textColor:'#334155',statusColor:'#059669'},{label:'Financial Analysis',status:'Complete',iconBg:'#ECFDF5',iconPath:'M1 4l3 3 5-6',iconColor:'#059669',textColor:'#334155',statusColor:'#059669'},{label:'Committee Decision',status:'Pending vote',iconBg:'#EFF6FF',iconPath:'M1 4.5l2 2M6 2v5',iconColor:'#1A56DB',textColor:'#1A56DB',statusColor:'#1A56DB'}]
+        },
+      ],
+      lra: [
+        { id:'LN-2026-00247', name:'Jose Reyes', amount:'₱150,000', status:'approved', purpose:'Home Improvement', date:'Jun 15', term:'24 months',
+          info:[{label:'Interest Rate',value:'1.5% / month'},{label:'Monthly Payment',value:'₱7,540.50'},{label:'Total Interest',value:'₱30,972'},{label:'PDC Count',value:'24 checks'},{label:'Release Date',value:'June 18, 2026'}],
+          docs:[{label:'Loan Agreement',status:'Signed',iconBg:'#ECFDF5',iconPath:'M1 4l3 3 5-6',iconColor:'#059669',textColor:'#334155',statusColor:'#059669'},{label:'Promissory Note',status:'Signed',iconBg:'#ECFDF5',iconPath:'M1 4l3 3 5-6',iconColor:'#059669',textColor:'#334155',statusColor:'#059669'},{label:'Post-Dated Checks',status:'Received',iconBg:'#ECFDF5',iconPath:'M1 4l3 3 5-6',iconColor:'#059669',textColor:'#334155',statusColor:'#059669'},{label:'Disclosure Statement',status:'Pending signature',iconBg:'#FFFBEB',iconPath:'M1 4.5l2 2M6 2v5',iconColor:'#D97706',textColor:'#D97706',statusColor:'#D97706'}]
+        },
+      ],
+      collection: [
+        { id:'LN-2026-00241', name:'Carlos Aquino', amount:'₱45,000', status:'overdue', purpose:'Emergency', date:'Jun 11', term:'12 months',
+          info:[{label:'Overdue Since',value:'May 15, 2026'},{label:'Overdue Amount',value:'₱2,354.20'},{label:'Penalty',value:'₱47.08 (2%/mo)'},{label:'Last Contact',value:'Jun 10 — no answer'},{label:'Assigned To',value:'Col. Rosa T.'}],
+          docs:[{label:'Payment Notice Sent',status:'Jun 1',iconBg:'#ECFDF5',iconPath:'M1 4l3 3 5-6',iconColor:'#059669',textColor:'#334155',statusColor:'#059669'},{label:'Demand Letter',status:'Jun 8',iconBg:'#ECFDF5',iconPath:'M1 4l3 3 5-6',iconColor:'#059669',textColor:'#334155',statusColor:'#059669'},{label:'Restructuring Offer',status:'Pending response',iconBg:'#FFFBEB',iconPath:'M1 4.5l2 2M6 2v5',iconColor:'#D97706',textColor:'#D97706',statusColor:'#D97706'}]
+        },
+        { id:'LN-2026-00244', name:'Rosa Mendoza', amount:'₱75,000', status:'active', purpose:'Business', date:'Jun 13', term:'18 months',
+          info:[{label:'Payment Status',value:'On Track'},{label:'Next Due',value:'Jul 15, 2026'},{label:'Installments Paid',value:'5 of 18'},{label:'Balance',value:'₱63,200'},{label:'Collector',value:'Benny Cruz'}],
+          docs:[{label:'DCR Updated',status:'Jun 15',iconBg:'#ECFDF5',iconPath:'M1 4l3 3 5-6',iconColor:'#059669',textColor:'#334155',statusColor:'#059669'},{label:'Payment History',status:'Complete',iconBg:'#ECFDF5',iconPath:'M1 4l3 3 5-6',iconColor:'#059669',textColor:'#334155',statusColor:'#059669'}]
+        },
+      ],
+    };
+
+    const currentQueue = allApps[activeRole] || [];
+    const avatarColors = ['#1A56DB','#059669','#D97706','#8B5CF6','#DC2626','#0EA5E9'];
+    const statusCfg = { pending:{bg:'#FFFBEB',color:'#D97706',label:'Pending'}, approved:{bg:'#ECFDF5',color:'#059669',label:'Approved'}, active:{bg:'#EFF6FF',color:'#1A56DB',label:'Active'}, overdue:{bg:'#FEF2F2',color:'#DC2626',label:'Overdue'} };
+
+    const queueItems = currentQueue.map((a, i) => ({
+      ...a,
+      initials: a.name.split(' ').map(w=>w[0]).join('').slice(0,2),
+      avatarBg: avatarColors[i % avatarColors.length],
+      statusBg: statusCfg[a.status]?.bg || '#F1F5F9',
+      statusColor: statusCfg[a.status]?.color || '#64748B',
+      statusLabel: statusCfg[a.status]?.label || a.status,
+      bg: selectedId === a.id ? '#F0F7FF' : '#FFFFFF',
+      isSelected: selectedId === a.id,
+      onClick: () => this.setState({ selectedId: a.id }),
+    }));
+
+    const sel = currentQueue.find(a => a.id === selectedId) || currentQueue[0];
+    const selectedApp = sel ? { ...sel, statusBg: statusCfg[sel.status]?.bg||'#F1F5F9', statusColor: statusCfg[sel.status]?.color||'#64748B', statusLabel: statusCfg[sel.status]?.label||sel.status } : null;
+
+    // Action buttons per role
+    const actionsByRole = {
+      csa: [
+        { label:'Forward to CIG', bg:'#1A56DB', color:'#FFFFFF', border:'none', icon:'M2 7h10M8 3l4 4-4 4' },
+        { label:'Request Documents', bg:'#FFFFFF', color:'#334155', border:'1.5px solid #E2E8F0', icon:'M3 2.5h6l3 3v8H3V2.5zM9 2.5v3h3' },
+        { label:'Decline Application', bg:'#FEF2F2', color:'#DC2626', border:'none', icon:'M2 2l10 10M12 2L2 12' },
+      ],
+      cig: [
+        { label:'Forward to Committee', bg:'#1A56DB', color:'#FFFFFF', border:'none', icon:'M2 7h10M8 3l4 4-4 4' },
+        { label:'Schedule Visit', bg:'#FFFFFF', color:'#334155', border:'1.5px solid #E2E8F0', icon:'M1 3.5h12v7a1 1 0 01-1 1H2a1 1 0 01-1-1v-7zM1 6.5h12' },
+        { label:'Needs More Docs', bg:'#FFFBEB', color:'#D97706', border:'none', icon:'M7 2.5L1.5 12.5h11zM7 6.5v3' },
+      ],
+      committee: [
+        { label:'Approve Loan', bg:'#059669', color:'#FFFFFF', border:'none', icon:'M1.5 7l3 3 7-7' },
+        { label:'Counter Offer', bg:'#1A56DB', color:'#FFFFFF', border:'none', icon:'M2 7h10M8 3l4 4-4 4' },
+        { label:'Reject Application', bg:'#FEF2F2', color:'#DC2626', border:'none', icon:'M2 2l10 10M12 2L2 12' },
+      ],
+      lra: [
+        { label:'Confirm Release', bg:'#059669', color:'#FFFFFF', border:'none', icon:'M1.5 7l3 3 7-7' },
+        { label:'Update Terms', bg:'#1A56DB', color:'#FFFFFF', border:'none', icon:'M2 7h8M2 4h10M2 10h6' },
+        { label:'Hold Release', bg:'#FFFBEB', color:'#D97706', border:'none', icon:'M7 2.5L1.5 12.5h11zM7 6.5v3' },
+      ],
+      collection: [
+        { label:'Mark Paid', bg:'#059669', color:'#FFFFFF', border:'none', icon:'M1.5 7l3 3 7-7' },
+        { label:'Offer Restructuring', bg:'#1A56DB', color:'#FFFFFF', border:'none', icon:'M2 7h10M8 3l4 4-4 4' },
+        { label:'Escalate', bg:'#FEF2F2', color:'#DC2626', border:'none', icon:'M7 2.5L1.5 12.5h11zM7 6.5v3' },
+      ],
+    };
+
+    const actionBtns = (actionsByRole[activeRole] || []).map(btn => ({ ...btn, onClick: () => {} }));
+
+    const sideNavItems = [
+      { id:'pending', label:'Pending Review', icon:'M2 3.5h10M2 7h10M2 10.5h7', count: currentQueue.filter(a=>a.status==='pending').length || currentQueue.length, semBg:'#FFFBEB', semColor:'#D97706' },
+      { id:'approved', label:'Approved', icon:'M1.5 7l3 3 7-7', count: currentQueue.filter(a=>a.status==='approved').length, semBg:'#ECFDF5', semColor:'#059669' },
+      { id:'overdue', label:'Overdue / Flagged', icon:'M7 2.5L1.5 12.5h11zM7 6.5v3', count: currentQueue.filter(a=>a.status==='overdue').length, semBg:'#FEF2F2', semColor:'#DC2626' },
+    ].map(n => {
+      const isActive = activeSideNav === n.id;
+      const hasCount = n.count > 0;
+      return {
+        ...n,
+        bg: isActive ? '#EFF6FF' : 'transparent',
+        color: isActive ? '#1A56DB' : '#334155',
+        fw: isActive ? '700' : '500',
+        iconBg: isActive ? '#1A56DB' : '#F1F5F9',
+        iconColor: isActive ? '#FFFFFF' : '#64748B',
+        badgeBg: hasCount ? n.semBg : '#F1F5F9',
+        badgeColor: hasCount ? n.semColor : '#94A3B8',
+        onClick: () => this.setState({ activeSideNav: n.id }),
+      };
+    });
+
+    const stats = [
+      { value: String(currentQueue.length), label: 'Assigned', color: '#1A56DB' },
+      { value: String(currentQueue.filter(a=>['active','approved'].includes(a.status)).length), label: 'In Progress', color: '#059669' },
+      { value: '3', label: 'Completed Today', color: '#D97706' },
+    ];
+
+    return {
+      roleTabs, sideNavItems, stats, queueItems,
+      hasSelected: !!selectedApp,
+      selectedApp,
+      actionBtns,
+      currentRoleLabel: currentRole.stage,
+      queueSummary: `${currentQueue.length} applications · ${currentRole.stage}`,
+    };
+  }
+}
+</script>
+</body>
+</html>

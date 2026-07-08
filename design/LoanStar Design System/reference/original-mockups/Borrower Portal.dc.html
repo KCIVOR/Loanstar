@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:'Plus Jakarta Sans',system-ui,sans-serif;background:#F8FAFC;}
+input,button{font-family:'Plus Jakarta Sans',system-ui,sans-serif;}
+::-webkit-scrollbar{width:4px;}::-webkit-scrollbar-thumb{background:#CBD5E1;border-radius:2px;}
+@keyframes pulse{0%,100%{opacity:1;}50%{opacity:0.35;}}
+@keyframes spin{to{transform:rotate(360deg);}}
+</style>
+</helmet>
+
+<div style="display:flex;height:100vh;overflow:hidden;font-family:'Plus Jakarta Sans',system-ui,sans-serif;">
+
+  <!-- SIDEBAR -->
+  <aside style="width:224px;flex-shrink:0;background:#FFFFFF;border-right:1px solid #E2E8F0;display:flex;flex-direction:column;overflow-y:auto;">
+    <div style="padding:20px 20px 16px;border-bottom:1px solid #F1F5F9;">
+      <div style="display:flex;align-items:center;gap:10px;">
+        <div style="width:36px;height:36px;background:linear-gradient(135deg,#1A56DB,#1444B8);border-radius:6px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+          <svg width="18" height="18" viewBox="0 0 18 18" fill="none"><path d="M9 1.5L11.2 6.7 16.5 7.4 12.75 11.1 13.8 16.5 9 13.9 4.2 16.5 5.25 11.1 1.5 7.4 6.8 6.7z" fill="white"/></svg>
+        </div>
+        <div>
+          <div style="font-size:15px;font-weight:800;color:#0F172A;letter-spacing:-0.4px;">LoanStar</div>
+          <div style="font-size:10px;color:#94A3B8;font-weight:600;letter-spacing:0.06em;text-transform:uppercase;">My Account</div>
+        </div>
+      </div>
+    </div>
+    <nav style="padding:10px;flex:1;">
+      <sc-for list="{{ navItems }}" as="item" hint-placeholder-count="6">
+        <div onClick="{{ item.onClick }}" style="display:flex;align-items:center;gap:9px;padding:8px 10px;border-radius:5px;cursor:pointer;background:{{ item.bg }};margin-bottom:1px;" style-hover="background:#F8FAFC;">
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none" style="flex-shrink:0;"><path d="{{ item.icon }}" stroke="{{ item.color }}" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          <span style="font-size:13px;font-weight:{{ item.fw }};color:{{ item.color }};">{{ item.label }}</span>
+        </div>
+      </sc-for>
+    </nav>
+    <!-- Borrower profile -->
+    <div style="padding:14px 16px;border-top:1px solid #F1F5F9;flex-shrink:0;">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
+        <div style="width:34px;height:34px;border-radius:50%;background:linear-gradient(135deg,#1A56DB,#60A5FA);display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:13px;font-weight:700;color:#FFFFFF;">J</div>
+        <div style="flex:1;min-width:0;">
+          <div style="font-size:13px;font-weight:600;color:#0F172A;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">Juan dela Cruz</div>
+          <div style="font-size:11px;color:#94A3B8;">Borrower</div>
+        </div>
+      </div>
+      <div style="background:#ECFDF5;border-radius:4px;padding:8px 10px;display:flex;align-items:center;gap:7px;">
+        <div style="width:7px;height:7px;background:#059669;border-radius:50%;flex-shrink:0;"></div>
+        <span style="font-size:11px;font-weight:600;color:#065F46;">Good Standing</span>
+        <span style="font-size:10px;color:#6EE7B7;margin-left:auto;">Credit Score 742</span>
+      </div>
+      <a href="Login.dc.html" style="display:flex;align-items:center;gap:6px;margin-top:10px;font-size:12px;color:#94A3B8;text-decoration:none;" style-hover="color:#DC2626;">
+        <svg width="13" height="13" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M5.5 2H2.5a1 1 0 00-1 1v8a1 1 0 001 1h3M9.5 10l3-3-3-3M12.5 7H5"/></svg>
+        Sign out
+      </a>
+    </div>
+  </aside>
+
+  <!-- MAIN -->
+  <main style="flex:1;overflow-y:auto;background:#F8FAFC;min-width:0;">
+
+    <!-- TOP BAR -->
+    <header style="height:60px;background:#FFFFFF;border-bottom:1px solid #E2E8F0;position:sticky;top:0;z-index:40;padding:0 32px;display:flex;align-items:center;justify-content:space-between;">
+      <div>
+        <div style="font-size:17px;font-weight:700;color:#0F172A;letter-spacing:-0.3px;">Good morning, Juan 👋</div>
+        <div style="font-size:12px;color:#94A3B8;">June 16, 2026 · Loan LN-2026-00142</div>
+      </div>
+      <div style="display:flex;align-items:center;gap:10px;">
+        <div style="position:relative;cursor:pointer;">
+          <div style="width:36px;height:36px;background:#F8FAFC;border:1.5px solid #E2E8F0;border-radius:4px;display:flex;align-items:center;justify-content:center;" style-hover="background:#F1F5F9;">
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="#475569" stroke-width="1.5"><path d="M8 2a5 5 0 014.9 4l.6 3H2.5l.6-3A5 5 0 018 2zM6 12.5a2 2 0 004 0"/></svg>
+          </div>
+          <div style="position:absolute;top:-3px;right:-3px;width:15px;height:15px;background:#D97706;border-radius:50%;border:2px solid #FFFFFF;display:flex;align-items:center;justify-content:center;">
+            <span style="font-size:8px;font-weight:700;color:#FFFFFF;">2</span>
+          </div>
+        </div>
+        <a href="Loan Application.dc.html" style="height:36px;padding:0 16px;background:#1A56DB;color:#FFFFFF;border:none;border-radius:4px;font-size:13px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:6px;text-decoration:none;" style-hover="background:#1444B8;">
+          <svg width="13" height="13" viewBox="0 0 13 13" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M6.5 1v11M1 6.5h11"/></svg>
+          Apply New Loan
+        </a>
+      </div>
+    </header>
+
+    <!-- CONTENT -->
+    <div style="padding:28px 32px;">
+
+      <!-- HERO: Loan Balance Card -->
+      <div style="background:linear-gradient(135deg,#1E3A8A 0%,#1A56DB 55%,#2563EB 100%);border-radius:8px;padding:28px 32px;margin-bottom:20px;position:relative;overflow:hidden;">
+        <div style="position:absolute;top:-60px;right:-60px;width:240px;height:240px;border-radius:50%;background:rgba(255,255,255,0.05);pointer-events:none;"></div>
+        <div style="position:absolute;bottom:-40px;left:40%;width:180px;height:180px;border-radius:50%;background:rgba(255,255,255,0.04);pointer-events:none;"></div>
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:20px;position:relative;">
+          <div>
+            <div style="font-size:12px;font-weight:600;color:rgba(255,255,255,0.55);letter-spacing:0.07em;text-transform:uppercase;margin-bottom:4px;">Outstanding Balance</div>
+            <div style="font-size:48px;font-weight:700;color:#FFFFFF;letter-spacing:-1.5px;font-variant-numeric:tabular-nums;line-height:1;">₱ 120,648</div>
+            <div style="font-size:14px;color:rgba(255,255,255,0.6);margin-top:6px;">16 installments remaining · LN-2026-00142</div>
+          </div>
+          <div style="text-align:right;">
+            <div style="background:rgba(255,255,255,0.15);border-radius:6px;padding:10px 16px;backdrop-filter:blur(4px);">
+              <div style="font-size:11px;color:rgba(255,255,255,0.55);margin-bottom:4px;text-transform:uppercase;letter-spacing:0.06em;">Next Payment</div>
+              <div style="font-size:22px;font-weight:700;color:#FFFFFF;font-variant-numeric:tabular-nums;letter-spacing:-0.5px;">₱7,540.50</div>
+              <div style="font-size:12px;color:rgba(255,255,255,0.6);margin-top:2px;">Due July 15, 2026</div>
+            </div>
+          </div>
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:16px;border-top:1px solid rgba(255,255,255,0.15);padding-top:20px;position:relative;">
+          <div><div style="font-size:11px;color:rgba(255,255,255,0.5);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:4px;">Principal</div><div style="font-size:18px;font-weight:600;color:#FFFFFF;font-variant-numeric:tabular-nums;">₱150,000</div></div>
+          <div><div style="font-size:11px;color:rgba(255,255,255,0.5);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:4px;">Interest Rate</div><div style="font-size:18px;font-weight:600;color:#FFFFFF;">1.5% / mo</div></div>
+          <div><div style="font-size:11px;color:rgba(255,255,255,0.5);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:4px;">Total Paid</div><div style="font-size:18px;font-weight:600;color:#FFFFFF;font-variant-numeric:tabular-nums;">₱49,352</div></div>
+          <div><div style="font-size:11px;color:rgba(255,255,255,0.5);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:4px;">Maturity</div><div style="font-size:18px;font-weight:600;color:#FFFFFF;">Nov 2027</div></div>
+        </div>
+      </div>
+
+      <!-- QUICK ACTIONS + ALERTS -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:24px;">
+
+        <!-- Payment Due Alert -->
+        <div style="background:#FFFBEB;border:1px solid #FDE68A;border-radius:6px;padding:20px;">
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;">
+            <div style="width:36px;height:36px;background:#FEF3C7;border-radius:6px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+              <svg width="18" height="18" viewBox="0 0 18 18" fill="none"><rect x="2" y="4" width="14" height="11" rx="2" stroke="#D97706" stroke-width="1.5"/><path d="M5 2v4M13 2v4M2 8h14" stroke="#D97706" stroke-width="1.5" stroke-linecap="round"/></svg>
+            </div>
+            <div>
+              <div style="font-size:13px;font-weight:700;color:#92400E;">Payment Due in 29 Days</div>
+              <div style="font-size:12px;color:#B45309;">July 15, 2026 · Installment #9 of 24</div>
+            </div>
+          </div>
+          <div style="font-size:32px;font-weight:700;color:#92400E;font-variant-numeric:tabular-nums;letter-spacing:-0.8px;margin-bottom:14px;">₱ 7,540.50</div>
+          <div style="display:flex;gap:8px;">
+            <button onClick="{{ onPayNow }}" style="flex:1;height:40px;background:#D97706;color:#FFFFFF;border:none;border-radius:4px;font-size:13px;font-weight:600;cursor:pointer;" style-hover="background:#B45309;">Pay Now</button>
+            <button style="height:40px;padding:0 16px;background:transparent;color:#B45309;border:1.5px solid #FCD34D;border-radius:4px;font-size:12px;font-weight:500;cursor:pointer;" style-hover="background:#FEF3C7;">Schedule</button>
+          </div>
+        </div>
+
+        <!-- Quick Actions -->
+        <div style="background:#FFFFFF;border:1px solid #E2E8F0;border-radius:6px;padding:20px;">
+          <div style="font-size:13px;font-weight:700;color:#0F172A;margin-bottom:14px;">Quick Actions</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+            <button onClick="{{ onViewSchedule }}" style="height:52px;background:#F8FAFC;border:1.5px solid #E2E8F0;border-radius:4px;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;" style-hover="background:#EFF6FF;border-color:#BFDBFE;">
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="#475569" stroke-width="1.5" stroke-linecap="round"><rect x="1.5" y="2.5" width="13" height="11" rx="1.5"/><path d="M1.5 6.5h13M5 1v3M11 1v3"/></svg>
+              <span style="font-size:11px;font-weight:600;color:#334155;">View Schedule</span>
+            </button>
+            <a href="Loan Application.dc.html" style="height:52px;background:#F8FAFC;border:1.5px solid #E2E8F0;border-radius:4px;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;text-decoration:none;" style-hover="background:#EFF6FF;border-color:#BFDBFE;">
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="#475569" stroke-width="1.5" stroke-linecap="round"><path d="M8 1v14M1 8h14"/></svg>
+              <span style="font-size:11px;font-weight:600;color:#334155;">New Loan</span>
+            </a>
+            <button style="height:52px;background:#F8FAFC;border:1.5px solid #E2E8F0;border-radius:4px;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;" style-hover="background:#EFF6FF;border-color:#BFDBFE;">
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="#475569" stroke-width="1.5" stroke-linecap="round"><path d="M4 8h8M4 5h5M4 11h3"/><rect x="1.5" y="1.5" width="13" height="13" rx="1.5"/></svg>
+              <span style="font-size:11px;font-weight:600;color:#334155;">Documents</span>
+            </button>
+            <button style="height:52px;background:#F8FAFC;border:1.5px solid #E2E8F0;border-radius:4px;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;" style-hover="background:#EFF6FF;border-color:#BFDBFE;">
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="#475569" stroke-width="1.5" stroke-linecap="round"><circle cx="8" cy="6" r="3"/><path d="M2 14c0-3.3 2.7-5 6-5s6 1.7 6 5"/></svg>
+              <span style="font-size:11px;font-weight:600;color:#334155;">Support</span>
+            </button>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- MAIN ROW: Loan Progress + Schedule -->
+      <div style="display:grid;grid-template-columns:1.1fr 1fr;gap:16px;margin-bottom:24px;">
+
+        <!-- Loan Repayment Progress -->
+        <div style="background:#FFFFFF;border:1px solid #E2E8F0;border-radius:6px;padding:22px;">
+          <div style="font-size:14px;font-weight:700;color:#0F172A;margin-bottom:4px;">Loan Progress</div>
+          <div style="font-size:12px;color:#94A3B8;margin-bottom:20px;">₱49,352 paid of ₱150,000 (32.9%)</div>
+          <div style="height:8px;background:#F1F5F9;border-radius:4px;margin-bottom:6px;overflow:hidden;">
+            <div style="height:100%;width:32.9%;background:linear-gradient(90deg,#1A56DB,#60A5FA);border-radius:4px;"></div>
+          </div>
+          <div style="display:flex;justify-content:space-between;margin-bottom:28px;">
+            <span style="font-size:11px;color:#1A56DB;font-weight:600;">32.9% repaid</span>
+            <span style="font-size:11px;color:#94A3B8;">16 months left</span>
+          </div>
+
+          <!-- Application Workflow Status -->
+          <div style="font-size:11px;font-weight:700;color:#94A3B8;text-transform:uppercase;letter-spacing:0.07em;margin-bottom:14px;">Application Stages</div>
+          <div style="display:flex;flex-direction:column;gap:0;">
+            <sc-for list="{{ stages }}" as="stage" hint-placeholder-count="6">
+              <div style="display:flex;align-items:flex-start;gap:12px;padding-bottom:14px;">
+                <div style="display:flex;flex-direction:column;align-items:center;flex-shrink:0;">
+                  <div style="width:28px;height:28px;border-radius:50%;background:{{ stage.circleBg }};border:2px solid {{ stage.circleBorder }};display:flex;align-items:center;justify-content:center;box-shadow:{{ stage.shadow }};">
+                    <span style="font-size:11px;font-weight:700;color:{{ stage.circleColor }};">{{ stage.icon }}</span>
+                  </div>
+                  <sc-if value="{{ stage.hasLine }}" hint-placeholder-val="{{ true }}">
+                    <div style="width:1.5px;height:14px;background:{{ stage.lineColor }};margin-top:2px;"></div>
+                  </sc-if>
+                </div>
+                <div style="padding-top:3px;">
+                  <div style="font-size:12px;font-weight:{{ stage.fw }};color:{{ stage.labelColor }};line-height:1.2;">{{ stage.label }}</div>
+                  <div style="font-size:11px;color:{{ stage.subColor }};margin-top:1px;">{{ stage.sub }}</div>
+                </div>
+              </div>
+            </sc-for>
+          </div>
+        </div>
+
+        <!-- Repayment Schedule Preview -->
+        <div style="background:#FFFFFF;border:1px solid #E2E8F0;border-radius:6px;overflow:hidden;">
+          <div style="padding:18px 20px;border-bottom:1px solid #F1F5F9;display:flex;justify-content:space-between;align-items:center;">
+            <div style="font-size:14px;font-weight:700;color:#0F172A;">Upcoming Payments</div>
+            <button onClick="{{ onViewSchedule }}" style="font-size:12px;color:#1A56DB;background:none;border:none;cursor:pointer;font-weight:600;font-family:'Plus Jakarta Sans',system-ui,sans-serif;" style-hover="text-decoration:underline;">View all →</button>
+          </div>
+          <div style="display:grid;grid-template-columns:40px 1fr 100px 80px;padding:9px 20px;background:#F8FAFC;border-bottom:1px solid #E2E8F0;">
+            <div style="font-size:10px;font-weight:700;color:#64748B;text-transform:uppercase;letter-spacing:0.07em;">#</div>
+            <div style="font-size:10px;font-weight:700;color:#64748B;text-transform:uppercase;letter-spacing:0.07em;">Due Date</div>
+            <div style="font-size:10px;font-weight:700;color:#64748B;text-transform:uppercase;letter-spacing:0.07em;text-align:right;">Amount</div>
+            <div style="font-size:10px;font-weight:700;color:#64748B;text-transform:uppercase;letter-spacing:0.07em;text-align:right;">Status</div>
+          </div>
+          <sc-for list="{{ schedule }}" as="row" hint-placeholder-count="5">
+            <div style="display:grid;grid-template-columns:40px 1fr 100px 80px;padding:12px 20px;border-bottom:1px solid #F8FAFC;align-items:center;background:{{ row.rowBg }};">
+              <div style="font-size:11px;font-weight:700;color:#CBD5E1;font-variant-numeric:tabular-nums;">{{ row.num }}</div>
+              <div style="font-size:13px;font-weight:{{ row.dateFw }};color:{{ row.dateColor }};">{{ row.dueDate }}</div>
+              <div style="font-size:13px;font-weight:600;color:{{ row.amountColor }};text-align:right;font-variant-numeric:tabular-nums;">{{ row.amount }}</div>
+              <div style="display:flex;justify-content:flex-end;"><span style="background:{{ row.statusBg }};color:{{ row.statusColor }};font-size:10px;font-weight:700;padding:3px 8px;border-radius:3px;">{{ row.status }}</span></div>
+            </div>
+          </sc-for>
+          <div style="padding:14px 20px;display:flex;justify-content:space-between;align-items:center;">
+            <span style="font-size:12px;color:#94A3B8;">+ 13 more installments</span>
+            <span style="font-size:12px;font-weight:600;color:#334155;font-variant-numeric:tabular-nums;">Total: ₱ 120,648</span>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Payment Modal Overlay -->
+      <sc-if value="{{ showPayModal }}" hint-placeholder-val="{{ false }}">
+        <div style="position:fixed;inset:0;background:rgba(15,23,42,0.4);display:flex;align-items:center;justify-content:center;z-index:200;backdrop-filter:blur(2px);" onClick="{{ onCloseModal }}">
+          <div style="background:#FFFFFF;border-radius:8px;width:420px;box-shadow:0 24px 48px rgba(15,23,42,0.15);overflow:hidden;" onClick="{{ onStopPropagation }}">
+            <div style="padding:20px 24px;border-bottom:1px solid #F1F5F9;display:flex;justify-content:space-between;align-items:center;">
+              <div style="font-size:15px;font-weight:700;color:#0F172A;">Confirm Payment</div>
+              <button onClick="{{ onCloseModal }}" style="width:28px;height:28px;background:#F8FAFC;border:none;border-radius:4px;cursor:pointer;font-size:18px;color:#94A3B8;display:flex;align-items:center;justify-content:center;line-height:1;" style-hover="background:#F1F5F9;">×</button>
+            </div>
+            <div style="padding:24px;">
+              <div style="background:#F8FAFC;border-radius:6px;padding:16px;margin-bottom:20px;border:1px solid #F1F5F9;">
+                <div style="display:flex;justify-content:space-between;margin-bottom:8px;"><span style="font-size:13px;color:#64748B;">Installment</span><span style="font-size:13px;font-weight:600;color:#334155;">#9 of 24</span></div>
+                <div style="display:flex;justify-content:space-between;margin-bottom:8px;"><span style="font-size:13px;color:#64748B;">Due Date</span><span style="font-size:13px;font-weight:600;color:#334155;">July 15, 2026</span></div>
+                <div style="display:flex;justify-content:space-between;margin-bottom:8px;"><span style="font-size:13px;color:#64748B;">Principal</span><span style="font-size:13px;font-weight:500;color:#334155;font-variant-numeric:tabular-nums;">₱5,790.50</span></div>
+                <div style="display:flex;justify-content:space-between;padding-top:8px;border-top:1px solid #E2E8F0;margin-top:8px;"><span style="font-size:14px;font-weight:600;color:#0F172A;">Total Amount</span><span style="font-size:16px;font-weight:700;color:#0F172A;font-variant-numeric:tabular-nums;">₱7,540.50</span></div>
+              </div>
+              <div style="background:#FFFBEB;border:1px solid #FDE68A;border-radius:4px;padding:10px 12px;margin-bottom:20px;font-size:12px;color:#92400E;line-height:1.5;">
+                This action cannot be undone. Ensure your account has sufficient funds before proceeding.
+              </div>
+              <div style="display:flex;gap:8px;">
+                <button onClick="{{ onCloseModal }}" style="flex:1;height:42px;background:#F8FAFC;color:#64748B;border:1px solid #E2E8F0;border-radius:4px;font-size:13px;font-weight:500;cursor:pointer;" style-hover="background:#F1F5F9;">Cancel</button>
+                <button onClick="{{ onConfirmPay }}" style="flex:2;height:42px;background:#1A56DB;color:#FFFFFF;border:none;border-radius:4px;font-size:14px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;" style-hover="background:#1444B8;">
+                  <sc-if value="{{ payLoading }}" hint-placeholder-val="{{ false }}">
+                    <div style="width:14px;height:14px;border:2px solid rgba(255,255,255,0.4);border-top-color:#FFFFFF;border-radius:50%;animation:spin 0.7s linear infinite;"></div>
+                  </sc-if>
+                  {{ payBtnLabel }}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </sc-if>
+
+    </div>
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+class Component extends DCLogic {
+  state = { activeNav: 'dashboard', showPayModal: false, payLoading: false, showSchedule: false };
+  renderVals() {
+    const { activeNav, showPayModal, payLoading } = this.state;
+    const navDefs = [
+      { id:'dashboard', label:'Dashboard', icon:'M1.5 1.5h4v4h-4v-4zM8.5 1.5h4v4h-4v-4zM1.5 8.5h4v4h-4v-4zM8.5 8.5h4v4h-4v-4z' },
+      { id:'my-loan', label:'My Loan', icon:'M1 3.5h12v7a1 1 0 01-1 1H2a1 1 0 01-1-1V3.5zM1 6.5h12' },
+      { id:'payments', label:'Payments', icon:'M2 11.5V8M5 11.5V5M8 11.5V7M11 11.5V3' },
+      { id:'documents', label:'Documents', icon:'M3 2.5h6l3 3v8a1 1 0 01-1 1H3a1 1 0 01-1-1v-10a1 1 0 011-1zM9 2.5v3h3' },
+      { id:'apply', label:'Apply for Loan', icon:'M7 1.5v11M1.5 7h11', href:'Loan Application.dc.html' },
+      { id:'support', label:'Support', icon:'M7 5.5a2 2 0 100 4 2 2 0 000-4zM2.5 12c0-2.4 2-4 4.5-4s4.5 1.6 4.5 4' },
+    ];
+    const navItems = navDefs.map(n => ({
+      ...n,
+      bg: activeNav===n.id ? '#EFF6FF' : 'transparent',
+      color: activeNav===n.id ? '#1A56DB' : '#475569',
+      fw: activeNav===n.id ? '600' : '500',
+      onClick: () => { this.setState({ activeNav: n.id }); if(n.href) window.location.href = n.href; },
+    }));
+
+    // Workflow stages
+    const stageData = [
+      { num:1, label:'Intake & Verification', sub:'Documents received · Jun 10', done:true, active:false },
+      { num:2, label:'Credit Investigation', sub:'CIG visit completed · Jun 12', done:true, active:false },
+      { num:3, label:'Committee Review', sub:'Approved · Jun 13', done:true, active:false },
+      { num:4, label:'Negotiation & Docs', sub:'Terms signed · Jun 14', done:true, active:false },
+      { num:5, label:'Briefing & Release', sub:'Funds released · Jun 15', done:true, active:false },
+      { num:6, label:'Monitoring & Collection', sub:'Active · payments on track', done:false, active:true },
+    ];
+    const stages = stageData.map((s, i) => ({
+      ...s,
+      icon: s.done ? '✓' : s.active ? '●' : String(s.num),
+      circleBg: s.done ? '#1A56DB' : s.active ? '#FFFFFF' : '#F8FAFC',
+      circleBorder: s.done || s.active ? '#1A56DB' : '#E2E8F0',
+      shadow: s.active ? '0 0 0 3px rgba(26,86,219,0.15)' : 'none',
+      circleColor: s.done ? '#FFFFFF' : s.active ? '#1A56DB' : '#CBD5E1',
+      labelColor: s.done ? '#334155' : s.active ? '#0F172A' : '#CBD5E1',
+      subColor: s.done ? '#94A3B8' : s.active ? '#1A56DB' : '#CBD5E1',
+      fw: s.active ? '700' : s.done ? '600' : '400',
+      lineColor: s.done ? '#1A56DB' : '#E2E8F0',
+      hasLine: i < stageData.length - 1,
+    }));
+
+    // Payment schedule
+    const scheduleData = [
+      { num:'07', dueDate:'Jul 15, 2026', amount:'₱7,540.50', status:'Due', statusBg:'#FFFBEB', statusColor:'#D97706', rowBg:'#FFFCF5', dateFw:'700', dateColor:'#D97706', amountColor:'#D97706' },
+      { num:'08', dueDate:'Aug 15, 2026', amount:'₱7,540.50', status:'Upcoming', statusBg:'#F1F5F9', statusColor:'#64748B', rowBg:'#FFFFFF', dateFw:'400', dateColor:'#334155', amountColor:'#334155' },
+      { num:'09', dueDate:'Sep 15, 2026', amount:'₱7,540.50', status:'Upcoming', statusBg:'#F1F5F9', statusColor:'#64748B', rowBg:'#FFFFFF', dateFw:'400', dateColor:'#334155', amountColor:'#334155' },
+      { num:'10', dueDate:'Oct 15, 2026', amount:'₱7,540.50', status:'Upcoming', statusBg:'#F1F5F9', statusColor:'#64748B', rowBg:'#FFFFFF', dateFw:'400', dateColor:'#94A3B8', amountColor:'#94A3B8' },
+      { num:'11', dueDate:'Nov 15, 2026', amount:'₱7,540.50', status:'Upcoming', statusBg:'#F1F5F9', statusColor:'#64748B', rowBg:'#FFFFFF', dateFw:'400', dateColor:'#94A3B8', amountColor:'#94A3B8' },
+    ];
+
+    return {
+      navItems, stages, schedule: scheduleData,
+      showPayModal, payLoading,
+      payBtnLabel: payLoading ? 'Processing...' : 'Confirm Payment',
+      onPayNow: () => this.setState({ showPayModal: true }),
+      onCloseModal: () => this.setState({ showPayModal: false, payLoading: false }),
+      onStopPropagation: e => e.stopPropagation(),
+      onViewSchedule: () => this.setState({ activeNav: 'payments' }),
+      onConfirmPay: () => {
+        this.setState({ payLoading: true });
+        setTimeout(() => this.setState({ payLoading: false, showPayModal: false }), 1400);
+      },
+    };
+  }
+}
+</script>
+</body>
+</html>
