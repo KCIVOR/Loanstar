@@ -1,0 +1,472 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:'Plus Jakarta Sans',system-ui,sans-serif;background:#F8FAFC;}
+input,button,select,textarea{font-family:'Plus Jakarta Sans',system-ui,sans-serif;}
+input[type=range]{accent-color:#1A56DB;cursor:pointer;width:100%;}
+::-webkit-scrollbar{width:4px;}::-webkit-scrollbar-thumb{background:#CBD5E1;border-radius:2px;}
+@keyframes spin{to{transform:rotate(360deg);}}
+@keyframes fadeUp{from{opacity:0;transform:translateY(8px);}to{opacity:1;transform:translateY(0);}}
+@keyframes success{from{opacity:0;transform:scale(0.85);}to{opacity:1;transform:scale(1);}}
+</style>
+</helmet>
+
+<div style="min-height:100vh;background:#F8FAFC;font-family:'Plus Jakarta Sans',system-ui,sans-serif;">
+
+  <!-- HEADER -->
+  <header style="background:#FFFFFF;border-bottom:1px solid #E2E8F0;position:sticky;top:0;z-index:40;">
+    <div style="max-width:900px;margin:0 auto;padding:0 32px;height:60px;display:flex;align-items:center;justify-content:space-between;">
+      <div style="display:flex;align-items:center;gap:12px;">
+        <a href="Borrower Portal.dc.html" style="display:flex;align-items:center;gap:6px;color:#64748B;text-decoration:none;font-size:13px;font-weight:500;" style-hover="color:#1A56DB;">
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M10 12L6 8l4-4"/></svg>
+          Back
+        </a>
+        <div style="width:1px;height:16px;background:#E2E8F0;"></div>
+        <div style="display:flex;align-items:center;gap:8px;">
+          <div style="width:28px;height:28px;background:linear-gradient(135deg,#1A56DB,#1444B8);border-radius:5px;display:flex;align-items:center;justify-content:center;">
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M7 1L8.57 4.84 13 5.38 9.9 8.3l.86 4.7L7 10.5l-3.76 2.5.86-4.7L1 5.38l4.43-.54z" fill="white"/></svg>
+          </div>
+          <span style="font-size:15px;font-weight:800;color:#0F172A;letter-spacing:-0.4px;">LoanStar</span>
+        </div>
+      </div>
+      <div style="font-size:12px;color:#94A3B8;">Step {{ currentStep }} of 4 · {{ stepTitle }}</div>
+    </div>
+
+    <!-- Progress bar -->
+    <div style="height:3px;background:#F1F5F9;">
+      <div style="height:100%;background:#1A56DB;transition:width 0.4s ease;width:{{ progressWidth }};"></div>
+    </div>
+  </header>
+
+  <!-- STEPPER -->
+  <div style="max-width:900px;margin:0 auto;padding:28px 32px 0;">
+    <div style="display:flex;align-items:center;justify-content:center;margin-bottom:40px;">
+      <sc-for list="{{ steps }}" as="step" hint-placeholder-count="4">
+        <div style="display:flex;align-items:center;">
+          <div style="display:flex;flex-direction:column;align-items:center;gap:6px;cursor:pointer;" onClick="{{ step.onClick }}">
+            <div style="width:36px;height:36px;border-radius:50%;background:{{ step.circleBg }};border:2px solid {{ step.circleBorder }};display:flex;align-items:center;justify-content:center;box-shadow:{{ step.shadow }};transition:all 0.2s;">
+              <span style="font-size:13px;font-weight:700;color:{{ step.numColor }};">{{ step.num }}</span>
+            </div>
+            <span style="font-size:11px;font-weight:{{ step.labelFw }};color:{{ step.labelColor }};white-space:nowrap;">{{ step.label }}</span>
+          </div>
+          <sc-if value="{{ step.hasConnector }}" hint-placeholder-val="{{ true }}">
+            <div style="width:80px;height:2px;background:{{ step.connectorColor }};margin-bottom:18px;margin-left:4px;margin-right:4px;"></div>
+          </sc-if>
+        </div>
+      </sc-for>
+    </div>
+
+    <!-- STEP 1: Personal Info -->
+    <sc-if value="{{ isStep1 }}" hint-placeholder-val="{{ true }}">
+      <div style="animation:fadeUp 0.2s ease;">
+        <div style="background:#FFFFFF;border:1px solid #E2E8F0;border-radius:6px;overflow:hidden;margin-bottom:24px;">
+          <div style="padding:20px 28px;border-bottom:1px solid #F1F5F9;background:#FAFBFF;">
+            <div style="font-size:18px;font-weight:700;color:#0F172A;letter-spacing:-0.3px;">Personal Information</div>
+            <div style="font-size:13px;color:#64748B;margin-top:3px;">Please ensure all details match your government-issued ID.</div>
+          </div>
+          <div style="padding:28px;display:grid;grid-template-columns:1fr 1fr;gap:20px;">
+            <div>
+              <label style="display:block;font-size:13px;font-weight:500;color:#334155;margin-bottom:6px;">First Name <span style="color:#DC2626;">*</span></label>
+              <input type="text" value="{{ fname }}" onInput="{{ onFname }}" placeholder="Juan" style="width:100%;height:42px;padding:0 14px;background:#FFFFFF;border:1.5px solid #CBD5E1;border-radius:4px;font-size:14px;color:#0F172A;outline:none;" style-focus="border-color:#1A56DB;box-shadow:0 0 0 3px rgba(26,86,219,0.1);" />
+            </div>
+            <div>
+              <label style="display:block;font-size:13px;font-weight:500;color:#334155;margin-bottom:6px;">Last Name <span style="color:#DC2626;">*</span></label>
+              <input type="text" value="{{ lname }}" onInput="{{ onLname }}" placeholder="dela Cruz" style="width:100%;height:42px;padding:0 14px;background:#FFFFFF;border:1.5px solid #CBD5E1;border-radius:4px;font-size:14px;color:#0F172A;outline:none;" style-focus="border-color:#1A56DB;box-shadow:0 0 0 3px rgba(26,86,219,0.1);" />
+            </div>
+            <div>
+              <label style="display:block;font-size:13px;font-weight:500;color:#334155;margin-bottom:6px;">Date of Birth <span style="color:#DC2626;">*</span></label>
+              <input type="date" value="{{ dob }}" onInput="{{ onDob }}" style="width:100%;height:42px;padding:0 14px;background:#FFFFFF;border:1.5px solid #CBD5E1;border-radius:4px;font-size:14px;color:#0F172A;outline:none;" style-focus="border-color:#1A56DB;box-shadow:0 0 0 3px rgba(26,86,219,0.1);" />
+            </div>
+            <div>
+              <label style="display:block;font-size:13px;font-weight:500;color:#334155;margin-bottom:6px;">Mobile Number <span style="color:#DC2626;">*</span></label>
+              <input type="tel" value="{{ phone }}" onInput="{{ onPhone }}" placeholder="+63 9XX XXX XXXX" style="width:100%;height:42px;padding:0 14px;background:#FFFFFF;border:1.5px solid #CBD5E1;border-radius:4px;font-size:14px;color:#0F172A;outline:none;" style-focus="border-color:#1A56DB;box-shadow:0 0 0 3px rgba(26,86,219,0.1);" />
+            </div>
+            <div style="grid-column:1/-1;">
+              <label style="display:block;font-size:13px;font-weight:500;color:#334155;margin-bottom:6px;">Complete Address <span style="color:#DC2626;">*</span></label>
+              <input type="text" placeholder="Street, Barangay, City, Province" style="width:100%;height:42px;padding:0 14px;background:#FFFFFF;border:1.5px solid #CBD5E1;border-radius:4px;font-size:14px;color:#0F172A;outline:none;" style-focus="border-color:#1A56DB;box-shadow:0 0 0 3px rgba(26,86,219,0.1);" />
+            </div>
+            <div>
+              <label style="display:block;font-size:13px;font-weight:500;color:#334155;margin-bottom:6px;">Employment Status <span style="color:#DC2626;">*</span></label>
+              <div style="position:relative;">
+                <select style="width:100%;height:42px;padding:0 36px 0 14px;background:#FFFFFF;border:1.5px solid #CBD5E1;border-radius:4px;font-size:14px;color:#0F172A;outline:none;appearance:none;cursor:pointer;" style-focus="border-color:#1A56DB;box-shadow:0 0 0 3px rgba(26,86,219,0.1);">
+                  <option>Employed — Private</option>
+                  <option>Employed — Government</option>
+                  <option>Self-employed</option>
+                  <option>Business Owner</option>
+                  <option>OFW</option>
+                </select>
+                <div style="position:absolute;right:11px;top:50%;transform:translateY(-50%);pointer-events:none;"><svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M3 5.5l4 4 4-4" stroke="#64748B" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+              </div>
+            </div>
+            <div>
+              <label style="display:block;font-size:13px;font-weight:500;color:#334155;margin-bottom:6px;">Monthly Income <span style="color:#DC2626;">*</span></label>
+              <div style="position:relative;">
+                <div style="position:absolute;left:13px;top:50%;transform:translateY(-50%);font-size:14px;font-weight:600;color:#64748B;pointer-events:none;">₱</div>
+                <input type="text" value="{{ income }}" onInput="{{ onIncome }}" placeholder="00,000" style="width:100%;height:42px;padding:0 14px 0 28px;background:#FFFFFF;border:1.5px solid #CBD5E1;border-radius:4px;font-size:14px;color:#0F172A;font-variant-numeric:tabular-nums;outline:none;" style-focus="border-color:#1A56DB;box-shadow:0 0 0 3px rgba(26,86,219,0.1);" />
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </sc-if>
+
+    <!-- STEP 2: Loan Details -->
+    <sc-if value="{{ isStep2 }}" hint-placeholder-val="{{ false }}">
+      <div style="animation:fadeUp 0.2s ease;">
+        <div style="background:#FFFFFF;border:1px solid #E2E8F0;border-radius:6px;overflow:hidden;margin-bottom:24px;">
+          <div style="padding:20px 28px;border-bottom:1px solid #F1F5F9;background:#FAFBFF;">
+            <div style="font-size:18px;font-weight:700;color:#0F172A;letter-spacing:-0.3px;">Loan Details</div>
+            <div style="font-size:13px;color:#64748B;margin-top:3px;">Tell us how much you need and how you plan to use it.</div>
+          </div>
+          <div style="padding:28px;">
+            <!-- Amount slider -->
+            <div style="margin-bottom:28px;">
+              <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:10px;">
+                <label style="font-size:13px;font-weight:500;color:#334155;">Loan Amount</label>
+                <div style="font-size:28px;font-weight:700;color:#1A56DB;font-variant-numeric:tabular-nums;letter-spacing:-0.8px;">₱ {{ loanAmountFmt }}</div>
+              </div>
+              <input type="range" min="10000" max="500000" step="5000" value="{{ loanAmount }}" onInput="{{ onLoanAmount }}" />
+              <div style="display:flex;justify-content:space-between;margin-top:4px;">
+                <span style="font-size:11px;color:#94A3B8;">₱10,000</span>
+                <span style="font-size:11px;color:#94A3B8;">₱500,000</span>
+              </div>
+            </div>
+            <!-- Term selector -->
+            <div style="margin-bottom:28px;">
+              <label style="display:block;font-size:13px;font-weight:500;color:#334155;margin-bottom:10px;">Loan Term</label>
+              <div style="display:flex;gap:8px;flex-wrap:wrap;">
+                <sc-for list="{{ termOptions }}" as="term" hint-placeholder-count="5">
+                  <button onClick="{{ term.onClick }}" style="height:36px;padding:0 18px;background:{{ term.bg }};color:{{ term.color }};border:{{ term.border }};border-radius:4px;font-size:13px;font-weight:600;cursor:pointer;transition:all 0.12s;">{{ term.label }}</button>
+                </sc-for>
+              </div>
+            </div>
+            <!-- Purpose -->
+            <div style="margin-bottom:28px;display:grid;grid-template-columns:1fr 1fr;gap:20px;">
+              <div>
+                <label style="display:block;font-size:13px;font-weight:500;color:#334155;margin-bottom:6px;">Loan Purpose <span style="color:#DC2626;">*</span></label>
+                <div style="position:relative;">
+                  <select style="width:100%;height:42px;padding:0 36px 0 14px;background:#FFFFFF;border:1.5px solid #CBD5E1;border-radius:4px;font-size:14px;color:#0F172A;outline:none;appearance:none;cursor:pointer;" style-focus="border-color:#1A56DB;box-shadow:0 0 0 3px rgba(26,86,219,0.1);">
+                    <option>Business Capital</option>
+                    <option>Home Improvement</option>
+                    <option>Education</option>
+                    <option>Medical / Emergency</option>
+                    <option>Vehicle Acquisition</option>
+                    <option>Debt Consolidation</option>
+                  </select>
+                  <div style="position:absolute;right:11px;top:50%;transform:translateY(-50%);pointer-events:none;"><svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M3 5.5l4 4 4-4" stroke="#64748B" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+                </div>
+              </div>
+              <div>
+                <label style="display:block;font-size:13px;font-weight:500;color:#334155;margin-bottom:6px;">Collateral Type</label>
+                <div style="position:relative;">
+                  <select style="width:100%;height:42px;padding:0 36px 0 14px;background:#FFFFFF;border:1.5px solid #CBD5E1;border-radius:4px;font-size:14px;color:#0F172A;outline:none;appearance:none;cursor:pointer;" style-focus="border-color:#1A56DB;box-shadow:0 0 0 3px rgba(26,86,219,0.1);">
+                    <option>None (Unsecured)</option>
+                    <option>Real Estate</option>
+                    <option>Vehicle</option>
+                    <option>Equipment</option>
+                    <option>Other</option>
+                  </select>
+                  <div style="position:absolute;right:11px;top:50%;transform:translateY(-50%);pointer-events:none;"><svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M3 5.5l4 4 4-4" stroke="#64748B" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+                </div>
+              </div>
+            </div>
+            <!-- Calculator Summary -->
+            <div style="background:linear-gradient(135deg,#1E3A8A,#1A56DB);border-radius:6px;padding:20px 24px;">
+              <div style="font-size:11px;font-weight:600;color:rgba(255,255,255,0.6);letter-spacing:0.06em;text-transform:uppercase;margin-bottom:14px;">Estimated Repayment (1.5% / month)</div>
+              <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px;">
+                <div><div style="font-size:11px;color:rgba(255,255,255,0.5);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:4px;">Monthly Payment</div><div style="font-size:22px;font-weight:700;color:#FFFFFF;font-variant-numeric:tabular-nums;letter-spacing:-0.5px;">{{ monthly }}</div></div>
+                <div><div style="font-size:11px;color:rgba(255,255,255,0.5);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:4px;">Total Interest</div><div style="font-size:22px;font-weight:700;color:#FFFFFF;font-variant-numeric:tabular-nums;letter-spacing:-0.5px;">{{ totalInterest }}</div></div>
+                <div><div style="font-size:11px;color:rgba(255,255,255,0.5);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:4px;">Total Repayment</div><div style="font-size:22px;font-weight:700;color:#FFFFFF;font-variant-numeric:tabular-nums;letter-spacing:-0.5px;">{{ totalPayment }}</div></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </sc-if>
+
+    <!-- STEP 3: Documents -->
+    <sc-if value="{{ isStep3 }}" hint-placeholder-val="{{ false }}">
+      <div style="animation:fadeUp 0.2s ease;">
+        <div style="background:#FFFFFF;border:1px solid #E2E8F0;border-radius:6px;overflow:hidden;margin-bottom:24px;">
+          <div style="padding:20px 28px;border-bottom:1px solid #F1F5F9;background:#FAFBFF;display:flex;justify-content:space-between;align-items:center;">
+            <div>
+              <div style="font-size:18px;font-weight:700;color:#0F172A;letter-spacing:-0.3px;">Required Documents</div>
+              <div style="font-size:13px;color:#64748B;margin-top:3px;">Upload clear, readable copies of the following documents.</div>
+            </div>
+            <div style="background:#EFF6FF;color:#1A56DB;font-size:12px;font-weight:700;padding:5px 12px;border-radius:4px;">{{ uploadedCount }} / {{ totalDocs }} uploaded</div>
+          </div>
+          <div style="padding:8px 0;">
+            <sc-for list="{{ docItems }}" as="doc" hint-placeholder-count="6">
+              <div style="display:flex;align-items:center;gap:14px;padding:14px 28px;border-bottom:1px solid #F8FAFC;" style-hover="background:#FAFBFC;">
+                <div style="width:36px;height:36px;border-radius:6px;background:{{ doc.iconBg }};display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                  <svg width="18" height="18" viewBox="0 0 18 18" fill="none"><path d="{{ doc.iconPath }}" stroke="{{ doc.iconColor }}" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                </div>
+                <div style="flex:1;">
+                  <div style="font-size:13px;font-weight:600;color:#334155;">{{ doc.label }} <sc-if value="{{ doc.required }}" hint-placeholder-val="{{ true }}"><span style="color:#DC2626;">*</span></sc-if></div>
+                  <div style="font-size:12px;color:#94A3B8;margin-top:1px;">{{ doc.hint }}</div>
+                </div>
+                <button onClick="{{ doc.onUpload }}" style="height:34px;padding:0 16px;background:{{ doc.btnBg }};color:{{ doc.btnColor }};border:{{ doc.btnBorder }};border-radius:4px;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap;display:flex;align-items:center;gap:6px;" style-hover="opacity:0.85;">
+                  <sc-if value="{{ doc.uploaded }}" hint-placeholder-val="{{ false }}">
+                    <svg width="12" height="10" viewBox="0 0 12 10" fill="none"><path d="M1 5l3.5 3.5 6.5-8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                  </sc-if>
+                  {{ doc.btnLabel }}
+                </button>
+              </div>
+            </sc-for>
+          </div>
+          <div style="padding:16px 28px;background:#FFFBEB;border-top:1px solid #FDE68A;display:flex;align-items:flex-start;gap:10px;">
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" style="flex-shrink:0;margin-top:1px;"><path d="M8 2L1.5 13.5h13L8 2z" stroke="#D97706" stroke-width="1.3" fill="rgba(217,119,6,0.1)" stroke-linejoin="round"/><path d="M8 7v3.5M8 12v.5" stroke="#D97706" stroke-width="1.5" stroke-linecap="round"/></svg>
+            <span style="font-size:12px;color:#92400E;line-height:1.6;">All uploaded documents are encrypted and stored securely. Only authorized LoanStar personnel may access them for loan processing purposes.</span>
+          </div>
+        </div>
+      </div>
+    </sc-if>
+
+    <!-- STEP 4: Review -->
+    <sc-if value="{{ isStep4 }}" hint-placeholder-val="{{ false }}">
+      <div style="animation:fadeUp 0.2s ease;">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:24px;">
+          <div style="background:#FFFFFF;border:1px solid #E2E8F0;border-radius:6px;padding:20px 24px;">
+            <div style="font-size:12px;font-weight:700;color:#94A3B8;text-transform:uppercase;letter-spacing:0.07em;margin-bottom:14px;">Personal Info</div>
+            <div style="display:flex;flex-direction:column;gap:8px;">
+              <div style="display:flex;justify-content:space-between;"><span style="font-size:13px;color:#64748B;">Full Name</span><span style="font-size:13px;font-weight:600;color:#334155;">{{ reviewName }}</span></div>
+              <div style="display:flex;justify-content:space-between;"><span style="font-size:13px;color:#64748B;">Date of Birth</span><span style="font-size:13px;font-weight:600;color:#334155;">{{ dob }}</span></div>
+              <div style="display:flex;justify-content:space-between;"><span style="font-size:13px;color:#64748B;">Mobile</span><span style="font-size:13px;font-weight:600;color:#334155;">{{ phone }}</span></div>
+              <div style="display:flex;justify-content:space-between;"><span style="font-size:13px;color:#64748B;">Monthly Income</span><span style="font-size:13px;font-weight:600;color:#334155;">₱{{ income }}</span></div>
+            </div>
+          </div>
+          <div style="background:#FFFFFF;border:1px solid #E2E8F0;border-radius:6px;padding:20px 24px;">
+            <div style="font-size:12px;font-weight:700;color:#94A3B8;text-transform:uppercase;letter-spacing:0.07em;margin-bottom:14px;">Loan Details</div>
+            <div style="display:flex;flex-direction:column;gap:8px;">
+              <div style="display:flex;justify-content:space-between;"><span style="font-size:13px;color:#64748B;">Amount</span><span style="font-size:13px;font-weight:700;color:#1A56DB;font-variant-numeric:tabular-nums;">₱ {{ loanAmountFmt }}</span></div>
+              <div style="display:flex;justify-content:space-between;"><span style="font-size:13px;color:#64748B;">Term</span><span style="font-size:13px;font-weight:600;color:#334155;">{{ loanMonths }} months</span></div>
+              <div style="display:flex;justify-content:space-between;"><span style="font-size:13px;color:#64748B;">Monthly Payment</span><span style="font-size:13px;font-weight:700;color:#0F172A;">{{ monthly }}</span></div>
+              <div style="display:flex;justify-content:space-between;"><span style="font-size:13px;color:#64748B;">Total Repayment</span><span style="font-size:13px;font-weight:600;color:#334155;">{{ totalPayment }}</span></div>
+            </div>
+          </div>
+        </div>
+        <!-- Terms -->
+        <div style="background:#FFFFFF;border:1px solid #E2E8F0;border-radius:6px;padding:20px 24px;margin-bottom:24px;">
+          <div style="font-size:12px;font-weight:700;color:#94A3B8;text-transform:uppercase;letter-spacing:0.07em;margin-bottom:14px;">Terms &amp; Agreements</div>
+          <div style="display:flex;flex-direction:column;gap:12px;">
+            <label style="display:flex;align-items:flex-start;gap:10px;cursor:pointer;">
+              <div onClick="{{ onToggleTerm1 }}" style="width:18px;height:18px;border-radius:3px;flex-shrink:0;margin-top:1px;display:flex;align-items:center;justify-content:center;background:{{ term1Bg }};border:1.5px solid {{ term1Border }};cursor:pointer;">
+                <sc-if value="{{ term1 }}" hint-placeholder-val="{{ true }}">
+                  <svg width="10" height="8" viewBox="0 0 10 8" fill="none"><path d="M1 4l3 3 5-6" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                </sc-if>
+              </div>
+              <span style="font-size:13px;color:#334155;line-height:1.6;">I have read and agree to the <strong style="color:#1A56DB;">Loan Terms and Conditions</strong>, including the interest rate, payment schedule, and penalties for late payment.</span>
+            </label>
+            <label style="display:flex;align-items:flex-start;gap:10px;cursor:pointer;">
+              <div onClick="{{ onToggleTerm2 }}" style="width:18px;height:18px;border-radius:3px;flex-shrink:0;margin-top:1px;display:flex;align-items:center;justify-content:center;background:{{ term2Bg }};border:1.5px solid {{ term2Border }};cursor:pointer;">
+                <sc-if value="{{ term2 }}" hint-placeholder-val="{{ false }}">
+                  <svg width="10" height="8" viewBox="0 0 10 8" fill="none"><path d="M1 4l3 3 5-6" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                </sc-if>
+              </div>
+              <span style="font-size:13px;color:#334155;line-height:1.6;">I authorize LoanStar to conduct a <strong>credit investigation</strong> of my financial records and contact my personal and business references.</span>
+            </label>
+            <label style="display:flex;align-items:flex-start;gap:10px;cursor:pointer;">
+              <div onClick="{{ onToggleTerm3 }}" style="width:18px;height:18px;border-radius:3px;flex-shrink:0;margin-top:1px;display:flex;align-items:center;justify-content:center;background:{{ term3Bg }};border:1.5px solid {{ term3Border }};cursor:pointer;">
+                <sc-if value="{{ term3 }}" hint-placeholder-val="{{ false }}">
+                  <svg width="10" height="8" viewBox="0 0 10 8" fill="none"><path d="M1 4l3 3 5-6" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                </sc-if>
+              </div>
+              <span style="font-size:13px;color:#334155;line-height:1.6;">I confirm that all information provided is accurate and complete. False declarations may result in immediate loan cancellation.</span>
+            </label>
+          </div>
+        </div>
+      </div>
+    </sc-if>
+
+    <!-- SUCCESS STATE -->
+    <sc-if value="{{ isSuccess }}" hint-placeholder-val="{{ false }}">
+      <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;padding:60px 32px;text-align:center;animation:success 0.4s ease;">
+        <div style="width:80px;height:80px;background:#ECFDF5;border-radius:50%;display:flex;align-items:center;justify-content:center;margin-bottom:24px;">
+          <svg width="40" height="40" viewBox="0 0 40 40" fill="none"><circle cx="20" cy="20" r="19" stroke="#059669" stroke-width="2" fill="rgba(5,150,105,0.08)"/><path d="M11 20l6.5 6.5 11.5-13" stroke="#059669" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </div>
+        <h2 style="font-size:28px;font-weight:800;color:#0F172A;letter-spacing:-0.7px;margin-bottom:10px;">Application Submitted!</h2>
+        <p style="font-size:15px;color:#64748B;line-height:1.7;max-width:440px;margin-bottom:10px;">Your loan application has been received. Our CSA team will contact you within <strong style="color:#334155;">1–3 business days</strong> to proceed with document verification.</p>
+        <div style="font-size:13px;color:#94A3B8;font-family:monospace;background:#F8FAFC;padding:6px 16px;border-radius:4px;border:1px solid #E2E8F0;margin-bottom:32px;">{{ appRefCode }}</div>
+        <div style="display:flex;gap:10px;">
+          <a href="Borrower Portal.dc.html" style="height:44px;padding:0 24px;background:#1A56DB;color:#FFFFFF;border:none;border-radius:4px;font-size:14px;font-weight:600;cursor:pointer;display:flex;align-items:center;text-decoration:none;" style-hover="background:#1444B8;">Go to My Dashboard</a>
+          <button onClick="{{ onNewApp }}" style="height:44px;padding:0 20px;background:#F8FAFC;color:#475569;border:1px solid #E2E8F0;border-radius:4px;font-size:14px;font-weight:500;cursor:pointer;" style-hover="background:#F1F5F9;">Start New Application</button>
+        </div>
+      </div>
+    </sc-if>
+
+    <!-- NAVIGATION FOOTER -->
+    <sc-if value="{{ showFooter }}" hint-placeholder-val="{{ true }}">
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:20px 0 40px;">
+        <button onClick="{{ onPrev }}" style="height:44px;padding:0 22px;background:#FFFFFF;color:#475569;border:1.5px solid #E2E8F0;border-radius:4px;font-size:14px;font-weight:500;cursor:pointer;display:flex;align-items:center;gap:8px;" style-hover="background:#F8FAFC;">
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M10 12L6 8l4-4"/></svg>
+          {{ prevLabel }}
+        </button>
+        <div style="display:flex;align-items:center;gap:6px;">
+          <sc-for list="{{ dots }}" as="dot" hint-placeholder-count="4">
+            <div style="width:{{ dot.size }};height:8px;border-radius:4px;background:{{ dot.color }};transition:all 0.2s;"></div>
+          </sc-for>
+        </div>
+        <button onClick="{{ onNext }}" style="height:44px;padding:0 28px;background:{{ nextBtnBg }};color:#FFFFFF;border:none;border-radius:4px;font-size:14px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:8px;" style-hover="opacity:0.9;">
+          <sc-if value="{{ submitting }}" hint-placeholder-val="{{ false }}">
+            <div style="width:14px;height:14px;border:2px solid rgba(255,255,255,0.4);border-top-color:#FFFFFF;border-radius:50%;animation:spin 0.7s linear infinite;"></div>
+          </sc-if>
+          {{ nextLabel }}
+          <sc-if value="{{ !submitting }}" hint-placeholder-val="{{ true }}">
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M6 4l4 4-4 4"/></svg>
+          </sc-if>
+        </button>
+      </div>
+    </sc-if>
+
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+class Component extends DCLogic {
+  state = {
+    step: 1,
+    fname: 'Juan', lname: 'dela Cruz', dob: '1990-03-15',
+    phone: '+63 912 345 6789', income: '45,000',
+    loanAmount: 150000, loanMonths: 24,
+    term1: true, term2: false, term3: false,
+    submitting: false, success: false,
+    docs: [false, false, true, true, false, false],
+  };
+
+  renderVals() {
+    const { step, fname, lname, dob, phone, income, loanAmount, loanMonths, term1, term2, term3, submitting, success, docs } = this.state;
+
+    // Loan calc
+    const r = 0.015, n = Math.max(1, loanMonths);
+    const monthly = loanAmount > 0 ? loanAmount * (r * Math.pow(1+r,n)) / (Math.pow(1+r,n)-1) : 0;
+    const totalPayment = monthly * n;
+    const totalInterest = totalPayment - loanAmount;
+    const fmt = v => '₱' + Math.round(v).toLocaleString('en-PH');
+
+    // Steps
+    const stepDefs = [
+      { n: 1, label: 'Personal Info' },
+      { n: 2, label: 'Loan Details' },
+      { n: 3, label: 'Documents' },
+      { n: 4, label: 'Review' },
+    ];
+    const steps = stepDefs.map((s, i) => ({
+      ...s, num: s.n < step ? '✓' : String(s.n),
+      circleBg: s.n < step ? '#1A56DB' : s.n === step ? '#FFFFFF' : '#F8FAFC',
+      circleBorder: s.n <= step ? '#1A56DB' : '#E2E8F0',
+      shadow: s.n === step ? '0 0 0 4px rgba(26,86,219,0.12)' : 'none',
+      numColor: s.n < step ? '#FFFFFF' : s.n === step ? '#1A56DB' : '#CBD5E1',
+      labelColor: s.n < step ? '#334155' : s.n === step ? '#0F172A' : '#CBD5E1',
+      labelFw: s.n === step ? '700' : '500',
+      hasConnector: i < stepDefs.length - 1,
+      connectorColor: s.n < step ? '#1A56DB' : '#E2E8F0',
+      onClick: () => s.n < step && this.setState({ step: s.n }),
+    }));
+
+    const stepTitles = { 1:'Personal Information', 2:'Loan Details', 3:'Documents', 4:'Review & Submit' };
+    const progressPcts = { 1:'25%', 2:'50%', 3:'75%', 4:'100%' };
+
+    // Dots
+    const dots = [1,2,3,4].map(i => ({
+      color: i === step ? '#1A56DB' : i < step ? '#BFDBFE' : '#E2E8F0',
+      size: i === step ? '24px' : '8px',
+    }));
+
+    // Term options
+    const termOptions = [6, 12, 18, 24, 36].map(m => ({
+      label: m + ' mo',
+      onClick: () => this.setState({ loanMonths: m }),
+      bg: loanMonths === m ? '#1A56DB' : '#F1F5F9',
+      color: loanMonths === m ? '#FFFFFF' : '#475569',
+      border: loanMonths === m ? 'none' : '1px solid #E2E8F0',
+    }));
+
+    // Document list
+    const docDefs = [
+      { label: 'Valid Government ID', hint: 'Passport, Driver\'s License, SSS, PhilHealth', required: true, iconPath: 'M3 2.5h8a1 1 0 011 1v9a1 1 0 01-1 1H3a1 1 0 01-1-1v-9a1 1 0 011-1zM4 6h6M4 8h4' },
+      { label: 'Income Tax Return (ITR)', hint: 'Latest BIR Form 2316 or ITR for self-employed', required: true, iconPath: 'M3 2.5h6l3 3v8H3V2.5zM9 2.5v3h3' },
+      { label: 'Certificate of Employment', hint: 'Original, signed by HR — not older than 3 months', required: true, iconPath: 'M2 3.5h10M2 7h10M2 10.5h7' },
+      { label: 'Latest 3 Months Payslips', hint: 'Or audited financial statements for business owners', required: true, iconPath: 'M3 2.5h8a1 1 0 011 1v9a1 1 0 01-1 1H3a1 1 0 01-1-1v-9a1 1 0 011-1z' },
+      { label: 'Proof of Billing', hint: 'Utility bill or bank statement — same address as application', required: false, iconPath: 'M1 3.5h12v7a1 1 0 01-1 1H2a1 1 0 01-1-1V3.5zM1 6.5h12' },
+      { label: 'Collateral Documents', hint: 'Land title, vehicle OR, deed of sale — if applicable', required: false, iconPath: 'M7 1.5L1.5 12.5h11zM7 6.5v3M7 11v.5' },
+    ];
+    const docItems = docDefs.map((d, i) => ({
+      ...d,
+      uploaded: docs[i],
+      iconBg: docs[i] ? '#ECFDF5' : '#F1F5F9',
+      iconColor: docs[i] ? '#059669' : '#94A3B8',
+      btnBg: docs[i] ? '#ECFDF5' : '#EFF6FF',
+      btnColor: docs[i] ? '#059669' : '#1A56DB',
+      btnBorder: 'none',
+      btnLabel: docs[i] ? 'Uploaded ✓' : 'Upload',
+      onUpload: () => {
+        const newDocs = [...this.state.docs];
+        newDocs[i] = !newDocs[i];
+        this.setState({ docs: newDocs });
+      },
+    }));
+    const uploadedCount = docs.filter(Boolean).length;
+
+    const canNext = step === 4 ? (term1 && term2 && term3) : true;
+    const nextBtnBg = (step === 4 && !canNext) ? '#CBD5E1' : step === 4 ? '#059669' : '#1A56DB';
+    const nextLabels = { 1:'Personal Info Done', 2:'Continue to Documents', 3:'Review Application', 4:'Submit Application' };
+    const prevLabels = { 1:'Cancel', 2:'Back', 3:'Back', 4:'Back' };
+
+    const appRefCode = `LN-2026-${String(Math.floor(Math.random()*1000)+200).padStart(5,'0')}`;
+
+    return {
+      currentStep: step, stepTitle: stepTitles[step],
+      progressWidth: progressPcts[step],
+      steps, dots, termOptions, docItems,
+      isStep1: step === 1 && !success,
+      isStep2: step === 2 && !success,
+      isStep3: step === 3 && !success,
+      isStep4: step === 4 && !success,
+      isSuccess: success,
+      showFooter: !success,
+      fname, lname, dob, phone, income,
+      reviewName: fname + ' ' + lname,
+      loanAmount, loanAmountFmt: loanAmount.toLocaleString('en-PH'),
+      loanMonths, monthly: fmt(monthly), totalInterest: fmt(totalInterest), totalPayment: fmt(totalPayment),
+      term1, term2, term3,
+      term1Bg: term1 ? '#1A56DB' : '#FFFFFF', term1Border: term1 ? '#1A56DB' : '#CBD5E1',
+      term2Bg: term2 ? '#1A56DB' : '#FFFFFF', term2Border: term2 ? '#1A56DB' : '#CBD5E1',
+      term3Bg: term3 ? '#1A56DB' : '#FFFFFF', term3Border: term3 ? '#1A56DB' : '#CBD5E1',
+      submitting, nextBtnBg,
+      uploadedCount, totalDocs: docDefs.length,
+      appRefCode,
+      prevLabel: prevLabels[step],
+      nextLabel: submitting ? 'Submitting...' : nextLabels[step],
+      onFname: e => this.setState({ fname: e.target.value }),
+      onLname: e => this.setState({ lname: e.target.value }),
+      onDob: e => this.setState({ dob: e.target.value }),
+      onPhone: e => this.setState({ phone: e.target.value }),
+      onIncome: e => this.setState({ income: e.target.value }),
+      onLoanAmount: e => this.setState({ loanAmount: parseFloat(e.target.value) || 0 }),
+      onToggleTerm1: () => this.setState(s => ({ term1: !s.term1 })),
+      onToggleTerm2: () => this.setState(s => ({ term2: !s.term2 })),
+      onToggleTerm3: () => this.setState(s => ({ term3: !s.term3 })),
+      onPrev: () => step > 1 ? this.setState({ step: step - 1 }) : window.location.href = 'Borrower Portal.dc.html',
+      onNext: () => {
+        if (step < 4) { this.setState({ step: step + 1 }); return; }
+        if (!canNext) return;
+        this.setState({ submitting: true });
+        setTimeout(() => this.setState({ submitting: false, success: true }), 1600);
+      },
+      onNewApp: () => this.setState({ step: 1, success: false, term1: true, term2: false, term3: false }),
+    };
+  }
+}
+</script>
+</body>
+</html>
