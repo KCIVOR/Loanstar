@@ -1,4 +1,6 @@
-/* LoanStar — Spacing, radius, shadow, z-index tokens. 4px base grid. */
+/* LoanStar — Spacing, radius, shadow, z-index tokens. 4px base grid.
+   Theme: "Deep Harbor" — radius softened from the earlier sharp 2-10px scale to
+   match the mockup's rounder cards (12px) and hero-to-tray transitions (20px). */
 :root {
   --space-1:  4px;
   --space-2:  8px;
@@ -11,10 +13,10 @@
   --space-12: 48px;
   --space-16: 64px;
 
-  --radius-xs:   2px;    /* badges, tooltips */
-  --radius-sm:   4px;    /* buttons, inputs, chips */
-  --radius-md:   6px;    /* cards, panels, modals */
-  --radius-lg:   10px;   /* feature cards, images */
+  --radius-xs:   4px;    /* badges, tooltips */
+  --radius-sm:   6px;    /* buttons, inputs, chips */
+  --radius-md:   12px;   /* cards, panels, modals */
+  --radius-lg:   20px;   /* feature cards, hero-to-tray transitions */
   --radius-full: 9999px; /* pills, avatars, toggles */
 
   --shadow-xs: 0 1px 2px rgba(15,23,42,0.06);

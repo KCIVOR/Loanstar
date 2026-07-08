@@ -1,17 +1,16 @@
 /* LoanStar — Typography tokens.
-   Display/body: Plus Jakarta Sans (Google Font, matches built mockups exactly).
-   Mono: JetBrains Mono — SUBSTITUTION FLAGGED. The mockups' token table names
-   "SF Mono" (a macOS system font, not distributable/webfontable) for loan IDs and
-   amounts; a couple of rows fall back to the browser's generic `monospace`. We
-   ship JetBrains Mono so numerals render consistently cross-platform. Swap the
-   @font-face in fonts.css if you have real SF Mono / brand mono files. */
+   Theme: "Deep Harbor". Display/body: Albert Sans (matches the 2b mockup exactly).
+   Mono: JetBrains Mono — unchanged substitution for loan IDs/amounts. The mockups'
+   token table names "SF Mono" (a macOS system font, not distributable/webfontable);
+   we ship JetBrains Mono instead so numerals render consistently cross-platform.
+   Swap the @font-face in this file if you have real SF Mono / brand mono files. */
 
 @font-face {
-  font-family: 'Plus Jakarta Sans';
+  font-family: 'Albert Sans';
   font-style: normal;
   font-weight: 300 800;
   font-display: swap;
-  src: url(https://fonts.gstatic.com/s/plusjakartasans/v13/LDIbaomQNQcsA88c7O9yZ4KMCoOg4Ko_QkP2AY9pXjTA9E1u4pmUdt4Xz3RAlhE.woff2) format('woff2');
+  src: url(https://fonts.gstatic.com/s/albertsans/v4/i7dOIFdwYjGaAMFtZd_QA1ZbYFeQGQyU.woff2) format('woff2');
 }
 
 @font-face {
@@ -23,8 +22,8 @@
 }
 
 :root {
-  --font-heading: 'Plus Jakarta Sans', system-ui, sans-serif;
-  --font-body:    'Plus Jakarta Sans', system-ui, sans-serif;
+  --font-heading: 'Albert Sans', system-ui, sans-serif;
+  --font-body:    'Albert Sans', system-ui, sans-serif;
   --font-mono:    'JetBrains Mono', ui-monospace, 'SF Mono', monospace;
 
   /* Type scale — size / weight / letter-spacing / line-height, from the built specimens */

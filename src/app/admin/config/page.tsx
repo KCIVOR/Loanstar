@@ -128,7 +128,7 @@ export default function ConfigPage() {
               value={penaltyRate}
               onChange={(e) => setPenaltyRate(e.target.value)}
             />
-            <p className="mt-1 text-xs text-zinc-500">
+            <p className="mt-1 text-xs text-neutral-500">
               {settings.find((s) => s.key === "penalty_rate")?.description}
             </p>
           </div>

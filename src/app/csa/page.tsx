@@ -73,24 +73,24 @@ export default function CsaDashboardPage() {
 
       {applications.length === 0 ? (
         <Card>
-          <p className="text-sm text-zinc-600">No applications in the intake queue.</p>
+          <p className="text-sm text-neutral-600">No applications in the intake queue.</p>
         </Card>
       ) : (
         <div className="space-y-3">
           {applications.map((app) => (
             <Card key={app.id} className="flex flex-wrap items-center justify-between gap-3">
               <div>
-                <p className="font-medium text-zinc-900">
+                <p className="font-medium text-neutral-900">
                   {app.borrower
                     ? `${app.borrower.firstName} ${app.borrower.lastName}`
                     : "Unknown borrower"}
                   {app.borrower ? (
-                    <span className="ml-2 text-sm font-normal text-zinc-500">
+                    <span className="ml-2 text-sm font-normal text-neutral-500">
                       {app.borrower.borrowerNo}
                     </span>
                   ) : null}
                 </p>
-                <p className="text-sm text-zinc-500">
+                <p className="text-sm text-neutral-500">
                   {formatStatusLabel(app.status)}
                   {app.isReloan ? " · Reloan" : ""}
                   {app.blocker ? ` · ${app.blocker}` : ""}

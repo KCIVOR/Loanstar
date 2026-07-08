@@ -10,7 +10,7 @@ import { createClient } from "@/lib/supabase/client";
 function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const redirect = searchParams.get("redirect") ?? "/admin";
+  const redirect = searchParams.get("redirect");
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -34,15 +34,15 @@ function LoginForm() {
       return;
     }
 
-    router.push(redirect);
+    router.push(redirect ?? "/dashboard");
     router.refresh();
   }
 
   return (
-    <div className="flex min-h-full flex-1 items-center justify-center bg-zinc-50 px-4">
-      <div className="w-full max-w-sm rounded-lg border border-zinc-200 bg-white p-6 shadow-sm">
-        <h1 className="text-xl font-semibold text-zinc-900">Sign in</h1>
-        <p className="mt-1 text-sm text-zinc-500">LoanStar LMS Admin</p>
+    <div className="flex min-h-full flex-1 items-center justify-center bg-neutral-50 px-4">
+      <div className="w-full max-w-sm rounded-lg border border-neutral-200 bg-white p-6 shadow-sm">
+        <h1 className="text-xl font-semibold text-neutral-900">Sign in</h1>
+        <p className="mt-1 text-sm text-neutral-500">LoanStar LMS</p>
 
         <form onSubmit={(e) => void handleSubmit(e)} className="mt-6 space-y-4">
           {error ? <Alert>{error}</Alert> : null}
@@ -77,23 +77,17 @@ function LoginForm() {
           </Button>
         </form>
 
-        <p className="mt-4 text-center text-sm text-zinc-500">
-          <Link href="/forgot-password" className="text-zinc-900 hover:underline">
+        <p className="mt-4 text-center text-sm text-neutral-500">
+          <Link href="/forgot-password" className="text-neutral-900 hover:underline">
             Forgot password?
           </Link>
         </p>
 
-        <div className="mt-6 space-y-2 border-t border-zinc-200 pt-4 text-center text-sm text-zinc-600">
+        <div className="mt-6 space-y-2 border-t border-neutral-200 pt-4 text-center text-sm text-neutral-600">
           <p>
             New borrower?{" "}
-            <Link href="/borrower/register" className="font-medium text-zinc-900 hover:underline">
+            <Link href="/borrower/register" className="font-medium text-neutral-900 hover:underline">
               Register here
-            </Link>
-          </p>
-          <p className="text-xs text-zinc-500">
-            Agents: sign in with your agent account, then go to{" "}
-            <Link href="/agent" className="text-zinc-700 hover:underline">
-              Agent portal
             </Link>
           </p>
         </div>
@@ -104,7 +98,7 @@ function LoginForm() {
 
 export default function LoginPage() {
   return (
-    <Suspense fallback={<div className="flex min-h-full items-center justify-center text-sm text-zinc-500">Loading…</div>}>
+    <Suspense fallback={<div className="flex min-h-full items-center justify-center text-sm text-neutral-500">Loading…</div>}>
       <LoginForm />
     </Suspense>
   );

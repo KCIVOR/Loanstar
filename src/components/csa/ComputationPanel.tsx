@@ -115,7 +115,7 @@ export function ComputationPanel({
 
   return (
     <Card>
-      <h2 className="mb-4 text-lg font-semibold text-zinc-900">Computation</h2>
+      <h2 className="mb-4 text-lg font-semibold text-neutral-900">Computation</h2>
 
       {error ? (
         <div className="mb-4">
@@ -125,25 +125,25 @@ export function ComputationPanel({
 
       {computation ? (
         <div className="mb-6 space-y-2 text-sm">
-          <p className="font-medium text-zinc-900">
+          <p className="font-medium text-neutral-900">
             {computation.loanTypeName ?? "Loan"} · {computation.inputMode.replace(/_/g, " ")}
           </p>
           <div className="grid gap-2 sm:grid-cols-2">
             {computation.lineItems.map((item) => (
-              <div key={item.key} className="flex justify-between border-b border-zinc-100 py-1">
-                <span className="text-zinc-600">{item.label}</span>
+              <div key={item.key} className="flex justify-between border-b border-neutral-100 py-1">
+                <span className="text-neutral-600">{item.label}</span>
                 <span className="font-medium tabular-nums">{formatMoney(item.amount)}</span>
               </div>
             ))}
           </div>
           {computation.signedAt ? (
-            <p className="text-green-700">Signed by borrower on {new Date(computation.signedAt).toLocaleString()}</p>
+            <p className="text-success-700">Signed by borrower on {new Date(computation.signedAt).toLocaleString()}</p>
           ) : (
-            <p className="text-amber-700">Awaiting borrower signature</p>
+            <p className="text-warning-700">Awaiting borrower signature</p>
           )}
         </div>
       ) : (
-        <p className="mb-4 text-sm text-zinc-600">No computation yet.</p>
+        <p className="mb-4 text-sm text-neutral-600">No computation yet.</p>
       )}
 
       {editable ? (

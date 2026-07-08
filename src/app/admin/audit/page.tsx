@@ -84,7 +84,7 @@ export default function AuditPage() {
                 <Th>IP</Th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-zinc-200 bg-white">
+            <tbody className="divide-y divide-neutral-200 bg-white">
               {events.map((ev) => (
                 <tr key={ev.id}>
                   <Td className="whitespace-nowrap text-xs">
@@ -105,7 +105,7 @@ export default function AuditPage() {
             </tbody>
           </Table>
 
-          <div className="mt-4 flex items-center justify-between text-sm text-zinc-600">
+          <div className="mt-4 flex items-center justify-between text-sm text-neutral-600">
             <span>
               Showing {offset + 1}–{Math.min(offset + limit, total)} of {total}
             </span>

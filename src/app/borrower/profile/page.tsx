@@ -150,7 +150,7 @@ export default function BorrowerProfilePage() {
 
       <form onSubmit={(e) => void handleSubmit(e)} className="space-y-6">
         <Card>
-          <h2 className="mb-4 font-medium text-zinc-900">Personal information</h2>
+          <h2 className="mb-4 font-medium text-neutral-900">Personal information</h2>
           <div className="grid gap-3 sm:grid-cols-2">
             {(
               [
@@ -203,7 +203,7 @@ export default function BorrowerProfilePage() {
         </Card>
 
         <Card>
-          <h2 className="mb-4 font-medium text-zinc-900">Present address</h2>
+          <h2 className="mb-4 font-medium text-neutral-900">Present address</h2>
           <AddressFields
             prefix="present"
             value={profile.presentAddress}
@@ -212,7 +212,7 @@ export default function BorrowerProfilePage() {
         </Card>
 
         <Card>
-          <h2 className="mb-4 font-medium text-zinc-900">Permanent address</h2>
+          <h2 className="mb-4 font-medium text-neutral-900">Permanent address</h2>
           <AddressFields
             prefix="permanent"
             value={profile.permanentAddress}
@@ -221,7 +221,7 @@ export default function BorrowerProfilePage() {
         </Card>
 
         <Card>
-          <h2 className="mb-4 font-medium text-zinc-900">Manning agency</h2>
+          <h2 className="mb-4 font-medium text-neutral-900">Manning agency</h2>
           <div className="grid gap-3 sm:grid-cols-2">
             {(
               [
@@ -253,7 +253,7 @@ export default function BorrowerProfilePage() {
         </Card>
 
         <Card>
-          <h2 className="mb-4 font-medium text-zinc-900">Financial</h2>
+          <h2 className="mb-4 font-medium text-neutral-900">Financial</h2>
           <div className="grid gap-3 sm:grid-cols-2">
             {(
               [
@@ -288,7 +288,7 @@ export default function BorrowerProfilePage() {
         </Card>
 
         <Card>
-          <h2 className="mb-4 font-medium text-zinc-900">Allottee</h2>
+          <h2 className="mb-4 font-medium text-neutral-900">Allottee</h2>
           <div className="grid gap-3 sm:grid-cols-2">
             {(
               [
@@ -318,7 +318,7 @@ export default function BorrowerProfilePage() {
         </Card>
 
         <Card>
-          <h2 className="mb-4 font-medium text-zinc-900">PIC work info</h2>
+          <h2 className="mb-4 font-medium text-neutral-900">PIC work info</h2>
           <div className="grid gap-3 sm:grid-cols-2">
             {(
               [
@@ -351,7 +351,7 @@ export default function BorrowerProfilePage() {
 
         <Card>
           <div className="mb-4 flex items-center justify-between">
-            <h2 className="font-medium text-zinc-900">Dependents</h2>
+            <h2 className="font-medium text-neutral-900">Dependents</h2>
             <Button
               type="button"
               variant="secondary"
@@ -371,7 +371,7 @@ export default function BorrowerProfilePage() {
           {profile.dependents.map((dep, i) => (
             <div
               key={i}
-              className="mb-3 grid gap-3 border-b border-zinc-100 pb-3 sm:grid-cols-3"
+              className="mb-3 grid gap-3 border-b border-neutral-100 pb-3 sm:grid-cols-3"
             >
               {(["name", "relationship", "dateOfBirth"] as const).map(
                 (field) => (
@@ -393,7 +393,7 @@ export default function BorrowerProfilePage() {
 
         <Card>
           <div className="mb-4 flex items-center justify-between">
-            <h2 className="font-medium text-zinc-900">References</h2>
+            <h2 className="font-medium text-neutral-900">References</h2>
             <Button
               type="button"
               variant="secondary"
@@ -413,7 +413,7 @@ export default function BorrowerProfilePage() {
           {profile.references.map((ref, i) => (
             <div
               key={i}
-              className="mb-3 grid gap-3 border-b border-zinc-100 pb-3 sm:grid-cols-2"
+              className="mb-3 grid gap-3 border-b border-neutral-100 pb-3 sm:grid-cols-2"
             >
               {(["name", "relationship", "phone", "address"] as const).map(
                 (field) => (

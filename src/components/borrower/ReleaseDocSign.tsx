@@ -74,9 +74,9 @@ export function ReleaseDocSign({ applicationId, onSigned }: ReleaseDocSignProps)
 
   return (
     <Card className="mb-6">
-      <h2 className="mb-2 text-lg font-semibold text-zinc-900">Release documents</h2>
+      <h2 className="mb-2 text-lg font-semibold text-neutral-900">Release documents</h2>
       {blocker ? (
-        <p className="mb-3 text-sm text-amber-700">{blocker}</p>
+        <p className="mb-3 text-sm text-warning-700">{blocker}</p>
       ) : null}
       {error ? (
         <div className="mb-3">
@@ -87,11 +87,11 @@ export function ReleaseDocSign({ applicationId, onSigned }: ReleaseDocSignProps)
         {documents.map((doc) => (
           <li
             key={doc.id}
-            className="flex items-center justify-between border-b border-zinc-100 py-2 text-sm"
+            className="flex items-center justify-between border-b border-neutral-100 py-2 text-sm"
           >
             <span className="capitalize">{doc.document_slug.replace(/_/g, " ")}</span>
             {doc.signed_at ? (
-              <span className="text-green-700">Signed</span>
+              <span className="text-success-700">Signed</span>
             ) : (
               <Button
                 variant="secondary"

@@ -8,6 +8,7 @@ import {
   Alert,
   Button,
   Card,
+  ConfirmDialog,
   Input,
   Label,
   PageHeader,
@@ -92,6 +93,9 @@ export default function CommitteeApplicationPage() {
   const [revisitComment, setRevisitComment] = useState("");
   const [revisitRoute, setRevisitRoute] = useState<"csa" | "cig">("csa");
   const [holdComment, setHoldComment] = useState("");
+  const [confirmAction, setConfirmAction] = useState<"approve" | "deny" | null>(
+    null,
+  );
   const [overrideAmount, setOverrideAmount] = useState("");
   const [overrideMode, setOverrideMode] = useState("NET_SARADO");
   const [overrideTerms, setOverrideTerms] = useState("6");
@@ -237,20 +241,20 @@ export default function CommitteeApplicationPage() {
 
       <div className="mb-6 grid gap-4 sm:grid-cols-3">
         <Card>
-          <p className="text-sm text-zinc-500">Status</p>
-          <p className="font-semibold text-zinc-900">
+          <p className="text-sm text-neutral-500">Status</p>
+          <p className="font-semibold text-neutral-900">
             {data.application.statusLabel}
           </p>
         </Card>
         <Card>
-          <p className="text-sm text-zinc-500">TAT (since CIG forward)</p>
-          <p className="font-semibold text-zinc-900">
+          <p className="text-sm text-neutral-500">TAT (since CIG forward)</p>
+          <p className="font-semibold text-neutral-900">
             {data.tatDays != null ? `${data.tatDays} day(s)` : "—"}
           </p>
         </Card>
         <Card>
-          <p className="text-sm text-zinc-500">Vote tally (informational)</p>
-          <p className="font-semibold text-zinc-900">
+          <p className="text-sm text-neutral-500">Vote tally (informational)</p>
+          <p className="font-semibold text-neutral-900">
             {data.tally.label ??
               `${data.tally.approve} approve · ${data.tally.deny} deny`}
           </p>
@@ -259,10 +263,10 @@ export default function CommitteeApplicationPage() {
 
       {data.computation ? (
         <Card className="mb-6">
-          <h2 className="mb-3 text-lg font-semibold text-zinc-900">
+          <h2 className="mb-3 text-lg font-semibold text-neutral-900">
             Computation
           </h2>
-          <p className="mb-2 text-sm text-zinc-600">
+          <p className="mb-2 text-sm text-neutral-600">
             {data.computation.loanTypeName ?? "Loan"} · Net released{" "}
             {formatMoney(data.computation.netReleased)}
           </p>
@@ -270,7 +274,7 @@ export default function CommitteeApplicationPage() {
             {data.computation.lineItems.slice(0, 6).map((item) => (
               <div
                 key={item.label}
-                className="flex justify-between text-sm text-zinc-700"
+                className="flex justify-between text-sm text-neutral-700"
               >
                 <span>{item.label}</span>
                 <span className="tabular-nums">{formatMoney(item.amount)}</span>
@@ -283,8 +287,8 @@ export default function CommitteeApplicationPage() {
       {data.application.canDecide ? (
         <>
           <Card className="mb-6">
-            <h2 className="mb-4 text-lg font-semibold text-zinc-900">Your vote</h2>
-            <p className="mb-3 text-sm text-zinc-600">
+            <h2 className="mb-4 text-lg font-semibold text-neutral-900">Your vote</h2>
+            <p className="mb-3 text-sm text-neutral-600">
               {data.myVote
                 ? `You voted: ${data.myVote}`
                 : "Cast your vote (informational — final action is separate)."}
@@ -307,30 +311,61 @@ export default function CommitteeApplicationPage() {
           </Card>
 
           <Card className="mb-6">
-            <h2 className="mb-4 text-lg font-semibold text-zinc-900">
+            <h2 className="mb-4 text-lg font-semibold text-neutral-900">
               Final action
             </h2>
+            <p className="mb-3 text-sm text-neutral-600">
+              Final actions are binding and recorded on the file — you will be
+              asked to confirm.
+            </p>
             <div className="flex flex-wrap gap-2">
-              <Button disabled={saving} onClick={() => void handleAction("approve")}>
-                Approve
+              <Button disabled={saving} onClick={() => setConfirmAction("approve")}>
+                Approve loan
               </Button>
               <Button
                 variant="danger"
                 disabled={saving}
-                onClick={() => void handleAction("deny")}
+                onClick={() => setConfirmAction("deny")}
               >
-                Deny
-              </Button>
-              <Button
-                variant="secondary"
-                disabled={saving}
-                onClick={() => void handleAction("hold")}
-              >
-                Hold
+                Deny loan
               </Button>
             </div>
 
-            <div className="mt-6 space-y-3 border-t border-zinc-100 pt-4">
+            <ConfirmDialog
+              open={confirmAction !== null}
+              title={
+                confirmAction === "approve"
+                  ? "Approve this loan?"
+                  : "Deny this loan?"
+              }
+              message={
+                confirmAction === "approve"
+                  ? `This records the final committee approval for ${
+                      data.borrower
+                        ? `${data.borrower.firstName} ${data.borrower.lastName}`
+                        : "this application"
+                    } and moves the file forward to negotiation and release. This cannot be undone from this screen.`
+                  : `This records the final committee denial for ${
+                      data.borrower
+                        ? `${data.borrower.firstName} ${data.borrower.lastName}`
+                        : "this application"
+                    }. This cannot be undone from this screen.`
+              }
+              confirmLabel={
+                confirmAction === "approve" ? "Yes, approve" : "Yes, deny"
+              }
+              variant={confirmAction === "approve" ? "primary" : "danger"}
+              loading={saving}
+              onCancel={() => setConfirmAction(null)}
+              onConfirm={() => {
+                if (!confirmAction) return;
+                void handleAction(confirmAction).then(() =>
+                  setConfirmAction(null),
+                );
+              }}
+            />
+
+            <div className="mt-6 space-y-3 border-t border-neutral-100 pt-4">
               <Label htmlFor="holdComment">Hold comment</Label>
               <Input
                 id="holdComment"
@@ -348,13 +383,13 @@ export default function CommitteeApplicationPage() {
             </div>
 
             <form
-              className="mt-6 space-y-3 border-t border-zinc-100 pt-4"
+              className="mt-6 space-y-3 border-t border-neutral-100 pt-4"
               onSubmit={(e) => {
                 e.preventDefault();
                 void handleAction("revisit");
               }}
             >
-              <h3 className="font-medium text-zinc-900">Notice to Revisit</h3>
+              <h3 className="font-medium text-neutral-900">Notice to Revisit</h3>
               <Label htmlFor="revisitRoute">Route to</Label>
               <Select
                 id="revisitRoute"
@@ -388,10 +423,10 @@ export default function CommitteeApplicationPage() {
 
       {data.application.canOverride && data.negotiation ? (
         <Card className="mb-6">
-          <h2 className="mb-2 text-lg font-semibold text-zinc-900">
+          <h2 className="mb-2 text-lg font-semibold text-neutral-900">
             Negotiation override
           </h2>
-          <p className="mb-4 text-sm text-zinc-600">
+          <p className="mb-4 text-sm text-neutral-600">
             Borrower counter:{" "}
             {data.negotiation.lastCounterAmount != null
               ? formatMoney(data.negotiation.lastCounterAmount)
@@ -440,15 +475,15 @@ export default function CommitteeApplicationPage() {
 
       {data.latestAction ? (
         <Card>
-          <h2 className="mb-2 text-lg font-semibold text-zinc-900">
+          <h2 className="mb-2 text-lg font-semibold text-neutral-900">
             Latest committee action
           </h2>
-          <p className="text-sm text-zinc-700">
+          <p className="text-sm text-neutral-700">
             {data.latestAction.action} ·{" "}
             {new Date(data.latestAction.actedAt).toLocaleString()}
           </p>
           {data.latestAction.comment ? (
-            <p className="mt-2 text-sm text-zinc-600">
+            <p className="mt-2 text-sm text-neutral-600">
               {data.latestAction.comment}
             </p>
           ) : null}

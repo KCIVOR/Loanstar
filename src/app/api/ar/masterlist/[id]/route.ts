@@ -12,6 +12,10 @@ type RouteParams = { params: Promise<{ id: string }> };
 const assignSchema = z.object({
   portfolioId: z.string().uuid().optional().nullable(),
   collectorUserId: z.string().uuid().optional().nullable(),
+  checkTransmittalStatus: z
+    .enum(["pending", "transmitted", "received"])
+    .optional(),
+  checkClearingStatus: z.enum(["pending", "clearing", "cleared"]).optional(),
 });
 
 const remedialSchema = z.object({
@@ -58,11 +62,29 @@ export async function PATCH(request: Request, { params }: RouteParams) {
     const body = assignSchema.parse(await request.json());
     const supabase = await createClient();
 
-    await assignMasterlist(supabase, id, {
-      portfolioId: body.portfolioId,
-      collectorUserId: body.collectorUserId,
-      assignedBy: user.id,
-    });
+    if (body.portfolioId !== undefined || body.collectorUserId !== undefined) {
+      await assignMasterlist(supabase, id, {
+        portfolioId: body.portfolioId,
+        collectorUserId: body.collectorUserId,
+        assignedBy: user.id,
+      });
+    }
+
+    if (body.checkTransmittalStatus || body.checkClearingStatus) {
+      const { error: statusError } = await supabase
+        .from("masterlist")
+        .update({
+          ...(body.checkTransmittalStatus
+            ? { check_transmittal_status: body.checkTransmittalStatus }
+            : {}),
+          ...(body.checkClearingStatus
+            ? { check_clearing_status: body.checkClearingStatus }
+            : {}),
+        })
+        .eq("id", id);
+
+      if (statusError) throw new Error(statusError.message);
+    }
 
     await writeAuditEvent({
       actorId: user.id,

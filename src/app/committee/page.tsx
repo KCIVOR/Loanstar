@@ -70,7 +70,7 @@ export default function CommitteeDashboardPage() {
 
       {applications.length === 0 ? (
         <Card>
-          <p className="text-sm text-zinc-600">No files pending committee decision.</p>
+          <p className="text-sm text-neutral-600">No files pending committee decision.</p>
         </Card>
       ) : (
         <div className="space-y-3">
@@ -78,17 +78,17 @@ export default function CommitteeDashboardPage() {
             <Card key={app.id}>
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
-                  <p className="font-medium text-zinc-900">
+                  <p className="font-medium text-neutral-900">
                     {app.borrower
                       ? `${app.borrower.firstName} ${app.borrower.lastName}`
                       : "Unknown"}
                     {app.borrower ? (
-                      <span className="ml-2 text-sm font-normal text-zinc-500">
+                      <span className="ml-2 text-sm font-normal text-neutral-500">
                         {app.borrower.borrowerNo}
                       </span>
                     ) : null}
                   </p>
-                  <p className="text-sm text-zinc-500">
+                  <p className="text-sm text-neutral-500">
                     {formatStatusLabel(app.status)}
                     {app.verification?.finding
                       ? ` · CIG finding: ${app.verification.finding}`

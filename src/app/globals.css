@@ -1,14 +1,14 @@
 @import "tailwindcss";
 
-/* LoanStar brand fonts.
-   Plus Jakarta Sans: headings + body. JetBrains Mono: amounts, loan IDs, OTP digits
+/* LoanStar brand fonts — "Deep Harbor" theme.
+   Albert Sans: headings + body. JetBrains Mono: amounts, loan IDs, OTP digits
    (substitutes the source mockups' "SF Mono", which has no distributable web font). */
 @font-face {
-  font-family: "Plus Jakarta Sans";
+  font-family: "Albert Sans";
   font-style: normal;
   font-weight: 300 800;
   font-display: swap;
-  src: url(https://fonts.gstatic.com/s/plusjakartasans/v13/LDIbaomQNQcsA88c7O9yZ4KMCoOg4Ko_QkP2AY9pXjTA9E1u4pmUdt4Xz3RAlhE.woff2)
+  src: url(https://fonts.gstatic.com/s/albertsans/v4/i7dOIFdwYjGaAMFtZd_QA1ZbYFeQGQyU.woff2)
     format("woff2");
 }
 
@@ -22,38 +22,43 @@
 }
 
 :root {
-  /* Primary — trust, authority, interactive */
-  --color-primary-50: #eff6ff;
-  --color-primary-100: #dbeafe;
-  --color-primary-200: #bfdbfe;
-  --color-primary-300: #93c5fd;
-  --color-primary-400: #60a5fa;
-  --color-primary-500: #2563eb;
-  --color-primary-600: #1a56db; /* main brand blue — buttons, links, active states */
-  --color-primary-700: #1444b8; /* hover */
-  --color-primary-800: #1e3a8a;
-  --color-primary-900: #1e2f5e;
+  /* Primary — navy, trust, authority, interactive */
+  --color-primary-50: #f3f5fa;
+  --color-primary-100: #e8edf7;
+  --color-primary-200: #c9d6ee;
+  --color-primary-300: #9fb0d8;
+  --color-primary-400: #7c97d8;
+  --color-primary-500: #4c6fc0;
+  --color-primary-600: #2f55b4; /* main interactive navy-blue — buttons, links, active states */
+  --color-primary-700: #22407f; /* hover */
+  --color-primary-800: #16233f;
+  --color-primary-900: #0e1e4b; /* deep navy — headers, hero KPI bands, sidebar */
 
-  /* Neutral — slate scaffolding */
+  /* Brand accents — NOT semantic colors, reserved for brand identity moments */
+  --color-gold: #f2b705; /* star mark, active-nav indicator, KPI emphasis */
+  --color-gold-dark: #c89400; /* hover/pressed gold */
+  --color-brand-red: #e4574a; /* wordmark/logo ONLY — kept distinct from semantic danger */
+
+  /* Neutral — navy-tinted scaffolding */
   --color-neutral-0: #ffffff;
-  --color-neutral-50: #f8fafc;
-  --color-neutral-100: #f1f5f9;
-  --color-neutral-200: #e2e8f0;
-  --color-neutral-300: #cbd5e1;
-  --color-neutral-400: #94a3b8;
-  --color-neutral-500: #64748b;
-  --color-neutral-600: #475569;
-  --color-neutral-700: #334155;
-  --color-neutral-800: #1e293b;
-  --color-neutral-900: #0f172a;
+  --color-neutral-50: #f3f5fa;
+  --color-neutral-100: #e8edf7;
+  --color-neutral-200: #dfe5f0;
+  --color-neutral-300: #c3ccde;
+  --color-neutral-400: #8b99bc;
+  --color-neutral-500: #64708c;
+  --color-neutral-600: #4f5a78;
+  --color-neutral-700: #3d4a68;
+  --color-neutral-800: #232f4c;
+  --color-neutral-900: #16233f;
 
   /* Semantic */
-  --color-success-50: #ecfdf5;
-  --color-success-100: #dcfce7;
-  --color-success-200: #a7f3d0;
-  --color-success-600: #059669;
-  --color-success-700: #047857;
-  --color-success-text-strong: #065f46;
+  --color-success-50: #eaf7e9;
+  --color-success-100: #d3efd1;
+  --color-success-200: #a6dfa3;
+  --color-success-600: #3e8e3c;
+  --color-success-700: #2f6e2d;
+  --color-success-text-strong: #1f4e1d;
 
   --color-warning-50: #fffbeb;
   --color-warning-100: #fef3c7;
@@ -62,12 +67,12 @@
   --color-warning-700: #b45309;
   --color-warning-text-strong: #92400e;
 
-  --color-danger-50: #fef2f2;
-  --color-danger-100: #ffe4e6;
-  --color-danger-200: #fecaca;
-  --color-danger-600: #dc2626;
-  --color-danger-700: #b91c1c;
-  --color-danger-text-strong: #991b1b;
+  --color-danger-50: #fcebe9;
+  --color-danger-100: #f8d3ce;
+  --color-danger-200: #f0a99f;
+  --color-danger-600: #c24638;
+  --color-danger-700: #9e372b;
+  --color-danger-text-strong: #7a2a20;
 
   --color-info-50: #f0f9ff;
   --color-info-100: #e0f2fe;
@@ -81,11 +86,11 @@
   --color-role-cig: #312e81;
   --color-role-committee: #4c1d95;
   --color-role-lra: #064e3b;
-  --color-role-ar: #0f172a;
+  --color-role-ar: #0b3d5c;
   --color-role-collector: #164e63;
   --color-role-remedial: #7f1d1d;
   --color-role-agent: #78350f;
-  --color-role-borrower: #2563eb;
+  --color-role-borrower: #2f55b4;
 
   /* Semantic aliases */
   --surface-page: var(--color-neutral-50);
@@ -101,8 +106,8 @@
   --link-hover-color: var(--color-primary-700);
 
   /* Fonts */
-  --font-heading: "Plus Jakarta Sans", system-ui, sans-serif;
-  --font-body: "Plus Jakarta Sans", system-ui, sans-serif;
+  --font-heading: "Albert Sans", system-ui, sans-serif;
+  --font-body: "Albert Sans", system-ui, sans-serif;
   --font-mono: "JetBrains Mono", ui-monospace, "SF Mono", monospace;
 
   /* Spacing — 4px base grid */
@@ -118,10 +123,10 @@
   --space-16: 64px;
 
   /* Radius */
-  --radius-xs: 2px; /* badges, tooltips */
-  --radius-sm: 4px; /* buttons, inputs, chips */
-  --radius-md: 6px; /* cards, panels, modals */
-  --radius-lg: 10px; /* feature cards, images */
+  --radius-xs: 4px; /* badges, tooltips */
+  --radius-sm: 6px; /* buttons, inputs, chips */
+  --radius-md: 12px; /* cards, panels, modals */
+  --radius-lg: 20px; /* feature cards, hero-to-tray transitions */
   --radius-full: 9999px; /* pills, avatars, toggles */
 
   /* Shadow */
@@ -145,6 +150,10 @@
   --color-primary-700: var(--color-primary-700);
   --color-primary-800: var(--color-primary-800);
   --color-primary-900: var(--color-primary-900);
+
+  --color-gold: var(--color-gold);
+  --color-gold-dark: var(--color-gold-dark);
+  --color-brand-red: var(--color-brand-red);
 
   --color-neutral-0: var(--color-neutral-0);
   --color-neutral-50: var(--color-neutral-50);

@@ -68,7 +68,7 @@ export default function LraDashboardPage() {
 
       {queue.length === 0 ? (
         <Card>
-          <p className="text-sm text-zinc-600">No files pending LRA processing.</p>
+          <p className="text-sm text-neutral-600">No files pending LRA processing.</p>
         </Card>
       ) : (
         <div className="space-y-3">
@@ -76,17 +76,17 @@ export default function LraDashboardPage() {
             <Card key={item.applicationId}>
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
-                  <p className="font-medium text-zinc-900">
+                  <p className="font-medium text-neutral-900">
                     {item.borrower
                       ? `${item.borrower.firstName} ${item.borrower.lastName}`
                       : "Unknown"}
                     {item.borrower ? (
-                      <span className="ml-2 text-sm font-normal text-zinc-500">
+                      <span className="ml-2 text-sm font-normal text-neutral-500">
                         {item.borrower.borrowerNo}
                       </span>
                     ) : null}
                   </p>
-                  <p className="text-sm text-zinc-500">
+                  <p className="text-sm text-neutral-500">
                     {item.application
                       ? formatStatusLabel(item.application.status)
                       : ""}

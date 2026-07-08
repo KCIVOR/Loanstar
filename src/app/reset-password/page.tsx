@@ -46,21 +46,21 @@ export default function ResetPasswordPage() {
       return;
     }
 
-    router.push("/admin");
+    router.push("/dashboard");
     router.refresh();
   }
 
   return (
-    <div className="flex min-h-full flex-1 items-center justify-center bg-zinc-50 px-4">
-      <div className="w-full max-w-sm rounded-lg border border-zinc-200 bg-white p-6 shadow-sm">
-        <h1 className="text-xl font-semibold text-zinc-900">Set new password</h1>
+    <div className="flex min-h-full flex-1 items-center justify-center bg-neutral-50 px-4">
+      <div className="w-full max-w-sm rounded-lg border border-neutral-200 bg-white p-6 shadow-sm">
+        <h1 className="text-xl font-semibold text-neutral-900">Set new password</h1>
 
         {!ready ? (
           <div className="mt-4 space-y-3">
             <Alert variant="info">
               Open this page from the reset link in your email, or sign in first.
             </Alert>
-            <Link href="/login" className="text-sm text-zinc-900 hover:underline">
+            <Link href="/login" className="text-sm text-neutral-900 hover:underline">
               Back to sign in
             </Link>
           </div>

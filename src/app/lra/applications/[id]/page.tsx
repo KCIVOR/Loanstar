@@ -8,6 +8,7 @@ import {
   Alert,
   Button,
   Card,
+  ConfirmDialog,
   Input,
   Label,
   PageHeader,
@@ -86,6 +87,8 @@ export default function LraApplicationPage() {
   const [blankTo, setBlankTo] = useState("");
   const [atmBank, setAtmBank] = useState("");
   const [atmCardLast4, setAtmCardLast4] = useState("");
+  const [confirmRelease, setConfirmRelease] = useState(false);
+  const [confirmClose, setConfirmClose] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -263,12 +266,12 @@ export default function LraApplicationPage() {
       {message ? <div className="mb-4"><Alert variant="success">{message}</Alert></div> : null}
 
       <Card className="mb-6">
-        <p className="text-sm text-zinc-500">Borrower blocker</p>
-        <p className="font-medium text-zinc-900">
+        <p className="text-sm text-neutral-500">Borrower blocker</p>
+        <p className="font-medium text-neutral-900">
           {data.application.blocker ?? formatStatusLabel(data.application.status)}
         </p>
         {data.computation ? (
-          <p className="mt-2 text-sm text-zinc-600">
+          <p className="mt-2 text-sm text-neutral-600">
             Net release {formatMoney(data.computation.netReleased)} ·{" "}
             {data.computation.terms} × {formatMoney(data.computation.monthlyAmortization)}
           </p>
@@ -277,7 +280,7 @@ export default function LraApplicationPage() {
 
       {!rf ? (
         <Card>
-          <p className="mb-3 text-sm text-zinc-600">Open this file to begin LRA processing.</p>
+          <p className="mb-3 text-sm text-neutral-600">Open this file to begin LRA processing.</p>
           <Button disabled={saving} onClick={() => void startProcessing()}>
             Start processing
           </Button>
@@ -364,7 +367,7 @@ export default function LraApplicationPage() {
             <Card>
               <h2 className="mb-3 text-lg font-semibold">Generate documents</h2>
               {data.blriPreview ? (
-                <div className="mb-3 text-sm text-zinc-600">
+                <div className="mb-3 text-sm text-neutral-600">
                   BLRI preview: principal {formatMoney(data.blriPreview.principal)}, interest{" "}
                   {formatMoney(data.blriPreview.totalInterest)}, total loan{" "}
                   {formatMoney(data.blriPreview.totalLoan)}
@@ -390,7 +393,7 @@ export default function LraApplicationPage() {
                           href={doc.downloadUrl}
                           target="_blank"
                           rel="noreferrer"
-                          className="ml-2 text-blue-600 underline"
+                          className="ml-2 text-primary-600 underline"
                         >
                           PDF
                         </a>
@@ -405,7 +408,7 @@ export default function LraApplicationPage() {
           {briefingPending ? (
             <Card>
               <h2 className="mb-3 text-lg font-semibold">Briefing gate</h2>
-              <p className="text-sm text-zinc-600">
+              <p className="text-sm text-neutral-600">
                 All documents signed. Waiting for the borrower to sign the briefing
                 acknowledgment in their portal before release can proceed.
               </p>
@@ -418,25 +421,55 @@ export default function LraApplicationPage() {
             </h2>
             <Button
               disabled={!canRelease || saving}
-              onClick={() => void releaseFunds()}
+              onClick={() => setConfirmRelease(true)}
             >
               Record release
             </Button>
             {!canRelease && rf.status === "ready_release" ? (
-              <p className="mt-2 text-sm text-amber-700">Briefing sign-off required.</p>
+              <p className="mt-2 text-sm text-warning-700">Briefing sign-off required.</p>
             ) : null}
+
+            <ConfirmDialog
+              open={confirmRelease}
+              title="Record this release?"
+              message={
+                data.computation
+                  ? `This records the disbursement of ${formatMoney(
+                      data.computation.netReleased,
+                    )} to the borrower. Make sure the check or cash has actually been handed over — this cannot be undone from this screen.`
+                  : "This records the disbursement of loan proceeds to the borrower. This cannot be undone from this screen."
+              }
+              confirmLabel="Yes, record release"
+              loading={saving}
+              onCancel={() => setConfirmRelease(false)}
+              onConfirm={() => {
+                void releaseFunds().then(() => setConfirmRelease(false));
+              }}
+            />
           </Card>
 
           {rf.status === "released" ? (
             <Card>
               <h2 className="mb-3 text-lg font-semibold">Close & transmit</h2>
-              <p className="mb-3 text-sm text-zinc-600">
+              <p className="mb-3 text-sm text-neutral-600">
                 Upload the signed check voucher on the release checklist below, then close
                 the file to queue it for AR.
               </p>
-              <Button disabled={saving} onClick={() => void closeFile()}>
+              <Button disabled={saving} onClick={() => setConfirmClose(true)}>
                 Close file
               </Button>
+
+              <ConfirmDialog
+                open={confirmClose}
+                title="Close this file?"
+                message="Confirm the signed check voucher has been uploaded on the release checklist below. Closing queues the file for AR and ends LRA processing."
+                confirmLabel="Yes, close file"
+                loading={saving}
+                onCancel={() => setConfirmClose(false)}
+                onConfirm={() => {
+                  void closeFile().then(() => setConfirmClose(false));
+                }}
+              />
             </Card>
           ) : null}
 

@@ -1,41 +1,47 @@
 /* LoanStar — Color tokens
-   Source of truth: docs mockups "LoanStar Design System.dc.html" + 5 screen mockups
-   (KCIVOR/Loanstar, docs/LoanStar (1)/). Ground truth wins over docs/LoanStar_System_Design.md
-   where the two differ (e.g. primary-600 is #1A56DB in the built mockups, not #2563EB). */
+   Theme: "Deep Harbor" — navy brand blue, gold star mark, red wordmark.
+   Source of truth: "LoanStar Redesign.dc.html" option 2b (Deep Harbor), derived from
+   loanstarlending.com.ph brand navy. Replaces the earlier blue (#1A56DB) system —
+   see reference/original-mockups/ for the superseded blue-theme mockups. */
 
 :root {
-  /* Primary — trust, authority, interactive */
-  --color-primary-50:  #EFF6FF;
-  --color-primary-100: #DBEAFE;
-  --color-primary-200: #BFDBFE;
-  --color-primary-300: #93C5FD;
-  --color-primary-400: #60A5FA;
-  --color-primary-500: #2563EB;
-  --color-primary-600: #1A56DB; /* ★ main brand blue — buttons, links, active states */
-  --color-primary-700: #1444B8; /* hover */
-  --color-primary-800: #1E3A8A;
-  --color-primary-900: #1E2F5E;
+  /* Primary — navy, trust, authority, interactive */
+  --color-primary-50:  #F3F5FA;
+  --color-primary-100: #E8EDF7;
+  --color-primary-200: #C9D6EE;
+  --color-primary-300: #9FB0D8;
+  --color-primary-400: #7C97D8;
+  --color-primary-500: #4C6FC0;
+  --color-primary-600: #2F55B4; /* ★ main interactive navy-blue — buttons, links, active states */
+  --color-primary-700: #22407F; /* hover */
+  --color-primary-800: #16233F;
+  --color-primary-900: #0E1E4B; /* ★ deep navy — headers, hero KPI bands, sidebar */
 
-  /* Neutral — slate scaffolding */
+  /* Brand accents — NOT semantic colors, reserved for brand identity moments */
+  --color-gold:       #F2B705; /* star mark, active-nav indicator, KPI emphasis */
+  --color-gold-dark:  #C89400; /* hover/pressed gold */
+  --color-brand-red:  #E4574A; /* wordmark/logo ONLY — kept distinct from semantic danger */
+
+  /* Neutral — navy-tinted scaffolding */
   --color-neutral-0:   #FFFFFF;
-  --color-neutral-50:  #F8FAFC;
-  --color-neutral-100: #F1F5F9;
-  --color-neutral-200: #E2E8F0;
-  --color-neutral-300: #CBD5E1;
-  --color-neutral-400: #94A3B8;
-  --color-neutral-500: #64748B;
-  --color-neutral-600: #475569;
-  --color-neutral-700: #334155;
-  --color-neutral-800: #1E293B;
-  --color-neutral-900: #0F172A;
+  --color-neutral-50:  #F3F5FA;
+  --color-neutral-100: #E8EDF7;
+  --color-neutral-200: #DFE5F0;
+  --color-neutral-300: #C3CCDE;
+  --color-neutral-400: #8B99BC;
+  --color-neutral-500: #64708C;
+  --color-neutral-600: #4F5A78;
+  --color-neutral-700: #3D4A68;
+  --color-neutral-800: #232F4C;
+  --color-neutral-900: #16233F;
 
   /* Semantic */
-  --color-success-50:  #ECFDF5;
-  --color-success-100: #DCFCE7;
-  --color-success-200: #A7F3D0;
-  --color-success-600: #059669;
-  --color-success-700: #047857;
-  --color-success-text-strong: #065F46;
+  --color-success-50:  #EAF7E9;
+  --color-success-100: #D3EFD1;
+  --color-success-200: #A6DFA3;
+  --color-success-600: #3E8E3C;
+  --color-success-700: #2F6E2D;
+  --color-success-text-strong: #1F4E1D;
 
   --color-warning-50:  #FFFBEB;
   --color-warning-100: #FEF3C7;
@@ -44,12 +50,12 @@
   --color-warning-700:  #B45309;
   --color-warning-text-strong: #92400E;
 
-  --color-danger-50:   #FEF2F2;
-  --color-danger-100:  #FFE4E6;
-  --color-danger-200:  #FECACA;
-  --color-danger-600:  #DC2626;
-  --color-danger-700:  #B91C1C;
-  --color-danger-text-strong: #991B1B;
+  --color-danger-50:   #FCEBE9;
+  --color-danger-100:  #F8D3CE;
+  --color-danger-200:  #F0A99F;
+  --color-danger-600:  #C24638;
+  --color-danger-700:  #9E372B;
+  --color-danger-text-strong: #7A2A20;
 
   --color-info-50:     #F0F9FF;
   --color-info-100:    #E0F2FE;
@@ -59,18 +65,18 @@
   --color-info-text-strong: #0C4A6E;
 
   /* Role accent colors — reference palette for staff-portal identity per module.
-     Documented in docs/LoanStar_System_Design.md; not all are expressed in the
-     built mockups yet, which currently favor the unified primary blue. Use when
-     building additional portal surfaces (CIG, Committee, AR, Remedial, Agent…). */
+     Kept distinct from the new primary navy scale so each portal remains
+     visually identifiable. --color-role-ar was moved off #0F172A (now
+     indistinguishable from --color-primary-900) to a teal-navy. */
   --color-role-csa:       #1E3A8A;
   --color-role-cig:       #312E81;
   --color-role-committee: #4C1D95;
   --color-role-lra:       #064E3B;
-  --color-role-ar:        #0F172A;
+  --color-role-ar:        #0B3D5C;
   --color-role-collector: #164E63;
   --color-role-remedial:  #7F1D1D;
   --color-role-agent:     #78350F;
-  --color-role-borrower:  #2563EB;
+  --color-role-borrower:  #2F55B4;
 
   /* Semantic aliases */
   --surface-page:     var(--color-neutral-50);

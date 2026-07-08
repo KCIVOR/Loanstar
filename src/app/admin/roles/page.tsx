@@ -6,9 +6,9 @@ import { FormEvent, useCallback, useEffect, useState } from "react";
 import {
   Alert,
   Button,
-  Card,
   Input,
   Label,
+  Modal,
   PageHeader,
   Spinner,
   Table,
@@ -87,9 +87,7 @@ export default function RolesPage() {
         title="Roles"
         description="Manage custom roles and module permissions"
         actions={
-          <Button onClick={() => setShowForm(!showForm)}>
-            {showForm ? "Cancel" : "Create role"}
-          </Button>
+          <Button onClick={() => setShowForm(true)}>Create role</Button>
         }
       />
 
@@ -99,32 +97,43 @@ export default function RolesPage() {
         </div>
       ) : null}
 
-      {showForm ? (
-        <Card className="mb-6">
-          <form onSubmit={(e) => void handleCreate(e)} className="space-y-4">
-            <div>
-              <Label htmlFor="role-name">Role name</Label>
-              <Input
-                id="role-name"
-                required
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-              />
-            </div>
-            <div>
-              <Label htmlFor="role-desc">Description</Label>
-              <Input
-                id="role-desc"
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-              />
-            </div>
+      <Modal
+        open={showForm}
+        title="Create role"
+        onClose={() => setShowForm(false)}
+      >
+        <form onSubmit={(e) => void handleCreate(e)} className="space-y-4">
+          <div>
+            <Label htmlFor="role-name">Role name</Label>
+            <Input
+              id="role-name"
+              required
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+            />
+          </div>
+          <div>
+            <Label htmlFor="role-desc">Description</Label>
+            <Input
+              id="role-desc"
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+            />
+          </div>
+          <div className="flex justify-end gap-2">
+            <Button
+              variant="secondary"
+              onClick={() => setShowForm(false)}
+              disabled={saving}
+            >
+              Cancel
+            </Button>
             <Button type="submit" disabled={saving}>
               {saving ? "Creating…" : "Create role"}
             </Button>
-          </form>
-        </Card>
-      ) : null}
+          </div>
+        </form>
+      </Modal>
 
       {loading ? (
         <Spinner />
@@ -139,18 +148,18 @@ export default function RolesPage() {
               <Th>Actions</Th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-zinc-200 bg-white">
+          <tbody className="divide-y divide-neutral-200 bg-white">
             {roles.map((role) => (
               <tr key={role.id}>
-                <Td className="font-medium text-zinc-900">{role.name}</Td>
+                <Td className="font-medium text-neutral-900">{role.name}</Td>
                 <Td>{role.slug}</Td>
                 <Td>{role.is_system ? "System" : "Custom"}</Td>
                 <Td>
                   <span
                     className={
                       role.is_active
-                        ? "text-green-700"
-                        : "text-zinc-400"
+                        ? "text-success-700"
+                        : "text-neutral-400"
                     }
                   >
                     {role.is_active ? "Active" : "Inactive"}
@@ -159,7 +168,7 @@ export default function RolesPage() {
                 <Td>
                   <Link
                     href={`/admin/roles/${role.id}`}
-                    className="text-sm text-zinc-900 hover:underline"
+                    className="text-sm text-neutral-900 hover:underline"
                   >
                     Edit
                   </Link>

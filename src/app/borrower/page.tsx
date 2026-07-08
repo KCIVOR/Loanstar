@@ -103,37 +103,37 @@ export default function BorrowerDashboardPage() {
 
       <div className="grid gap-6 md:grid-cols-2">
         <Card>
-          <h2 className="text-sm font-medium text-zinc-500">Borrower number</h2>
-          <p className="mt-1 font-mono text-xl font-semibold text-zinc-900">
+          <h2 className="text-sm font-medium text-neutral-500">Borrower number</h2>
+          <p className="mt-1 font-mono text-xl font-semibold text-neutral-900">
             {profile?.borrowerNo ?? "—"}
           </p>
         </Card>
 
         <Card>
-          <h2 className="text-sm font-medium text-zinc-500">
+          <h2 className="text-sm font-medium text-neutral-500">
             Current application
           </h2>
           {application ? (
             <>
-              <p className="mt-1 text-lg font-semibold text-zinc-900">
+              <p className="mt-1 text-lg font-semibold text-neutral-900">
                 {application.statusLabel ??
                   formatStatusLabel(application.status)}
               </p>
               {application.applicationNo ? (
-                <p className="text-xs text-zinc-500">
+                <p className="text-xs text-neutral-500">
                   {application.applicationNo}
                 </p>
               ) : null}
             </>
           ) : (
-            <p className="mt-1 text-zinc-600">No active application</p>
+            <p className="mt-1 text-neutral-600">No active application</p>
           )}
         </Card>
       </div>
 
       {application ? (
         <Card className="mt-6 overflow-x-auto">
-          <h2 className="mb-4 font-medium text-zinc-900">Application progress</h2>
+          <h2 className="mb-4 font-medium text-neutral-900">Application progress</h2>
           <StatusTimeline currentStatus={application.status} />
         </Card>
       ) : null}

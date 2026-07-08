@@ -47,8 +47,8 @@ export function SignatureConfirm({
 
   return (
     <Card>
-      <h2 className="text-lg font-medium text-zinc-900">{documentName}</h2>
-      <p className="mt-2 text-sm text-zinc-600">
+      <h2 className="text-lg font-medium text-neutral-900">{documentName}</h2>
+      <p className="mt-2 text-sm text-neutral-600">
         By confirming, you acknowledge that you have reviewed this document and
         agree to its contents. Your signature will be recorded with a timestamp
         and document hash.
@@ -74,11 +74,11 @@ export function SignatureConfirm({
 
       {confirmOpen ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
-          <div className="w-full max-w-md rounded-lg border border-zinc-200 bg-white p-6 shadow-lg">
-            <h3 className="text-lg font-semibold text-zinc-900">
+          <div className="w-full max-w-md rounded-lg border border-neutral-200 bg-white p-6 shadow-lg">
+            <h3 className="text-lg font-semibold text-neutral-900">
               Confirm signature
             </h3>
-            <p className="mt-2 text-sm text-zinc-600">
+            <p className="mt-2 text-sm text-neutral-600">
               Are you sure you want to sign{" "}
               <span className="font-medium">{documentName}</span>? This action
               cannot be undone.

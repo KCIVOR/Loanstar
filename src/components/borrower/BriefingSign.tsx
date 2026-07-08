@@ -74,8 +74,8 @@ export function BriefingSign({ applicationId, onSigned }: BriefingSignProps) {
 
   return (
     <Card className="mb-6">
-      <h2 className="mb-2 text-lg font-semibold text-zinc-900">Loan briefing</h2>
-      <p className="mb-3 text-sm text-zinc-600">
+      <h2 className="mb-2 text-lg font-semibold text-neutral-900">Loan briefing</h2>
+      <p className="mb-3 text-sm text-neutral-600">
         Review the briefing checklist below, then confirm your acknowledgment.
       </p>
       {error ? (
@@ -83,14 +83,14 @@ export function BriefingSign({ applicationId, onSigned }: BriefingSignProps) {
           <Alert>{error}</Alert>
         </div>
       ) : null}
-      <ul className="mb-4 list-disc space-y-1 pl-5 text-sm text-zinc-700">
+      <ul className="mb-4 list-disc space-y-1 pl-5 text-sm text-neutral-700">
         {checklist.map((item) => (
           <li key={item.key}>{item.label}</li>
         ))}
       </ul>
       {showDialog ? (
-        <div className="rounded-lg border border-zinc-200 bg-zinc-50 p-4">
-          <p className="mb-3 text-sm text-zinc-700">
+        <div className="rounded-lg border border-neutral-200 bg-neutral-50 p-4">
+          <p className="mb-3 text-sm text-neutral-700">
             I confirm that the loan terms, payment obligations, and collection
             contact information were explained to me during briefing.
           </p>

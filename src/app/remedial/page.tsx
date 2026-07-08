@@ -44,19 +44,19 @@ export default function RemedialDashboardPage() {
 
       {accounts.length === 0 ? (
         <Card>
-          <p className="text-sm text-zinc-600">No remedial accounts assigned.</p>
+          <p className="text-sm text-neutral-600">No remedial accounts assigned.</p>
         </Card>
       ) : (
         <div className="space-y-3">
           {accounts.map((acc) => (
             <Card key={acc.id}>
-              <p className="font-medium text-zinc-900">
+              <p className="font-medium text-neutral-900">
                 {acc.borrower_name}
-                <span className="ml-2 text-sm font-normal text-zinc-500">
+                <span className="ml-2 text-sm font-normal text-neutral-500">
                   {acc.loan_account_no}
                 </span>
               </p>
-              <p className="text-sm text-zinc-500">
+              <p className="text-sm text-neutral-500">
                 Balance{" "}
                 {Number(acc.outstanding_balance).toLocaleString("en-PH", {
                   minimumFractionDigits: 2,

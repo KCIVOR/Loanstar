@@ -16,20 +16,20 @@ export function StatusTimeline({ currentStatus }: { currentStatus: string }) {
         const isDenied = currentStatus === "denied";
         const isFuture = !isPast && !isCurrent;
 
-        let dotClass = "border-zinc-300 bg-white text-zinc-400";
-        let labelClass = "text-zinc-500";
+        let dotClass = "border-neutral-300 bg-white text-neutral-400";
+        let labelClass = "text-neutral-500";
         if (isDenied && isCurrent) {
-          dotClass = "border-red-600 bg-red-600 text-white";
-          labelClass = "font-medium text-red-700";
+          dotClass = "border-danger-600 bg-danger-600 text-white";
+          labelClass = "font-medium text-danger-700";
         } else if (isCurrent) {
-          dotClass = "border-zinc-900 bg-zinc-900 text-white";
-          labelClass = "font-medium text-zinc-900";
+          dotClass = "border-neutral-900 bg-neutral-900 text-white";
+          labelClass = "font-medium text-neutral-900";
         } else if (isPast) {
-          dotClass = "border-zinc-900 bg-zinc-900 text-white";
-          labelClass = "text-zinc-700";
+          dotClass = "border-neutral-900 bg-neutral-900 text-white";
+          labelClass = "text-neutral-700";
         } else if (isFuture) {
-          dotClass = "border-zinc-200 bg-zinc-50 text-zinc-300";
-          labelClass = "text-zinc-400";
+          dotClass = "border-neutral-200 bg-neutral-50 text-neutral-300";
+          labelClass = "text-neutral-400";
         }
 
         return (

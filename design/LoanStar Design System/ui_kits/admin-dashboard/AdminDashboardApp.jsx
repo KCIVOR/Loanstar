@@ -9,10 +9,10 @@ function AdminDashboardApp() {
   ];
 
   const donutData = [
-    { label: 'Active', count: 856, color: '#1A56DB', pct: '68.6%' },
+    { label: 'Active', count: 856, color: '#2F55B4', pct: '68.6%' },
     { label: 'Pending', count: 218, color: '#D97706', pct: '17.5%' },
-    { label: 'Overdue', count: 73, color: '#DC2626', pct: '5.8%' },
-    { label: 'Closed', count: 100, color: '#CBD5E1', pct: '8.0%' },
+    { label: 'Overdue', count: 73, color: '#C24638', pct: '5.8%' },
+    { label: 'Closed', count: 100, color: '#C3CCDE', pct: '8.0%' },
   ];
   let cum = 0;
   const gradParts = donutData.map((d) => {
@@ -23,10 +23,10 @@ function AdminDashboardApp() {
   });
 
   const pipeline = [
-    { stage: 'Intake & Verification', count: 48, role: 'CSA', color: '#1A56DB' },
+    { stage: 'Intake & Verification', count: 48, role: 'CSA', color: '#2F55B4' },
     { stage: 'Credit Investigation', count: 32, role: 'CIG', color: '#0EA5E9' },
     { stage: 'Committee Review', count: 24, role: 'Committee', color: '#D97706' },
-    { stage: 'Negotiation & Docs', count: 18, role: 'LRA', color: '#059669' },
+    { stage: 'Negotiation & Docs', count: 18, role: 'LRA', color: '#3E8E3C' },
     { stage: 'Briefing & Release', count: 12, role: 'LRA', color: '#8B5CF6' },
   ];
 
@@ -38,9 +38,9 @@ function AdminDashboardApp() {
     { id: 'LN-2026-00244', name: 'Rosa Mendoza', amount: '₱75,000', stage: 'Monitoring', date: 'Jun 13', status: 'active' },
     { id: 'LN-2026-00241', name: 'Carlos Aquino', amount: '₱45,000', stage: 'CIG', date: 'Jun 11', status: 'overdue' },
   ];
-  const statusCfg = { pending: ['#FFFBEB', '#D97706', 'Pending'], approved: ['#ECFDF5', '#059669', 'Approved'], active: ['#EFF6FF', '#1A56DB', 'Active'], overdue: ['#FEF2F2', '#DC2626', 'Overdue'] };
+  const statusCfg = { pending: ['#FFFBEB', '#D97706', 'Pending'], approved: ['#EAF7E9', '#3E8E3C', 'Approved'], active: ['#F3F5FA', '#2F55B4', 'Active'], overdue: ['#FCEBE9', '#C24638', 'Overdue'] };
   const filtered = activeTab === 'all' ? allApps : allApps.filter((a) => a.status === activeTab);
-  const avatarColors = ['#1A56DB', '#059669', '#D97706', '#8B5CF6', '#DC2626', '#0EA5E9'];
+  const avatarColors = ['#2F55B4', '#3E8E3C', '#D97706', '#8B5CF6', '#C24638', '#0EA5E9'];
 
   const navDefs = [
     { id: 'dashboard', label: 'Dashboard' },
@@ -54,96 +54,96 @@ function AdminDashboardApp() {
   const [activeNav, setActiveNav] = React.useState('dashboard');
 
   return (
-    <div style={{ display: 'flex', height: 760, overflow: 'hidden', fontFamily: "'Plus Jakarta Sans',system-ui,sans-serif", background: '#F8FAFC' }}>
-      <aside style={{ width: 216, flexShrink: 0, background: '#fff', borderRight: '1px solid #E2E8F0', display: 'flex', flexDirection: 'column', overflowY: 'auto' }}>
-        <div style={{ padding: '18px 18px 14px', borderBottom: '1px solid #F1F5F9' }}>
+    <div style={{ display: 'flex', height: 760, overflow: 'hidden', fontFamily: "'Albert Sans',system-ui,sans-serif", background: '#F3F5FA' }}>
+      <aside style={{ width: 216, flexShrink: 0, background: '#fff', borderRight: '1px solid #DFE5F0', display: 'flex', flexDirection: 'column', overflowY: 'auto' }}>
+        <div style={{ padding: '18px 18px 14px', borderBottom: '1px solid #E8EDF7' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <div style={{ width: 34, height: 34, background: 'linear-gradient(135deg,#1A56DB,#1444B8)', borderRadius: 6, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <div style={{ width: 34, height: 34, background: 'linear-gradient(135deg,#2F55B4,#22407F)', borderRadius: 6, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <svg width="17" height="17" viewBox="0 0 18 18" fill="none"><path d="M9 1.5L11.2 6.7 16.5 7.4 12.75 11.1 13.8 16.5 9 13.9 4.2 16.5 5.25 11.1 1.5 7.4 6.8 6.7z" fill="white"/></svg>
             </div>
             <div>
-              <div style={{ fontSize: 14, fontWeight: 800, color: '#0F172A' }}>LoanStar</div>
-              <div style={{ fontSize: 10, color: '#94A3B8', fontWeight: 600, textTransform: 'uppercase' }}>Admin Portal</div>
+              <div style={{ fontSize: 14, fontWeight: 800, color: '#16233F' }}>LoanStar</div>
+              <div style={{ fontSize: 10, color: '#8B99BC', fontWeight: 600, textTransform: 'uppercase' }}>Admin Portal</div>
             </div>
           </div>
         </div>
         <nav style={{ padding: 10, flex: 1 }}>
-          <div style={{ fontSize: 9.5, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#94A3B8', padding: '6px 8px' }}>Main Menu</div>
+          <div style={{ fontSize: 9.5, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#8B99BC', padding: '6px 8px' }}>Main Menu</div>
           {navDefs.map((item) => {
             const active = activeNav === item.id;
             return (
-              <div key={item.id} onClick={() => setActiveNav(item.id)} style={{ display: 'flex', alignItems: 'center', gap: 9, padding: '7px 8px', borderRadius: 5, cursor: 'pointer', background: active ? '#EFF6FF' : 'transparent' }}>
-                <span style={{ fontSize: 13, fontWeight: active ? 600 : 500, color: active ? '#1A56DB' : '#475569', flex: 1 }}>{item.label}</span>
-                {item.badge && <span style={{ background: '#FEF2F2', color: '#DC2626', fontSize: 10, fontWeight: 700, padding: '1px 6px', borderRadius: 9 }}>{item.badge}</span>}
+              <div key={item.id} onClick={() => setActiveNav(item.id)} style={{ display: 'flex', alignItems: 'center', gap: 9, padding: '7px 8px', borderRadius: 5, cursor: 'pointer', background: active ? '#F3F5FA' : 'transparent' }}>
+                <span style={{ fontSize: 13, fontWeight: active ? 600 : 500, color: active ? '#2F55B4' : '#4F5A78', flex: 1 }}>{item.label}</span>
+                {item.badge && <span style={{ background: '#FCEBE9', color: '#C24638', fontSize: 10, fontWeight: 700, padding: '1px 6px', borderRadius: 9 }}>{item.badge}</span>}
               </div>
             );
           })}
         </nav>
-        <div style={{ padding: '12px 14px', borderTop: '1px solid #F1F5F9', display: 'flex', alignItems: 'center', gap: 10 }}>
-          <div style={{ width: 32, height: 32, borderRadius: '50%', background: 'linear-gradient(135deg,#1A56DB,#0EA5E9)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 700, color: '#fff' }}>M</div>
-          <div><div style={{ fontSize: 12, fontWeight: 600, color: '#0F172A' }}>Maria Santos</div><div style={{ fontSize: 11, color: '#94A3B8' }}>Branch Manager</div></div>
+        <div style={{ padding: '12px 14px', borderTop: '1px solid #E8EDF7', display: 'flex', alignItems: 'center', gap: 10 }}>
+          <div style={{ width: 32, height: 32, borderRadius: '50%', background: 'linear-gradient(135deg,#2F55B4,#0EA5E9)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 700, color: '#fff' }}>M</div>
+          <div><div style={{ fontSize: 12, fontWeight: 600, color: '#16233F' }}>Maria Santos</div><div style={{ fontSize: 11, color: '#8B99BC' }}>Branch Manager</div></div>
         </div>
       </aside>
 
       <main style={{ flex: 1, overflowY: 'auto', minWidth: 0 }}>
-        <header style={{ height: 58, background: '#fff', borderBottom: '1px solid #E2E8F0', position: 'sticky', top: 0, zIndex: 40, padding: '0 26px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <header style={{ height: 58, background: '#fff', borderBottom: '1px solid #DFE5F0', position: 'sticky', top: 0, zIndex: 40, padding: '0 26px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div>
-            <div style={{ fontSize: 17, fontWeight: 700, color: '#0F172A' }}>Dashboard</div>
-            <div style={{ fontSize: 12, color: '#94A3B8' }}>June 16, 2026 · Good morning, Maria</div>
+            <div style={{ fontSize: 17, fontWeight: 700, color: '#16233F' }}>Dashboard</div>
+            <div style={{ fontSize: 12, color: '#8B99BC' }}>June 16, 2026 · Good morning, Maria</div>
           </div>
-          <input placeholder="Search loans, borrowers…" style={{ width: 200, height: 34, padding: '0 12px', background: '#F8FAFC', border: '1.5px solid #E2E8F0', borderRadius: 4, fontSize: 13 }} />
+          <input placeholder="Search loans, borrowers…" style={{ width: 200, height: 34, padding: '0 12px', background: '#F3F5FA', border: '1.5px solid #DFE5F0', borderRadius: 4, fontSize: 13 }} />
         </header>
 
         <div style={{ padding: '22px 26px' }}>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 14, marginBottom: 20 }}>
             {kpis.map((k) => (
-              <div key={k.label} style={{ background: '#fff', border: '1px solid #E2E8F0', borderRadius: 6, padding: 18, boxShadow: '0 1px 3px rgba(15,23,42,0.05)' }}>
-                <div style={{ fontSize: 11, fontWeight: 600, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 12 }}>{k.label}</div>
-                <div style={{ fontSize: 28, fontWeight: 700, color: '#0F172A', letterSpacing: '-1px', fontVariantNumeric: 'tabular-nums', marginBottom: 8 }}>{k.value}</div>
-                <span style={{ background: k.up ? '#ECFDF5' : '#FEF2F2', color: k.up ? '#059669' : '#DC2626', fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 3 }}>{k.trend}</span>
-                <span style={{ fontSize: 11, color: '#94A3B8', marginLeft: 8 }}>{k.change}</span>
+              <div key={k.label} style={{ background: '#fff', border: '1px solid #DFE5F0', borderRadius: 6, padding: 18, boxShadow: '0 1px 3px rgba(15,23,42,0.05)' }}>
+                <div style={{ fontSize: 11, fontWeight: 600, color: '#64708C', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 12 }}>{k.label}</div>
+                <div style={{ fontSize: 28, fontWeight: 700, color: '#16233F', letterSpacing: '-1px', fontVariantNumeric: 'tabular-nums', marginBottom: 8 }}>{k.value}</div>
+                <span style={{ background: k.up ? '#EAF7E9' : '#FCEBE9', color: k.up ? '#3E8E3C' : '#C24638', fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 3 }}>{k.trend}</span>
+                <span style={{ fontSize: 11, color: '#8B99BC', marginLeft: 8 }}>{k.change}</span>
               </div>
             ))}
           </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.6fr', gap: 14, marginBottom: 20 }}>
-            <div style={{ background: '#fff', border: '1px solid #E2E8F0', borderRadius: 6, padding: 18 }}>
-              <div style={{ fontSize: 14, fontWeight: 700, color: '#0F172A', marginBottom: 4 }}>Loan Status Mix</div>
-              <div style={{ fontSize: 12, color: '#94A3B8', marginBottom: 16 }}>1,247 total loans</div>
+            <div style={{ background: '#fff', border: '1px solid #DFE5F0', borderRadius: 6, padding: 18 }}>
+              <div style={{ fontSize: 14, fontWeight: 700, color: '#16233F', marginBottom: 4 }}>Loan Status Mix</div>
+              <div style={{ fontSize: 12, color: '#8B99BC', marginBottom: 16 }}>1,247 total loans</div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 20 }}>
                 <div style={{ width: 120, height: 120, borderRadius: '50%', background: `conic-gradient(${gradParts.join(', ')})`, flexShrink: 0, position: 'relative' }}>
                   <div style={{ position: 'absolute', inset: 24, background: '#fff', borderRadius: '50%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
-                    <div style={{ fontSize: 18, fontWeight: 700, color: '#0F172A' }}>1,247</div>
-                    <div style={{ fontSize: 9, color: '#94A3B8' }}>Total</div>
+                    <div style={{ fontSize: 18, fontWeight: 700, color: '#16233F' }}>1,247</div>
+                    <div style={{ fontSize: 9, color: '#8B99BC' }}>Total</div>
                   </div>
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 8, flex: 1 }}>
                   {donutData.map((d) => (
                     <div key={d.label} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                       <div style={{ width: 8, height: 8, borderRadius: 2, background: d.color }} />
-                      <div style={{ flex: 1 }}><div style={{ fontSize: 12, fontWeight: 600, color: '#334155' }}>{d.label}</div><div style={{ fontSize: 10, color: '#94A3B8' }}>{d.pct}</div></div>
-                      <div style={{ fontSize: 13, fontWeight: 700, color: '#0F172A' }}>{d.count}</div>
+                      <div style={{ flex: 1 }}><div style={{ fontSize: 12, fontWeight: 600, color: '#3D4A68' }}>{d.label}</div><div style={{ fontSize: 10, color: '#8B99BC' }}>{d.pct}</div></div>
+                      <div style={{ fontSize: 13, fontWeight: 700, color: '#16233F' }}>{d.count}</div>
                     </div>
                   ))}
                 </div>
               </div>
             </div>
-            <div style={{ background: '#fff', border: '1px solid #E2E8F0', borderRadius: 6, padding: 18 }}>
-              <div style={{ fontSize: 14, fontWeight: 700, color: '#0F172A', marginBottom: 4 }}>Active Pipeline</div>
-              <div style={{ fontSize: 12, color: '#94A3B8', marginBottom: 18 }}>Applications currently in processing stages</div>
+            <div style={{ background: '#fff', border: '1px solid #DFE5F0', borderRadius: 6, padding: 18 }}>
+              <div style={{ fontSize: 14, fontWeight: 700, color: '#16233F', marginBottom: 4 }}>Active Pipeline</div>
+              <div style={{ fontSize: 12, color: '#8B99BC', marginBottom: 18 }}>Applications currently in processing stages</div>
               {pipeline.map((row) => (
                 <div key={row.stage} style={{ marginBottom: 14 }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                       <div style={{ width: 6, height: 6, borderRadius: '50%', background: row.color }} />
-                      <span style={{ fontSize: 12, fontWeight: 600, color: '#334155' }}>{row.stage}</span>
+                      <span style={{ fontSize: 12, fontWeight: 600, color: '#3D4A68' }}>{row.stage}</span>
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <span style={{ fontSize: 10, color: '#94A3B8', background: '#F1F5F9', padding: '2px 7px', borderRadius: 3, fontWeight: 600 }}>{row.role}</span>
-                      <span style={{ fontSize: 14, fontWeight: 700, color: '#0F172A', minWidth: 24, textAlign: 'right' }}>{row.count}</span>
+                      <span style={{ fontSize: 10, color: '#8B99BC', background: '#E8EDF7', padding: '2px 7px', borderRadius: 3, fontWeight: 600 }}>{row.role}</span>
+                      <span style={{ fontSize: 14, fontWeight: 700, color: '#16233F', minWidth: 24, textAlign: 'right' }}>{row.count}</span>
                     </div>
                   </div>
-                  <div style={{ height: 6, background: '#F1F5F9', borderRadius: 3, overflow: 'hidden' }}>
+                  <div style={{ height: 6, background: '#E8EDF7', borderRadius: 3, overflow: 'hidden' }}>
                     <div style={{ height: '100%', width: `${Math.round((row.count / 60) * 100)}%`, background: row.color, borderRadius: 3 }} />
                   </div>
                 </div>
@@ -151,32 +151,32 @@ function AdminDashboardApp() {
             </div>
           </div>
 
-          <div style={{ background: '#fff', border: '1px solid #E2E8F0', borderRadius: 6, overflow: 'hidden' }}>
-            <div style={{ padding: '14px 18px', borderBottom: '1px solid #E2E8F0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <div style={{ fontSize: 14, fontWeight: 700, color: '#0F172A' }}>Recent Applications</div>
-              <div style={{ display: 'flex', gap: 2, background: '#F1F5F9', padding: 3, borderRadius: 5 }}>
+          <div style={{ background: '#fff', border: '1px solid #DFE5F0', borderRadius: 6, overflow: 'hidden' }}>
+            <div style={{ padding: '14px 18px', borderBottom: '1px solid #DFE5F0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div style={{ fontSize: 14, fontWeight: 700, color: '#16233F' }}>Recent Applications</div>
+              <div style={{ display: 'flex', gap: 2, background: '#E8EDF7', padding: 3, borderRadius: 5 }}>
                 {['all', 'pending', 'active', 'overdue'].map((t) => (
-                  <button key={t} onClick={() => setActiveTab(t)} style={{ height: 28, padding: '0 12px', border: 'none', borderRadius: 3, fontSize: 12, fontWeight: 600, cursor: 'pointer', textTransform: 'capitalize', background: activeTab === t ? '#fff' : 'transparent', color: activeTab === t ? '#0F172A' : '#64748B' }}>{t}</button>
+                  <button key={t} onClick={() => setActiveTab(t)} style={{ height: 28, padding: '0 12px', border: 'none', borderRadius: 3, fontSize: 12, fontWeight: 600, cursor: 'pointer', textTransform: 'capitalize', background: activeTab === t ? '#fff' : 'transparent', color: activeTab === t ? '#16233F' : '#64708C' }}>{t}</button>
                 ))}
               </div>
             </div>
-            <div style={{ display: 'grid', gridTemplateColumns: '130px 1fr 100px 100px 80px 90px', padding: '8px 18px', background: '#F8FAFC', borderBottom: '1px solid #E2E8F0' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '130px 1fr 100px 100px 80px 90px', padding: '8px 18px', background: '#F3F5FA', borderBottom: '1px solid #DFE5F0' }}>
               {['Loan ID', 'Borrower', 'Amount', 'Stage', 'Date', 'Status'].map((h) => (
-                <div key={h} style={{ fontSize: 10, fontWeight: 700, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.07em' }}>{h}</div>
+                <div key={h} style={{ fontSize: 10, fontWeight: 700, color: '#64708C', textTransform: 'uppercase', letterSpacing: '0.07em' }}>{h}</div>
               ))}
             </div>
             {filtered.map((row, i) => {
               const [bg, color, label] = statusCfg[row.status];
               return (
-                <div key={row.id} style={{ display: 'grid', gridTemplateColumns: '130px 1fr 100px 100px 80px 90px', padding: '11px 18px', borderBottom: '1px solid #F8FAFC', alignItems: 'center' }}>
-                  <div style={{ fontSize: 12, fontWeight: 600, color: '#334155', fontFamily: 'var(--font-mono)' }}>{row.id}</div>
+                <div key={row.id} style={{ display: 'grid', gridTemplateColumns: '130px 1fr 100px 100px 80px 90px', padding: '11px 18px', borderBottom: '1px solid #F3F5FA', alignItems: 'center' }}>
+                  <div style={{ fontSize: 12, fontWeight: 600, color: '#3D4A68', fontFamily: 'var(--font-mono)' }}>{row.id}</div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                     <div style={{ width: 26, height: 26, borderRadius: '50%', background: avatarColors[i % avatarColors.length], display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 700, color: '#fff' }}>{row.name.split(' ').map((w) => w[0]).join('')}</div>
-                    <span style={{ fontSize: 13, color: '#334155' }}>{row.name}</span>
+                    <span style={{ fontSize: 13, color: '#3D4A68' }}>{row.name}</span>
                   </div>
-                  <div style={{ fontSize: 13, fontWeight: 600, color: '#0F172A' }}>{row.amount}</div>
-                  <div style={{ fontSize: 12, color: '#64748B' }}>{row.stage}</div>
-                  <div style={{ fontSize: 12, color: '#94A3B8' }}>{row.date}</div>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: '#16233F' }}>{row.amount}</div>
+                  <div style={{ fontSize: 12, color: '#64708C' }}>{row.stage}</div>
+                  <div style={{ fontSize: 12, color: '#8B99BC' }}>{row.date}</div>
                   <span style={{ background: bg, color, fontSize: 11, fontWeight: 700, padding: '3px 9px', borderRadius: 3, width: 'fit-content' }}>{label}</span>
                 </div>
               );

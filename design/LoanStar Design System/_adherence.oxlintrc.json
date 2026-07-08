@@ -43,8 +43,8 @@
         "message": "Raw px value — use a design-system spacing token via var()."
       },
       {
-        "selector": "Literal[value=/font-family\\s*:\\s*(?!['\\\"]?(?:Plus Jakarta Sans|JetBrains Mono))/i]",
-        "message": "Font not provided by the design system. Available: Plus Jakarta Sans, JetBrains Mono."
+        "selector": "Literal[value=/font-family\\s*:\\s*(?!['\\\"]?(?:Albert Sans|JetBrains Mono))/i]",
+        "message": "Font not provided by the design system. Available: Albert Sans, JetBrains Mono."
       },
       {
         "selector": "JSXOpeningElement[name.name='Alert'] > JSXAttribute > JSXIdentifier[name!=/^(?:variant|title|children|key|ref|className|style|children)$/]",
@@ -171,6 +171,9 @@
       "--color-danger-600",
       "--color-danger-700",
       "--color-danger-text-strong",
+      "--color-gold",
+      "--color-gold-dark",
+      "--color-brand-red",
       "--color-info-100",
       "--color-info-200",
       "--color-info-50",
@@ -331,6 +334,9 @@
       "--color-danger-600": "color",
       "--color-danger-700": "color",
       "--color-danger-text-strong": "font",
+      "--color-gold": "color",
+      "--color-gold-dark": "color",
+      "--color-brand-red": "color",
       "--color-info-50": "color",
       "--color-info-100": "color",
       "--color-info-200": "color",
@@ -422,7 +428,7 @@
     },
     "fontFamilies": [
       "JetBrains Mono",
-      "Plus Jakarta Sans"
+      "Albert Sans"
     ]
   }
 }

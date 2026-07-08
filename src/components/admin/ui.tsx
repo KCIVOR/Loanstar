@@ -1,5 +1,7 @@
 import type { ReactNode } from "react";
 
+export { Badge } from "./Badge";
+
 export function PageHeader({
   title,
   description,
@@ -38,7 +40,7 @@ export function Card({
     highlight: "bg-primary-50 border border-primary-200 border-l-4 border-l-primary-600",
     warning: "bg-warning-50 border border-warning-200 border-l-4 border-l-warning-600",
     danger: "bg-danger-50 border border-danger-200 border-l-4 border-l-danger-600",
-    gradient: "bg-gradient-to-br from-[#1E3A8A] to-primary-600 text-white",
+    gradient: "bg-gradient-to-br from-primary-900 to-primary-600 text-white",
   };
   return (
     <div
@@ -167,6 +169,83 @@ export function Alert({
     <div className={`flex items-start gap-3 rounded-md border px-4 py-3.5 ${v.bg} ${v.border}`}>
       <span className={`mt-1.5 h-2 w-2 shrink-0 rounded-full ${v.dot}`} />
       <div className={`text-[13px] leading-relaxed ${v.text}`}>{children}</div>
+    </div>
+  );
+}
+
+export function Modal({
+  open,
+  title,
+  onClose,
+  children,
+}: {
+  open: boolean;
+  title: string;
+  onClose: () => void;
+  children: ReactNode;
+}) {
+  if (!open) return null;
+  return (
+    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/40 px-4 py-10">
+      <div className="w-full max-w-lg rounded-lg border border-neutral-200 bg-white p-6 shadow-lg">
+        <div className="mb-4 flex items-center justify-between gap-4">
+          <h3 className="text-lg font-semibold text-neutral-900">{title}</h3>
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Close"
+            className="rounded-sm px-2 py-1 text-neutral-400 hover:bg-neutral-100 hover:text-neutral-700"
+          >
+            ✕
+          </button>
+        </div>
+        {children}
+      </div>
+    </div>
+  );
+}
+
+export function ConfirmDialog({
+  open,
+  title,
+  message,
+  confirmLabel = "Confirm",
+  cancelLabel = "Cancel",
+  variant = "primary",
+  loading = false,
+  onConfirm,
+  onCancel,
+  children,
+}: {
+  open: boolean;
+  title: string;
+  message?: ReactNode;
+  confirmLabel?: string;
+  cancelLabel?: string;
+  variant?: "primary" | "danger";
+  loading?: boolean;
+  onConfirm: () => void;
+  onCancel: () => void;
+  children?: ReactNode;
+}) {
+  if (!open) return null;
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
+      <div className="w-full max-w-md rounded-lg border border-neutral-200 bg-white p-6 shadow-lg">
+        <h3 className="text-lg font-semibold text-neutral-900">{title}</h3>
+        {message ? (
+          <p className="mt-2 text-sm text-neutral-600">{message}</p>
+        ) : null}
+        {children ? <div className="mt-4">{children}</div> : null}
+        <div className="mt-6 flex justify-end gap-2">
+          <Button variant="secondary" onClick={onCancel} disabled={loading}>
+            {cancelLabel}
+          </Button>
+          <Button variant={variant} onClick={onConfirm} loading={loading}>
+            {confirmLabel}
+          </Button>
+        </div>
+      </div>
     </div>
   );
 }

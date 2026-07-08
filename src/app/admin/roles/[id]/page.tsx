@@ -243,7 +243,7 @@ export default function RoleDetailPage() {
         title={role.name}
         description={`Slug: ${role.slug}${role.is_system ? " (system role)" : ""}`}
         actions={
-          <Link href="/admin/roles" className="text-sm text-zinc-600 hover:underline">
+          <Link href="/admin/roles" className="text-sm text-neutral-600 hover:underline">
             ← Back to roles
           </Link>
         }
@@ -261,7 +261,7 @@ export default function RoleDetailPage() {
       ) : null}
 
       <Card className="mb-6">
-        <h2 className="mb-3 font-medium text-zinc-900">Role name</h2>
+        <h2 className="mb-3 font-medium text-neutral-900">Role name</h2>
         <div className="flex gap-2">
           <Input value={name} onChange={(e) => setName(e.target.value)} />
           <Button onClick={() => void saveName()} disabled={saving}>
@@ -272,7 +272,7 @@ export default function RoleDetailPage() {
 
       <Card className="mb-6">
         <div className="mb-3 flex items-center justify-between">
-          <h2 className="font-medium text-zinc-900">Module permissions</h2>
+          <h2 className="font-medium text-neutral-900">Module permissions</h2>
           <Button onClick={() => void savePermissions()} disabled={saving}>
             Save permissions
           </Button>
@@ -280,7 +280,7 @@ export default function RoleDetailPage() {
         <div className="overflow-x-auto">
           <table className="min-w-full text-sm">
             <thead>
-              <tr className="border-b border-zinc-200 text-left text-xs uppercase text-zinc-500">
+              <tr className="border-b border-neutral-200 text-left text-xs uppercase text-neutral-500">
                 <th className="py-2 pr-4">Module</th>
                 {PERM_KEYS.map((p) => (
                   <th key={p.key} className="px-2 py-2 text-center">
@@ -293,7 +293,7 @@ export default function RoleDetailPage() {
               {MODULES.map((mod) => {
                 const state = permState[mod.slug];
                 return (
-                  <tr key={mod.slug} className="border-b border-zinc-100">
+                  <tr key={mod.slug} className="border-b border-neutral-100">
                     <td className="py-2 pr-4 font-medium">{mod.name}</td>
                     {(
                       [
@@ -317,7 +317,7 @@ export default function RoleDetailPage() {
                               },
                             }))
                           }
-                          className="rounded border-zinc-300"
+                          className="rounded border-neutral-300"
                         />
                       </td>
                     ))}
@@ -331,7 +331,7 @@ export default function RoleDetailPage() {
 
       <Card>
         <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-          <h2 className="font-medium text-zinc-900">Field rules (JSON)</h2>
+          <h2 className="font-medium text-neutral-900">Field rules (JSON)</h2>
           <Button onClick={() => void saveFieldRules()} disabled={saving}>
             Save field rules
           </Button>
@@ -342,7 +342,7 @@ export default function RoleDetailPage() {
             id="field-module"
             value={selectedModuleId}
             onChange={(e) => handleModuleFieldRulesChange(e.target.value)}
-            className="mt-1 w-full rounded-md border border-zinc-300 px-3 py-2 text-sm"
+            className="mt-1 w-full rounded-md border border-neutral-300 px-3 py-2 text-sm"
           >
             <option value="">Select module…</option>
             {role.role_module_permissions.map((p) => {
@@ -360,10 +360,10 @@ export default function RoleDetailPage() {
           value={fieldRulesJson}
           onChange={(e) => setFieldRulesJson(e.target.value)}
           rows={10}
-          className="w-full rounded-md border border-zinc-300 px-3 py-2 font-mono text-sm"
+          className="w-full rounded-md border border-neutral-300 px-3 py-2 font-mono text-sm"
           placeholder='{"computation": "read_only", "borrower_info": "edit"}'
         />
-        <p className="mt-2 text-xs text-zinc-500">
+        <p className="mt-2 text-xs text-neutral-500">
           Values: edit, read_only, deny
         </p>
       </Card>

@@ -71,7 +71,7 @@ export default function ChecksPage() {
       ) : null}
 
       <Card className="mb-6">
-        <h2 className="mb-3 font-medium text-zinc-900">Check types</h2>
+        <h2 className="mb-3 font-medium text-neutral-900">Check types</h2>
         <Table>
           <thead>
             <tr>
@@ -80,7 +80,7 @@ export default function ChecksPage() {
               <Th>Description</Th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-zinc-200">
+          <tbody className="divide-y divide-neutral-200">
             {checkTypes.map((ct) => (
               <tr key={ct.id}>
                 <Td className="font-mono text-xs">{ct.slug}</Td>
@@ -93,7 +93,7 @@ export default function ChecksPage() {
       </Card>
 
       <Card>
-        <h2 className="mb-3 font-medium text-zinc-900">Stage check mapping</h2>
+        <h2 className="mb-3 font-medium text-neutral-900">Stage check mapping</h2>
         <Table>
           <thead>
             <tr>
@@ -102,7 +102,7 @@ export default function ChecksPage() {
               <Th>Check</Th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-zinc-200">
+          <tbody className="divide-y divide-neutral-200">
             {mappings.map((m) => {
               const ct = Array.isArray(m.check_types)
                 ? m.check_types[0]

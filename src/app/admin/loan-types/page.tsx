@@ -5,9 +5,9 @@ import { FormEvent, useCallback, useEffect, useState } from "react";
 import {
   Alert,
   Button,
-  Card,
   Input,
   Label,
+  Modal,
   PageHeader,
   Spinner,
   Table,
@@ -119,15 +119,13 @@ export default function LoanTypesPage() {
               onChange={(e) =>
                 setFilter(e.target.value as "all" | "active" | "inactive")
               }
-              className="rounded-md border border-zinc-300 px-3 py-2 text-sm"
+              className="rounded-md border border-neutral-300 px-3 py-2 text-sm"
             >
               <option value="all">All</option>
               <option value="active">Active only</option>
               <option value="inactive">Inactive only</option>
             </select>
-            <Button onClick={() => setShowForm(!showForm)}>
-              {showForm ? "Cancel" : "Enroll rate"}
-            </Button>
+            <Button onClick={() => setShowForm(true)}>Enroll rate</Button>
           </div>
         }
       />
@@ -143,59 +141,70 @@ export default function LoanTypesPage() {
         </div>
       ) : null}
 
-      {showForm ? (
-        <Card className="mb-6">
-          <form onSubmit={(e) => void handleEnroll(e)} className="space-y-4">
+      <Modal
+        open={showForm}
+        title="Enroll new rate version"
+        onClose={() => setShowForm(false)}
+      >
+        <form onSubmit={(e) => void handleEnroll(e)} className="space-y-4">
+          <div>
+            <Label htmlFor="lt-name">Loan type name</Label>
+            <Input
+              id="lt-name"
+              required
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="REGULAR"
+            />
+          </div>
+          <div className="grid gap-4 sm:grid-cols-2">
             <div>
-              <Label htmlFor="lt-name">Loan type name</Label>
+              <Label htmlFor="lt-interest">Interest rate (decimal)</Label>
               <Input
-                id="lt-name"
+                id="lt-interest"
+                type="number"
+                step="0.0001"
                 required
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                placeholder="REGULAR"
+                value={interestRate}
+                onChange={(e) => setInterestRate(e.target.value)}
               />
             </div>
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div>
-                <Label htmlFor="lt-interest">Interest rate (decimal)</Label>
-                <Input
-                  id="lt-interest"
-                  type="number"
-                  step="0.0001"
-                  required
-                  value={interestRate}
-                  onChange={(e) => setInterestRate(e.target.value)}
-                />
-              </div>
-              <div>
-                <Label htmlFor="lt-pf">PF rate (decimal, min {(MIN_PF_RATE * 100).toFixed(3)}%)</Label>
-                <Input
-                  id="lt-pf"
-                  type="number"
-                  step="0.0001"
-                  required
-                  value={pfRate}
-                  onChange={(e) => setPfRate(e.target.value)}
-                />
-              </div>
-            </div>
             <div>
-              <Label htmlFor="lt-effective">Effective from</Label>
+              <Label htmlFor="lt-pf">PF rate (decimal, min {(MIN_PF_RATE * 100).toFixed(3)}%)</Label>
               <Input
-                id="lt-effective"
-                type="date"
+                id="lt-pf"
+                type="number"
+                step="0.0001"
                 required
-                value={effectiveFrom}
-                onChange={(e) => setEffectiveFrom(e.target.value)}
+                value={pfRate}
+                onChange={(e) => setPfRate(e.target.value)}
               />
             </div>
+          </div>
+          <div>
+            <Label htmlFor="lt-effective">Effective from</Label>
+            <Input
+              id="lt-effective"
+              type="date"
+              required
+              value={effectiveFrom}
+              onChange={(e) => setEffectiveFrom(e.target.value)}
+            />
+          </div>
+          <div className="flex justify-end gap-2">
+            <Button
+              variant="secondary"
+              onClick={() => setShowForm(false)}
+              disabled={saving}
+            >
+              Cancel
+            </Button>
             <Button type="submit" disabled={saving}>
               {saving ? "Enrolling…" : "Enroll new rate version"}
             </Button>
-          </form>
-        </Card>
-      ) : null}
+          </div>
+        </form>
+      </Modal>
 
       {loading ? (
         <Spinner />
@@ -211,14 +220,14 @@ export default function LoanTypesPage() {
               <Th>Enrolled</Th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-zinc-200 bg-white">
+          <tbody className="divide-y divide-neutral-200 bg-white">
             {loanTypes.map((lt) => (
               <tr key={lt.id}>
                 <Td className="font-medium">{lt.name}</Td>
                 <Td>{formatRate(lt.interest_rate)}</Td>
                 <Td>{formatRate(lt.pf_rate)}</Td>
                 <Td>
-                  <span className={lt.is_active ? "text-green-700" : "text-zinc-400"}>
+                  <span className={lt.is_active ? "text-success-700" : "text-neutral-400"}>
                     {lt.is_active ? "Active" : "Inactive"}
                   </span>
                 </Td>
@@ -226,7 +235,7 @@ export default function LoanTypesPage() {
                   {lt.effective_from}
                   {lt.effective_to ? ` → ${lt.effective_to}` : ""}
                 </Td>
-                <Td className="text-xs text-zinc-500">
+                <Td className="text-xs text-neutral-500">
                   {new Date(lt.enrolled_at).toLocaleString()}
                 </Td>
               </tr>

@@ -56,7 +56,7 @@ export default function AgentLeadsPage() {
         actions={
           <Link
             href="/agent/leads/new"
-            className="inline-flex items-center justify-center rounded-md bg-zinc-900 px-3 py-2 text-sm font-medium text-white hover:bg-zinc-800"
+            className="inline-flex items-center justify-center rounded-md bg-neutral-900 px-3 py-2 text-sm font-medium text-white hover:bg-neutral-800"
           >
             New lead
           </Link>
@@ -79,20 +79,20 @@ export default function AgentLeadsPage() {
               <Th>Created</Th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-zinc-200">
+          <tbody className="divide-y divide-neutral-200">
             {leads.map((lead) => (
               <tr key={lead.id}>
                 <Td>
                   <Link
                     href={`/agent/leads/${lead.id}`}
-                    className="font-medium text-zinc-900 hover:underline"
+                    className="font-medium text-neutral-900 hover:underline"
                   >
                     {lead.borrowerName}
                   </Link>
                 </Td>
                 <Td>{lead.businessName ?? "—"}</Td>
                 <Td className="capitalize">{lead.status}</Td>
-                <Td className="text-xs text-zinc-500">
+                <Td className="text-xs text-neutral-500">
                   {new Date(lead.createdAt).toLocaleDateString()}
                 </Td>
               </tr>
@@ -100,7 +100,7 @@ export default function AgentLeadsPage() {
           </tbody>
         </Table>
         {leads.length === 0 ? (
-          <p className="py-6 text-center text-sm text-zinc-500">No leads yet.</p>
+          <p className="py-6 text-center text-sm text-neutral-500">No leads yet.</p>
         ) : null}
       </Card>
     </div>

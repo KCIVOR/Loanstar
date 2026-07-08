@@ -6,8 +6,8 @@ export function Sidebar({ items, activeId, onNavigate, footer, subtitle = 'My Ac
     <aside style={{ width, flexShrink: 0, background: '#fff', borderRight: '1px solid var(--color-neutral-200)', display: 'flex', flexDirection: 'column', height: '100%', overflowY: 'auto', fontFamily: 'var(--font-body)' }}>
       <div style={{ padding: '20px 20px 16px', borderBottom: '1px solid var(--color-neutral-100)' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <div style={{ width: 36, height: 36, background: 'linear-gradient(135deg,#1A56DB,#1444B8)', borderRadius: 6, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-            <svg width="18" height="18" viewBox="0 0 18 18" fill="none"><path d="M9 1.5L11.2 6.7 16.5 7.4 12.75 11.1 13.8 16.5 9 13.9 4.2 16.5 5.25 11.1 1.5 7.4 6.8 6.7z" fill="white"/></svg>
+          <div style={{ width: 36, height: 36, background: 'linear-gradient(135deg,var(--color-primary-900),var(--color-primary-800))', borderRadius: 6, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+            <svg width="18" height="18" viewBox="0 0 18 18" fill="none"><path d="M9 1.5L11.2 6.7 16.5 7.4 12.75 11.1 13.8 16.5 9 13.9 4.2 16.5 5.25 11.1 1.5 7.4 6.8 6.7z" fill="var(--color-gold)"/></svg>
           </div>
           <div>
             <div style={{ fontSize: 15, fontWeight: 800, color: 'var(--color-neutral-900)', letterSpacing: '-0.4px' }}>LoanStar</div>

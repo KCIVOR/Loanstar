@@ -7,7 +7,7 @@ const STATUS_MAP = {
   approved:     { bg: 'var(--color-success-50)', color: 'var(--color-success-600)' },
   active:       { bg: 'var(--color-primary-50)', color: 'var(--color-primary-600)' },
   denied:       { bg: 'var(--color-danger-50)', color: 'var(--color-danger-600)' },
-  overdue:      { bg: '#FFF7ED', color: '#EA580C' },
+  overdue:      { bg: 'var(--color-warning-50)', color: 'var(--color-warning-600)' },
   closed:       { bg: 'var(--color-neutral-50)', color: 'var(--color-neutral-500)' },
 };
 

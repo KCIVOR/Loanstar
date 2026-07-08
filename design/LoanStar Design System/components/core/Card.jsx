@@ -11,7 +11,7 @@ export function Card({ children, variant = 'base', style, ...props }) {
     highlight: { background: 'var(--color-primary-50)', border: '1px solid var(--color-primary-200)', borderLeft: '4px solid var(--color-primary-600)' },
     warning:   { background: 'var(--color-warning-50)', border: '1px solid var(--color-warning-200)', borderLeft: '4px solid var(--color-warning-600)' },
     danger:    { background: 'var(--color-danger-50)', border: '1px solid var(--color-danger-200)', borderLeft: '4px solid var(--color-danger-600)' },
-    gradient:  { background: 'linear-gradient(135deg,#1E3A8A 0%,#1A56DB 100%)', color: '#fff' },
+    gradient:  { background: 'linear-gradient(135deg,var(--color-primary-900) 0%,var(--color-primary-600) 100%)', color: '#fff' },
   };
   return (
     <div style={{ ...base, ...(variants[variant] || variants.base), ...style }} {...props}>

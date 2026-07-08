@@ -136,12 +136,12 @@ export default function BorrowerApplicationPage() {
       ) : null}
 
       <Card className="mb-6 overflow-x-auto">
-        <p className="text-sm text-zinc-500">Status</p>
-        <p className="text-lg font-semibold text-zinc-900">
+        <p className="text-sm text-neutral-500">Status</p>
+        <p className="text-lg font-semibold text-neutral-900">
           {application.statusLabel ?? formatStatusLabel(application.status)}
         </p>
         {application.blocker ? (
-          <p className="mt-2 text-sm text-amber-700">{application.blocker}</p>
+          <p className="mt-2 text-sm text-warning-700">{application.blocker}</p>
         ) : null}
         <div className="mt-4">
           <StatusTimeline currentStatus={application.status} />

@@ -85,13 +85,13 @@ export default function ArDcrPage() {
 
       {queue.length === 0 ? (
         <Card>
-          <p className="text-sm text-zinc-600">No DCRs awaiting reconciliation.</p>
+          <p className="text-sm text-neutral-600">No DCRs awaiting reconciliation.</p>
         </Card>
       ) : (
         <div className="space-y-4">
           {queue.map((dcr) => (
             <Card key={dcr.id}>
-              <p className="mb-2 text-sm text-zinc-500">
+              <p className="mb-2 text-sm text-neutral-500">
                 Submitted {dcr.submitted_at ? new Date(dcr.submitted_at).toLocaleString() : "—"}
               </p>
               <ul className="mb-4 space-y-1 text-sm">

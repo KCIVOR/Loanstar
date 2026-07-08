@@ -47,6 +47,10 @@ export default function ArMasterlistDetailPage() {
       if (!recRes.ok) throw new Error("Failed to load");
       const recData = (await recRes.json()) as { record: Record<string, unknown> };
       setRecord(recData.record);
+      setTransmittal(
+        (recData.record.check_transmittal_status as string) ?? "pending",
+      );
+      setClearing((recData.record.check_clearing_status as string) ?? "pending");
       if (lookupRes.ok) {
         setLookups((await lookupRes.json()) as Lookup);
       }
@@ -76,6 +80,28 @@ export default function ArMasterlistDetailPage() {
       });
       if (!res.ok) throw new Error("Assignment failed");
       setMessage("Assignment saved.");
+      await load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function saveCheckStatuses() {
+    setSaving(true);
+    setMessage(null);
+    try {
+      const res = await fetch(`/api/ar/masterlist/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          checkTransmittalStatus: transmittal,
+          checkClearingStatus: clearing,
+        }),
+      });
+      if (!res.ok) throw new Error("Failed to save check statuses");
+      setMessage("Check statuses saved.");
       await load();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed");
@@ -124,13 +150,13 @@ export default function ArMasterlistDetailPage() {
       {message ? <div className="mb-4"><Alert variant="success">{message}</Alert></div> : null}
 
       <Card className="mb-6">
-        <p className="text-sm text-zinc-500">Outstanding balance</p>
+        <p className="text-sm text-neutral-500">Outstanding balance</p>
         <p className="text-2xl font-semibold">
           {Number(record.outstanding_balance).toLocaleString("en-PH", {
             minimumFractionDigits: 2,
           })}
         </p>
-        <p className="mt-2 text-sm text-zinc-600">
+        <p className="mt-2 text-sm text-neutral-600">
           {Number(record.terms)} ×{" "}
           {Number(record.monthly_amortization).toLocaleString("en-PH", {
             minimumFractionDigits: 2,
@@ -205,14 +231,18 @@ export default function ArMasterlistDetailPage() {
             </Select>
           </div>
         </div>
-        <p className="mt-2 text-xs text-zinc-500">
-          Status fields for End-to-End §7.3 tracking (persist via future API if needed).
-        </p>
+        <Button
+          className="mt-3"
+          disabled={saving}
+          onClick={() => void saveCheckStatuses()}
+        >
+          Save check statuses
+        </Button>
       </Card>
 
       <Card>
         <h2 className="mb-3 text-lg font-semibold">Amortization schedule</h2>
-        <ul className="divide-y divide-zinc-100 text-sm">
+        <ul className="divide-y divide-neutral-100 text-sm">
           {schedules.map((row) => (
             <li key={String(row.id)} className="flex justify-between py-2">
               <span>

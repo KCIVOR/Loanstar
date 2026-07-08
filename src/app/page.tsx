@@ -1,6 +1,5 @@
 import { redirect } from "next/navigation";
 
-import { isSuperAdmin } from "@/lib/permissions/server";
 import { createClient } from "@/lib/supabase/server";
 
 export default async function HomePage() {
@@ -13,10 +12,5 @@ export default async function HomePage() {
     redirect("/login");
   }
 
-  const superAdmin = await isSuperAdmin(user.id);
-  if (superAdmin) {
-    redirect("/admin");
-  }
-
-  redirect("/login");
+  redirect("/dashboard");
 }

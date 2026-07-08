@@ -16,7 +16,7 @@ export function Stepper({ steps, currentIndex, onStepClick }) {
               background: done ? 'var(--color-primary-600)' : active ? '#fff' : 'var(--color-neutral-50)',
               border: `2px solid ${(done || active) ? 'var(--color-primary-600)' : 'var(--color-neutral-200)'}`,
               display: 'flex', alignItems: 'center', justifyContent: 'center',
-              boxShadow: active ? '0 0 0 4px rgba(26,86,219,0.15)' : 'none',
+              boxShadow: active ? '0 0 0 4px rgba(47,85,180,0.18)' : 'none',
             }}>
               <span style={{ fontSize: 13, fontWeight: 700, color: done ? '#fff' : active ? 'var(--color-primary-600)' : 'var(--color-neutral-300)' }}>{done ? '✓' : i + 1}</span>
             </div>

@@ -71,7 +71,7 @@ export default function EmailTestPage() {
               onChange={(e) => setTo(e.target.value)}
             />
           </div>
-          <p className="text-xs text-zinc-500">
+          <p className="text-xs text-neutral-500">
             Uses template slug &quot;test&quot; via Resend. Requires RESEND_API_KEY.
           </p>
           <Button type="submit" disabled={loading}>

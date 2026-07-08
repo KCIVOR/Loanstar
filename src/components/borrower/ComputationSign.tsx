@@ -105,15 +105,15 @@ export function ComputationSign({
 
   return (
     <Card className="mb-6">
-      <h2 className="mb-2 text-lg font-semibold text-zinc-900">Loan computation</h2>
-      <p className="mb-4 text-sm text-zinc-600">
+      <h2 className="mb-2 text-lg font-semibold text-neutral-900">Loan computation</h2>
+      <p className="mb-4 text-sm text-neutral-600">
         {computation.loanTypeName ?? "Loan"} · review and confirm your loan terms.
       </p>
 
       <div className="mb-4 grid gap-2 sm:grid-cols-2">
         {computation.lineItems.map((item) => (
-          <div key={item.key} className="flex justify-between border-b border-zinc-100 py-1 text-sm">
-            <span className="text-zinc-600">{item.label}</span>
+          <div key={item.key} className="flex justify-between border-b border-neutral-100 py-1 text-sm">
+            <span className="text-neutral-600">{item.label}</span>
             <span className="font-medium tabular-nums">{formatMoney(item.amount)}</span>
           </div>
         ))}
@@ -132,8 +132,8 @@ export function ComputationSign({
             </div>
           ) : null}
           {showDialog ? (
-            <div className="rounded-md border border-zinc-200 bg-zinc-50 p-4">
-              <p className="mb-3 text-sm text-zinc-700">
+            <div className="rounded-md border border-neutral-200 bg-neutral-50 p-4">
+              <p className="mb-3 text-sm text-neutral-700">
                 I confirm that I have reviewed the loan computation above and agree to the
                 stated principal, net release, and monthly amortization.
               </p>
@@ -157,10 +157,10 @@ export function ComputationSign({
       {canCounter && applicationStatus !== "lra_pending" ? (
         <form
           onSubmit={(e) => void handleCounter(e)}
-          className="mt-6 space-y-3 border-t border-zinc-100 pt-4"
+          className="mt-6 space-y-3 border-t border-neutral-100 pt-4"
         >
-          <h3 className="font-medium text-zinc-900">Counter-offer</h3>
-          <p className="text-sm text-zinc-600">
+          <h3 className="font-medium text-neutral-900">Counter-offer</h3>
+          <p className="text-sm text-neutral-600">
             Propose a different net release amount for Committee review.
           </p>
           <div>

@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 import type { User } from "@supabase/supabase-js";
 
 import { MODULE_SLUGS } from "@/lib/constants";
-import { createClient } from "@/lib/supabase/server";
+import { createClient, createServiceClient } from "@/lib/supabase/server";
 import type {
   FieldRule,
   ModulePermission,
@@ -63,7 +63,6 @@ export async function isSuperAdmin(userId?: string): Promise<boolean> {
 export async function getUserPermissions(
   userId?: string,
 ): Promise<UserPermissions> {
-  const supabase = await createClient();
   const resolvedUserId = userId ?? (await requireAuth()).id;
   const superAdmin = await isSuperAdmin(resolvedUserId);
 
@@ -83,7 +82,13 @@ export async function getUserPermissions(
     };
   }
 
-  const { data: roleRows, error: roleError } = await supabase
+  // RLS only lets users with auth_admin view read roles/role_module_permissions,
+  // so reading a regular user's own permission set requires the service client.
+  // Safe: identity comes from requireAuth above and the query is scoped to
+  // resolvedUserId, so callers can only ever read their own (or an explicitly
+  // requested) user's permission rows.
+  const service = createServiceClient();
+  const { data: roleRows, error: roleError } = await service
     .from("user_roles")
     .select(
       `

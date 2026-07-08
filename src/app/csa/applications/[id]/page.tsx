@@ -237,7 +237,7 @@ export default function CsaApplicationPage() {
       <div className="grid gap-6 lg:grid-cols-2">
         <div className="space-y-6">
           <Card>
-            <h2 className="mb-4 text-lg font-semibold text-zinc-900">Borrower profile</h2>
+            <h2 className="mb-4 text-lg font-semibold text-neutral-900">Borrower profile</h2>
             {data.borrower && editable ? (
               <form onSubmit={(e) => void handleSaveProfile(e)} className="grid gap-3">
                 <div>
@@ -284,7 +284,7 @@ export default function CsaApplicationPage() {
                 </Button>
               </form>
             ) : data.borrower ? (
-              <div className="space-y-1 text-sm text-zinc-700">
+              <div className="space-y-1 text-sm text-neutral-700">
                 <p>{data.borrower.email}</p>
                 <p>{data.borrower.mobilePhone ?? "No mobile on file"}</p>
               </div>
@@ -292,8 +292,8 @@ export default function CsaApplicationPage() {
           </Card>
 
           <Card>
-            <h2 className="mb-4 text-lg font-semibold text-zinc-900">NCL check</h2>
-            <p className="mb-3 text-sm text-zinc-600">
+            <h2 className="mb-4 text-lg font-semibold text-neutral-900">NCL check</h2>
+            <p className="mb-3 text-sm text-neutral-600">
               Current result:{" "}
               <span className="font-medium capitalize">{ncl.result}</span>
             </p>
@@ -337,10 +337,10 @@ export default function CsaApplicationPage() {
           />
 
           <Card>
-            <h2 className="mb-4 text-lg font-semibold text-zinc-900">Endorse to CIG</h2>
-            <ul className="mb-4 list-inside list-disc text-sm text-zinc-600">
+            <h2 className="mb-4 text-lg font-semibold text-neutral-900">Endorse to CIG</h2>
+            <ul className="mb-4 list-inside list-disc text-sm text-neutral-600">
               {data.endorseReadiness.ready ? (
-                <li className="text-green-700">All requirements met</li>
+                <li className="text-success-700">All requirements met</li>
               ) : (
                 data.endorseReadiness.missing.map((item) => (
                   <li key={item}>{item}</li>
@@ -355,7 +355,7 @@ export default function CsaApplicationPage() {
                 >
                   Endorse to CIG
                 </Button>
-                <form onSubmit={(e) => void handleHold(e)} className="space-y-2 border-t border-zinc-100 pt-4">
+                <form onSubmit={(e) => void handleHold(e)} className="space-y-2 border-t border-neutral-100 pt-4">
                   <Label htmlFor="holdReason">Hold reason (if incomplete)</Label>
                   <Input
                     id="holdReason"
@@ -369,7 +369,7 @@ export default function CsaApplicationPage() {
                 </form>
               </div>
             ) : (
-              <p className="text-sm text-zinc-600">
+              <p className="text-sm text-neutral-600">
                 Endorsed — status is {formatStatusLabel(data.application.status)}.
               </p>
             )}

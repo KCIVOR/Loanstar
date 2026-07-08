@@ -19,10 +19,10 @@ export function Input({ label, required, error, helper, prefix, style, inputStyl
           onBlur={(e) => { setFocused(false); props.onBlur?.(e); }}
           style={{
             width: '100%', height: 40, padding: prefix ? '0 14px 0 30px' : '0 14px',
-            background: error ? '#FEF2F2' : '#fff',
+            background: error ? 'var(--color-danger-50)' : '#fff',
             border: `1.5px solid ${borderColor}`, borderRadius: 'var(--radius-sm)',
             fontFamily: 'var(--font-body)', fontSize: 14, color: 'var(--color-neutral-900)',
-            outline: 'none', boxShadow: focused ? '0 0 0 3px rgba(26,86,219,0.1)' : 'none',
+            outline: 'none', boxShadow: focused ? '0 0 0 3px rgba(47,85,180,0.12)' : 'none',
             ...inputStyle,
           }}
           {...props}

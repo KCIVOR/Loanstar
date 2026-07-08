@@ -30,14 +30,14 @@ export default function CsaLayout({ children }: { children: React.ReactNode }) {
 
   if (checking) {
     return (
-      <div className="flex min-h-full items-center justify-center bg-zinc-50">
+      <div className="flex min-h-full items-center justify-center bg-neutral-50">
         <Spinner />
       </div>
     );
   }
 
   return (
-    <div className="flex min-h-full flex-col bg-zinc-50">
+    <div className="flex min-h-full flex-col bg-neutral-50">
       <CsaNav />
       <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-8">{children}</main>
     </div>

@@ -1,0 +1,725 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet data-dc-atomics>
+<meta name="design_doc_mode" content="canvas">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400..700;1,6..72,400..600&amp;family=Albert+Sans:wght@400;500;600;700&amp;family=Nunito+Sans:wght@400;600;700;800&amp;family=IBM+Plex+Sans:wght@400;500;600&amp;family=IBM+Plex+Mono:wght@400;500&amp;family=Instrument+Serif:ital@0;1&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#EFECE5;font-family:"Albert Sans",system-ui,sans-serif}
+a{color:#8A5A2B}a:hover{color:#6E4218}
+.dv-turn{padding:40px 44px 32px;border-bottom:1px solid rgba(0,0,0,.08);scroll-margin-top:16px}
+.dv-thd{display:flex;align-items:baseline;gap:10px;margin:0 0 20px}
+.dv-tid{font:600 10px ui-monospace,Menlo,monospace;padding:3px 7px;background:#1a1a1a;color:#fff;border-radius:4px;text-decoration:none}
+.dv-tname{font:600 13px/1.2 system-ui,sans-serif;color:#1a1a1a}
+.dv-opts{display:flex;flex-wrap:wrap;gap:28px;align-items:flex-start}
+.dv-opt{flex:none;display:flex;flex-direction:column;gap:9px;scroll-margin-top:16px}
+.dv-oid{font:600 10.5px ui-monospace,Menlo,monospace;padding:3px 7px;background:rgba(0,0,0,.08);color:#1a1a1a;border-radius:5px;text-decoration:none}
+.dv-olabel{display:flex;align-items:baseline;gap:8px;font:400 11px/1.3 system-ui,sans-serif;color:rgba(0,0,0,.55)}
+.dv-card{max-width:100%;background:#fff;border:1px solid rgba(0,0,0,.08);border-radius:8px;box-shadow:0 1px 3px rgba(0,0,0,.06);overflow:hidden}
+.dv-opt:target .dv-oid{background:#2a78d6;color:#fff}
+.dv-next{margin:22px 0 0;font:12px/1.5 system-ui,sans-serif;color:rgba(0,0,0,.5)}
+.dv-cluster{margin:34px 0 14px;font:600 12px/1.2 system-ui,sans-serif;color:rgba(0,0,0,.65);letter-spacing:.04em;text-transform:uppercase}
+.dv-cluster:first-of-type{margin-top:0}
+</style>
+</helmet>
+
+<section class="dv-turn" id="t1">
+  <div class="dv-thd"><a class="dv-tid" href="#t1">1</a><span class="dv-tname">LoanStar redesign — visual directions + fixes for the flagged patterns</span></div>
+
+  <div style="max-width:860px;background:#FFFDF9;border:1px solid rgba(0,0,0,.09);border-radius:8px;padding:18px 22px;margin:0 0 26px;font-size:12.5px;line-height:1.6;color:#3d3830">
+    <div style="font-weight:700;font-size:13px;margin-bottom:6px;color:#26221c">Assumptions &amp; reasoning</div>
+    <div>Working from your structural audit (GitHub not connected yet). Context: Philippine seafarer-loan ops — internal staff tools + a borrower portal, so "warm &amp; approachable" but still dense enough for daily operators. Sample data is invented but plausible (₱, aging buckets, pipeline stages from the audit). Three explorations below: <b>A)</b> four visual directions on the Reports dashboard — the language we'd roll out everywhere; <b>B)</b> four IA patterns to replace the inline <span style="font-family:ui-monospace,Menlo,monospace;font-size:11px">showForm</span> create flow (Users/Roles/Loan&nbsp;types); <b>C)</b> four structured editors to replace the checkbox matrix + hand-typed JSON field rules on Role detail. B and C use a neutral warm style so the IA reads independently of the A choice.</div>
+  </div>
+
+  <div class="dv-cluster">A · Reports dashboard — four visual directions</div>
+  <div class="dv-opts">
+
+    <!-- ============ 1a LEDGER ============ -->
+    <div class="dv-opt" id="1a">
+      <div class="dv-olabel"><a class="dv-oid" href="#1a">1a</a>Ledger — cream + terracotta, serif numerals, classic banking warmth</div>
+      <div class="dv-card" style="width:1040px;background:#F7F1E8;font-family:'Albert Sans',sans-serif;color:#2B241C">
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:16px 28px;border-bottom:1px solid #E5DAC6;background:#FFFDF9">
+          <div style="display:flex;align-items:baseline;gap:14px">
+            <span style="font-family:'Newsreader',serif;font-weight:600;font-size:21px;letter-spacing:-.01em">LoanStar</span>
+            <span style="width:1px;height:16px;background:#DCCFB8;align-self:center"></span>
+            <span style="font-size:11px;font-weight:600;letter-spacing:.09em;text-transform:uppercase;color:#8B7E6A">Reports · Executive</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:18px;font-size:12.5px">
+            <span style="font-weight:600;border-bottom:2px solid #BF5B2D;padding-bottom:3px">Dashboard</span>
+            <span style="color:#8B7E6A">Exports</span>
+            <span style="display:inline-flex;align-items:center;gap:8px;color:#8B7E6A"><span style="width:24px;height:24px;border-radius:50%;background:#BF5B2D;color:#fff;display:inline-flex;align-items:center;justify-content:center;font-size:10.5px;font-weight:700">AM</span>Sign out</span>
+          </div>
+        </div>
+        <div style="padding:26px 28px 30px">
+          <div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:20px">
+            <div>
+              <div style="font-family:'Newsreader',serif;font-size:26px;font-weight:500">Portfolio at a glance</div>
+              <div style="font-size:12.5px;color:#8B7E6A;margin-top:2px">As of Tuesday, July 8 · refreshed 9:41 AM</div>
+            </div>
+            <div style="font-size:12px;color:#8B7E6A">Month to date · <b style="color:#2B241C">June 1 – July 8</b></div>
+          </div>
+          <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:18px">
+            <div style="background:#FFFDF9;border:1px solid #E8DECD;border-radius:10px;padding:16px 18px">
+              <div style="font-size:11px;font-weight:600;letter-spacing:.07em;text-transform:uppercase;color:#8B7E6A">Active loans</div>
+              <div style="font-family:'Newsreader',serif;font-size:34px;font-weight:500;margin-top:6px">128</div>
+              <div style="font-size:11.5px;color:#47804F;margin-top:4px">▲ 6 released this month</div>
+            </div>
+            <div style="background:#FFFDF9;border:1px solid #E8DECD;border-radius:10px;padding:16px 18px">
+              <div style="font-size:11px;font-weight:600;letter-spacing:.07em;text-transform:uppercase;color:#8B7E6A">Portfolio balance</div>
+              <div style="font-family:'Newsreader',serif;font-size:34px;font-weight:500;margin-top:6px">₱42.6M</div>
+              <div style="font-size:11.5px;color:#8B7E6A;margin-top:4px">across 128 accounts</div>
+            </div>
+            <div style="background:#FFFDF9;border:1px solid #E8DECD;border-radius:10px;padding:16px 18px">
+              <div style="font-size:11px;font-weight:600;letter-spacing:.07em;text-transform:uppercase;color:#8B7E6A">Collection rate</div>
+              <div style="font-family:'Newsreader',serif;font-size:34px;font-weight:500;margin-top:6px">94.2%</div>
+              <div style="font-size:11.5px;color:#47804F;margin-top:4px">₱3.94M of ₱4.18M due</div>
+            </div>
+            <div style="background:#FFFDF9;border:1px solid #EAD3C6;border-radius:10px;padding:16px 18px">
+              <div style="font-size:11px;font-weight:600;letter-spacing:.07em;text-transform:uppercase;color:#B0432C">Overdue 91+</div>
+              <div style="font-family:'Newsreader',serif;font-size:34px;font-weight:500;margin-top:6px;color:#B0432C">₱1.8M</div>
+              <div style="font-size:11.5px;color:#8B7E6A;margin-top:4px">7 accounts in remedial</div>
+            </div>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+            <div style="background:#FFFDF9;border:1px solid #E8DECD;border-radius:10px;padding:18px 20px">
+              <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:14px">
+                <span style="font-weight:600;font-size:13.5px">Pipeline by stage</span>
+                <span style="font-size:11.5px;color:#8B7E6A">33 in flight</span>
+              </div>
+              <div style="display:flex;flex-direction:column;gap:11px">
+                <div style="display:flex;align-items:center;gap:12px"><span style="width:88px;font-size:12px;color:#5C5346">Intake</span><span style="flex:1;height:10px;background:#EFE6D6;border-radius:5px;overflow:hidden"><span style="display:block;height:100%;width:100%;background:#BF5B2D;border-radius:5px"></span></span><span style="width:22px;text-align:right;font-size:12.5px;font-weight:600">14</span></div>
+                <div style="display:flex;align-items:center;gap:12px"><span style="width:88px;font-size:12px;color:#5C5346">Verification</span><span style="flex:1;height:10px;background:#EFE6D6;border-radius:5px;overflow:hidden"><span style="display:block;height:100%;width:64%;background:#BF5B2D;border-radius:5px;opacity:.85"></span></span><span style="width:22px;text-align:right;font-size:12.5px;font-weight:600">9</span></div>
+                <div style="display:flex;align-items:center;gap:12px"><span style="width:88px;font-size:12px;color:#5C5346">Committee</span><span style="flex:1;height:10px;background:#EFE6D6;border-radius:5px;overflow:hidden"><span style="display:block;height:100%;width:43%;background:#BF5B2D;border-radius:5px;opacity:.7"></span></span><span style="width:22px;text-align:right;font-size:12.5px;font-weight:600">6</span></div>
+                <div style="display:flex;align-items:center;gap:12px"><span style="width:88px;font-size:12px;color:#5C5346">Release</span><span style="flex:1;height:10px;background:#EFE6D6;border-radius:5px;overflow:hidden"><span style="display:block;height:100%;width:29%;background:#BF5B2D;border-radius:5px;opacity:.55"></span></span><span style="width:22px;text-align:right;font-size:12.5px;font-weight:600">4</span></div>
+              </div>
+              <div style="margin-top:14px;padding-top:12px;border-top:1px dashed #E5DAC6;font-size:11.5px;color:#8B7E6A">Slowest step this month: <b style="color:#2B241C">Release — 2.9 days avg</b></div>
+            </div>
+            <div style="background:#FFFDF9;border:1px solid #E8DECD;border-radius:10px;padding:18px 20px">
+              <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:14px">
+                <span style="font-weight:600;font-size:13.5px">Receivables aging</span>
+                <span style="font-size:11.5px;color:#8B7E6A">₱42.6M total</span>
+              </div>
+              <div style="display:flex;height:26px;border-radius:6px;overflow:hidden;margin-bottom:14px">
+                <span style="width:73%;background:#47804F"></span>
+                <span style="width:13%;background:#8FAE6B"></span>
+                <span style="width:6%;background:#D9A441"></span>
+                <span style="width:4%;background:#C97B33"></span>
+                <span style="width:4%;background:#B0432C"></span>
+              </div>
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px 20px;font-size:12px">
+                <div style="display:flex;justify-content:space-between"><span style="color:#5C5346"><span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:#47804F;margin-right:7px"></span>Current</span><b>₱31.2M</b></div>
+                <div style="display:flex;justify-content:space-between"><span style="color:#5C5346"><span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:#8FAE6B;margin-right:7px"></span>1–30 days</span><b>₱5.4M</b></div>
+                <div style="display:flex;justify-content:space-between"><span style="color:#5C5346"><span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:#D9A441;margin-right:7px"></span>31–60 days</span><b>₱2.6M</b></div>
+                <div style="display:flex;justify-content:space-between"><span style="color:#5C5346"><span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:#C97B33;margin-right:7px"></span>61–90 days</span><b>₱1.6M</b></div>
+                <div style="display:flex;justify-content:space-between"><span style="color:#5C5346"><span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:#B0432C;margin-right:7px"></span>91+ days</span><b style="color:#B0432C">₱1.8M</b></div>
+              </div>
+            </div>
+            <div style="background:#FFFDF9;border:1px solid #E8DECD;border-radius:10px;padding:18px 20px">
+              <div style="font-weight:600;font-size:13.5px;margin-bottom:14px">Income recognition — June</div>
+              <div style="display:flex;flex-direction:column;gap:10px;font-size:12.5px">
+                <div style="display:flex;justify-content:space-between;padding-bottom:10px;border-bottom:1px solid #F0E8D9"><span style="color:#5C5346">Interest income</span><b style="font-family:'Newsreader',serif;font-size:15px">₱612,400</b></div>
+                <div style="display:flex;justify-content:space-between;padding-bottom:10px;border-bottom:1px solid #F0E8D9"><span style="color:#5C5346">Processing fees</span><b style="font-family:'Newsreader',serif;font-size:15px">₱91,000</b></div>
+                <div style="display:flex;justify-content:space-between;padding-bottom:10px;border-bottom:1px solid #F0E8D9"><span style="color:#5C5346">Penalty income</span><b style="font-family:'Newsreader',serif;font-size:15px">₱48,250</b></div>
+                <div style="display:flex;justify-content:space-between"><span style="font-weight:600">Total recognized</span><b style="font-family:'Newsreader',serif;font-size:15px;color:#47804F">₱751,650</b></div>
+              </div>
+            </div>
+            <div style="background:#FFFDF9;border:1px solid #E8DECD;border-radius:10px;padding:18px 20px">
+              <div style="font-weight:600;font-size:13.5px;margin-bottom:14px">Turnaround time by step</div>
+              <div style="display:flex;flex-direction:column;gap:9px;font-size:12px">
+                <div style="display:flex;align-items:center;gap:12px"><span style="width:150px;color:#5C5346">Intake → Verification</span><span style="flex:1;height:7px;background:#EFE6D6;border-radius:4px"><span style="display:block;height:100%;width:62%;background:#8B7E6A;border-radius:4px"></span></span><b style="width:38px;text-align:right">1.8d</b></div>
+                <div style="display:flex;align-items:center;gap:12px"><span style="width:150px;color:#5C5346">Verification → Committee</span><span style="flex:1;height:7px;background:#EFE6D6;border-radius:4px"><span style="display:block;height:100%;width:83%;background:#8B7E6A;border-radius:4px"></span></span><b style="width:38px;text-align:right">2.4d</b></div>
+                <div style="display:flex;align-items:center;gap:12px"><span style="width:150px;color:#5C5346">Committee decision</span><span style="flex:1;height:7px;background:#EFE6D6;border-radius:4px"><span style="display:block;height:100%;width:41%;background:#8B7E6A;border-radius:4px"></span></span><b style="width:38px;text-align:right">1.2d</b></div>
+                <div style="display:flex;align-items:center;gap:12px"><span style="width:150px;color:#5C5346">Approval → Release</span><span style="flex:1;height:7px;background:#EFE6D6;border-radius:4px"><span style="display:block;height:100%;width:100%;background:#BF5B2D;border-radius:4px"></span></span><b style="width:38px;text-align:right;color:#BF5B2D">2.9d</b></div>
+              </div>
+              <div style="margin-top:14px;font-size:11.5px;color:#8B7E6A">Target: 7 working days end-to-end · currently <b style="color:#2B241C">8.3d</b></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============ 1b MEADOW ============ -->
+    <div class="dv-opt" id="1b">
+      <div class="dv-olabel"><a class="dv-oid" href="#1b">1b</a>Meadow — sage green, rounded &amp; friendly, greeting-led</div>
+      <div class="dv-card" style="width:1040px;background:#F1F5EF;font-family:'Nunito Sans',sans-serif;color:#243329">
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 28px;background:#2E5243;color:#F1F5EF">
+          <div style="display:flex;align-items:center;gap:12px">
+            <span style="width:30px;height:30px;border-radius:9px;background:#DFA054;display:inline-flex;align-items:center;justify-content:center;font-weight:800;font-size:14px;color:#2E5243">★</span>
+            <span style="font-weight:800;font-size:17px">LoanStar</span>
+            <span style="font-size:11px;font-weight:700;background:rgba(255,255,255,.14);padding:4px 10px;border-radius:999px;letter-spacing:.04em">REPORTS</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:16px;font-size:12.5px;font-weight:600">
+            <span style="background:rgba(255,255,255,.16);padding:6px 14px;border-radius:999px">Executive dashboard</span>
+            <span style="opacity:.75">Sign out</span>
+          </div>
+        </div>
+        <div style="padding:26px 28px 30px">
+          <div style="margin-bottom:18px">
+            <div style="font-size:24px;font-weight:800">Good morning, Amelia 👋</div>
+            <div style="font-size:13px;color:#5F7367;margin-top:2px">Collections are on pace — 3 things need a look today.</div>
+          </div>
+          <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:16px">
+            <div style="background:#fff;border-radius:18px;padding:18px 20px;box-shadow:0 1px 2px rgba(36,51,41,.06)">
+              <div style="font-size:12px;font-weight:700;color:#5F7367">Active loans</div>
+              <div style="font-size:32px;font-weight:800;margin-top:4px">128</div>
+              <span style="display:inline-block;margin-top:6px;font-size:11px;font-weight:700;color:#2E7D54;background:#E2F0E5;padding:3px 9px;border-radius:999px">+6 this month</span>
+            </div>
+            <div style="background:#fff;border-radius:18px;padding:18px 20px;box-shadow:0 1px 2px rgba(36,51,41,.06)">
+              <div style="font-size:12px;font-weight:700;color:#5F7367">Portfolio balance</div>
+              <div style="font-size:32px;font-weight:800;margin-top:4px">₱42.6M</div>
+              <span style="display:inline-block;margin-top:6px;font-size:11px;font-weight:700;color:#5F7367;background:#EEF3EC;padding:3px 9px;border-radius:999px">128 accounts</span>
+            </div>
+            <div style="background:#fff;border-radius:18px;padding:18px 20px;box-shadow:0 1px 2px rgba(36,51,41,.06);display:flex;justify-content:space-between;align-items:center">
+              <div>
+                <div style="font-size:12px;font-weight:700;color:#5F7367">Collection rate</div>
+                <div style="font-size:32px;font-weight:800;margin-top:4px">94.2%</div>
+                <span style="display:inline-block;margin-top:6px;font-size:11px;font-weight:700;color:#2E7D54;background:#E2F0E5;padding:3px 9px;border-radius:999px">on target</span>
+              </div>
+              <div style="width:54px;height:54px;border-radius:50%;background:conic-gradient(#3E7D5C 0 339deg,#E2EAE0 339deg 360deg);display:flex;align-items:center;justify-content:center"><span style="width:38px;height:38px;border-radius:50%;background:#fff"></span></div>
+            </div>
+            <div style="background:#fff;border-radius:18px;padding:18px 20px;box-shadow:0 1px 2px rgba(36,51,41,.06)">
+              <div style="font-size:12px;font-weight:700;color:#5F7367">Overdue 91+</div>
+              <div style="font-size:32px;font-weight:800;margin-top:4px;color:#B4552F">₱1.8M</div>
+              <span style="display:inline-block;margin-top:6px;font-size:11px;font-weight:700;color:#B4552F;background:#F7E8DE;padding:3px 9px;border-radius:999px">7 in remedial</span>
+            </div>
+          </div>
+          <div style="display:grid;grid-template-columns:1.2fr .8fr;gap:14px">
+            <div style="background:#fff;border-radius:18px;padding:20px 22px;box-shadow:0 1px 2px rgba(36,51,41,.06)">
+              <div style="font-weight:800;font-size:14px;margin-bottom:14px">Where applications are right now</div>
+              <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px">
+                <div style="background:#EEF3EC;border-radius:14px;padding:14px;text-align:center"><div style="font-size:26px;font-weight:800">14</div><div style="font-size:11.5px;font-weight:700;color:#5F7367;margin-top:2px">Intake</div><div style="font-size:10.5px;color:#8CA095;margin-top:2px">1.8d avg</div></div>
+                <div style="background:#EEF3EC;border-radius:14px;padding:14px;text-align:center"><div style="font-size:26px;font-weight:800">9</div><div style="font-size:11.5px;font-weight:700;color:#5F7367;margin-top:2px">Verification</div><div style="font-size:10.5px;color:#8CA095;margin-top:2px">2.4d avg</div></div>
+                <div style="background:#EEF3EC;border-radius:14px;padding:14px;text-align:center"><div style="font-size:26px;font-weight:800">6</div><div style="font-size:11.5px;font-weight:700;color:#5F7367;margin-top:2px">Committee</div><div style="font-size:10.5px;color:#8CA095;margin-top:2px">1.2d avg</div></div>
+                <div style="background:#FBF1E4;border-radius:14px;padding:14px;text-align:center;border:1.5px solid #ECD9BC"><div style="font-size:26px;font-weight:800;color:#A96F24">4</div><div style="font-size:11.5px;font-weight:700;color:#A96F24;margin-top:2px">Release</div><div style="font-size:10.5px;color:#C29A5D;margin-top:2px">2.9d avg — slowest</div></div>
+              </div>
+              <div style="margin-top:16px;font-weight:800;font-size:14px;margin-bottom:12px">Receivables aging</div>
+              <div style="display:flex;height:22px;border-radius:999px;overflow:hidden;margin-bottom:10px">
+                <span style="width:73%;background:#3E7D5C"></span><span style="width:13%;background:#7FAE83"></span><span style="width:6%;background:#DFA054"></span><span style="width:4%;background:#C97B3D"></span><span style="width:4%;background:#B4552F"></span>
+              </div>
+              <div style="display:flex;gap:16px;flex-wrap:wrap;font-size:11.5px;font-weight:600;color:#5F7367">
+                <span><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#3E7D5C;margin-right:6px"></span>Current ₱31.2M</span>
+                <span><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#7FAE83;margin-right:6px"></span>1–30 ₱5.4M</span>
+                <span><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#DFA054;margin-right:6px"></span>31–60 ₱2.6M</span>
+                <span><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#C97B3D;margin-right:6px"></span>61–90 ₱1.6M</span>
+                <span style="color:#B4552F"><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#B4552F;margin-right:6px"></span>91+ ₱1.8M</span>
+              </div>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:14px">
+              <div style="background:#fff;border-radius:18px;padding:20px 22px;box-shadow:0 1px 2px rgba(36,51,41,.06)">
+                <div style="font-weight:800;font-size:14px;margin-bottom:12px">Needs a look</div>
+                <div style="display:flex;flex-direction:column;gap:10px;font-size:12.5px">
+                  <div style="display:flex;gap:10px;align-items:flex-start"><span style="width:8px;height:8px;border-radius:50%;background:#B4552F;margin-top:5px;flex:none"></span><span><b>2 release files</b> waiting on briefing sign-off for 3+ days</span></div>
+                  <div style="display:flex;gap:10px;align-items:flex-start"><span style="width:8px;height:8px;border-radius:50%;background:#DFA054;margin-top:5px;flex:none"></span><span><b>₱240K in DCRs</b> unreconciled from last week</span></div>
+                  <div style="display:flex;gap:10px;align-items:flex-start"><span style="width:8px;height:8px;border-radius:50%;background:#DFA054;margin-top:5px;flex:none"></span><span><b>3 accounts</b> crossed into 61–90 bucket</span></div>
+                </div>
+              </div>
+              <div style="background:#fff;border-radius:18px;padding:20px 22px;box-shadow:0 1px 2px rgba(36,51,41,.06)">
+                <div style="font-weight:800;font-size:14px;margin-bottom:12px">Income — June</div>
+                <div style="display:flex;flex-direction:column;gap:8px;font-size:12.5px">
+                  <div style="display:flex;justify-content:space-between"><span style="color:#5F7367">Interest</span><b>₱612,400</b></div>
+                  <div style="display:flex;justify-content:space-between"><span style="color:#5F7367">Processing fees</span><b>₱91,000</b></div>
+                  <div style="display:flex;justify-content:space-between"><span style="color:#5F7367">Penalties</span><b>₱48,250</b></div>
+                  <div style="display:flex;justify-content:space-between;padding-top:8px;border-top:1px solid #EEF3EC"><b>Total</b><b style="color:#2E7D54">₱751,650</b></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============ 1c PLEX DESK ============ -->
+    <div class="dv-opt" id="1c">
+      <div class="dv-olabel"><a class="dv-oid" href="#1c">1c</a>Plex Desk — dense operator's console, mono numerals, warm neutrals + amber</div>
+      <div class="dv-card" style="width:1040px;background:#F5F2ED;font-family:'IBM Plex Sans',sans-serif;color:#21201D">
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 24px;border-bottom:2px solid #21201D;background:#F5F2ED">
+          <div style="display:flex;align-items:center;gap:14px">
+            <span style="font-weight:600;font-size:15px;letter-spacing:.01em">LOANSTAR</span>
+            <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#A96F24;border:1px solid #D9C9A8;padding:2px 8px;border-radius:3px">REPORTS/EXEC</span>
+          </div>
+          <div style="display:flex;gap:18px;font-size:12px;color:#6B655B">
+            <span style="color:#21201D;font-weight:600">Dashboard</span><span>Aging</span><span>Income</span><span>TAT</span>
+            <span style="font-family:'IBM Plex Mono',monospace;font-size:11px">08 JUL 09:41</span>
+          </div>
+        </div>
+        <div style="padding:20px 24px 26px">
+          <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:#D8D2C6;border:1px solid #D8D2C6;border-radius:6px;overflow:hidden;margin-bottom:14px">
+            <div style="background:#FCFAF6;padding:14px 16px"><div style="font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.08em;color:#8A8272">ACTIVE LOANS</div><div style="font-family:'IBM Plex Mono',monospace;font-size:27px;font-weight:500;margin-top:5px">128</div><div style="font-size:11px;color:#3A6E48;margin-top:3px">+6 MTD</div></div>
+            <div style="background:#FCFAF6;padding:14px 16px"><div style="font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.08em;color:#8A8272">PORTFOLIO BAL</div><div style="font-family:'IBM Plex Mono',monospace;font-size:27px;font-weight:500;margin-top:5px">42.61M</div><div style="font-size:11px;color:#8A8272;margin-top:3px">PHP · 128 accts</div></div>
+            <div style="background:#FCFAF6;padding:14px 16px"><div style="font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.08em;color:#8A8272">COLLECTION RATE</div><div style="font-family:'IBM Plex Mono',monospace;font-size:27px;font-weight:500;margin-top:5px">94.2%</div><div style="font-size:11px;color:#3A6E48;margin-top:3px">3.94M / 4.18M due</div></div>
+            <div style="background:#FBF4EC;padding:14px 16px"><div style="font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.08em;color:#A6431F">OVERDUE 91+</div><div style="font-family:'IBM Plex Mono',monospace;font-size:27px;font-weight:500;margin-top:5px;color:#A6431F">1.80M</div><div style="font-size:11px;color:#A6431F;margin-top:3px">7 accts → remedial</div></div>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+            <div style="background:#FCFAF6;border:1px solid #D8D2C6;border-radius:6px">
+              <div style="padding:10px 16px;border-bottom:1px solid #E6E0D3;font-size:12px;font-weight:600;display:flex;justify-content:space-between"><span>PIPELINE BY STAGE</span><span style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;color:#8A8272">N=33</span></div>
+              <div style="padding:6px 0">
+                <div style="display:flex;align-items:center;padding:7px 16px;gap:12px;border-bottom:1px solid #F0EBE0"><span style="width:96px;font-size:12px">Intake</span><span style="flex:1;height:12px;background:#EFE9DC"><span style="display:block;height:100%;width:100%;background:#A96F24"></span></span><span style="font-family:'IBM Plex Mono',monospace;font-size:12px;width:56px;text-align:right">14 · 1.8d</span></div>
+                <div style="display:flex;align-items:center;padding:7px 16px;gap:12px;border-bottom:1px solid #F0EBE0"><span style="width:96px;font-size:12px">Verification</span><span style="flex:1;height:12px;background:#EFE9DC"><span style="display:block;height:100%;width:64%;background:#A96F24"></span></span><span style="font-family:'IBM Plex Mono',monospace;font-size:12px;width:56px;text-align:right">9 · 2.4d</span></div>
+                <div style="display:flex;align-items:center;padding:7px 16px;gap:12px;border-bottom:1px solid #F0EBE0"><span style="width:96px;font-size:12px">Committee</span><span style="flex:1;height:12px;background:#EFE9DC"><span style="display:block;height:100%;width:43%;background:#A96F24"></span></span><span style="font-family:'IBM Plex Mono',monospace;font-size:12px;width:56px;text-align:right">6 · 1.2d</span></div>
+                <div style="display:flex;align-items:center;padding:7px 16px;gap:12px"><span style="width:96px;font-size:12px;color:#A6431F;font-weight:600">Release ⚠</span><span style="flex:1;height:12px;background:#EFE9DC"><span style="display:block;height:100%;width:29%;background:#A6431F"></span></span><span style="font-family:'IBM Plex Mono',monospace;font-size:12px;width:56px;text-align:right;color:#A6431F">4 · 2.9d</span></div>
+              </div>
+              <div style="padding:9px 16px;border-top:1px solid #E6E0D3;font-size:11px;color:#8A8272">E2E TAT <b style="color:#21201D;font-family:'IBM Plex Mono',monospace">8.3d</b> vs target <span style="font-family:'IBM Plex Mono',monospace">7.0d</span></div>
+            </div>
+            <div style="background:#FCFAF6;border:1px solid #D8D2C6;border-radius:6px">
+              <div style="padding:10px 16px;border-bottom:1px solid #E6E0D3;font-size:12px;font-weight:600">RECEIVABLES AGING</div>
+              <div style="padding:0">
+                <div style="display:grid;grid-template-columns:110px 1fr 90px 52px;padding:7px 16px;font-family:'IBM Plex Mono',monospace;font-size:10px;color:#8A8272;border-bottom:1px solid #E6E0D3"><span>BUCKET</span><span></span><span style="text-align:right">AMOUNT</span><span style="text-align:right">%</span></div>
+                <div style="display:grid;grid-template-columns:110px 1fr 90px 52px;align-items:center;padding:7px 16px;border-bottom:1px solid #F0EBE0;font-size:12px"><span>Current</span><span style="height:10px;background:#EFE9DC"><span style="display:block;height:100%;width:73%;background:#3A6E48"></span></span><span style="font-family:'IBM Plex Mono',monospace;text-align:right">31,20M</span><span style="font-family:'IBM Plex Mono',monospace;text-align:right">73.2</span></div>
+                <div style="display:grid;grid-template-columns:110px 1fr 90px 52px;align-items:center;padding:7px 16px;border-bottom:1px solid #F0EBE0;font-size:12px"><span>1–30</span><span style="height:10px;background:#EFE9DC"><span style="display:block;height:100%;width:13%;background:#7C9662"></span></span><span style="font-family:'IBM Plex Mono',monospace;text-align:right">5,40M</span><span style="font-family:'IBM Plex Mono',monospace;text-align:right">12.7</span></div>
+                <div style="display:grid;grid-template-columns:110px 1fr 90px 52px;align-items:center;padding:7px 16px;border-bottom:1px solid #F0EBE0;font-size:12px"><span>31–60</span><span style="height:10px;background:#EFE9DC"><span style="display:block;height:100%;width:6%;background:#C9973F"></span></span><span style="font-family:'IBM Plex Mono',monospace;text-align:right">2,60M</span><span style="font-family:'IBM Plex Mono',monospace;text-align:right">6.1</span></div>
+                <div style="display:grid;grid-template-columns:110px 1fr 90px 52px;align-items:center;padding:7px 16px;border-bottom:1px solid #F0EBE0;font-size:12px"><span>61–90</span><span style="height:10px;background:#EFE9DC"><span style="display:block;height:100%;width:4%;background:#B5722E"></span></span><span style="font-family:'IBM Plex Mono',monospace;text-align:right">1,60M</span><span style="font-family:'IBM Plex Mono',monospace;text-align:right">3.8</span></div>
+                <div style="display:grid;grid-template-columns:110px 1fr 90px 52px;align-items:center;padding:7px 16px;font-size:12px;background:#FBF4EC"><span style="color:#A6431F;font-weight:600">91+ ⚠</span><span style="height:10px;background:#EFE9DC"><span style="display:block;height:100%;width:4%;background:#A6431F"></span></span><span style="font-family:'IBM Plex Mono',monospace;text-align:right;color:#A6431F">1,80M</span><span style="font-family:'IBM Plex Mono',monospace;text-align:right;color:#A6431F">4.2</span></div>
+              </div>
+            </div>
+            <div style="grid-column:1 / -1;background:#FCFAF6;border:1px solid #D8D2C6;border-radius:6px">
+              <div style="padding:10px 16px;border-bottom:1px solid #E6E0D3;font-size:12px;font-weight:600;display:flex;justify-content:space-between"><span>INCOME RECOGNITION — JUN 2026</span><span style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;color:#8A8272">PHP</span></div>
+              <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:#E6E0D3">
+                <div style="background:#FCFAF6;padding:12px 16px"><div style="font-size:11px;color:#8A8272">Interest</div><div style="font-family:'IBM Plex Mono',monospace;font-size:17px;margin-top:3px">612,400</div></div>
+                <div style="background:#FCFAF6;padding:12px 16px"><div style="font-size:11px;color:#8A8272">Processing fees</div><div style="font-family:'IBM Plex Mono',monospace;font-size:17px;margin-top:3px">91,000</div></div>
+                <div style="background:#FCFAF6;padding:12px 16px"><div style="font-size:11px;color:#8A8272">Penalties</div><div style="font-family:'IBM Plex Mono',monospace;font-size:17px;margin-top:3px">48,250</div></div>
+                <div style="background:#F0F4EC;padding:12px 16px"><div style="font-size:11px;color:#3A6E48;font-weight:600">TOTAL</div><div style="font-family:'IBM Plex Mono',monospace;font-size:17px;margin-top:3px;color:#3A6E48;font-weight:500">751,650</div></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============ 1d BROADSHEET ============ -->
+    <div class="dv-opt" id="1d">
+      <div class="dv-olabel"><a class="dv-oid" href="#1d">1d</a>Broadsheet — editorial, oversized serif numerals, hairlines, maximum calm</div>
+      <div class="dv-card" style="width:1040px;background:#FBF9F3;font-family:'Albert Sans',sans-serif;color:#1B1914">
+        <div style="display:flex;align-items:baseline;justify-content:space-between;padding:22px 40px 18px;border-bottom:1px solid #1B1914">
+          <div style="display:flex;align-items:baseline;gap:16px">
+            <span style="font-family:'Instrument Serif',serif;font-size:26px">LoanStar</span>
+            <span style="font-size:10.5px;letter-spacing:.18em;text-transform:uppercase;color:#8A8172">Executive Report</span>
+          </div>
+          <span style="font-size:10.5px;letter-spacing:.18em;text-transform:uppercase;color:#8A8172">Tuesday · 8 July 2026 · Sign out</span>
+        </div>
+        <div style="padding:34px 40px 40px">
+          <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:0;border-bottom:1px solid #E3DCC9;padding-bottom:30px">
+            <div style="padding-right:28px;border-right:1px solid #E3DCC9">
+              <div style="font-size:10.5px;letter-spacing:.16em;text-transform:uppercase;color:#8A8172">Active loans</div>
+              <div style="font-family:'Instrument Serif',serif;font-size:58px;line-height:1.05;margin-top:10px">128</div>
+              <div style="font-size:12px;color:#5C574B;margin-top:8px">six released this month</div>
+            </div>
+            <div style="padding:0 28px;border-right:1px solid #E3DCC9">
+              <div style="font-size:10.5px;letter-spacing:.16em;text-transform:uppercase;color:#8A8172">Portfolio</div>
+              <div style="font-family:'Instrument Serif',serif;font-size:58px;line-height:1.05;margin-top:10px">₱42.6<span style="font-size:32px">M</span></div>
+              <div style="font-size:12px;color:#5C574B;margin-top:8px">across 128 accounts</div>
+            </div>
+            <div style="padding:0 28px;border-right:1px solid #E3DCC9">
+              <div style="font-size:10.5px;letter-spacing:.16em;text-transform:uppercase;color:#8A8172">Collected</div>
+              <div style="font-family:'Instrument Serif',serif;font-size:58px;line-height:1.05;margin-top:10px">94.2<span style="font-size:32px">%</span></div>
+              <div style="font-size:12px;color:#5C574B;margin-top:8px">₱3.94M of ₱4.18M due</div>
+            </div>
+            <div style="padding-left:28px">
+              <div style="font-size:10.5px;letter-spacing:.16em;text-transform:uppercase;color:#B0432C">Overdue 91+</div>
+              <div style="font-family:'Instrument Serif',serif;font-size:58px;line-height:1.05;margin-top:10px;color:#B0432C">₱1.8<span style="font-size:32px">M</span></div>
+              <div style="font-size:12px;color:#5C574B;margin-top:8px">seven accounts, in remedial</div>
+            </div>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:40px;padding-top:30px">
+            <div>
+              <div style="font-size:10.5px;letter-spacing:.16em;text-transform:uppercase;color:#8A8172;margin-bottom:16px">Pipeline</div>
+              <div style="display:flex;flex-direction:column">
+                <div style="display:flex;justify-content:space-between;align-items:baseline;padding:9px 0;border-bottom:1px solid #EDE7D6"><span style="font-size:13px">Intake</span><span style="font-family:'Instrument Serif',serif;font-size:22px">14</span></div>
+                <div style="display:flex;justify-content:space-between;align-items:baseline;padding:9px 0;border-bottom:1px solid #EDE7D6"><span style="font-size:13px">Verification</span><span style="font-family:'Instrument Serif',serif;font-size:22px">9</span></div>
+                <div style="display:flex;justify-content:space-between;align-items:baseline;padding:9px 0;border-bottom:1px solid #EDE7D6"><span style="font-size:13px">Committee</span><span style="font-family:'Instrument Serif',serif;font-size:22px">6</span></div>
+                <div style="display:flex;justify-content:space-between;align-items:baseline;padding:9px 0"><span style="font-size:13px;color:#B0432C">Release — slowest, 2.9d</span><span style="font-family:'Instrument Serif',serif;font-size:22px;color:#B0432C">4</span></div>
+              </div>
+            </div>
+            <div>
+              <div style="font-size:10.5px;letter-spacing:.16em;text-transform:uppercase;color:#8A8172;margin-bottom:16px">Aging</div>
+              <div style="display:flex;height:8px;margin-bottom:16px">
+                <span style="width:73%;background:#1B1914"></span><span style="width:13%;background:#8A8172"></span><span style="width:6%;background:#C4B893"></span><span style="width:4%;background:#D08B4C"></span><span style="width:4%;background:#B0432C"></span>
+              </div>
+              <div style="display:flex;flex-direction:column;font-size:12.5px">
+                <div style="display:flex;justify-content:space-between;padding:7px 0;border-bottom:1px solid #EDE7D6"><span style="color:#5C574B">Current</span><span>₱31.2M</span></div>
+                <div style="display:flex;justify-content:space-between;padding:7px 0;border-bottom:1px solid #EDE7D6"><span style="color:#5C574B">1–30 days</span><span>₱5.4M</span></div>
+                <div style="display:flex;justify-content:space-between;padding:7px 0;border-bottom:1px solid #EDE7D6"><span style="color:#5C574B">31–60 days</span><span>₱2.6M</span></div>
+                <div style="display:flex;justify-content:space-between;padding:7px 0;border-bottom:1px solid #EDE7D6"><span style="color:#5C574B">61–90 days</span><span>₱1.6M</span></div>
+                <div style="display:flex;justify-content:space-between;padding:7px 0"><span style="color:#B0432C">91+ days</span><span style="color:#B0432C">₱1.8M</span></div>
+              </div>
+            </div>
+            <div>
+              <div style="font-size:10.5px;letter-spacing:.16em;text-transform:uppercase;color:#8A8172;margin-bottom:16px">Income · June</div>
+              <div style="display:flex;flex-direction:column;font-size:12.5px">
+                <div style="display:flex;justify-content:space-between;padding:7px 0;border-bottom:1px solid #EDE7D6"><span style="color:#5C574B">Interest</span><span>₱612,400</span></div>
+                <div style="display:flex;justify-content:space-between;padding:7px 0;border-bottom:1px solid #EDE7D6"><span style="color:#5C574B">Processing fees</span><span>₱91,000</span></div>
+                <div style="display:flex;justify-content:space-between;padding:7px 0;border-bottom:1px solid #EDE7D6"><span style="color:#5C574B">Penalties</span><span>₱48,250</span></div>
+                <div style="display:flex;justify-content:space-between;padding:10px 0;align-items:baseline"><span style="font-weight:600">Total recognized</span><span style="font-family:'Instrument Serif',serif;font-size:24px">₱751,650</span></div>
+              </div>
+              <div style="margin-top:14px;padding:12px 14px;background:#F2EEE1;font-size:11.5px;line-height:1.55;color:#5C574B">End-to-end turnaround is <b style="color:#1B1914">8.3 days</b> against a 7-day target; the release step (2.9d) is the drag.</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="dv-cluster">B · Replacing the inline "showForm" create pattern — Admin › Users</div>
+  <div class="dv-opts">
+
+    <!-- ============ 1e MODAL ============ -->
+    <div class="dv-opt" id="1e">
+      <div class="dv-olabel"><a class="dv-oid" href="#1e">1e</a>Modal dialog — focused, keeps list context behind</div>
+      <div class="dv-card" style="width:860px;font-family:'Albert Sans',sans-serif;color:#2B2620;position:relative;background:#F6F2EB">
+        <div style="filter:blur(1px);opacity:.85;min-height:640px">
+          <div style="display:flex;justify-content:space-between;align-items:center;padding:20px 28px 14px">
+            <div><div style="font-size:19px;font-weight:700">Users</div><div style="font-size:12px;color:#8B8171">12 accounts · 3 roles in use</div></div>
+            <span style="background:#BF5B2D;color:#fff;font-size:12.5px;font-weight:600;padding:8px 16px;border-radius:8px">+ Create user</span>
+          </div>
+          <div style="margin:0 28px 24px;background:#FFFDF9;border:1px solid #E8DECD;border-radius:10px;overflow:hidden">
+            <div style="display:grid;grid-template-columns:2fr 1.4fr 1fr 1fr;padding:10px 18px;font-size:11px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;color:#8B8171;border-bottom:1px solid #E8DECD">
+              <span>Email</span><span>Name</span><span>Roles</span><span>Status</span>
+            </div>
+            <div style="display:grid;grid-template-columns:2fr 1.4fr 1fr 1fr;padding:12px 18px;font-size:12.5px;border-bottom:1px solid #F1EADC;align-items:center"><span>m.reyes@loanstar.ph</span><span>Marites Reyes</span><span>CSA intake</span><span><span style="background:#E4EFE2;color:#3A6E48;font-size:11px;font-weight:600;padding:3px 9px;border-radius:999px">Active</span></span></div>
+            <div style="display:grid;grid-template-columns:2fr 1.4fr 1fr 1fr;padding:12px 18px;font-size:12.5px;border-bottom:1px solid #F1EADC;align-items:center"><span>j.dizon@loanstar.ph</span><span>Joel Dizon</span><span>Committee</span><span><span style="background:#E4EFE2;color:#3A6E48;font-size:11px;font-weight:600;padding:3px 9px;border-radius:999px">Active</span></span></div>
+            <div style="display:grid;grid-template-columns:2fr 1.4fr 1fr 1fr;padding:12px 18px;font-size:12.5px;border-bottom:1px solid #F1EADC;align-items:center"><span>r.lim@loanstar.ph</span><span>Rosa Lim</span><span>Collector</span><span><span style="background:#EFEBE2;color:#8B8171;font-size:11px;font-weight:600;padding:3px 9px;border-radius:999px">Inactive</span></span></div>
+            <div style="display:grid;grid-template-columns:2fr 1.4fr 1fr 1fr;padding:12px 18px;font-size:12.5px;border-bottom:1px solid #F1EADC;align-items:center"><span>b.santos@loanstar.ph</span><span>Ben Santos</span><span>LRA release</span><span><span style="background:#E4EFE2;color:#3A6E48;font-size:11px;font-weight:600;padding:3px 9px;border-radius:999px">Active</span></span></div>
+            <div style="display:grid;grid-template-columns:2fr 1.4fr 1fr 1fr;padding:12px 18px;font-size:12.5px;border-bottom:1px solid #F1EADC;align-items:center"><span>c.uy@loanstar.ph</span><span>Carla Uy</span><span>Accounting</span><span><span style="background:#E4EFE2;color:#3A6E48;font-size:11px;font-weight:600;padding:3px 9px;border-radius:999px">Active</span></span></div>
+            <div style="display:grid;grid-template-columns:2fr 1.4fr 1fr 1fr;padding:12px 18px;font-size:12.5px;align-items:center"><span>d.ocampo@loanstar.ph</span><span>Dan Ocampo</span><span>CIG verification</span><span><span style="background:#E4EFE2;color:#3A6E48;font-size:11px;font-weight:600;padding:3px 9px;border-radius:999px">Active</span></span></div>
+          </div>
+        </div>
+        <div style="position:absolute;inset:0;background:rgba(43,38,32,.45);display:flex;align-items:center;justify-content:center">
+          <div style="width:420px;background:#FFFDF9;border-radius:14px;box-shadow:0 24px 60px rgba(27,22,15,.35);overflow:hidden">
+            <div style="padding:20px 24px 0;display:flex;justify-content:space-between;align-items:flex-start">
+              <div><div style="font-size:16px;font-weight:700">Create user</div><div style="font-size:12px;color:#8B8171;margin-top:2px">They'll get an invite email to set things up.</div></div>
+              <span style="color:#8B8171;font-size:16px;line-height:1;padding:2px">✕</span>
+            </div>
+            <div style="padding:18px 24px 6px;display:flex;flex-direction:column;gap:13px">
+              <div><div style="font-size:12px;font-weight:600;margin-bottom:5px">Work email</div><div style="border:1.5px solid #BF5B2D;border-radius:8px;padding:9px 12px;font-size:13px;background:#fff;box-shadow:0 0 0 3px rgba(191,91,45,.12)">a.navarro@loanstar.ph<span style="display:inline-block;width:1.5px;height:14px;background:#BF5B2D;margin-left:1px;vertical-align:-2px"></span></div></div>
+              <div><div style="font-size:12px;font-weight:600;margin-bottom:5px">Full name</div><div style="border:1px solid #DDD2BE;border-radius:8px;padding:9px 12px;font-size:13px;background:#fff;color:#A99C86">Ana Navarro</div></div>
+              <div><div style="font-size:12px;font-weight:600;margin-bottom:5px">Temporary password</div><div style="border:1px solid #DDD2BE;border-radius:8px;padding:9px 12px;font-size:13px;background:#fff;color:#A99C86;display:flex;justify-content:space-between"><span>••••••••••</span><span style="color:#BF5B2D;font-weight:600;font-size:12px">Generate</span></div><div style="font-size:11px;color:#8B8171;margin-top:4px">Minimum 8 characters · must be changed at first sign-in</div></div>
+              <div>
+                <div style="font-size:12px;font-weight:600;margin-bottom:7px">Roles</div>
+                <div style="display:flex;flex-wrap:wrap;gap:7px">
+                  <span style="border:1.5px solid #BF5B2D;background:#FAEDE4;color:#9C4820;font-size:12px;font-weight:600;padding:5px 12px;border-radius:999px">✓ CSA intake</span>
+                  <span style="border:1px solid #DDD2BE;color:#5C5346;font-size:12px;padding:5px 12px;border-radius:999px">CIG verification</span>
+                  <span style="border:1px solid #DDD2BE;color:#5C5346;font-size:12px;padding:5px 12px;border-radius:999px">Committee</span>
+                  <span style="border:1.5px solid #BF5B2D;background:#FAEDE4;color:#9C4820;font-size:12px;font-weight:600;padding:5px 12px;border-radius:999px">✓ LRA release</span>
+                  <span style="border:1px solid #DDD2BE;color:#5C5346;font-size:12px;padding:5px 12px;border-radius:999px">Accounting</span>
+                  <span style="border:1px solid #DDD2BE;color:#5C5346;font-size:12px;padding:5px 12px;border-radius:999px">Collector</span>
+                </div>
+              </div>
+            </div>
+            <div style="display:flex;justify-content:flex-end;gap:10px;padding:18px 24px;margin-top:8px;border-top:1px solid #F1EADC">
+              <span style="font-size:13px;font-weight:600;color:#5C5346;padding:9px 16px">Cancel</span>
+              <span style="background:#BF5B2D;color:#fff;font-size:13px;font-weight:600;padding:9px 18px;border-radius:8px">Create user</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============ 1f DRAWER ============ -->
+    <div class="dv-opt" id="1f">
+      <div class="dv-olabel"><a class="dv-oid" href="#1f">1f</a>Side drawer — list stays live &amp; scannable while creating</div>
+      <div class="dv-card" style="width:860px;font-family:'Albert Sans',sans-serif;color:#2B2620;background:#F6F2EB;display:flex;overflow:hidden">
+        <div style="flex:1;min-width:0">
+          <div style="display:flex;justify-content:space-between;align-items:center;padding:20px 24px 14px">
+            <div><div style="font-size:19px;font-weight:700">Users</div><div style="font-size:12px;color:#8B8171">12 accounts</div></div>
+          </div>
+          <div style="margin:0 20px 20px;background:#FFFDF9;border:1px solid #E8DECD;border-radius:10px;overflow:hidden">
+            <div style="display:grid;grid-template-columns:1.6fr 1fr .8fr;padding:10px 16px;font-size:11px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;color:#8B8171;border-bottom:1px solid #E8DECD"><span>User</span><span>Roles</span><span>Status</span></div>
+            <div style="display:grid;grid-template-columns:1.6fr 1fr .8fr;padding:11px 16px;font-size:12.5px;border-bottom:1px solid #F1EADC;align-items:center"><span><b>Marites Reyes</b><br><span style="color:#8B8171;font-size:11.5px">m.reyes@loanstar.ph</span></span><span>CSA intake</span><span><span style="background:#E4EFE2;color:#3A6E48;font-size:11px;font-weight:600;padding:3px 9px;border-radius:999px">Active</span></span></div>
+            <div style="display:grid;grid-template-columns:1.6fr 1fr .8fr;padding:11px 16px;font-size:12.5px;border-bottom:1px solid #F1EADC;align-items:center"><span><b>Joel Dizon</b><br><span style="color:#8B8171;font-size:11.5px">j.dizon@loanstar.ph</span></span><span>Committee</span><span><span style="background:#E4EFE2;color:#3A6E48;font-size:11px;font-weight:600;padding:3px 9px;border-radius:999px">Active</span></span></div>
+            <div style="display:grid;grid-template-columns:1.6fr 1fr .8fr;padding:11px 16px;font-size:12.5px;align-items:center"><span><b>Rosa Lim</b><br><span style="color:#8B8171;font-size:11.5px">r.lim@loanstar.ph</span></span><span>Collector</span><span><span style="background:#EFEBE2;color:#8B8171;font-size:11px;font-weight:600;padding:3px 9px;border-radius:999px">Inactive</span></span></div>
+          </div>
+        </div>
+        <div style="width:320px;flex:none;background:#FFFDF9;border-left:1px solid #E8DECD;box-shadow:-12px 0 28px rgba(43,38,32,.08);display:flex;flex-direction:column">
+          <div style="padding:18px 22px 0;display:flex;justify-content:space-between;align-items:flex-start">
+            <div style="font-size:15px;font-weight:700">New user</div>
+            <span style="color:#8B8171;font-size:15px">✕</span>
+          </div>
+          <div style="padding:16px 22px;display:flex;flex-direction:column;gap:12px;flex:1">
+            <div><div style="font-size:11.5px;font-weight:600;margin-bottom:5px">Work email</div><div style="border:1px solid #DDD2BE;border-radius:8px;padding:8px 11px;font-size:12.5px;background:#fff;color:#A99C86">name@loanstar.ph</div></div>
+            <div><div style="font-size:11.5px;font-weight:600;margin-bottom:5px">Full name</div><div style="border:1px solid #DDD2BE;border-radius:8px;padding:8px 11px;font-size:12.5px;background:#fff;color:#A99C86">Full name</div></div>
+            <div><div style="font-size:11.5px;font-weight:600;margin-bottom:5px">Temporary password</div><div style="border:1px solid #DDD2BE;border-radius:8px;padding:8px 11px;font-size:12.5px;background:#fff;color:#A99C86">Min. 8 characters</div></div>
+            <div>
+              <div style="font-size:11.5px;font-weight:600;margin-bottom:6px">Roles</div>
+              <div style="display:flex;flex-direction:column;border:1px solid #E8DECD;border-radius:8px;overflow:hidden">
+                <div style="display:flex;justify-content:space-between;align-items:center;padding:9px 12px;border-bottom:1px solid #F1EADC;font-size:12.5px;background:#FAEDE4"><span style="font-weight:600;color:#9C4820">CSA intake</span><span style="width:30px;height:17px;border-radius:999px;background:#BF5B2D;position:relative"><span style="position:absolute;right:2px;top:2px;width:13px;height:13px;border-radius:50%;background:#fff"></span></span></div>
+                <div style="display:flex;justify-content:space-between;align-items:center;padding:9px 12px;border-bottom:1px solid #F1EADC;font-size:12.5px"><span>CIG verification</span><span style="width:30px;height:17px;border-radius:999px;background:#DDD2BE;position:relative"><span style="position:absolute;left:2px;top:2px;width:13px;height:13px;border-radius:50%;background:#fff"></span></span></div>
+                <div style="display:flex;justify-content:space-between;align-items:center;padding:9px 12px;border-bottom:1px solid #F1EADC;font-size:12.5px"><span>Committee</span><span style="width:30px;height:17px;border-radius:999px;background:#DDD2BE;position:relative"><span style="position:absolute;left:2px;top:2px;width:13px;height:13px;border-radius:50%;background:#fff"></span></span></div>
+                <div style="display:flex;justify-content:space-between;align-items:center;padding:9px 12px;font-size:12.5px"><span>Accounting</span><span style="width:30px;height:17px;border-radius:999px;background:#DDD2BE;position:relative"><span style="position:absolute;left:2px;top:2px;width:13px;height:13px;border-radius:50%;background:#fff"></span></span></div>
+              </div>
+            </div>
+          </div>
+          <div style="padding:14px 22px;border-top:1px solid #F1EADC;display:flex;gap:10px">
+            <span style="flex:1;text-align:center;background:#BF5B2D;color:#fff;font-size:12.5px;font-weight:600;padding:10px 0;border-radius:8px">Create user</span>
+            <span style="font-size:12.5px;font-weight:600;color:#5C5346;padding:10px 14px">Cancel</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============ 1g SPLIT PANE ============ -->
+    <div class="dv-opt" id="1g">
+      <div class="dv-olabel"><a class="dv-oid" href="#1g">1g</a>Master–detail — create is just another "detail"; also fixes per-row role editing</div>
+      <div class="dv-card" style="width:860px;font-family:'Albert Sans',sans-serif;color:#2B2620;background:#F6F2EB;display:flex;overflow:hidden">
+        <div style="width:290px;flex:none;border-right:1px solid #E8DECD;background:#FBF7EF;display:flex;flex-direction:column">
+          <div style="padding:16px 16px 12px;display:flex;justify-content:space-between;align-items:center">
+            <span style="font-size:15px;font-weight:700">Users <span style="color:#8B8171;font-weight:400;font-size:12px">12</span></span>
+            <span style="background:#BF5B2D;color:#fff;font-size:11.5px;font-weight:600;padding:5px 11px;border-radius:7px">+ New</span>
+          </div>
+          <div style="margin:0 16px 12px;border:1px solid #E1D6C1;border-radius:8px;padding:7px 11px;font-size:12px;color:#A99C86;background:#fff">⌕ Search users…</div>
+          <div style="display:flex;flex-direction:column">
+            <div style="padding:11px 16px;background:#F3E3D6;border-left:3px solid #BF5B2D"><div style="font-size:13px;font-weight:700;color:#9C4820">＋ New user</div><div style="font-size:11px;color:#B5875F">unsaved draft</div></div>
+            <div style="padding:11px 16px;border-bottom:1px solid #F1EADC"><div style="font-size:13px;font-weight:600">Marites Reyes</div><div style="font-size:11px;color:#8B8171">CSA intake · Active</div></div>
+            <div style="padding:11px 16px;border-bottom:1px solid #F1EADC"><div style="font-size:13px;font-weight:600">Joel Dizon</div><div style="font-size:11px;color:#8B8171">Committee · Active</div></div>
+            <div style="padding:11px 16px;border-bottom:1px solid #F1EADC"><div style="font-size:13px;font-weight:600">Rosa Lim</div><div style="font-size:11px;color:#8B8171">Collector · Inactive</div></div>
+            <div style="padding:11px 16px"><div style="font-size:13px;font-weight:600">Ben Santos</div><div style="font-size:11px;color:#8B8171">LRA release · Active</div></div>
+          </div>
+        </div>
+        <div style="flex:1;padding:22px 26px">
+          <div style="font-size:17px;font-weight:700">New user</div>
+          <div style="font-size:12px;color:#8B8171;margin-top:2px;margin-bottom:18px">Account details and access. Roles can be changed here any time later, too.</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:13px 14px;max-width:480px">
+            <div style="grid-column:1 / -1"><div style="font-size:12px;font-weight:600;margin-bottom:5px">Work email</div><div style="border:1px solid #DDD2BE;border-radius:8px;padding:9px 12px;font-size:13px;background:#fff;color:#A99C86">name@loanstar.ph</div></div>
+            <div><div style="font-size:12px;font-weight:600;margin-bottom:5px">Full name</div><div style="border:1px solid #DDD2BE;border-radius:8px;padding:9px 12px;font-size:13px;background:#fff;color:#A99C86">Full name</div></div>
+            <div><div style="font-size:12px;font-weight:600;margin-bottom:5px">Temporary password</div><div style="border:1px solid #DDD2BE;border-radius:8px;padding:9px 12px;font-size:13px;background:#fff;color:#A99C86">Min. 8 characters</div></div>
+          </div>
+          <div style="margin-top:18px;max-width:480px">
+            <div style="font-size:12px;font-weight:600;margin-bottom:8px">Roles</div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+              <div style="border:1.5px solid #BF5B2D;background:#FAEDE4;border-radius:9px;padding:10px 12px"><div style="font-size:12.5px;font-weight:700;color:#9C4820">✓ CSA intake</div><div style="font-size:11px;color:#B5875F;margin-top:1px">Queue, new applications</div></div>
+              <div style="border:1px solid #E1D6C1;border-radius:9px;padding:10px 12px;background:#fff"><div style="font-size:12.5px;font-weight:600">CIG verification</div><div style="font-size:11px;color:#8B8171;margin-top:1px">External checks, callbacks</div></div>
+              <div style="border:1px solid #E1D6C1;border-radius:9px;padding:10px 12px;background:#fff"><div style="font-size:12.5px;font-weight:600">Committee</div><div style="font-size:11px;color:#8B8171;margin-top:1px">Votes &amp; final decisions</div></div>
+              <div style="border:1px solid #E1D6C1;border-radius:9px;padding:10px 12px;background:#fff"><div style="font-size:12.5px;font-weight:600">LRA release</div><div style="font-size:11px;color:#8B8171;margin-top:1px">Docs, PDC, fund release</div></div>
+            </div>
+          </div>
+          <div style="display:flex;gap:10px;margin-top:22px">
+            <span style="background:#BF5B2D;color:#fff;font-size:13px;font-weight:600;padding:10px 18px;border-radius:8px">Create user</span>
+            <span style="font-size:13px;font-weight:600;color:#5C5346;padding:10px 14px">Discard</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============ 1h FULL PAGE ============ -->
+    <div class="dv-opt" id="1h">
+      <div class="dv-olabel"><a class="dv-oid" href="#1h">1h</a>Dedicated page — matches your existing /agent/leads/new convention, sectioned + sticky footer</div>
+      <div class="dv-card" style="width:640px;font-family:'Albert Sans',sans-serif;color:#2B2620;background:#F6F2EB">
+        <div style="padding:20px 30px 0">
+          <div style="font-size:11.5px;color:#8B8171;margin-bottom:10px"><span style="color:#8A5A2B;font-weight:600">Users</span> / New user</div>
+          <div style="font-size:20px;font-weight:700">Create a user</div>
+          <div style="font-size:12.5px;color:#8B8171;margin-top:3px">Two quick sections — account, then access.</div>
+        </div>
+        <div style="padding:18px 30px 20px;display:flex;flex-direction:column;gap:14px">
+          <div style="background:#FFFDF9;border:1px solid #E8DECD;border-radius:12px;padding:18px 22px">
+            <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px"><span style="width:22px;height:22px;border-radius:50%;background:#2B2620;color:#fff;font-size:11.5px;font-weight:700;display:inline-flex;align-items:center;justify-content:center">1</span><span style="font-size:13.5px;font-weight:700">Account</span></div>
+            <div style="display:flex;flex-direction:column;gap:12px">
+              <div><div style="font-size:12px;font-weight:600;margin-bottom:5px">Work email</div><div style="border:1px solid #DDD2BE;border-radius:8px;padding:9px 12px;font-size:13px;background:#fff;color:#A99C86">name@loanstar.ph</div></div>
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+                <div><div style="font-size:12px;font-weight:600;margin-bottom:5px">Full name</div><div style="border:1px solid #DDD2BE;border-radius:8px;padding:9px 12px;font-size:13px;background:#fff;color:#A99C86">Full name</div></div>
+                <div><div style="font-size:12px;font-weight:600;margin-bottom:5px">Temporary password</div><div style="border:1px solid #DDD2BE;border-radius:8px;padding:9px 12px;font-size:13px;background:#fff;color:#A99C86">Min. 8 characters</div></div>
+              </div>
+            </div>
+          </div>
+          <div style="background:#FFFDF9;border:1px solid #E8DECD;border-radius:12px;padding:18px 22px">
+            <div style="display:flex;align-items:center;gap:10px;margin-bottom:4px"><span style="width:22px;height:22px;border-radius:50%;background:#2B2620;color:#fff;font-size:11.5px;font-weight:700;display:inline-flex;align-items:center;justify-content:center">2</span><span style="font-size:13.5px;font-weight:700">Access</span></div>
+            <div style="font-size:11.5px;color:#8B8171;margin:0 0 12px 32px">Pick at least one role. Each role opens one workspace.</div>
+            <div style="display:flex;flex-direction:column;border:1px solid #E8DECD;border-radius:9px;overflow:hidden">
+              <div style="display:flex;align-items:center;gap:11px;padding:10px 14px;border-bottom:1px solid #F1EADC;background:#FAEDE4"><span style="width:16px;height:16px;border-radius:4px;background:#BF5B2D;color:#fff;font-size:10.5px;display:inline-flex;align-items:center;justify-content:center">✓</span><span style="font-size:12.5px;font-weight:700;color:#9C4820">CSA intake</span><span style="font-size:11px;color:#B5875F;margin-left:auto">Queue · new applications</span></div>
+              <div style="display:flex;align-items:center;gap:11px;padding:10px 14px;border-bottom:1px solid #F1EADC"><span style="width:16px;height:16px;border-radius:4px;border:1.5px solid #CBBFA8;background:#fff"></span><span style="font-size:12.5px;font-weight:600">CIG verification</span><span style="font-size:11px;color:#8B8171;margin-left:auto">Checks · callbacks</span></div>
+              <div style="display:flex;align-items:center;gap:11px;padding:10px 14px;border-bottom:1px solid #F1EADC"><span style="width:16px;height:16px;border-radius:4px;border:1.5px solid #CBBFA8;background:#fff"></span><span style="font-size:12.5px;font-weight:600">Committee</span><span style="font-size:11px;color:#8B8171;margin-left:auto">Votes · decisions</span></div>
+              <div style="display:flex;align-items:center;gap:11px;padding:10px 14px"><span style="width:16px;height:16px;border-radius:4px;border:1.5px solid #CBBFA8;background:#fff"></span><span style="font-size:12.5px;font-weight:600">Accounting (AR)</span><span style="font-size:11px;color:#8B8171;margin-left:auto">Masterlist · DCR</span></div>
+            </div>
+          </div>
+        </div>
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:14px 30px;background:#FFFDF9;border-top:1px solid #E8DECD">
+          <span style="font-size:12px;color:#8B8171">Draft isn't saved until you create</span>
+          <div style="display:flex;gap:10px">
+            <span style="font-size:13px;font-weight:600;color:#5C5346;padding:9px 14px">Cancel</span>
+            <span style="background:#BF5B2D;color:#fff;font-size:13px;font-weight:600;padding:9px 18px;border-radius:8px">Create user</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="dv-cluster">C · Role detail — structured permissions &amp; field rules (replacing raw JSON)</div>
+  <div class="dv-opts">
+
+    <!-- ============ 1i REFINED MATRIX ============ -->
+    <div class="dv-opt" id="1i">
+      <div class="dv-olabel"><a class="dv-oid" href="#1i">1i</a>Refined matrix + per-field segmented control — closest to today, zero JSON</div>
+      <div class="dv-card" style="width:860px;font-family:'Albert Sans',sans-serif;color:#2B2620;background:#F6F2EB">
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:20px 28px 14px">
+          <div><div style="font-size:19px;font-weight:700">Committee Officer <span style="font-size:11px;font-weight:600;color:#8B8171;background:#EFEBE2;padding:3px 9px;border-radius:999px;vertical-align:3px">Custom role</span></div><div style="font-size:12px;color:#8B8171;margin-top:2px">committee-officer · 4 users have this role</div></div>
+          <span style="background:#BF5B2D;color:#fff;font-size:12.5px;font-weight:600;padding:8px 16px;border-radius:8px">Save changes</span>
+        </div>
+        <div style="margin:0 28px 14px;background:#FFFDF9;border:1px solid #E8DECD;border-radius:10px;overflow:hidden">
+          <div style="padding:12px 18px;border-bottom:1px solid #E8DECD;font-size:13px;font-weight:700">Module permissions</div>
+          <div style="display:grid;grid-template-columns:1.6fr repeat(5,72px);padding:8px 18px;font-size:10.5px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;color:#8B8171;border-bottom:1px solid #F1EADC;text-align:center"><span style="text-align:left">Module</span><span>View</span><span>Create</span><span>Edit</span><span>Delete</span><span>Trigger</span></div>
+          <div style="display:grid;grid-template-columns:1.6fr repeat(5,72px);padding:9px 18px;align-items:center;border-bottom:1px solid #F1EADC;text-align:center"><span style="text-align:left;font-size:12.5px;font-weight:600">Applications</span><span><span style="display:inline-block;width:17px;height:17px;border-radius:5px;background:#BF5B2D;color:#fff;font-size:11px;line-height:17px">✓</span></span><span><span style="display:inline-block;width:17px;height:17px;border-radius:5px;border:1.5px solid #CBBFA8"></span></span><span><span style="display:inline-block;width:17px;height:17px;border-radius:5px;background:#BF5B2D;color:#fff;font-size:11px;line-height:17px">✓</span></span><span><span style="display:inline-block;width:17px;height:17px;border-radius:5px;border:1.5px solid #CBBFA8"></span></span><span><span style="display:inline-block;width:17px;height:17px;border-radius:5px;background:#BF5B2D;color:#fff;font-size:11px;line-height:17px">✓</span></span></div>
+          <div style="display:grid;grid-template-columns:1.6fr repeat(5,72px);padding:9px 18px;align-items:center;border-bottom:1px solid #F1EADC;text-align:center;background:#FBF7EF"><span style="text-align:left;font-size:12.5px;font-weight:600">Computation <span style="font-size:10.5px;color:#9C4820;background:#F3E3D6;padding:2px 7px;border-radius:999px;font-weight:600;margin-left:6px">3 field rules</span></span><span><span style="display:inline-block;width:17px;height:17px;border-radius:5px;background:#BF5B2D;color:#fff;font-size:11px;line-height:17px">✓</span></span><span><span style="display:inline-block;width:17px;height:17px;border-radius:5px;border:1.5px solid #CBBFA8"></span></span><span><span style="display:inline-block;width:17px;height:17px;border-radius:5px;background:#BF5B2D;color:#fff;font-size:11px;line-height:17px">✓</span></span><span><span style="display:inline-block;width:17px;height:17px;border-radius:5px;border:1.5px solid #CBBFA8"></span></span><span><span style="display:inline-block;width:17px;height:17px;border-radius:5px;border:1.5px solid #CBBFA8"></span></span></div>
+          <div style="display:grid;grid-template-columns:1.6fr repeat(5,72px);padding:9px 18px;align-items:center;border-bottom:1px solid #F1EADC;text-align:center"><span style="text-align:left;font-size:12.5px;font-weight:600">Borrowers</span><span><span style="display:inline-block;width:17px;height:17px;border-radius:5px;background:#BF5B2D;color:#fff;font-size:11px;line-height:17px">✓</span></span><span><span style="display:inline-block;width:17px;height:17px;border-radius:5px;border:1.5px solid #CBBFA8"></span></span><span><span style="display:inline-block;width:17px;height:17px;border-radius:5px;border:1.5px solid #CBBFA8"></span></span><span><span style="display:inline-block;width:17px;height:17px;border-radius:5px;border:1.5px solid #CBBFA8"></span></span><span><span style="display:inline-block;width:17px;height:17px;border-radius:5px;border:1.5px solid #CBBFA8"></span></span></div>
+          <div style="display:grid;grid-template-columns:1.6fr repeat(5,72px);padding:9px 18px;align-items:center;text-align:center"><span style="text-align:left;font-size:12.5px;font-weight:600;color:#A99C86">Releases <span style="font-size:11px;font-weight:400">— no access</span></span><span><span style="display:inline-block;width:17px;height:17px;border-radius:5px;border:1.5px solid #E1D6C1"></span></span><span><span style="display:inline-block;width:17px;height:17px;border-radius:5px;border:1.5px solid #E1D6C1"></span></span><span><span style="display:inline-block;width:17px;height:17px;border-radius:5px;border:1.5px solid #E1D6C1"></span></span><span><span style="display:inline-block;width:17px;height:17px;border-radius:5px;border:1.5px solid #E1D6C1"></span></span><span><span style="display:inline-block;width:17px;height:17px;border-radius:5px;border:1.5px solid #E1D6C1"></span></span></div>
+        </div>
+        <div style="margin:0 28px 24px;background:#FFFDF9;border:1px solid #E8DECD;border-radius:10px;overflow:hidden">
+          <div style="padding:12px 18px;border-bottom:1px solid #E8DECD;display:flex;justify-content:space-between;align-items:center">
+            <span style="font-size:13px;font-weight:700">Field rules · <span style="color:#9C4820">Computation</span></span>
+            <span style="font-size:11.5px;color:#8B8171">Unset fields follow module permission</span>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 210px;padding:9px 18px;align-items:center;border-bottom:1px solid #F1EADC"><span style="font-size:12.5px"><b>principal_amount</b><span style="color:#8B8171;font-size:11.5px"> — approved loan principal</span></span><span style="display:inline-flex;border:1px solid #E1D6C1;border-radius:999px;overflow:hidden;font-size:11.5px;font-weight:600"><span style="padding:5px 13px;color:#8B8171">Edit</span><span style="padding:5px 13px;background:#2B2620;color:#fff">Read only</span><span style="padding:5px 13px;color:#8B8171">Hidden</span></span></div>
+          <div style="display:grid;grid-template-columns:1fr 210px;padding:9px 18px;align-items:center;border-bottom:1px solid #F1EADC"><span style="font-size:12.5px"><b>interest_rate</b><span style="color:#8B8171;font-size:11.5px"> — from active rate version</span></span><span style="display:inline-flex;border:1px solid #E1D6C1;border-radius:999px;overflow:hidden;font-size:11.5px;font-weight:600"><span style="padding:5px 13px;color:#8B8171">Edit</span><span style="padding:5px 13px;background:#2B2620;color:#fff">Read only</span><span style="padding:5px 13px;color:#8B8171">Hidden</span></span></div>
+          <div style="display:grid;grid-template-columns:1fr 210px;padding:9px 18px;align-items:center;border-bottom:1px solid #F1EADC"><span style="font-size:12.5px"><b>override_amount</b><span style="color:#8B8171;font-size:11.5px"> — negotiation override</span></span><span style="display:inline-flex;border:1px solid #E1D6C1;border-radius:999px;overflow:hidden;font-size:11.5px;font-weight:600"><span style="padding:5px 13px;background:#3A6E48;color:#fff">Edit</span><span style="padding:5px 13px;color:#8B8171">Read only</span><span style="padding:5px 13px;color:#8B8171">Hidden</span></span></div>
+          <div style="display:grid;grid-template-columns:1fr 210px;padding:9px 18px;align-items:center"><span style="font-size:12.5px"><b>coverage_ratio</b><span style="color:#8B8171;font-size:11.5px"> — system config value</span></span><span style="display:inline-flex;border:1px solid #E1D6C1;border-radius:999px;overflow:hidden;font-size:11.5px;font-weight:600"><span style="padding:5px 13px;color:#8B8171">Edit</span><span style="padding:5px 13px;color:#8B8171">Read only</span><span style="padding:5px 13px;background:#B0432C;color:#fff">Hidden</span></span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============ 1j MODULE CARDS ============ -->
+    <div class="dv-opt" id="1j">
+      <div class="dv-olabel"><a class="dv-oid" href="#1j">1j</a>Module accordion cards — capabilities as chips, field rules nested where they belong</div>
+      <div class="dv-card" style="width:640px;font-family:'Albert Sans',sans-serif;color:#2B2620;background:#F6F2EB">
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:20px 26px 14px">
+          <div><div style="font-size:18px;font-weight:700">Committee Officer</div><div style="font-size:12px;color:#8B8171;margin-top:2px">Access is granted per module. 3 of 7 modules enabled.</div></div>
+          <span style="background:#BF5B2D;color:#fff;font-size:12px;font-weight:600;padding:8px 15px;border-radius:8px">Save</span>
+        </div>
+        <div style="padding:0 26px 24px;display:flex;flex-direction:column;gap:10px">
+          <div style="background:#FFFDF9;border:1px solid #E8DECD;border-radius:12px;padding:14px 18px">
+            <div style="display:flex;justify-content:space-between;align-items:center">
+              <span style="font-size:13.5px;font-weight:700">Applications</span>
+              <span style="color:#8B8171;font-size:12px">▾</span>
+            </div>
+            <div style="display:flex;gap:7px;margin-top:10px">
+              <span style="border:1.5px solid #BF5B2D;background:#FAEDE4;color:#9C4820;font-size:11.5px;font-weight:600;padding:4px 11px;border-radius:999px">✓ View</span>
+              <span style="border:1px solid #E1D6C1;color:#8B8171;font-size:11.5px;padding:4px 11px;border-radius:999px">Create</span>
+              <span style="border:1.5px solid #BF5B2D;background:#FAEDE4;color:#9C4820;font-size:11.5px;font-weight:600;padding:4px 11px;border-radius:999px">✓ Edit</span>
+              <span style="border:1px solid #E1D6C1;color:#8B8171;font-size:11.5px;padding:4px 11px;border-radius:999px">Delete</span>
+              <span style="border:1.5px solid #BF5B2D;background:#FAEDE4;color:#9C4820;font-size:11.5px;font-weight:600;padding:4px 11px;border-radius:999px">✓ Trigger</span>
+            </div>
+          </div>
+          <div style="background:#FFFDF9;border:1.5px solid #D9BFA4;border-radius:12px;padding:14px 18px;box-shadow:0 2px 8px rgba(43,38,32,.05)">
+            <div style="display:flex;justify-content:space-between;align-items:center">
+              <span style="font-size:13.5px;font-weight:700">Computation <span style="font-size:10.5px;color:#9C4820;background:#F3E3D6;padding:2px 8px;border-radius:999px;margin-left:6px">3 field rules</span></span>
+              <span style="color:#8B8171;font-size:12px">▴</span>
+            </div>
+            <div style="display:flex;gap:7px;margin-top:10px">
+              <span style="border:1.5px solid #BF5B2D;background:#FAEDE4;color:#9C4820;font-size:11.5px;font-weight:600;padding:4px 11px;border-radius:999px">✓ View</span>
+              <span style="border:1px solid #E1D6C1;color:#8B8171;font-size:11.5px;padding:4px 11px;border-radius:999px">Create</span>
+              <span style="border:1.5px solid #BF5B2D;background:#FAEDE4;color:#9C4820;font-size:11.5px;font-weight:600;padding:4px 11px;border-radius:999px">✓ Edit</span>
+              <span style="border:1px solid #E1D6C1;color:#8B8171;font-size:11.5px;padding:4px 11px;border-radius:999px">Delete</span>
+              <span style="border:1px solid #E1D6C1;color:#8B8171;font-size:11.5px;padding:4px 11px;border-radius:999px">Trigger</span>
+            </div>
+            <div style="margin-top:14px;border-top:1px dashed #E8DECD;padding-top:12px">
+              <div style="font-size:11px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;color:#8B8171;margin-bottom:9px">Field exceptions</div>
+              <div style="display:flex;flex-direction:column;gap:7px">
+                <div style="display:flex;justify-content:space-between;align-items:center;font-size:12.5px"><span>principal_amount</span><span style="font-size:11px;font-weight:700;color:#5C5346;background:#EFEBE2;padding:3px 10px;border-radius:999px">READ ONLY</span></div>
+                <div style="display:flex;justify-content:space-between;align-items:center;font-size:12.5px"><span>interest_rate</span><span style="font-size:11px;font-weight:700;color:#5C5346;background:#EFEBE2;padding:3px 10px;border-radius:999px">READ ONLY</span></div>
+                <div style="display:flex;justify-content:space-between;align-items:center;font-size:12.5px"><span>coverage_ratio</span><span style="font-size:11px;font-weight:700;color:#B0432C;background:#F7E3DC;padding:3px 10px;border-radius:999px">HIDDEN</span></div>
+                <span style="font-size:12px;font-weight:600;color:#8A5A2B;margin-top:2px">+ Add field exception</span>
+              </div>
+            </div>
+          </div>
+          <div style="background:#FFFDF9;border:1px solid #E8DECD;border-radius:12px;padding:14px 18px;display:flex;justify-content:space-between;align-items:center">
+            <span style="font-size:13.5px;font-weight:700">Borrowers</span>
+            <span style="display:flex;gap:7px;align-items:center"><span style="border:1.5px solid #BF5B2D;background:#FAEDE4;color:#9C4820;font-size:11.5px;font-weight:600;padding:4px 11px;border-radius:999px">✓ View</span><span style="color:#8B8171;font-size:12px">▾</span></span>
+          </div>
+          <div style="background:#FBF7EF;border:1px dashed #DDD2BE;border-radius:12px;padding:14px 18px;display:flex;justify-content:space-between;align-items:center">
+            <span style="font-size:13.5px;font-weight:600;color:#A99C86">Releases · Payments · Reports · Audit</span>
+            <span style="font-size:12px;font-weight:600;color:#8A5A2B">Enable a module…</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============ 1k PRESET LEVELS ============ -->
+    <div class="dv-opt" id="1k">
+      <div class="dv-olabel"><a class="dv-oid" href="#1k">1k</a>Access levels — presets first (radio!), matrix only under "Custom"</div>
+      <div class="dv-card" style="width:640px;font-family:'Albert Sans',sans-serif;color:#2B2620;background:#F6F2EB">
+        <div style="padding:20px 26px 14px">
+          <div style="font-size:18px;font-weight:700">Committee Officer</div>
+          <div style="font-size:12px;color:#8B8171;margin-top:2px">Choose an access level per module — customize only when needed.</div>
+        </div>
+        <div style="padding:0 26px 24px;display:flex;flex-direction:column;gap:10px">
+          <div style="background:#FFFDF9;border:1px solid #E8DECD;border-radius:12px;padding:16px 18px">
+            <div style="font-size:13.5px;font-weight:700;margin-bottom:11px">Applications</div>
+            <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px">
+              <div style="border:1px solid #E1D6C1;border-radius:9px;padding:10px 11px;background:#fff"><div style="display:flex;align-items:center;gap:7px"><span style="width:13px;height:13px;border-radius:50%;border:1.5px solid #CBBFA8"></span><span style="font-size:12px;font-weight:700">No access</span></div></div>
+              <div style="border:1px solid #E1D6C1;border-radius:9px;padding:10px 11px;background:#fff"><div style="display:flex;align-items:center;gap:7px"><span style="width:13px;height:13px;border-radius:50%;border:1.5px solid #CBBFA8"></span><span style="font-size:12px;font-weight:700">Viewer</span></div><div style="font-size:10.5px;color:#8B8171;margin-top:3px;margin-left:20px">view</div></div>
+              <div style="border:1.5px solid #BF5B2D;border-radius:9px;padding:10px 11px;background:#FAEDE4"><div style="display:flex;align-items:center;gap:7px"><span style="width:13px;height:13px;border-radius:50%;border:4px solid #BF5B2D;background:#fff"></span><span style="font-size:12px;font-weight:700;color:#9C4820">Operator</span></div><div style="font-size:10.5px;color:#B5875F;margin-top:3px;margin-left:20px">view · edit · trigger</div></div>
+              <div style="border:1px solid #E1D6C1;border-radius:9px;padding:10px 11px;background:#fff"><div style="display:flex;align-items:center;gap:7px"><span style="width:13px;height:13px;border-radius:50%;border:1.5px solid #CBBFA8"></span><span style="font-size:12px;font-weight:700">Custom…</span></div><div style="font-size:10.5px;color:#8B8171;margin-top:3px;margin-left:20px">pick capabilities</div></div>
+            </div>
+          </div>
+          <div style="background:#FFFDF9;border:1px solid #E8DECD;border-radius:12px;padding:16px 18px">
+            <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:11px"><span style="font-size:13.5px;font-weight:700">Computation</span><span style="font-size:11px;color:#9C4820;background:#F3E3D6;padding:2px 8px;border-radius:999px;font-weight:600">Custom</span></div>
+            <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:12px">
+              <div style="border:1px solid #E1D6C1;border-radius:9px;padding:10px 11px;background:#fff"><div style="display:flex;align-items:center;gap:7px"><span style="width:13px;height:13px;border-radius:50%;border:1.5px solid #CBBFA8"></span><span style="font-size:12px;font-weight:700">No access</span></div></div>
+              <div style="border:1px solid #E1D6C1;border-radius:9px;padding:10px 11px;background:#fff"><div style="display:flex;align-items:center;gap:7px"><span style="width:13px;height:13px;border-radius:50%;border:1.5px solid #CBBFA8"></span><span style="font-size:12px;font-weight:700">Viewer</span></div><div style="font-size:10.5px;color:#8B8171;margin-top:3px;margin-left:20px">view</div></div>
+              <div style="border:1px solid #E1D6C1;border-radius:9px;padding:10px 11px;background:#fff"><div style="display:flex;align-items:center;gap:7px"><span style="width:13px;height:13px;border-radius:50%;border:1.5px solid #CBBFA8"></span><span style="font-size:12px;font-weight:700">Operator</span></div><div style="font-size:10.5px;color:#8B8171;margin-top:3px;margin-left:20px">view · edit · trigger</div></div>
+              <div style="border:1.5px solid #BF5B2D;border-radius:9px;padding:10px 11px;background:#FAEDE4"><div style="display:flex;align-items:center;gap:7px"><span style="width:13px;height:13px;border-radius:50%;border:4px solid #BF5B2D;background:#fff"></span><span style="font-size:12px;font-weight:700;color:#9C4820">Custom…</span></div><div style="font-size:10.5px;color:#B5875F;margin-top:3px;margin-left:20px">view · edit</div></div>
+            </div>
+            <div style="border-top:1px dashed #E8DECD;padding-top:12px;display:flex;flex-wrap:wrap;gap:7px;align-items:center">
+              <span style="font-size:11px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;color:#8B8171;margin-right:4px">Capabilities:</span>
+              <span style="border:1.5px solid #BF5B2D;background:#FAEDE4;color:#9C4820;font-size:11.5px;font-weight:600;padding:4px 11px;border-radius:999px">✓ View</span>
+              <span style="border:1px solid #E1D6C1;color:#8B8171;font-size:11.5px;padding:4px 11px;border-radius:999px">Create</span>
+              <span style="border:1.5px solid #BF5B2D;background:#FAEDE4;color:#9C4820;font-size:11.5px;font-weight:600;padding:4px 11px;border-radius:999px">✓ Edit</span>
+              <span style="border:1px solid #E1D6C1;color:#8B8171;font-size:11.5px;padding:4px 11px;border-radius:999px">Delete</span>
+              <span style="border:1px solid #E1D6C1;color:#8B8171;font-size:11.5px;padding:4px 11px;border-radius:999px">Trigger</span>
+            </div>
+          </div>
+          <div style="display:flex;justify-content:flex-end;gap:10px">
+            <span style="font-size:13px;font-weight:600;color:#5C5346;padding:9px 14px">Discard</span>
+            <span style="background:#BF5B2D;color:#fff;font-size:13px;font-weight:600;padding:9px 18px;border-radius:8px">Save changes</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============ 1l EDITOR + PREVIEW ============ -->
+    <div class="dv-opt" id="1l">
+      <div class="dv-olabel"><a class="dv-oid" href="#1l">1l</a>Structured editor + live JSON preview — admins keep the JSON, but never type it</div>
+      <div class="dv-card" style="width:860px;font-family:'Albert Sans',sans-serif;color:#2B2620;background:#F6F2EB;display:flex;overflow:hidden">
+        <div style="flex:1;padding:20px 24px">
+          <div style="font-size:16px;font-weight:700">Field rules · Computation</div>
+          <div style="font-size:12px;color:#8B8171;margin-top:2px;margin-bottom:14px">Committee Officer · rules override module permissions per field</div>
+          <div style="border:1px solid #E1D6C1;border-radius:8px;padding:7px 12px;font-size:12px;color:#A99C86;background:#fff;margin-bottom:12px">⌕ Filter fields…</div>
+          <div style="display:flex;flex-direction:column;gap:8px">
+            <div style="background:#FFFDF9;border:1px solid #E8DECD;border-radius:9px;padding:10px 14px;display:flex;justify-content:space-between;align-items:center"><span style="font-size:12.5px;font-weight:600">principal_amount</span><span style="display:inline-flex;border:1px solid #E1D6C1;border-radius:7px;overflow:hidden;font-size:11px;font-weight:600"><span style="padding:4px 10px;color:#8B8171">Edit</span><span style="padding:4px 10px;background:#2B2620;color:#fff">Read</span><span style="padding:4px 10px;color:#8B8171">Deny</span></span></div>
+            <div style="background:#FFFDF9;border:1px solid #E8DECD;border-radius:9px;padding:10px 14px;display:flex;justify-content:space-between;align-items:center"><span style="font-size:12.5px;font-weight:600">interest_rate</span><span style="display:inline-flex;border:1px solid #E1D6C1;border-radius:7px;overflow:hidden;font-size:11px;font-weight:600"><span style="padding:4px 10px;color:#8B8171">Edit</span><span style="padding:4px 10px;background:#2B2620;color:#fff">Read</span><span style="padding:4px 10px;color:#8B8171">Deny</span></span></div>
+            <div style="background:#FFFDF9;border:1px solid #E8DECD;border-radius:9px;padding:10px 14px;display:flex;justify-content:space-between;align-items:center"><span style="font-size:12.5px;font-weight:600">override_amount</span><span style="display:inline-flex;border:1px solid #E1D6C1;border-radius:7px;overflow:hidden;font-size:11px;font-weight:600"><span style="padding:4px 10px;background:#3A6E48;color:#fff">Edit</span><span style="padding:4px 10px;color:#8B8171">Read</span><span style="padding:4px 10px;color:#8B8171">Deny</span></span></div>
+            <div style="background:#FFFDF9;border:1px solid #E8DECD;border-radius:9px;padding:10px 14px;display:flex;justify-content:space-between;align-items:center"><span style="font-size:12.5px;font-weight:600">coverage_ratio</span><span style="display:inline-flex;border:1px solid #E1D6C1;border-radius:7px;overflow:hidden;font-size:11px;font-weight:600"><span style="padding:4px 10px;color:#8B8171">Edit</span><span style="padding:4px 10px;color:#8B8171">Read</span><span style="padding:4px 10px;background:#B0432C;color:#fff">Deny</span></span></div>
+            <div style="background:#FFFDF9;border:1px solid #E8DECD;border-radius:9px;padding:10px 14px;display:flex;justify-content:space-between;align-items:center;opacity:.65"><span style="font-size:12.5px;font-weight:600">terms_months <span style="font-size:10.5px;color:#8B8171;font-weight:400">no rule — follows module</span></span><span style="display:inline-flex;border:1px dashed #E1D6C1;border-radius:7px;overflow:hidden;font-size:11px;font-weight:600"><span style="padding:4px 10px;color:#B9AE99">Edit</span><span style="padding:4px 10px;color:#B9AE99">Read</span><span style="padding:4px 10px;color:#B9AE99">Deny</span></span></div>
+          </div>
+          <div style="display:flex;gap:10px;margin-top:16px">
+            <span style="background:#BF5B2D;color:#fff;font-size:12.5px;font-weight:600;padding:9px 16px;border-radius:8px">Save field rules</span>
+            <span style="font-size:12.5px;font-weight:600;color:#5C5346;padding:9px 12px">Reset</span>
+          </div>
+        </div>
+        <div style="width:320px;flex:none;background:#2B2620;color:#EDE4D3;padding:20px 22px;font-family:'IBM Plex Mono',monospace">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+            <span style="font-size:10px;letter-spacing:.1em;color:#A99C86">GENERATED JSON</span>
+            <span style="font-size:10px;color:#A99C86;border:1px solid #4A4438;padding:2px 8px;border-radius:4px">read-only · Copy</span>
+          </div>
+          <div style="font-size:11.5px;line-height:1.75">
+            <span style="color:#8B8171">{</span><br>
+            &nbsp;&nbsp;<span style="color:#D9A441">"principal_amount"</span>: <span style="color:#9FBF8F">"read_only"</span>,<br>
+            &nbsp;&nbsp;<span style="color:#D9A441">"interest_rate"</span>: <span style="color:#9FBF8F">"read_only"</span>,<br>
+            &nbsp;&nbsp;<span style="color:#D9A441">"override_amount"</span>: <span style="color:#9FBF8F">"edit"</span>,<br>
+            &nbsp;&nbsp;<span style="color:#D9A441">"coverage_ratio"</span>: <span style="color:#E08A6D">"deny"</span><br>
+            <span style="color:#8B8171">}</span>
+          </div>
+          <div style="margin-top:18px;padding-top:14px;border-top:1px solid #4A4438;font-family:'Albert Sans',sans-serif;font-size:11px;line-height:1.6;color:#A99C86">Same storage format as today — the editor writes it for you, so no more typos breaking permissions.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <p class="dv-next">Try next: "apply <a class="dv-oid" href="#1a">1a</a> (or <a class="dv-oid" href="#1b">1b</a>/<a class="dv-oid" href="#1c">1c</a>/<a class="dv-oid" href="#1d">1d</a>) to the Committee + LRA + CSA workspaces" · "combine <a class="dv-oid" href="#1f">1f</a> drawers with <a class="dv-oid" href="#1i">1i</a> field rules" · "show the borrower portal in the winning direction"</p>
+</section>
+
+</x-dc>
+</body>
+</html>

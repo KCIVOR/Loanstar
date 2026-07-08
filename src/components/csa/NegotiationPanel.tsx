@@ -78,7 +78,7 @@ export function NegotiationPanel({
 
   return (
     <Card>
-      <h2 className="mb-4 text-lg font-semibold text-zinc-900">
+      <h2 className="mb-4 text-lg font-semibold text-neutral-900">
         Negotiation &amp; disclosure
       </h2>
 
@@ -95,7 +95,7 @@ export function NegotiationPanel({
 
       {status === "for_revision" ? (
         <div>
-          <p className="mb-3 text-sm text-zinc-600">
+          <p className="mb-3 text-sm text-neutral-600">
             Committee requested revisions. Complete your updates and return the
             file to Committee.
           </p>
@@ -104,7 +104,7 @@ export function NegotiationPanel({
           </Button>
         </div>
       ) : negotiation ? (
-        <div className="space-y-2 text-sm text-zinc-700">
+        <div className="space-y-2 text-sm text-neutral-700">
           <p>
             Approved amount:{" "}
             {negotiation.approvedAmount != null
@@ -119,7 +119,7 @@ export function NegotiationPanel({
           </p>
           <p className="capitalize">Negotiation status: {negotiation.status.replace("_", " ")}</p>
           {negotiation.disclosedAt ? (
-            <p className="text-zinc-500">
+            <p className="text-neutral-500">
               Disclosed {new Date(negotiation.disclosedAt).toLocaleString()}
             </p>
           ) : status === "approved" ? (
@@ -129,7 +129,7 @@ export function NegotiationPanel({
           ) : null}
         </div>
       ) : (
-        <p className="text-sm text-zinc-600">No negotiation record yet.</p>
+        <p className="text-sm text-neutral-600">No negotiation record yet.</p>
       )}
     </Card>
   );

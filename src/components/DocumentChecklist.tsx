@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 
-import { Alert, Button, Card, Spinner } from "@/components/admin/ui";
+import { Alert, Badge, Button, Card, Spinner } from "@/components/admin/ui";
 import { DOCUMENT_BUCKET } from "@/lib/constants";
 import type { ChecklistItem as ApiChecklistItem } from "@/lib/documents/checklist";
 import { createClient } from "@/lib/supabase/client";
@@ -27,44 +27,24 @@ function statusBadge(
   required: boolean,
 ) {
   if (status === "confirmed") {
-    return (
-      <span className="rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-800">
-        Confirmed
-      </span>
-    );
+    return <Badge variant="success">Confirmed</Badge>;
   }
   if (status === "uploaded") {
-    return (
-      <span className="rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-800">
-        Uploaded
-      </span>
-    );
+    return <Badge variant="info">Uploaded</Badge>;
   }
   return (
-    <span
-      className={`rounded-full px-2 py-0.5 text-xs font-medium ${
-        required
-          ? "bg-amber-100 text-amber-800"
-          : "bg-zinc-100 text-zinc-600"
-      }`}
-    >
+    <Badge variant={required ? "warning" : "neutral"}>
       {required ? "Required" : "Optional"}
-    </span>
+    </Badge>
   );
 }
 
 function agentFlagBadge(status: ApiChecklistItem["status"]) {
   const complete = status === "confirmed" || status === "uploaded";
   return (
-    <span
-      className={`rounded-full px-2 py-0.5 text-xs font-medium ${
-        complete
-          ? "bg-green-100 text-green-800"
-          : "bg-red-100 text-red-800"
-      }`}
-    >
+    <Badge variant={complete ? "success" : "danger"}>
       {complete ? "Complete" : "Incomplete"}
-    </span>
+    </Badge>
   );
 }
 
@@ -165,7 +145,7 @@ export function DocumentChecklist({
 
   return (
     <Card>
-      <h2 className="mb-4 font-medium text-zinc-900">
+      <h2 className="mb-4 font-medium text-neutral-900">
         {flagsOnly ? "Checklist status" : "Document checklist"}
       </h2>
 
@@ -175,23 +155,23 @@ export function DocumentChecklist({
         </div>
       ) : null}
 
-      <ul className="divide-y divide-zinc-200">
+      <ul className="divide-y divide-neutral-200">
         {items.map((item) => (
           <li
             key={item.documentTypeId}
             className="flex flex-wrap items-center justify-between gap-3 py-3"
           >
             <div>
-              <p className="font-medium text-zinc-900">
+              <p className="font-medium text-neutral-900">
                 {item.documentTypeName}
                 {item.isOptionalFlag ? (
-                  <span className="ml-2 text-xs font-normal text-zinc-500">
+                  <span className="ml-2 text-xs font-normal text-neutral-500">
                     (optional)
                   </span>
                 ) : null}
               </p>
               {!flagsOnly && item.fileName ? (
-                <p className="text-xs text-zinc-500">{item.fileName}</p>
+                <p className="text-xs text-neutral-500">{item.fileName}</p>
               ) : null}
             </div>
             <div className="flex items-center gap-2">
@@ -229,7 +209,7 @@ export function DocumentChecklist({
               item.status === "uploaded" ? (
                 <a
                   href={`/borrower/applications/${applicationId}/documents/${item.documentId}/sign`}
-                  className="text-xs text-zinc-900 underline hover:no-underline"
+                  className="text-xs text-neutral-900 underline hover:no-underline"
                 >
                   Sign
                 </a>
@@ -240,7 +220,7 @@ export function DocumentChecklist({
       </ul>
 
       {items.length === 0 ? (
-        <p className="py-4 text-sm text-zinc-500">No checklist items.</p>
+        <p className="py-4 text-sm text-neutral-500">No checklist items.</p>
       ) : null}
     </Card>
   );

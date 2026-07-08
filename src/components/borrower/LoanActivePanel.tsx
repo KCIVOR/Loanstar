@@ -104,7 +104,7 @@ export function LoanActivePanel({ applicationId, applicationStatus }: LoanPanelP
   return (
     <Card className="mb-6">
       <h2 className="mb-2 text-lg font-semibold">Loan active</h2>
-      <p className="mb-4 text-sm text-zinc-600">
+      <p className="mb-4 text-sm text-neutral-600">
         Balance{" "}
         {Number(loan.outstanding_balance).toLocaleString("en-PH", {
           minimumFractionDigits: 2,
@@ -124,7 +124,7 @@ export function LoanActivePanel({ applicationId, applicationStatus }: LoanPanelP
       ) : null}
 
       <h3 className="mb-2 font-medium">Amortization schedule</h3>
-      <ul className="mb-4 divide-y divide-zinc-100 text-sm">
+      <ul className="mb-4 divide-y divide-neutral-100 text-sm">
         {schedules.map((row) => (
           <li key={row.installment_no} className="flex justify-between py-2">
             <span>

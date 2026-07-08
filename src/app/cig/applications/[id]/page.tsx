@@ -285,10 +285,10 @@ export default function CigApplicationPage() {
 
       {applicationStatus === "for_revision" ? (
         <Card className="mb-4">
-          <h2 className="mb-2 text-lg font-semibold text-zinc-900">
+          <h2 className="mb-2 text-lg font-semibold text-neutral-900">
             Committee revisit
           </h2>
-          <p className="mb-3 text-sm text-zinc-600">
+          <p className="mb-3 text-sm text-neutral-600">
             Committee requested verification revisions. Complete updates and return
             the file to Committee.
           </p>
@@ -349,11 +349,11 @@ export default function CigApplicationPage() {
               {checks.map((check) => (
                 <div
                   key={check.slug ?? check.name}
-                  className="flex flex-wrap items-center justify-between gap-2 border-b border-zinc-100 pb-2"
+                  className="flex flex-wrap items-center justify-between gap-2 border-b border-neutral-100 pb-2"
                 >
                   <div>
                     <p className="text-sm font-medium">{check.name}</p>
-                    <p className="text-xs capitalize text-zinc-500">{check.result}</p>
+                    <p className="text-xs capitalize text-neutral-500">{check.result}</p>
                   </div>
                   {editable && check.slug ? (
                     <div className="flex gap-2">
@@ -415,7 +415,7 @@ export default function CigApplicationPage() {
               <div className="space-y-1 text-sm">
                 {computation.lineItems.map((item) => (
                   <div key={item.label} className="flex justify-between">
-                    <span className="text-zinc-600">{item.label}</span>
+                    <span className="text-neutral-600">{item.label}</span>
                     <span className="tabular-nums">{formatMoney(item.amount)}</span>
                   </div>
                 ))}
@@ -426,7 +426,7 @@ export default function CigApplicationPage() {
           <Card>
             <h2 className="mb-3 text-lg font-semibold">Verification form</h2>
             {!completeness.complete && editable ? (
-              <ul className="mb-4 list-inside list-disc text-sm text-amber-700">
+              <ul className="mb-4 list-inside list-disc text-sm text-warning-700">
                 {completeness.missing.map((item) => (
                   <li key={item}>{item}</li>
                 ))}
@@ -575,7 +575,7 @@ export default function CigApplicationPage() {
                 </Button>
               </form>
             ) : (
-              <p className="text-sm text-zinc-600">Verification locked after forward.</p>
+              <p className="text-sm text-neutral-600">Verification locked after forward.</p>
             )}
           </Card>
         </div>

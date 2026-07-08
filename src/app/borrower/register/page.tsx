@@ -69,7 +69,7 @@ export default function BorrowerRegisterPage() {
   }
 
   return (
-    <div className="flex min-h-full items-center justify-center bg-zinc-50 px-4 py-12">
+    <div className="flex min-h-full items-center justify-center bg-neutral-50 px-4 py-12">
       <div className="w-full max-w-lg">
         <PageHeader
           title="Borrower registration"
@@ -171,11 +171,11 @@ export default function BorrowerRegisterPage() {
             </Button>
           </form>
 
-          <p className="mt-4 text-center text-sm text-zinc-500">
+          <p className="mt-4 text-center text-sm text-neutral-500">
             Already have an account?{" "}
             <Link
               href="/login?redirect=/borrower"
-              className="text-zinc-900 hover:underline"
+              className="text-neutral-900 hover:underline"
             >
               Sign in
             </Link>

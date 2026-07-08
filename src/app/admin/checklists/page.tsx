@@ -172,7 +172,7 @@ export default function ChecklistsAdminPage() {
           id="stage"
           value={stage}
           onChange={(e) => setStage(e.target.value)}
-          className="mt-1 w-full max-w-xs rounded-md border border-zinc-300 px-3 py-2 text-sm text-zinc-900 focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+          className="mt-1 w-full max-w-xs rounded-md border border-neutral-300 px-3 py-2 text-sm text-neutral-900 focus:border-neutral-500 focus:outline-none focus:ring-1 focus:ring-neutral-500"
         >
           {STAGES.map((s) => (
             <option key={s} value={s}>
@@ -187,7 +187,7 @@ export default function ChecklistsAdminPage() {
       ) : (
         <>
           <Card className="mb-6">
-            <h2 className="mb-3 font-medium text-zinc-900">
+            <h2 className="mb-3 font-medium text-neutral-900">
               Checklist items — {stage.replace(/_/g, " ")}
             </h2>
             <Table>
@@ -199,7 +199,7 @@ export default function ChecklistsAdminPage() {
                   <Th>Actions</Th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-zinc-200">
+              <tbody className="divide-y divide-neutral-200">
                 {items.map((item) => (
                   <tr key={item.id}>
                     <Td className="font-medium">
@@ -207,11 +207,11 @@ export default function ChecklistsAdminPage() {
                     </Td>
                     <Td>
                       {item.isRequired ? (
-                        <span className="text-xs font-medium text-zinc-900">
+                        <span className="text-xs font-medium text-neutral-900">
                           Required
                         </span>
                       ) : (
-                        <span className="text-xs text-zinc-500">Optional</span>
+                        <span className="text-xs text-neutral-500">Optional</span>
                       )}
                     </Td>
                     <Td>{item.sortOrder}</Td>
@@ -238,14 +238,14 @@ export default function ChecklistsAdminPage() {
               </tbody>
             </Table>
             {items.length === 0 ? (
-              <p className="py-4 text-sm text-zinc-500">No items for this stage.</p>
+              <p className="py-4 text-sm text-neutral-500">No items for this stage.</p>
             ) : null}
           </Card>
 
           <Card>
-            <h2 className="mb-3 font-medium text-zinc-900">Add document type</h2>
+            <h2 className="mb-3 font-medium text-neutral-900">Add document type</h2>
             {availableTypes.length === 0 ? (
-              <p className="text-sm text-zinc-500">
+              <p className="text-sm text-neutral-500">
                 All known document types are already in this stage checklist.
               </p>
             ) : (
@@ -259,7 +259,7 @@ export default function ChecklistsAdminPage() {
                     id="docType"
                     value={newDocTypeId}
                     onChange={(e) => setNewDocTypeId(e.target.value)}
-                    className="mt-1 w-full rounded-md border border-zinc-300 px-3 py-2 text-sm text-zinc-900"
+                    className="mt-1 w-full rounded-md border border-neutral-300 px-3 py-2 text-sm text-neutral-900"
                     required
                   >
                     <option value="">Select…</option>

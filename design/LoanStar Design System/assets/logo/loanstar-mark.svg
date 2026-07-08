@@ -1,10 +1,10 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 36 36" width="36" height="36">
   <defs>
     <linearGradient id="loanstarGrad" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0%" stop-color="#1A56DB"></stop>
-      <stop offset="100%" stop-color="#1444B8"></stop>
+      <stop offset="0%" stop-color="#0E1E4B"></stop>
+      <stop offset="100%" stop-color="#16233F"></stop>
     </linearGradient>
   </defs>
   <rect width="36" height="36" rx="6" fill="url(#loanstarGrad)"></rect>
-  <path d="M18 3L20.16 8.04L25.5 8.84L21.75 12.46L22.73 18L18 15.38L13.27 18L14.25 12.46L10.5 8.84L15.84 8.04L18 3Z" fill="white"></path>
+  <path d="M18 3L20.16 8.04L25.5 8.84L21.75 12.46L22.73 18L18 15.38L13.27 18L14.25 12.46L10.5 8.84L15.84 8.04L18 3Z" fill="#F2B705"></path>
 </svg>

@@ -6,9 +6,10 @@ A design system for **LoanStar**, a loan management system (LMS) for a Philippin
 
 This design system was built from the following inputs:
 
-- **GitHub repo:** [KCIVOR/Loanstar](https://github.com/KCIVOR/Loanstar) — a Next.js + Supabase application. The repo's own UI (`src/components/admin/ui.tsx`, `PortalNav.tsx`, `Sidebar.tsx`) is currently bare, unstyled Tailwind (zinc grays) — it has **not yet had the branded visual design applied**.
-- **`docs/LoanStar_System_Design.md`** (in the repo) — a full written design specification: color tokens, type scale, component inventory, page-by-page layouts. Some values here (e.g. primary blue `#2563EB`, Inter font) were later refined in the built mockups below.
-- **`docs/LoanStar (1)/*.dc.html`** (in the repo) — five high-fidelity, interactive HTML mockups already built against that spec: a design-system reference page plus Login, Borrower Portal, Admin Dashboard, Staff Operations, and Loan Application screens. **These mockups are the ground truth this design system was built from** — where they differ from `LoanStar_System_Design.md` (e.g. primary blue is `#1A56DB`, font is Plus Jakarta Sans, not Inter), the built mockups win. They're preserved as-is in `/reference/original-mockups/` and `/reference/docs/` for your own deeper exploration.
+- **GitHub repo:** [KCIVOR/Loanstar](https://github.com/KCIVOR/Loanstar) — a Next.js + Supabase application.
+- **`docs/LoanStar_System_Design.md`** (in the repo) — a full written design specification: color tokens, type scale, component inventory, page-by-page layouts.
+- **`docs/LoanStar (1)/*.dc.html`** (in the repo) — five high-fidelity, interactive HTML mockups originally built against that spec: a design-system reference page plus Login, Borrower Portal, Admin Dashboard, Staff Operations, and Loan Application screens. They're preserved as-is in `/reference/original-mockups/` and `/reference/docs/` — **these are the superseded blue-theme mockups**, kept for before/after comparison only.
+- **"Deep Harbor"** (`LoanStar Redesign.dc.html`, option 2b) — the current source of truth. A navy (`#0E1E4B`) brand redesign with a gold star mark (`#F2B705`) and red wordmark (`#E4574A`), replacing the earlier blue (`#1A56DB`) system throughout this design system and the production app.
 - `src/lib/constants.ts` — the 15 module slugs and 18 application-status values that drive the workflow (see Content Fundamentals below).
 
 Explore the source repo further at the link above to cross-check anything this design system simplified or omitted.
@@ -37,31 +38,31 @@ Not built (no mockup existed for these — see `docs/LoanStar_System_Design.md` 
 
 ## Visual foundations
 
-- **Colors:** confident primary blue (`#1A56DB`) on clean slate neutrals (`#F8FAFC` page bg, white cards). Semantic success/warning/danger/info are desaturated, WCAG-AA-checked. See the Colors cards.
-- **Type:** Plus Jakarta Sans everywhere (400–800), tight negative letter-spacing on large headings (-1px at 40px), generous 1.65–1.75 line-height on body copy. Numerals switch to a monospace font + `tabular-nums` for anything financial (amounts, loan IDs, OTP digits).
+- **Colors:** immersive navy (`#0E1E4B`→`#2F55B4`) on clean navy-tinted neutrals (`#F3F5FA` page bg, white cards), with gold (`#F2B705`) reserved for brand accent/emphasis moments and red (`#E4574A`) reserved for the wordmark only. Semantic success/warning/danger/info are desaturated, WCAG-AA-checked. See the Colors cards.
+- **Type:** Albert Sans everywhere (400–800), tight negative letter-spacing on large headings (-1px at 40px), generous 1.65–1.75 line-height on body copy. Numerals switch to a monospace font + `tabular-nums` for anything financial (amounts, loan IDs, OTP digits).
 - **Spacing:** strict 4px base grid, 24px card padding, 48px page horizontal padding, 64px section rhythm.
-- **Backgrounds:** flat `#F8FAFC` page background throughout — no photography, no textures, no patterns. The only gradients are a deliberate dark-blue diagonal (`#1E3A8A → #1A56DB`) reserved for hero/balance cards and the auth brand panel — never used decoratively elsewhere.
+- **Backgrounds:** flat `#F3F5FA` page background throughout — no photography, no textures, no patterns. The signature gradient is the deep-navy diagonal (`#0E1E4B → #16233F`) reserved for hero/balance cards and the auth brand panel — never used decoratively elsewhere.
 - **Animation:** minimal and functional only — 150ms color transitions on hover, 200ms fade+scale on modals, a soft `pulse` on in-progress status dots, `shimmer` on skeleton loaders, `spin` on button loading states. No bounce, no springs, no decorative looping motion on static content.
-- **Hover/press states:** hover = darker fill for solid buttons (primary-600→700), lighter tint for tinted surfaces; no press/shrink effect is used in the source (buttons in the mockups don't scale on `:active`, despite `docs/LoanStar_System_Design.md` suggesting `scale(0.97)` — that's aspirational, not yet built).
-- **Borders & shadows:** 1px `#E2E8F0` borders everywhere; shadows are barely-there (`0 1px 3px rgba(15,23,42,.08)` on cards) — depth communicated mostly through borders and background tint, not shadow.
-- **Corner radii:** sharp and consistent — 4px buttons/inputs, 6px cards/modals, full-round only for pills/avatars/toggles. Deliberately NOT the softer 8–16px radii common in consumer apps — sharper corners read as more precise/financial.
-- **Cards:** white surface, 1px border, 6px radius, 24px padding, subtle shadow; "highlight" variants (CIG notices, warnings) add a 4px colored left border instead of changing the whole card color.
+- **Hover/press states:** hover = darker fill for solid buttons (primary-600→700), lighter tint for tinted surfaces; no press/shrink effect is used (buttons don't scale on `:active`).
+- **Borders & shadows:** 1px `#DFE5F0` borders everywhere; shadows are barely-there (`0 1px 3px rgba(15,23,42,.08)` on cards) — depth communicated mostly through borders and background tint, not shadow.
+- **Corner radii:** softer than the earlier blue system — 6px buttons/inputs, 12px cards/modals, 20px feature cards and hero-to-tray transitions, full-round for pills/avatars/toggles. Matches the Deep Harbor mockup's rounder card language.
+- **Cards:** white surface, 1px border, 12px radius, 24px padding, subtle shadow; "highlight" variants (CIG notices, warnings) add a 4px colored left border instead of changing the whole card color.
 - **Transparency/blur:** used exactly twice — modal overlay (`rgba(15,23,42,0.4)` + `backdrop-filter: blur(2px)`) and translucent stat tiles on the auth brand panel (`rgba(255,255,255,0.1–0.15)`). Not used elsewhere.
 - **Layout:** fixed sidebar (224–248px) + sticky top bar (56–64px) is the shared shell for every logged-in surface; content max-width 900–1300px depending on surface.
 
 ## Iconography
 
-Every icon in the source is a **hand-authored inline SVG**, 14–18px viewBox, 1.5–1.8px round-capped stroke, colored brand-blue or neutral-gray. There is no icon font, no PNG icon set, and no emoji use outside the one borrower-dashboard greeting. No third-party icon library (Lucide, Heroicons, etc.) was in the source — if you need a broader icon set for new screens, match this stroke weight and style, or substitute a stroke-based CDN set (Lucide is the closest match) and note the substitution.
+Every icon in the source is a **hand-authored inline SVG**, 14–18px viewBox, 1.5–1.8px round-capped stroke, colored brand-navy or neutral-gray. There is no icon font, no PNG icon set, and no emoji use outside the one borrower-dashboard greeting. No third-party icon library (Lucide, Heroicons, etc.) was in the source — if you need a broader icon set for new screens, match this stroke weight and style, or substitute a stroke-based CDN set (Lucide is the closest match) and note the substitution.
 
 ## Fonts — substitution flagged
 
-**Plus Jakarta Sans** (headings + body) is the real brand font — reproduced exactly via Google Fonts, no substitution needed.
+**Albert Sans** (headings + body) is the real brand font — reproduced exactly via Google Fonts, no substitution needed.
 
 **Monospace is a flagged substitution.** The built design-tokens table names `'SF Mono', monospace` for loan IDs/amounts, and a couple of rows just use the browser's generic `monospace`. SF Mono is a macOS system font with no distributable web-font file, so this design system ships **JetBrains Mono** instead for cross-platform consistency. If you have real brand mono files, swap the `@font-face` in `tokens/typography.css`.
 
 ## Logo
 
-No production logo file was supplied in the source repo — the only brand mark is a **five-pointed star inside a rounded-square gradient tile**, drawn consistently as inline SVG across every mockup (sidebar, login, application header). It's reproduced faithfully as real asset files at `assets/logo/loanstar-mark.svg` and `assets/logo/loanstar-wordmark.svg`. Do not treat this as a final production logo — confirm with the brand owner before shipping it externally.
+No production logo file was supplied in the source repo — the brand mark is a **gold five-pointed star inside a rounded-square navy gradient tile**, with the wordmark set in red — drawn consistently as inline SVG across every mockup (sidebar, login, application header). It's reproduced faithfully as real asset files at `assets/logo/loanstar-mark.svg` and `assets/logo/loanstar-wordmark.svg`. Do not treat this as a final production logo — confirm with the brand owner before shipping it externally.
 
 ## Index
 

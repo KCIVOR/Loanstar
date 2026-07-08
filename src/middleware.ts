@@ -13,6 +13,7 @@ const AR_PREFIX = "/ar";
 const COLLECTOR_PREFIX = "/collector";
 const REMEDIAL_PREFIX = "/remedial";
 const REPORTS_PREFIX = "/reports";
+const DASHBOARD_PREFIX = "/dashboard";
 const AUTH_ROUTES = ["/login", "/signup", "/forgot-password", "/reset-password"];
 
 function isAuthRoute(pathname: string) {
@@ -24,7 +25,7 @@ function resolveAuthedRedirect(request: NextRequest): string {
   if (redirect && redirect.startsWith("/")) {
     return redirect;
   }
-  return ADMIN_PREFIX;
+  return "/dashboard";
 }
 
 export async function middleware(request: NextRequest) {
@@ -51,7 +52,9 @@ export async function middleware(request: NextRequest) {
   const isCollectorRoute = pathname.startsWith(COLLECTOR_PREFIX);
   const isRemedialRoute = pathname.startsWith(REMEDIAL_PREFIX);
   const isReportsRoute = pathname.startsWith(REPORTS_PREFIX);
+  const isDashboardRoute = pathname.startsWith(DASHBOARD_PREFIX);
   const isProtectedPortal =
+    isDashboardRoute ||
     isAdminRoute ||
     isBorrowerRoute ||
     isAgentRoute ||
