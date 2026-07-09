@@ -48,6 +48,16 @@ function formatMoney(value: number) {
   });
 }
 
+const KEY_AMOUNT_KEYS = new Set([
+  "principal",
+  "net_released",
+  "netReleased",
+  "total_loan",
+  "totalLoan",
+  "monthly_amortization",
+  "monthlyAmortization",
+]);
+
 export function ComputationPanel({
   applicationId,
   loanTypeId,
@@ -115,7 +125,7 @@ export function ComputationPanel({
 
   return (
     <Card>
-      <h2 className="mb-4 text-lg font-semibold text-neutral-900">Computation</h2>
+      <h2 className="mb-4 font-display text-lg font-semibold text-ink">Computation</h2>
 
       {error ? (
         <div className="mb-4">
@@ -125,25 +135,45 @@ export function ComputationPanel({
 
       {computation ? (
         <div className="mb-6 space-y-2 text-sm">
-          <p className="font-medium text-neutral-900">
-            {computation.loanTypeName ?? "Loan"} · {computation.inputMode.replace(/_/g, " ")}
+          <p className="font-medium text-ink">
+            {computation.loanTypeName ?? "Loan"} ·{" "}
+            {computation.inputMode.replace(/_/g, " ")}
           </p>
           <div className="grid gap-2 sm:grid-cols-2">
-            {computation.lineItems.map((item) => (
-              <div key={item.key} className="flex justify-between border-b border-neutral-100 py-1">
-                <span className="text-neutral-600">{item.label}</span>
-                <span className="font-medium tabular-nums">{formatMoney(item.amount)}</span>
-              </div>
-            ))}
+            {computation.lineItems.map((item) => {
+              const isKey = KEY_AMOUNT_KEYS.has(item.key);
+              return (
+                <div
+                  key={item.key}
+                  className="flex justify-between border-b border-neutral-100 py-1.5"
+                >
+                  <span className="text-ink-muted">{item.label}</span>
+                  <span
+                    className={
+                      isKey
+                        ? "font-mono font-bold tabular-nums text-gold-600"
+                        : "font-mono font-medium tabular-nums text-ink"
+                    }
+                  >
+                    {formatMoney(item.amount)}
+                  </span>
+                </div>
+              );
+            })}
           </div>
           {computation.signedAt ? (
-            <p className="text-success-700">Signed by borrower on {new Date(computation.signedAt).toLocaleString()}</p>
+            <Alert variant="success">
+              Signed by borrower on{" "}
+              <span className="font-mono">
+                {new Date(computation.signedAt).toLocaleString()}
+              </span>
+            </Alert>
           ) : (
-            <p className="text-warning-700">Awaiting borrower signature</p>
+            <Alert variant="warning">Awaiting borrower signature</Alert>
           )}
         </div>
       ) : (
-        <p className="mb-4 text-sm text-neutral-600">No computation yet.</p>
+        <p className="mb-4 text-sm text-ink-muted">No computation yet.</p>
       )}
 
       {editable ? (
@@ -215,12 +245,12 @@ export function ComputationPanel({
           </div>
           {coverageMessage ? (
             <div className="sm:col-span-2">
-              <Alert>{coverageMessage}</Alert>
+              <Alert variant="warning">{coverageMessage}</Alert>
             </div>
           ) : null}
           <div className="sm:col-span-2">
-            <Button type="submit" disabled={computing}>
-              {computing ? "Computing…" : computation ? "Recalculate" : "Compute"}
+            <Button type="submit" loading={computing}>
+              {computation ? "Recalculate" : "Compute"}
             </Button>
           </div>
         </form>

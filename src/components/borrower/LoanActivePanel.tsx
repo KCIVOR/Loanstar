@@ -4,6 +4,7 @@ import { FormEvent, useCallback, useEffect, useState } from "react";
 
 import {
   Alert,
+  Badge,
   Button,
   Card,
   Input,
@@ -34,6 +35,13 @@ type PaymentRow = {
   status: string;
 };
 
+function formatMoney(value: number) {
+  return value.toLocaleString("en-PH", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+}
+
 export function LoanActivePanel({ applicationId, applicationStatus }: LoanPanelProps) {
   const [loan, setLoan] = useState<Record<string, unknown> | null>(null);
   const [payments, setPayments] = useState<PaymentRow[]>([]);
@@ -46,6 +54,7 @@ export function LoanActivePanel({ applicationId, applicationStatus }: LoanPanelP
   );
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
 
   const load = useCallback(async () => {
     if (!["loan_active", "closed"].includes(applicationStatus)) return;
@@ -75,6 +84,7 @@ export function LoanActivePanel({ applicationId, applicationStatus }: LoanPanelP
     e.preventDefault();
     setError(null);
     setMessage(null);
+    setSubmitting(true);
     try {
       const res = await fetch(`/api/borrower/applications/${applicationId}/loan`, {
         method: "POST",
@@ -94,6 +104,8 @@ export function LoanActivePanel({ applicationId, applicationStatus }: LoanPanelP
       await load();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed");
+    } finally {
+      setSubmitting(false);
     }
   }
 
@@ -103,13 +115,13 @@ export function LoanActivePanel({ applicationId, applicationStatus }: LoanPanelP
 
   return (
     <Card className="mb-6">
-      <h2 className="mb-2 text-lg font-semibold">Loan active</h2>
-      <p className="mb-4 text-sm text-neutral-600">
+      <h2 className="mb-2 font-display text-lg font-semibold text-ink">Loan active</h2>
+      <p className="mb-4 text-sm text-ink-muted">
         Balance{" "}
-        {Number(loan.outstanding_balance).toLocaleString("en-PH", {
-          minimumFractionDigits: 2,
-        })}{" "}
-        · Status {String(loan.account_status)}
+        <span className="font-mono font-bold tabular-nums text-gold-600">
+          {formatMoney(Number(loan.outstanding_balance))}
+        </span>{" "}
+        · Status <Badge variant="gold">{String(loan.account_status)}</Badge>
       </p>
 
       {error ? (
@@ -123,30 +135,44 @@ export function LoanActivePanel({ applicationId, applicationStatus }: LoanPanelP
         </div>
       ) : null}
 
-      <h3 className="mb-2 font-medium">Amortization schedule</h3>
+      <h3 className="mb-2 font-medium text-ink">Amortization schedule</h3>
       <ul className="mb-4 divide-y divide-neutral-100 text-sm">
         {schedules.map((row) => (
           <li key={row.installment_no} className="flex justify-between py-2">
-            <span>
-              #{row.installment_no} · {row.due_date}
+            <span className="text-ink-muted">
+              #{row.installment_no} ·{" "}
+              <span className="font-mono text-ink">{row.due_date}</span>
             </span>
-            <span>
-              {Number(row.amount_due).toLocaleString("en-PH", { minimumFractionDigits: 2 })}{" "}
-              · {row.status}
+            <span className="flex items-center gap-2">
+              <span className="font-mono font-medium tabular-nums text-ink">
+                {formatMoney(Number(row.amount_due))}
+              </span>
+              <Badge variant="neutral">{row.status}</Badge>
             </span>
           </li>
         ))}
       </ul>
 
-      <h3 className="mb-2 font-medium">Submit payment proof</h3>
+      <h3 className="mb-2 font-medium text-ink">Submit payment proof</h3>
       <form onSubmit={(e) => void submitPayment(e)} className="grid gap-3 sm:grid-cols-2">
         <div>
           <Label>Amount</Label>
-          <Input type="number" step="0.01" value={amount} onChange={(e) => setAmount(e.target.value)} required />
+          <Input
+            type="number"
+            step="0.01"
+            value={amount}
+            onChange={(e) => setAmount(e.target.value)}
+            required
+          />
         </div>
         <div>
           <Label>Payment date</Label>
-          <Input type="date" value={paymentDate} onChange={(e) => setPaymentDate(e.target.value)} required />
+          <Input
+            type="date"
+            value={paymentDate}
+            onChange={(e) => setPaymentDate(e.target.value)}
+            required
+          />
         </div>
         <div>
           <Label>Reference no.</Label>
@@ -154,23 +180,34 @@ export function LoanActivePanel({ applicationId, applicationStatus }: LoanPanelP
         </div>
         <div>
           <Label>Channel</Label>
-          <Select value={channel} onChange={(e) => setChannel(e.target.value as typeof channel)}>
+          <Select
+            value={channel}
+            onChange={(e) => setChannel(e.target.value as typeof channel)}
+          >
             <option value="bank_deposit">Bank deposit</option>
             <option value="check">Check</option>
             <option value="pos_cash">POS / Cash</option>
           </Select>
         </div>
-        <Button type="submit">Submit proof</Button>
+        <div className="sm:col-span-2">
+          <Button type="submit" loading={submitting}>
+            Submit proof
+          </Button>
+        </div>
       </form>
 
       {payments.length > 0 ? (
         <>
-          <h3 className="mb-2 mt-6 font-medium">Payment history</h3>
+          <h3 className="mb-2 mt-6 font-medium text-ink">Payment history</h3>
           <ul className="text-sm">
             {payments.map((p) => (
-              <li key={p.id} className="py-1">
-                {p.payment_date} · {Number(p.amount).toLocaleString("en-PH", { minimumFractionDigits: 2 })} ·{" "}
-                {p.status}
+              <li key={p.id} className="flex flex-wrap items-center gap-2 py-1.5 text-ink-muted">
+                <span className="font-mono text-ink">{p.payment_date}</span>
+                <span aria-hidden>·</span>
+                <span className="font-mono font-medium tabular-nums text-ink">
+                  {formatMoney(Number(p.amount))}
+                </span>
+                <Badge variant="neutral">{p.status}</Badge>
               </li>
             ))}
           </ul>

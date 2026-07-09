@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 
-import { Alert, Button, Card } from "@/components/ui";
+import { Alert, Button, Card, ConfirmDialog } from "@/components/ui";
 
 type SignatureConfirmProps = {
   documentId: string;
@@ -47,8 +47,8 @@ export function SignatureConfirm({
 
   return (
     <Card>
-      <h2 className="text-lg font-medium text-neutral-900">{documentName}</h2>
-      <p className="mt-2 text-sm text-neutral-600">
+      <h2 className="font-display text-lg font-semibold text-ink">{documentName}</h2>
+      <p className="mt-2 text-sm text-ink-muted">
         By confirming, you acknowledge that you have reviewed this document and
         agree to its contents. Your signature will be recorded with a timestamp
         and document hash.
@@ -72,32 +72,22 @@ export function SignatureConfirm({
         </div>
       )}
 
-      {confirmOpen ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
-          <div className="w-full max-w-md rounded-lg border border-neutral-200 bg-white p-6 shadow-lg">
-            <h3 className="text-lg font-semibold text-neutral-900">
-              Confirm signature
-            </h3>
-            <p className="mt-2 text-sm text-neutral-600">
-              Are you sure you want to sign{" "}
-              <span className="font-medium">{documentName}</span>? This action
-              cannot be undone.
-            </p>
-            <div className="mt-6 flex justify-end gap-2">
-              <Button
-                variant="secondary"
-                onClick={() => setConfirmOpen(false)}
-                disabled={loading}
-              >
-                Cancel
-              </Button>
-              <Button onClick={() => void handleSign()} disabled={loading}>
-                {loading ? "Signing…" : "Yes, sign"}
-              </Button>
-            </div>
-          </div>
-        </div>
-      ) : null}
+      <ConfirmDialog
+        open={confirmOpen}
+        title="Confirm signature"
+        message={
+          <>
+            Are you sure you want to sign{" "}
+            <span className="font-medium text-ink">{documentName}</span>? This
+            action cannot be undone.
+          </>
+        }
+        confirmLabel={loading ? "Signing…" : "Yes, sign"}
+        cancelLabel="Cancel"
+        loading={loading}
+        onConfirm={() => void handleSign()}
+        onCancel={() => setConfirmOpen(false)}
+      />
     </Card>
   );
 }

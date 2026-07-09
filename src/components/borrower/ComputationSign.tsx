@@ -2,7 +2,7 @@
 
 import { FormEvent, useState } from "react";
 
-import { Alert, Button, Card, Input, Label } from "@/components/ui";
+import { Alert, Button, Card, ConfirmDialog, Input, Label } from "@/components/ui";
 
 type ComputationSummary = {
   id: string;
@@ -36,6 +36,16 @@ const COUNTER_STATUSES = [
   "awaiting_confirmation",
   "negotiating_terms",
 ];
+
+const KEY_AMOUNT_KEYS = new Set([
+  "principal",
+  "net_released",
+  "netReleased",
+  "total_loan",
+  "totalLoan",
+  "monthly_amortization",
+  "monthlyAmortization",
+]);
 
 export function ComputationSign({
   applicationId,
@@ -105,24 +115,41 @@ export function ComputationSign({
 
   return (
     <Card className="mb-6">
-      <h2 className="mb-2 text-lg font-semibold text-neutral-900">Loan computation</h2>
-      <p className="mb-4 text-sm text-neutral-600">
+      <h2 className="mb-2 font-display text-lg font-semibold text-ink">Loan computation</h2>
+      <p className="mb-4 text-sm text-ink-muted">
         {computation.loanTypeName ?? "Loan"} · review and confirm your loan terms.
       </p>
 
       <div className="mb-4 grid gap-2 sm:grid-cols-2">
-        {computation.lineItems.map((item) => (
-          <div key={item.key} className="flex justify-between border-b border-neutral-100 py-1 text-sm">
-            <span className="text-neutral-600">{item.label}</span>
-            <span className="font-medium tabular-nums">{formatMoney(item.amount)}</span>
-          </div>
-        ))}
+        {computation.lineItems.map((item) => {
+          const isKey = KEY_AMOUNT_KEYS.has(item.key);
+          return (
+            <div
+              key={item.key}
+              className="flex justify-between border-b border-neutral-100 py-1.5 text-sm"
+            >
+              <span className="text-ink-muted">{item.label}</span>
+              <span
+                className={
+                  isKey
+                    ? "font-mono font-bold tabular-nums text-gold-600"
+                    : "font-mono font-medium tabular-nums text-ink"
+                }
+              >
+                {formatMoney(item.amount)}
+              </span>
+            </div>
+          );
+        })}
       </div>
 
       {computation.signedAt ? (
         <Alert variant="success">
           You confirmed this computation on{" "}
-          {new Date(computation.signedAt).toLocaleString()}.
+          <span className="font-mono">
+            {new Date(computation.signedAt).toLocaleString()}
+          </span>
+          .
         </Alert>
       ) : canSign ? (
         <>
@@ -131,27 +158,20 @@ export function ComputationSign({
               <Alert>{error}</Alert>
             </div>
           ) : null}
-          {showDialog ? (
-            <div className="rounded-md border border-neutral-200 bg-neutral-50 p-4">
-              <p className="mb-3 text-sm text-neutral-700">
-                I confirm that I have reviewed the loan computation above and agree to the
-                stated principal, net release, and monthly amortization.
-              </p>
-              <div className="flex gap-2">
-                <Button disabled={confirming} onClick={() => void handleSign()}>
-                  {confirming ? "Confirming…" : "I confirm / sign"}
-                </Button>
-                <Button variant="secondary" onClick={() => setShowDialog(false)}>
-                  Cancel
-                </Button>
-              </div>
-            </div>
-          ) : (
-            <Button onClick={() => setShowDialog(true)}>Review & confirm computation</Button>
-          )}
+          <Button onClick={() => setShowDialog(true)}>Review & confirm computation</Button>
+          <ConfirmDialog
+            open={showDialog}
+            title="Confirm computation"
+            message="I confirm that I have reviewed the loan computation above and agree to the stated principal, net release, and monthly amortization."
+            confirmLabel="I confirm / sign"
+            cancelLabel="Cancel"
+            loading={confirming}
+            onConfirm={() => void handleSign()}
+            onCancel={() => setShowDialog(false)}
+          />
         </>
       ) : negotiationStatus === "pending_disclosure" ? (
-        <Alert>Approved terms will be disclosed by CSA shortly.</Alert>
+        <Alert variant="info">Approved terms will be disclosed by CSA shortly.</Alert>
       ) : null}
 
       {canCounter && applicationStatus !== "lra_pending" ? (
@@ -159,8 +179,8 @@ export function ComputationSign({
           onSubmit={(e) => void handleCounter(e)}
           className="mt-6 space-y-3 border-t border-neutral-100 pt-4"
         >
-          <h3 className="font-medium text-neutral-900">Counter-offer</h3>
-          <p className="text-sm text-neutral-600">
+          <h3 className="font-medium text-ink">Counter-offer</h3>
+          <p className="text-sm text-ink-muted">
             Propose a different net release amount for Committee review.
           </p>
           <div>
@@ -174,8 +194,8 @@ export function ComputationSign({
               required
             />
           </div>
-          <Button type="submit" variant="secondary" disabled={countering}>
-            {countering ? "Submitting…" : "Submit counter-offer"}
+          <Button type="submit" variant="secondary" loading={countering}>
+            Submit counter-offer
           </Button>
         </form>
       ) : null}

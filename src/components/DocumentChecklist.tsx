@@ -2,7 +2,14 @@
 
 import { useCallback, useEffect, useState } from "react";
 
-import { Alert, Badge, Button, Card, Spinner } from "@/components/ui";
+import {
+  Alert,
+  Button,
+  Card,
+  DocumentRow,
+  EmptyState,
+  Spinner,
+} from "@/components/ui";
 import { DOCUMENT_BUCKET } from "@/lib/constants";
 import type { ChecklistItem as ApiChecklistItem } from "@/lib/documents/checklist";
 import { createClient } from "@/lib/supabase/client";
@@ -22,30 +29,18 @@ type DocumentChecklistProps = {
   onUploadComplete?: () => void;
 };
 
-function statusBadge(
-  status: ApiChecklistItem["status"],
-  required: boolean,
-) {
-  if (status === "confirmed") {
-    return <Badge variant="success">Confirmed</Badge>;
+function rowStatus(
+  item: ApiChecklistItem,
+  flagsOnly: boolean,
+): "confirmed" | "uploaded" | "required" | "optional" | "complete" | "incomplete" {
+  if (flagsOnly) {
+    return item.status === "confirmed" || item.status === "uploaded"
+      ? "complete"
+      : "incomplete";
   }
-  if (status === "uploaded") {
-    return <Badge variant="info">Uploaded</Badge>;
-  }
-  return (
-    <Badge variant={required ? "warning" : "neutral"}>
-      {required ? "Required" : "Optional"}
-    </Badge>
-  );
-}
-
-function agentFlagBadge(status: ApiChecklistItem["status"]) {
-  const complete = status === "confirmed" || status === "uploaded";
-  return (
-    <Badge variant={complete ? "success" : "danger"}>
-      {complete ? "Complete" : "Incomplete"}
-    </Badge>
-  );
+  if (item.status === "confirmed") return "confirmed";
+  if (item.status === "uploaded") return "uploaded";
+  return item.isRequired ? "required" : "optional";
 }
 
 export function DocumentChecklist({
@@ -145,9 +140,14 @@ export function DocumentChecklist({
 
   return (
     <Card>
-      <h2 className="mb-4 font-medium text-neutral-900">
+      <h2 className="mb-1 font-display text-lg font-semibold text-ink">
         {flagsOnly ? "Checklist status" : "Document checklist"}
       </h2>
+      <p className="mb-4 text-sm text-ink-muted">
+        {flagsOnly
+          ? "Completion flags for required documents."
+          : "Upload required files, then sign where indicated."}
+      </p>
 
       {error ? (
         <div className="mb-4">
@@ -155,73 +155,78 @@ export function DocumentChecklist({
         </div>
       ) : null}
 
-      <ul className="divide-y divide-neutral-200">
-        {items.map((item) => (
-          <li
-            key={item.documentTypeId}
-            className="flex flex-wrap items-center justify-between gap-3 py-3"
-          >
-            <div>
-              <p className="font-medium text-neutral-900">
-                {item.documentTypeName}
-                {item.isOptionalFlag ? (
-                  <span className="ml-2 text-xs font-normal text-neutral-500">
-                    (optional)
-                  </span>
-                ) : null}
-              </p>
-              {!flagsOnly && item.fileName ? (
-                <p className="text-xs text-neutral-500">{item.fileName}</p>
-              ) : null}
-            </div>
-            <div className="flex items-center gap-2">
-              {flagsOnly
-                ? agentFlagBadge(item.status)
-                : statusBadge(item.status, item.isRequired)}
-              {(!flagsOnly || uploadApiPath) && item.status !== "confirmed" ? (
-                <label className="cursor-pointer">
-                  <input
-                    type="file"
-                    className="hidden"
-                    accept=".pdf,.jpg,.jpeg,.png,.doc,.docx"
-                    disabled={uploadingId === item.documentTypeId}
-                    onChange={(e) => {
-                      const file = e.target.files?.[0];
-                      if (file) void handleUpload(item, file);
-                      e.target.value = "";
-                    }}
-                  />
-                  <Button
-                    variant="secondary"
-                    className="pointer-events-none text-xs"
-                    disabled={uploadingId === item.documentTypeId}
-                  >
-                    {uploadingId === item.documentTypeId
-                      ? "Uploading…"
-                      : item.status === "pending" || !item.status
-                        ? "Upload"
-                        : "Replace"}
-                  </Button>
-                </label>
-              ) : null}
-              {!flagsOnly &&
-              item.documentId &&
-              item.status === "uploaded" ? (
-                <a
-                  href={`/borrower/applications/${applicationId}/documents/${item.documentId}/sign`}
-                  className="text-xs text-neutral-900 underline hover:no-underline"
-                >
-                  Sign
-                </a>
-              ) : null}
-            </div>
-          </li>
-        ))}
-      </ul>
-
       {items.length === 0 ? (
-        <p className="py-4 text-sm text-neutral-500">No checklist items.</p>
-      ) : null}
+        <EmptyState
+          title="No checklist items"
+          description="Nothing is required for this stage yet."
+          showMark={false}
+        />
+      ) : (
+        <ul className="space-y-2">
+          {items.map((item) => {
+            const canUpload =
+              (!flagsOnly || uploadApiPath) && item.status !== "confirmed";
+            const showSign =
+              !flagsOnly &&
+              item.documentId &&
+              item.status === "uploaded";
+
+            return (
+              <li key={item.documentTypeId}>
+                <DocumentRow
+                  title={
+                    item.isOptionalFlag
+                      ? `${item.documentTypeName} (optional)`
+                      : item.documentTypeName
+                  }
+                  status={rowStatus(item, flagsOnly)}
+                  subtitle={!flagsOnly && item.fileName ? item.fileName : undefined}
+                  action={
+                    canUpload || showSign ? (
+                      <>
+                        {canUpload ? (
+                          <label className="cursor-pointer">
+                            <input
+                              type="file"
+                              className="sr-only"
+                              accept=".pdf,.jpg,.jpeg,.png,.doc,.docx"
+                              disabled={uploadingId === item.documentTypeId}
+                              onChange={(e) => {
+                                const file = e.target.files?.[0];
+                                if (file) void handleUpload(item, file);
+                                e.target.value = "";
+                              }}
+                            />
+                            <Button
+                              variant="secondary"
+                              size="sm"
+                              className="pointer-events-none"
+                              loading={uploadingId === item.documentTypeId}
+                              disabled={uploadingId === item.documentTypeId}
+                            >
+                              {item.status === "pending" || !item.status
+                                ? "Upload"
+                                : "Replace"}
+                            </Button>
+                          </label>
+                        ) : null}
+                        {showSign ? (
+                          <a
+                            href={`/borrower/applications/${applicationId}/documents/${item.documentId}/sign`}
+                            className="text-xs font-semibold text-gold-600 underline-offset-2 hover:underline"
+                          >
+                            Sign
+                          </a>
+                        ) : null}
+                      </>
+                    ) : undefined
+                  }
+                />
+              </li>
+            );
+          })}
+        </ul>
+      )}
     </Card>
   );
 }

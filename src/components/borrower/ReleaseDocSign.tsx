@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 
-import { Alert, Button, Card } from "@/components/ui";
+import { Alert, Button, Card, DocumentRow } from "@/components/ui";
 
 type ReleaseDoc = {
   id: string;
@@ -74,9 +74,11 @@ export function ReleaseDocSign({ applicationId, onSigned }: ReleaseDocSignProps)
 
   return (
     <Card className="mb-6">
-      <h2 className="mb-2 text-lg font-semibold text-neutral-900">Release documents</h2>
+      <h2 className="mb-2 font-display text-lg font-semibold text-ink">Release documents</h2>
       {blocker ? (
-        <p className="mb-3 text-sm text-warning-700">{blocker}</p>
+        <div className="mb-3">
+          <Alert variant="warning">{blocker}</Alert>
+        </div>
       ) : null}
       {error ? (
         <div className="mb-3">
@@ -85,22 +87,23 @@ export function ReleaseDocSign({ applicationId, onSigned }: ReleaseDocSignProps)
       ) : null}
       <ul className="space-y-2">
         {documents.map((doc) => (
-          <li
-            key={doc.id}
-            className="flex items-center justify-between border-b border-neutral-100 py-2 text-sm"
-          >
-            <span className="capitalize">{doc.document_slug.replace(/_/g, " ")}</span>
-            {doc.signed_at ? (
-              <span className="text-success-700">Signed</span>
-            ) : (
-              <Button
-                variant="secondary"
-                disabled={signingId === doc.id}
-                onClick={() => void sign(doc.id)}
-              >
-                {signingId === doc.id ? "Signing…" : "Confirm / sign"}
-              </Button>
-            )}
+          <li key={doc.id}>
+            <DocumentRow
+              title={doc.document_slug.replace(/_/g, " ")}
+              status={doc.signed_at ? "confirmed" : "required"}
+              action={
+                doc.signed_at ? undefined : (
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    loading={signingId === doc.id}
+                    onClick={() => void sign(doc.id)}
+                  >
+                    Confirm / sign
+                  </Button>
+                )
+              }
+            />
           </li>
         ))}
       </ul>

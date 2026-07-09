@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 
-import { Alert, Button, Card } from "@/components/ui";
+import { Alert, Button, Card, ConfirmDialog } from "@/components/ui";
 
 type BriefingItem = {
   key: string;
@@ -74,8 +74,8 @@ export function BriefingSign({ applicationId, onSigned }: BriefingSignProps) {
 
   return (
     <Card className="mb-6">
-      <h2 className="mb-2 text-lg font-semibold text-neutral-900">Loan briefing</h2>
-      <p className="mb-3 text-sm text-neutral-600">
+      <h2 className="mb-2 font-display text-lg font-semibold text-ink">Loan briefing</h2>
+      <p className="mb-3 text-sm text-ink-muted">
         Review the briefing checklist below, then confirm your acknowledgment.
       </p>
       {error ? (
@@ -83,33 +83,22 @@ export function BriefingSign({ applicationId, onSigned }: BriefingSignProps) {
           <Alert>{error}</Alert>
         </div>
       ) : null}
-      <ul className="mb-4 list-disc space-y-1 pl-5 text-sm text-neutral-700">
+      <ul className="mb-4 list-disc space-y-1 pl-5 text-sm text-ink-muted">
         {checklist.map((item) => (
           <li key={item.key}>{item.label}</li>
         ))}
       </ul>
-      {showDialog ? (
-        <div className="rounded-lg border border-neutral-200 bg-neutral-50 p-4">
-          <p className="mb-3 text-sm text-neutral-700">
-            I confirm that the loan terms, payment obligations, and collection
-            contact information were explained to me during briefing.
-          </p>
-          <div className="flex gap-2">
-            <Button disabled={signing} onClick={() => void handleSign()}>
-              {signing ? "Signing…" : "Confirm briefing"}
-            </Button>
-            <Button
-              variant="secondary"
-              disabled={signing}
-              onClick={() => setShowDialog(false)}
-            >
-              Cancel
-            </Button>
-          </div>
-        </div>
-      ) : (
-        <Button onClick={() => setShowDialog(true)}>Sign briefing acknowledgment</Button>
-      )}
+      <Button onClick={() => setShowDialog(true)}>Sign briefing acknowledgment</Button>
+      <ConfirmDialog
+        open={showDialog}
+        title="Confirm briefing"
+        message="I confirm that the loan terms, payment obligations, and collection contact information were explained to me during briefing."
+        confirmLabel="Confirm briefing"
+        cancelLabel="Cancel"
+        loading={signing}
+        onConfirm={() => void handleSign()}
+        onCancel={() => setShowDialog(false)}
+      />
     </Card>
   );
 }
