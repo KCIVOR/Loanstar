@@ -10,7 +10,7 @@ import {
   Card,
   Input,
   Label,
-  PageHeader,
+  LoanStarMark,
 } from "@/components/ui";
 import { createClient } from "@/lib/supabase/client";
 
@@ -69,119 +69,123 @@ export default function BorrowerRegisterPage() {
   }
 
   return (
-    <div className="flex min-h-full items-center justify-center bg-neutral-50 px-4 py-12">
-      <div className="w-full max-w-lg">
-        <PageHeader
-          title="Borrower registration"
-          description="Create your account to start a loan application"
-        />
-
-        <Card>
-          <form onSubmit={(e) => void handleSubmit(e)} className="space-y-4">
-            {error ? <Alert>{error}</Alert> : null}
-
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div>
-                <Label htmlFor="firstName">First name</Label>
-                <Input
-                  id="firstName"
-                  required
-                  value={firstName}
-                  onChange={(e) => setFirstName(e.target.value)}
-                />
-              </div>
-              <div>
-                <Label htmlFor="middleName">Middle name</Label>
-                <Input
-                  id="middleName"
-                  value={middleName}
-                  onChange={(e) => setMiddleName(e.target.value)}
-                />
-              </div>
-            </div>
-
-            <div>
-              <Label htmlFor="lastName">Last name</Label>
-              <Input
-                id="lastName"
-                required
-                value={lastName}
-                onChange={(e) => setLastName(e.target.value)}
-              />
-            </div>
-
-            <div>
-              <Label htmlFor="email">Email</Label>
-              <Input
-                id="email"
-                type="email"
-                required
-                autoComplete="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-              />
-            </div>
-
-            <div>
-              <Label htmlFor="password">Password</Label>
-              <Input
-                id="password"
-                type="password"
-                required
-                minLength={8}
-                autoComplete="new-password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-              />
-            </div>
-
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div>
-                <Label htmlFor="mobilePhone">Mobile phone</Label>
-                <Input
-                  id="mobilePhone"
-                  type="tel"
-                  value={mobilePhone}
-                  onChange={(e) => setMobilePhone(e.target.value)}
-                />
-              </div>
-              <div>
-                <Label htmlFor="dateOfBirth">Date of birth</Label>
-                <Input
-                  id="dateOfBirth"
-                  type="date"
-                  value={dateOfBirth}
-                  onChange={(e) => setDateOfBirth(e.target.value)}
-                />
-              </div>
-            </div>
-
-            <div>
-              <Label htmlFor="civilStatus">Civil status</Label>
-              <Input
-                id="civilStatus"
-                placeholder="Single, Married, etc."
-                value={civilStatus}
-                onChange={(e) => setCivilStatus(e.target.value)}
-              />
-            </div>
-
-            <Button type="submit" disabled={loading} className="w-full">
-              {loading ? "Creating account…" : "Register"}
-            </Button>
-          </form>
-
-          <p className="mt-4 text-center text-sm text-neutral-500">
-            Already have an account?{" "}
-            <Link
-              href="/login?redirect=/borrower"
-              className="text-neutral-900 hover:underline"
-            >
-              Sign in
-            </Link>
+    <div className="flex min-h-full flex-1 items-center justify-center bg-navy-950 px-4 py-12">
+      <Card className="w-full max-w-lg">
+        <div className="flex flex-col items-center text-center">
+          <LoanStarMark size={40} />
+          <p className="mt-3 font-display text-lg font-semibold text-ink">LoanStar</p>
+          <h1 className="mt-4 font-display text-xl font-semibold text-ink">
+            Borrower registration
+          </h1>
+          <p className="mt-1 text-sm text-ink-faint">
+            Create your account to start a loan application
           </p>
-        </Card>
-      </div>
+        </div>
+
+        <form onSubmit={(e) => void handleSubmit(e)} className="mt-6 space-y-4">
+          {error ? <Alert>{error}</Alert> : null}
+
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div>
+              <Label htmlFor="firstName">First name</Label>
+              <Input
+                id="firstName"
+                required
+                value={firstName}
+                onChange={(e) => setFirstName(e.target.value)}
+              />
+            </div>
+            <div>
+              <Label htmlFor="middleName">Middle name</Label>
+              <Input
+                id="middleName"
+                value={middleName}
+                onChange={(e) => setMiddleName(e.target.value)}
+              />
+            </div>
+          </div>
+
+          <div>
+            <Label htmlFor="lastName">Last name</Label>
+            <Input
+              id="lastName"
+              required
+              value={lastName}
+              onChange={(e) => setLastName(e.target.value)}
+            />
+          </div>
+
+          <div>
+            <Label htmlFor="email">Email</Label>
+            <Input
+              id="email"
+              type="email"
+              required
+              autoComplete="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+            />
+          </div>
+
+          <div>
+            <Label htmlFor="password">Password</Label>
+            <Input
+              id="password"
+              type="password"
+              required
+              minLength={8}
+              autoComplete="new-password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+            />
+          </div>
+
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div>
+              <Label htmlFor="mobilePhone">Mobile phone</Label>
+              <Input
+                id="mobilePhone"
+                type="tel"
+                value={mobilePhone}
+                onChange={(e) => setMobilePhone(e.target.value)}
+              />
+            </div>
+            <div>
+              <Label htmlFor="dateOfBirth">Date of birth</Label>
+              <Input
+                id="dateOfBirth"
+                type="date"
+                value={dateOfBirth}
+                onChange={(e) => setDateOfBirth(e.target.value)}
+              />
+            </div>
+          </div>
+
+          <div>
+            <Label htmlFor="civilStatus">Civil status</Label>
+            <Input
+              id="civilStatus"
+              placeholder="Single, Married, etc."
+              value={civilStatus}
+              onChange={(e) => setCivilStatus(e.target.value)}
+            />
+          </div>
+
+          <Button type="submit" disabled={loading} className="w-full">
+            {loading ? "Creating account…" : "Register"}
+          </Button>
+        </form>
+
+        <p className="mt-4 text-center text-sm text-ink-faint">
+          Already have an account?{" "}
+          <Link
+            href="/login?redirect=/borrower"
+            className="text-ink hover:underline"
+          >
+            Sign in
+          </Link>
+        </p>
+      </Card>
     </div>
   );
 }

@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { FormEvent, useEffect, useState } from "react";
 
-import { Alert, Button, Input, Label } from "@/components/ui";
+import { Alert, Button, Card, Input, Label, LoanStarMark } from "@/components/ui";
 import { createClient } from "@/lib/supabase/client";
 
 export default function ResetPasswordPage() {
@@ -51,18 +51,24 @@ export default function ResetPasswordPage() {
   }
 
   return (
-    <div className="flex min-h-full flex-1 items-center justify-center bg-neutral-50 px-4">
-      <div className="w-full max-w-sm rounded-lg border border-neutral-200 bg-white p-6 shadow-sm">
-        <h1 className="text-xl font-semibold text-neutral-900">Set new password</h1>
+    <div className="flex min-h-full flex-1 items-center justify-center bg-navy-950 px-4 py-12">
+      <Card className="w-full max-w-sm">
+        <div className="flex flex-col items-center text-center">
+          <LoanStarMark size={40} />
+          <p className="mt-3 font-display text-lg font-semibold text-ink">LoanStar</p>
+          <h1 className="mt-4 font-display text-xl font-semibold text-ink">Set new password</h1>
+        </div>
 
         {!ready ? (
-          <div className="mt-4 space-y-3">
+          <div className="mt-6 space-y-3">
             <Alert variant="info">
               Open this page from the reset link in your email, or sign in first.
             </Alert>
-            <Link href="/login" className="text-sm text-neutral-900 hover:underline">
-              Back to sign in
-            </Link>
+            <p className="text-center text-sm text-ink-faint">
+              <Link href="/login" className="text-ink hover:underline">
+                Back to sign in
+              </Link>
+            </p>
           </div>
         ) : (
           <form onSubmit={(e) => void handleSubmit(e)} className="mt-6 space-y-4">
@@ -94,7 +100,7 @@ export default function ResetPasswordPage() {
             </Button>
           </form>
         )}
-      </div>
+      </Card>
     </div>
   );
 }

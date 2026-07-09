@@ -1,4 +1,5 @@
 export { cn } from "./cn";
+export { LoanStarMark } from "./LoanStarMark";
 export { Button } from "./Button";
 export type { ButtonProps } from "./Button";
 export { Input } from "./Input";
