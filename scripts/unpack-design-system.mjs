@@ -26,6 +26,14 @@ template = template.replace(
   ""
 );
 
+template = template.trim();
+if (template.startsWith('"') && template.endsWith('"')) {
+  template = template.slice(1, -1);
+}
+template = template.trim();
+
+// Re-unpack from packed HTML won't work after first pack (one-shot).
+
 fs.mkdirSync(outDir, { recursive: true });
 fs.writeFileSync(catalogPath, template, "utf8");
 console.log("Wrote", catalogPath);
