@@ -71,7 +71,7 @@ export default function ChecksPage() {
       ) : null}
 
       <Card className="mb-6">
-        <h2 className="mb-3 font-medium text-neutral-900">Check types</h2>
+        <h2 className="mb-3 font-medium text-ink">Check types</h2>
         <Table>
           <thead>
             <tr>
@@ -93,7 +93,7 @@ export default function ChecksPage() {
       </Card>
 
       <Card>
-        <h2 className="mb-3 font-medium text-neutral-900">Stage check mapping</h2>
+        <h2 className="mb-3 font-medium text-ink">Stage check mapping</h2>
         <Table>
           <thead>
             <tr>
@@ -110,7 +110,7 @@ export default function ChecksPage() {
               return (
                 <tr key={m.id}>
                   <Td className="uppercase">{m.stage}</Td>
-                  <Td>{m.sort_order}</Td>
+                  <Td className="font-mono">{m.sort_order}</Td>
                   <Td>{ct?.name ?? "—"}</Td>
                 </tr>
               );

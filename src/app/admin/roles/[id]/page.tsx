@@ -11,8 +11,13 @@ import {
   Input,
   Label,
   PageHeader,
+  Select,
   Spinner,
+  Table,
+  Td,
+  Th,
 } from "@/components/ui";
+import { FieldRulesEditor } from "@/components/admin/FieldRulesEditor";
 import { MODULES } from "@/lib/constants";
 import type { FieldAccess } from "@/lib/permissions/types";
 
@@ -43,6 +48,8 @@ type RoleDetail = {
   role_field_rules: FieldRuleRow[];
 };
 
+type ModuleRow = { id: string; slug: string; name: string };
+
 const PERM_KEYS = [
   { key: "can_view", label: "View" },
   { key: "can_create", label: "Create" },
@@ -56,11 +63,12 @@ export default function RoleDetailPage() {
   const roleId = params.id as string;
 
   const [role, setRole] = useState<RoleDetail | null>(null);
+  const [modules, setModules] = useState<ModuleRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [name, setName] = useState("");
-  const [fieldRulesJson, setFieldRulesJson] = useState("{}");
+  const [fieldRules, setFieldRules] = useState<Record<string, FieldAccess>>({});
   const [selectedModuleId, setSelectedModuleId] = useState("");
   const [saving, setSaving] = useState(false);
 
@@ -86,8 +94,9 @@ export default function RoleDetailPage() {
         const body = (await res.json()) as { error?: string };
         throw new Error(body.error ?? "Failed to load role");
       }
-      const data = (await res.json()) as { role: RoleDetail };
+      const data = (await res.json()) as { role: RoleDetail; modules: ModuleRow[] };
       setRole(data.role);
+      setModules(data.modules);
       setName(data.role.name);
 
       const perms: typeof permState = {};
@@ -112,7 +121,7 @@ export default function RoleDetailPage() {
           ? first.modules[0]
           : first.modules;
         setSelectedModuleId(mod?.id ?? "");
-        setFieldRulesJson(JSON.stringify(first.field_rules, null, 2));
+        setFieldRules(first.field_rules ?? {});
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load role");
@@ -131,9 +140,7 @@ export default function RoleDetailPage() {
       const m = Array.isArray(r.modules) ? r.modules[0] : r.modules;
       return m?.id === moduleId;
     });
-    setFieldRulesJson(
-      JSON.stringify(rule?.field_rules ?? {}, null, 2),
-    );
+    setFieldRules(rule?.field_rules ?? {});
   }
 
   async function saveName() {
@@ -165,18 +172,19 @@ export default function RoleDetailPage() {
     setError(null);
     setMessage(null);
     try {
-      const permissions = role.role_module_permissions
-        .map((p) => {
-          const m = Array.isArray(p.modules) ? p.modules[0] : p.modules;
-          if (!m) return null;
-          const state = permState[m.slug];
-          if (!state) return null;
-          return {
-            moduleId: m.id,
-            ...state,
-          };
-        })
-        .filter(Boolean);
+      const permissions = modules.map((m) => {
+        const state = permState[m.slug] ?? {
+          canView: false,
+          canCreate: false,
+          canEdit: false,
+          canDelete: false,
+          canExecuteTrigger: false,
+        };
+        return {
+          moduleId: m.id,
+          ...state,
+        };
+      });
 
       const res = await fetch(`/api/admin/roles/${roleId}/permissions`, {
         method: "PUT",
@@ -201,13 +209,7 @@ export default function RoleDetailPage() {
     setError(null);
     setMessage(null);
     try {
-      let parsed: Record<string, FieldAccess>;
-      try {
-        parsed = JSON.parse(fieldRulesJson) as Record<string, FieldAccess>;
-      } catch {
-        throw new Error("Invalid JSON in field rules editor");
-      }
-
+      const parsed = fieldRules;
       if (!selectedModuleId) {
         throw new Error("Select a module for field rules");
       }
@@ -243,7 +245,7 @@ export default function RoleDetailPage() {
         title={role.name}
         description={`Slug: ${role.slug}${role.is_system ? " (system role)" : ""}`}
         actions={
-          <Link href="/admin/roles" className="text-sm text-neutral-600 hover:underline">
+          <Link href="/admin/roles" className="text-sm text-ink-muted hover:underline">
             ← Back to roles
           </Link>
         }
@@ -261,7 +263,7 @@ export default function RoleDetailPage() {
       ) : null}
 
       <Card className="mb-6">
-        <h2 className="mb-3 font-medium text-neutral-900">Role name</h2>
+        <h2 className="mb-3 font-medium text-ink">Role name</h2>
         <div className="flex gap-2">
           <Input value={name} onChange={(e) => setName(e.target.value)} />
           <Button onClick={() => void saveName()} disabled={saving}>
@@ -272,77 +274,74 @@ export default function RoleDetailPage() {
 
       <Card className="mb-6">
         <div className="mb-3 flex items-center justify-between">
-          <h2 className="font-medium text-neutral-900">Module permissions</h2>
+          <h2 className="font-medium text-ink">Module permissions</h2>
           <Button onClick={() => void savePermissions()} disabled={saving}>
             Save permissions
           </Button>
         </div>
-        <div className="overflow-x-auto">
-          <table className="min-w-full text-sm">
-            <thead>
-              <tr className="border-b border-neutral-200 text-left text-xs uppercase text-neutral-500">
-                <th className="py-2 pr-4">Module</th>
-                {PERM_KEYS.map((p) => (
-                  <th key={p.key} className="px-2 py-2 text-center">
-                    {p.label}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {MODULES.map((mod) => {
-                const state = permState[mod.slug];
-                return (
-                  <tr key={mod.slug} className="border-b border-neutral-100">
-                    <td className="py-2 pr-4 font-medium">{mod.name}</td>
-                    {(
-                      [
-                        "canView",
-                        "canCreate",
-                        "canEdit",
-                        "canDelete",
-                        "canExecuteTrigger",
-                      ] as const
-                    ).map((key) => (
-                      <td key={key} className="px-2 py-2 text-center">
-                        <input
-                          type="checkbox"
-                          checked={state?.[key] ?? false}
-                          onChange={(e) =>
-                            setPermState((prev) => ({
-                              ...prev,
-                              [mod.slug]: {
-                                ...prev[mod.slug],
-                                [key]: e.target.checked,
-                              },
-                            }))
-                          }
-                          className="rounded border-neutral-300"
-                        />
-                      </td>
-                    ))}
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
+        <Table>
+          <thead>
+            <tr>
+              <Th>Module</Th>
+              {PERM_KEYS.map((p) => (
+                <Th key={p.key}>{p.label}</Th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {MODULES.map((mod) => {
+              const state = permState[mod.slug];
+              return (
+                <tr key={mod.slug}>
+                  <Td className="font-medium text-ink">{mod.name}</Td>
+                  {(
+                    [
+                      "canView",
+                      "canCreate",
+                      "canEdit",
+                      "canDelete",
+                      "canExecuteTrigger",
+                    ] as const
+                  ).map((key) => (
+                    <Td key={key} className="text-center">
+                      {/* Compact matrix cells — full Checkbox label would clutter columns */}
+                      <input
+                        type="checkbox"
+                        aria-label={`${mod.name} ${key}`}
+                        checked={state?.[key] ?? false}
+                        onChange={(e) =>
+                          setPermState((prev) => ({
+                            ...prev,
+                            [mod.slug]: {
+                              ...prev[mod.slug],
+                              [key]: e.target.checked,
+                            },
+                          }))
+                        }
+                        className="h-4 w-4 rounded border-neutral-300 accent-gold-400"
+                      />
+                    </Td>
+                  ))}
+                </tr>
+              );
+            })}
+          </tbody>
+        </Table>
       </Card>
 
       <Card>
         <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-          <h2 className="font-medium text-neutral-900">Field rules (JSON)</h2>
+          <h2 className="font-medium text-ink">Field rules</h2>
           <Button onClick={() => void saveFieldRules()} disabled={saving}>
             Save field rules
           </Button>
         </div>
-        <div className="mb-3">
+        <div className="mb-4">
           <Label htmlFor="field-module">Module</Label>
-          <select
+          <Select
             id="field-module"
             value={selectedModuleId}
             onChange={(e) => handleModuleFieldRulesChange(e.target.value)}
-            className="mt-1 w-full rounded-md border border-neutral-300 px-3 py-2 text-sm"
           >
             <option value="">Select module…</option>
             {role.role_module_permissions.map((p) => {
@@ -354,18 +353,13 @@ export default function RoleDetailPage() {
                 </option>
               );
             })}
-          </select>
+          </Select>
         </div>
-        <textarea
-          value={fieldRulesJson}
-          onChange={(e) => setFieldRulesJson(e.target.value)}
-          rows={10}
-          className="w-full rounded-md border border-neutral-300 px-3 py-2 font-mono text-sm"
-          placeholder='{"computation": "read_only", "borrower_info": "edit"}'
+        <FieldRulesEditor
+          rules={fieldRules}
+          onChange={setFieldRules}
+          disabled={!selectedModuleId || saving}
         />
-        <p className="mt-2 text-xs text-neutral-500">
-          Values: edit, read_only, deny
-        </p>
       </Card>
     </div>
   );

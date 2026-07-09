@@ -6,6 +6,7 @@ import { useParams } from "next/navigation";
 
 import {
   Alert,
+  Badge,
   Button,
   Card,
   ConfirmDialog,
@@ -218,8 +219,9 @@ export default function CommitteeApplicationPage() {
             : "Application"
         }
         description={
-          data.application.applicationNo ??
-          formatStatusLabel(data.application.status)
+          data.application.applicationNo
+            ? data.application.applicationNo
+            : formatStatusLabel(data.application.status)
         }
         actions={
           <Link href="/committee">
@@ -241,20 +243,18 @@ export default function CommitteeApplicationPage() {
 
       <div className="mb-6 grid gap-4 sm:grid-cols-3">
         <Card>
-          <p className="text-sm text-neutral-500">Status</p>
-          <p className="font-semibold text-neutral-900">
-            {data.application.statusLabel}
-          </p>
+          <p className="text-sm text-ink-faint">Status</p>
+          <Badge variant="neutral">{data.application.statusLabel}</Badge>
         </Card>
         <Card>
-          <p className="text-sm text-neutral-500">TAT (since CIG forward)</p>
-          <p className="font-semibold text-neutral-900">
+          <p className="text-sm text-ink-faint">TAT (since CIG forward)</p>
+          <p className="font-semibold text-ink">
             {data.tatDays != null ? `${data.tatDays} day(s)` : "—"}
           </p>
         </Card>
         <Card>
-          <p className="text-sm text-neutral-500">Vote tally (informational)</p>
-          <p className="font-semibold text-neutral-900">
+          <p className="text-sm text-ink-faint">Vote tally (informational)</p>
+          <p className="font-semibold text-ink">
             {data.tally.label ??
               `${data.tally.approve} approve · ${data.tally.deny} deny`}
           </p>
@@ -263,21 +263,21 @@ export default function CommitteeApplicationPage() {
 
       {data.computation ? (
         <Card className="mb-6">
-          <h2 className="mb-3 text-lg font-semibold text-neutral-900">
+          <h2 className="mb-3 text-lg font-semibold text-ink">
             Computation
           </h2>
-          <p className="mb-2 text-sm text-neutral-600">
+          <p className="mb-2 text-sm text-ink-muted">
             {data.computation.loanTypeName ?? "Loan"} · Net released{" "}
-            {formatMoney(data.computation.netReleased)}
+            <span className="font-mono">{formatMoney(data.computation.netReleased)}</span>
           </p>
           <div className="grid gap-1 sm:grid-cols-2">
             {data.computation.lineItems.slice(0, 6).map((item) => (
               <div
                 key={item.label}
-                className="flex justify-between text-sm text-neutral-700"
+                className="flex justify-between text-sm text-ink-muted"
               >
                 <span>{item.label}</span>
-                <span className="tabular-nums">{formatMoney(item.amount)}</span>
+                <span className="font-mono tabular-nums">{formatMoney(item.amount)}</span>
               </div>
             ))}
           </div>
@@ -287,8 +287,8 @@ export default function CommitteeApplicationPage() {
       {data.application.canDecide ? (
         <>
           <Card className="mb-6">
-            <h2 className="mb-4 text-lg font-semibold text-neutral-900">Your vote</h2>
-            <p className="mb-3 text-sm text-neutral-600">
+            <h2 className="mb-4 text-lg font-semibold text-ink">Your vote</h2>
+            <p className="mb-3 text-sm text-ink-muted">
               {data.myVote
                 ? `You voted: ${data.myVote}`
                 : "Cast your vote (informational — final action is separate)."}
@@ -311,10 +311,10 @@ export default function CommitteeApplicationPage() {
           </Card>
 
           <Card className="mb-6">
-            <h2 className="mb-4 text-lg font-semibold text-neutral-900">
+            <h2 className="mb-4 text-lg font-semibold text-ink">
               Final action
             </h2>
-            <p className="mb-3 text-sm text-neutral-600">
+            <p className="mb-3 text-sm text-ink-muted">
               Final actions are binding and recorded on the file — you will be
               asked to confirm.
             </p>
@@ -389,7 +389,7 @@ export default function CommitteeApplicationPage() {
                 void handleAction("revisit");
               }}
             >
-              <h3 className="font-medium text-neutral-900">Notice to Revisit</h3>
+              <h3 className="font-medium text-ink">Notice to Revisit</h3>
               <Label htmlFor="revisitRoute">Route to</Label>
               <Select
                 id="revisitRoute"
@@ -423,13 +423,13 @@ export default function CommitteeApplicationPage() {
 
       {data.application.canOverride && data.negotiation ? (
         <Card className="mb-6">
-          <h2 className="mb-2 text-lg font-semibold text-neutral-900">
+          <h2 className="mb-2 text-lg font-semibold text-ink">
             Negotiation override
           </h2>
-          <p className="mb-4 text-sm text-neutral-600">
+          <p className="mb-4 text-sm text-ink-muted">
             Borrower counter:{" "}
             {data.negotiation.lastCounterAmount != null
-              ? formatMoney(data.negotiation.lastCounterAmount)
+              ? <span className="font-mono">{formatMoney(data.negotiation.lastCounterAmount)}</span>
               : "—"}
           </p>
           <form onSubmit={(e) => void handleOverride(e)} className="space-y-3">
@@ -475,15 +475,15 @@ export default function CommitteeApplicationPage() {
 
       {data.latestAction ? (
         <Card>
-          <h2 className="mb-2 text-lg font-semibold text-neutral-900">
+          <h2 className="mb-2 text-lg font-semibold text-ink">
             Latest committee action
           </h2>
-          <p className="text-sm text-neutral-700">
+          <p className="text-sm text-ink-muted">
             {data.latestAction.action} ·{" "}
-            {new Date(data.latestAction.actedAt).toLocaleString()}
+            <span className="font-mono">{new Date(data.latestAction.actedAt).toLocaleString()}</span>
           </p>
           {data.latestAction.comment ? (
-            <p className="mt-2 text-sm text-neutral-600">
+            <p className="mt-2 text-sm text-ink-muted">
               {data.latestAction.comment}
             </p>
           ) : null}

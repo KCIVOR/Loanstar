@@ -10,6 +10,7 @@ import { LoanActivePanel } from "@/components/borrower/LoanActivePanel";
 import { ReleaseDocSign } from "@/components/borrower/ReleaseDocSign";
 import {
   Alert,
+  Badge,
   Button,
   Card,
   PageHeader,
@@ -119,8 +120,9 @@ export default function BorrowerApplicationPage() {
       <PageHeader
         title="Application documents"
         description={
-          application.applicationNo ??
-          `Application ${applicationId.slice(0, 8)}…`
+          application.applicationNo
+            ? application.applicationNo
+            : `Application ${applicationId.slice(0, 8)}…`
         }
         actions={
           <Link href="/borrower">
@@ -136,12 +138,14 @@ export default function BorrowerApplicationPage() {
       ) : null}
 
       <Card className="mb-6 overflow-x-auto">
-        <p className="text-sm text-neutral-500">Status</p>
-        <p className="text-lg font-semibold text-neutral-900">
-          {application.statusLabel ?? formatStatusLabel(application.status)}
-        </p>
+        <p className="text-sm text-ink-faint">Status</p>
+        <div className="mt-1">
+          <Badge variant="neutral">
+            {application.statusLabel ?? formatStatusLabel(application.status)}
+          </Badge>
+        </div>
         {application.blocker ? (
-          <p className="mt-2 text-sm text-warning-700">{application.blocker}</p>
+          <p className="mt-2 text-sm text-warning-ink">{application.blocker}</p>
         ) : null}
         <div className="mt-4">
           <StatusTimeline currentStatus={application.status} />

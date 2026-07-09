@@ -2,6 +2,7 @@
 
 import { FormEvent, useCallback, useEffect, useState } from "react";
 
+import { MIN_PF_RATE } from "@/lib/loan-types/g2";
 import {
   Alert,
   Button,
@@ -9,12 +10,14 @@ import {
   Label,
   Modal,
   PageHeader,
+  Select,
   Spinner,
+  StatusBadge,
   Table,
   Td,
   Th,
 } from "@/components/ui";
-import { MIN_PF_RATE } from "@/lib/loan-types/g2";
+
 
 type LoanType = {
   id: string;
@@ -114,17 +117,18 @@ export default function LoanTypesPage() {
         description="Rate table with effectivity versioning (G2 guard enforced)"
         actions={
           <div className="flex items-center gap-2">
-            <select
+            <Select
               value={filter}
               onChange={(e) =>
                 setFilter(e.target.value as "all" | "active" | "inactive")
               }
-              className="rounded-md border border-neutral-300 px-3 py-2 text-sm"
+              className="w-auto min-w-[9rem]"
+              aria-label="Filter loan types"
             >
               <option value="all">All</option>
               <option value="active">Active only</option>
               <option value="inactive">Inactive only</option>
-            </select>
+            </Select>
             <Button onClick={() => setShowForm(true)}>Enroll rate</Button>
           </div>
         }
@@ -227,15 +231,13 @@ export default function LoanTypesPage() {
                 <Td>{formatRate(lt.interest_rate)}</Td>
                 <Td>{formatRate(lt.pf_rate)}</Td>
                 <Td>
-                  <span className={lt.is_active ? "text-success-700" : "text-neutral-400"}>
-                    {lt.is_active ? "Active" : "Inactive"}
-                  </span>
+                  <StatusBadge active={lt.is_active} />
                 </Td>
-                <Td>
+                <Td className="font-mono text-sm">
                   {lt.effective_from}
                   {lt.effective_to ? ` → ${lt.effective_to}` : ""}
                 </Td>
-                <Td className="text-xs text-neutral-500">
+                <Td className="font-mono text-xs text-ink-faint">
                   {new Date(lt.enrolled_at).toLocaleString()}
                 </Td>
               </tr>

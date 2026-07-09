@@ -1,8 +1,8 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
-import { Alert, Card, Spinner } from "@/components/ui";
+import { Alert, Badge, Card, KpiCard, PageHeader, Spinner } from "@/components/ui";
 import { formatStatusLabel } from "@/lib/applications/status";
 
 type Dashboard = {
@@ -36,7 +36,10 @@ type Dashboard = {
 };
 
 function money(v: number) {
-  return v.toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  return v.toLocaleString("en-PH", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
 }
 
 export default function ReportsDashboardPage() {
@@ -61,11 +64,23 @@ export default function ReportsDashboardPage() {
     void load();
   }, [load]);
 
+  const pipelineTotal = useMemo(
+    () => (data ? Object.values(data.pipeline).reduce((s, n) => s + n, 0) : 0),
+    [data],
+  );
+
   if (loading) return <Spinner />;
   if (!data) return <Alert>Reports unavailable.</Alert>;
 
-  const pipelineTotal = Object.values(data.pipeline).reduce((s, n) => s + n, 0);
   const overdue91 = data.aging.bucket91_plus;
+  const maxAging = Math.max(
+    data.aging.current,
+    data.aging.bucket1_30,
+    data.aging.bucket31_60,
+    data.aging.bucket61_90,
+    data.aging.bucket91_plus,
+    1,
+  );
 
   return (
     <div>
@@ -75,127 +90,137 @@ export default function ReportsDashboardPage() {
         </div>
       ) : null}
 
-      {/* Hero KPI band — navy, matches the Deep Harbor "portfolio at a glance" pattern */}
-      <div className="mb-6 rounded-lg bg-primary-900 px-7 py-6 text-white">
-        <div className="mb-5 flex flex-wrap items-baseline justify-between gap-2">
-          <h1 className="text-2xl font-bold tracking-[-0.5px]">Portfolio at a glance</h1>
-          <p className="text-xs text-primary-300">
+      <PageHeader
+        title="Portfolio at a glance"
+        actions={
+          <p className="font-mono text-xs text-ink-faint">
             Generated {new Date(data.generatedAt).toLocaleString()}
           </p>
-        </div>
-        <div className="grid grid-cols-2 gap-0 lg:grid-cols-4">
-          <div className="border-white/10 pr-6 lg:border-r">
-            <p className="text-xs font-semibold uppercase tracking-wider text-primary-300">
-              Pipeline applications
-            </p>
-            <p className="mt-2 text-[40px] font-extrabold leading-none tabular-nums">
-              {pipelineTotal}
-            </p>
-          </div>
-          <div className="pl-0 pr-6 lg:border-r lg:border-white/10 lg:pl-6">
-            <p className="text-xs font-semibold uppercase tracking-wider text-primary-300">
-              Active loans
-            </p>
-            <p className="mt-2 text-[40px] font-extrabold leading-none tabular-nums">
-              {data.activeLoans}
-            </p>
-          </div>
-          <div className="border-white/10 pr-6 pt-4 lg:border-r lg:pt-0 lg:pl-6">
-            <p className="text-xs font-semibold uppercase tracking-wider text-primary-300">
-              Portfolio outstanding
-            </p>
-            <p className="mt-2 text-[40px] font-extrabold leading-none tabular-nums">
-              {money(data.aging.totalOutstanding)}
-            </p>
-          </div>
-          <div className="pt-4 lg:pl-6 lg:pt-0">
-            <p className="text-xs font-semibold uppercase tracking-wider text-primary-300">
-              Posted collections
-            </p>
-            <p className="mt-2 text-[40px] font-extrabold leading-none tabular-nums text-gold">
-              {money(data.income.totalPosted)}
-            </p>
-          </div>
-        </div>
+        }
+      />
+
+      <div className="mb-6 grid grid-cols-2 gap-3.5 lg:grid-cols-4">
+        <KpiCard label="Pipeline applications" value={pipelineTotal} />
+        <KpiCard label="Active loans" value={data.activeLoans} />
+        <KpiCard
+          label="Portfolio outstanding"
+          value={money(data.aging.totalOutstanding)}
+          highlight
+        />
+        <KpiCard
+          label="Posted collections"
+          value={money(data.income.totalPosted)}
+          highlight
+        />
       </div>
 
       <div className="grid gap-6 lg:grid-cols-2">
         <Card>
-          <h2 className="mb-3 text-lg font-semibold">Pipeline by stage</h2>
-          <ul className="space-y-1 text-sm">
+          <h2 className="mb-3 font-display text-lg font-semibold text-ink">
+            Pipeline by stage
+          </h2>
+          <ul className="space-y-2 text-sm">
             {Object.entries(data.pipeline)
               .sort((a, b) => b[1] - a[1])
               .map(([status, count]) => (
-                <li key={status} className="flex justify-between">
-                  <span>{formatStatusLabel(status)}</span>
-                  <span className="font-medium">{count}</span>
+                <li key={status} className="flex items-center justify-between">
+                  <span className="text-ink-muted">{formatStatusLabel(status)}</span>
+                  <span className="font-mono font-medium text-ink">{count}</span>
                 </li>
               ))}
           </ul>
         </Card>
 
         <Card>
-          <h2 className="mb-3 text-lg font-semibold">Aging buckets</h2>
-          <ul className="space-y-1 text-sm">
-            <li className="flex justify-between"><span>Current</span><span>{data.aging.current}</span></li>
-            <li className="flex justify-between"><span>1–30 days</span><span>{data.aging.bucket1_30}</span></li>
-            <li className="flex justify-between"><span>31–60 days</span><span>{data.aging.bucket31_60}</span></li>
-            <li className="flex justify-between"><span>61–90 days</span><span>{data.aging.bucket61_90}</span></li>
+          <h2 className="mb-3 font-display text-lg font-semibold text-ink">
+            Aging buckets
+          </h2>
+          <ul className="space-y-3 text-sm">
+            {[
+              { label: "Current", value: data.aging.current, tone: "success" as const },
+              { label: "1–30 days", value: data.aging.bucket1_30, tone: "info" as const },
+              { label: "31–60 days", value: data.aging.bucket31_60, tone: "warning" as const },
+              { label: "61–90 days", value: data.aging.bucket61_90, tone: "warning" as const },
+              { label: "91+ days", value: data.aging.bucket91_plus, tone: "danger" as const },
+            ].map((row) => (
+              <li key={row.label}>
+                <div className="mb-1 flex justify-between">
+                  <span className="text-ink-muted">{row.label}</span>
+                  <span className="font-mono font-medium text-ink">{row.value}</span>
+                </div>
+                <div className="h-1.5 overflow-hidden rounded-full bg-neutral-100">
+                  <div
+                    className={`h-full rounded-full ${
+                      row.tone === "success"
+                        ? "bg-success"
+                        : row.tone === "info"
+                          ? "bg-info"
+                          : row.tone === "warning"
+                            ? "bg-warning"
+                            : "bg-danger"
+                    }`}
+                    style={{ width: `${Math.max(4, (row.value / maxAging) * 100)}%` }}
+                  />
+                </div>
+              </li>
+            ))}
+          </ul>
+        </Card>
+
+        <Card>
+          <h2 className="mb-3 font-display text-lg font-semibold text-ink">
+            Income recognition
+          </h2>
+          <ul className="space-y-2 text-sm">
             <li className="flex justify-between">
-              <span className="text-danger-600">91+ days</span>
-              <span className="font-semibold text-danger-600">{overdue91}</span>
+              <span className="text-ink-muted">Posted payments</span>
+              <span className="font-mono text-ink">{money(data.income.totalPosted)}</span>
+            </li>
+            <li className="flex justify-between">
+              <span className="text-ink-muted">Penalties collected</span>
+              <span className="font-mono text-ink">{money(data.income.totalPenalties)}</span>
+            </li>
+            <li className="flex justify-between">
+              <span className="text-ink-muted">Posting count</span>
+              <span className="font-mono text-ink">{data.income.paymentCount}</span>
             </li>
           </ul>
         </Card>
 
         <Card>
-          <h2 className="mb-3 text-lg font-semibold">Income recognition</h2>
-          <ul className="space-y-1 text-sm">
+          <h2 className="mb-3 font-display text-lg font-semibold text-ink">
+            Collection performance
+          </h2>
+          <ul className="space-y-2 text-sm">
             <li className="flex justify-between">
-              <span>Posted payments</span>
-              <span>{money(data.income.totalPosted)}</span>
+              <span className="text-ink-muted">DCRs awaiting AR</span>
+              <span className="font-mono text-ink">{data.collection.dcrsSubmitted}</span>
             </li>
             <li className="flex justify-between">
-              <span>Penalties collected</span>
-              <span>{money(data.income.totalPenalties)}</span>
+              <span className="text-ink-muted">DCRs reconciled</span>
+              <span className="font-mono text-ink">{data.collection.dcrsReconciled}</span>
             </li>
             <li className="flex justify-between">
-              <span>Posting count</span>
-              <span>{data.income.paymentCount}</span>
-            </li>
-          </ul>
-        </Card>
-
-        <Card>
-          <h2 className="mb-3 text-lg font-semibold">Collection performance</h2>
-          <ul className="space-y-1 text-sm">
-            <li className="flex justify-between">
-              <span>DCRs awaiting AR</span>
-              <span>{data.collection.dcrsSubmitted}</span>
+              <span className="text-ink-muted">Pending proofs</span>
+              <span className="font-mono text-ink">{data.collection.pendingProofs}</span>
             </li>
             <li className="flex justify-between">
-              <span>DCRs reconciled</span>
-              <span>{data.collection.dcrsReconciled}</span>
-            </li>
-            <li className="flex justify-between">
-              <span>Pending proofs</span>
-              <span>{data.collection.pendingProofs}</span>
-            </li>
-            <li className="flex justify-between">
-              <span>Posted payments</span>
-              <span>{data.collection.postedPayments}</span>
+              <span className="text-ink-muted">Posted payments</span>
+              <span className="font-mono text-ink">{data.collection.postedPayments}</span>
             </li>
           </ul>
         </Card>
       </div>
 
       <Card className="mt-6">
-        <h2 className="mb-3 text-lg font-semibold">Turnaround time (TAT) by step</h2>
+        <h2 className="mb-3 font-display text-lg font-semibold text-ink">
+          Turnaround time (TAT) by step
+        </h2>
         <ul className="divide-y divide-neutral-100 text-sm">
           {data.tat.map((row) => (
-            <li key={row.label} className="flex justify-between py-2">
-              <span>{row.label}</span>
-              <span>
+            <li key={row.label} className="flex justify-between py-2.5">
+              <span className="text-ink-muted">{row.label}</span>
+              <span className="font-mono text-ink">
                 {row.averageDays != null
                   ? `${row.averageDays} days (n=${row.sampleCount})`
                   : "—"}
@@ -203,6 +228,11 @@ export default function ReportsDashboardPage() {
             </li>
           ))}
         </ul>
+        {overdue91 > 0 ? (
+          <div className="mt-4">
+            <Badge variant="danger">{overdue91} accounts 91+ days overdue</Badge>
+          </div>
+        ) : null}
       </Card>
     </div>
   );

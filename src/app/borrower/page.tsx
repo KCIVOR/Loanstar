@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 
 import {
   Alert,
+  Badge,
   Button,
   Card,
   PageHeader,
@@ -103,37 +104,39 @@ export default function BorrowerDashboardPage() {
 
       <div className="grid gap-6 md:grid-cols-2">
         <Card>
-          <h2 className="text-sm font-medium text-neutral-500">Borrower number</h2>
-          <p className="mt-1 font-mono text-xl font-semibold text-neutral-900">
+          <h2 className="text-sm font-medium text-ink-faint">Borrower number</h2>
+          <p className="mt-1 font-mono text-xl font-semibold text-ink">
             {profile?.borrowerNo ?? "—"}
           </p>
         </Card>
 
         <Card>
-          <h2 className="text-sm font-medium text-neutral-500">
+          <h2 className="text-sm font-medium text-ink-faint">
             Current application
           </h2>
           {application ? (
             <>
-              <p className="mt-1 text-lg font-semibold text-neutral-900">
-                {application.statusLabel ??
-                  formatStatusLabel(application.status)}
-              </p>
+              <div className="mt-1">
+                <Badge variant="neutral">
+                  {application.statusLabel ??
+                    formatStatusLabel(application.status)}
+                </Badge>
+              </div>
               {application.applicationNo ? (
-                <p className="text-xs text-neutral-500">
+                <p className="font-mono text-xs text-ink-faint">
                   {application.applicationNo}
                 </p>
               ) : null}
             </>
           ) : (
-            <p className="mt-1 text-neutral-600">No active application</p>
+            <p className="mt-1 text-ink-muted">No active application</p>
           )}
         </Card>
       </div>
 
       {application ? (
         <Card className="mt-6 overflow-x-auto">
-          <h2 className="mb-4 font-medium text-neutral-900">Application progress</h2>
+          <h2 className="mb-4 font-medium text-ink">Application progress</h2>
           <StatusTimeline currentStatus={application.status} />
         </Card>
       ) : null}

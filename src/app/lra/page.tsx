@@ -5,6 +5,7 @@ import { useCallback, useEffect, useState } from "react";
 
 import {
   Alert,
+  Badge,
   Button,
   Card,
   PageHeader,
@@ -68,7 +69,7 @@ export default function LraDashboardPage() {
 
       {queue.length === 0 ? (
         <Card>
-          <p className="text-sm text-neutral-600">No files pending LRA processing.</p>
+          <p className="text-sm text-ink-muted">No files pending LRA processing.</p>
         </Card>
       ) : (
         <div className="space-y-3">
@@ -76,24 +77,29 @@ export default function LraDashboardPage() {
             <Card key={item.applicationId}>
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
-                  <p className="font-medium text-neutral-900">
+                  <p className="font-medium text-ink">
                     {item.borrower
                       ? `${item.borrower.firstName} ${item.borrower.lastName}`
                       : "Unknown"}
                     {item.borrower ? (
-                      <span className="ml-2 text-sm font-normal text-neutral-500">
+                      <span className="ml-2 font-mono text-sm font-normal text-ink-muted">
                         {item.borrower.borrowerNo}
                       </span>
                     ) : null}
                   </p>
-                  <p className="text-sm text-neutral-500">
-                    {item.application
-                      ? formatStatusLabel(item.application.status)
-                      : ""}
+                  <p className="flex flex-wrap items-center gap-1.5 text-sm text-ink-muted">
+                    {item.application ? (
+                      <Badge variant="neutral">
+                        {formatStatusLabel(item.application.status)}
+                      </Badge>
+                    ) : null}
                     {item.application?.blocker
-                      ? ` · ${item.application.blocker}`
+                      ? `· ${item.application.blocker}`
                       : ""}
-                    {` · Queued ${new Date(item.queuedAt).toLocaleString()}`}
+                    {" · Queued "}
+                    <span className="font-mono">
+                      {new Date(item.queuedAt).toLocaleString()}
+                    </span>
                   </p>
                 </div>
                 <Link href={`/lra/applications/${item.applicationId}`}>

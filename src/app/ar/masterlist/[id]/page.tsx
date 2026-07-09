@@ -6,6 +6,7 @@ import { useParams } from "next/navigation";
 
 import {
   Alert,
+  Badge,
   Button,
   Card,
   Input,
@@ -138,7 +139,7 @@ export default function ArMasterlistDetailPage() {
     <div>
       <PageHeader
         title={(record.borrower_name as string) ?? "Account"}
-        description={(record.loan_account_no as string) ?? undefined}
+        description={record.loan_account_no ? (record.loan_account_no as string) : undefined}
         actions={
           <Link href="/ar">
             <Button variant="secondary">Back</Button>
@@ -150,18 +151,23 @@ export default function ArMasterlistDetailPage() {
       {message ? <div className="mb-4"><Alert variant="success">{message}</Alert></div> : null}
 
       <Card className="mb-6">
-        <p className="text-sm text-neutral-500">Outstanding balance</p>
-        <p className="text-2xl font-semibold">
+        <p className="text-sm text-ink-faint">Outstanding balance</p>
+        <p className="text-2xl font-semibold font-mono">
           {Number(record.outstanding_balance).toLocaleString("en-PH", {
             minimumFractionDigits: 2,
           })}
         </p>
-        <p className="mt-2 text-sm text-neutral-600">
+        <p className="mt-2 text-sm text-ink-muted">
           {Number(record.terms)} ×{" "}
-          {Number(record.monthly_amortization).toLocaleString("en-PH", {
-            minimumFractionDigits: 2,
-          })}{" "}
-          · Aging {String(record.aging_bucket)} · {String(record.account_status)}
+          <span className="font-mono">
+            {Number(record.monthly_amortization).toLocaleString("en-PH", {
+              minimumFractionDigits: 2,
+            })}
+          </span>
+          {" · Aging "}
+          {String(record.aging_bucket)}
+          {" · "}
+          <Badge variant="neutral">{String(record.account_status)}</Badge>
         </p>
       </Card>
 
@@ -245,12 +251,14 @@ export default function ArMasterlistDetailPage() {
         <ul className="divide-y divide-neutral-100 text-sm">
           {schedules.map((row) => (
             <li key={String(row.id)} className="flex justify-between py-2">
-              <span>
+              <span className="font-mono">
                 #{String(row.installment_no)} · {String(row.due_date)}
               </span>
-              <span>
-                {Number(row.amount_due).toLocaleString("en-PH", { minimumFractionDigits: 2 })}{" "}
-                · {String(row.status)}
+              <span className="flex items-center gap-2">
+                <span className="font-mono">
+                  {Number(row.amount_due).toLocaleString("en-PH", { minimumFractionDigits: 2 })}
+                </span>
+                <Badge variant="neutral">{String(row.status)}</Badge>
               </span>
             </li>
           ))}

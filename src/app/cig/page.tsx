@@ -5,6 +5,7 @@ import { useCallback, useEffect, useState } from "react";
 
 import {
   Alert,
+  Badge,
   Button,
   Card,
   PageHeader,
@@ -65,7 +66,7 @@ export default function CigDashboardPage() {
 
       {applications.length === 0 ? (
         <Card>
-          <p className="text-sm text-neutral-600">No applications in the active queue.</p>
+          <p className="text-sm text-ink-muted">No applications in the active queue.</p>
         </Card>
       ) : (
         <div className="space-y-3">
@@ -75,21 +76,26 @@ export default function CigDashboardPage() {
               className="flex flex-wrap items-center justify-between gap-3"
             >
               <div>
-                <p className="font-medium text-neutral-900">
+                <p className="font-medium text-ink">
                   {app.borrower
                     ? `${app.borrower.firstName} ${app.borrower.lastName}`
                     : "Unknown"}
                   {app.borrower ? (
-                    <span className="ml-2 text-sm font-normal text-neutral-500">
+                    <span className="ml-2 font-mono text-sm font-normal text-ink-muted">
                       {app.borrower.borrowerNo}
                     </span>
                   ) : null}
                 </p>
-                <p className="text-sm text-neutral-500">
-                  {formatStatusLabel(app.status)}
-                  {app.endorsedAt
-                    ? ` · Endorsed ${new Date(app.endorsedAt).toLocaleString()}`
-                    : ""}
+                <p className="flex flex-wrap items-center gap-1.5 text-sm text-ink-muted">
+                  <Badge variant="neutral">{formatStatusLabel(app.status)}</Badge>
+                  {app.endorsedAt ? (
+                    <>
+                      {" · Endorsed "}
+                      <span className="font-mono">
+                        {new Date(app.endorsedAt).toLocaleString()}
+                      </span>
+                    </>
+                  ) : null}
                 </p>
               </div>
               <Link href={`/cig/applications/${app.id}`}>

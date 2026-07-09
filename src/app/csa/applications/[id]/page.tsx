@@ -6,6 +6,7 @@ import { useParams } from "next/navigation";
 
 import {
   Alert,
+  Badge,
   Button,
   Card,
   Input,
@@ -214,7 +215,9 @@ export default function CsaApplicationPage() {
             ? `${data.borrower.firstName} ${data.borrower.lastName}`
             : "Application"
         }
-        description={`${data.borrower?.borrowerNo ?? ""} · ${data.application.statusLabel}`}
+        description={
+          [data.borrower?.borrowerNo, data.application.statusLabel].filter(Boolean).join(" · ")
+        }
         actions={
           <Link href="/csa">
             <Button variant="secondary">Back to queue</Button>
@@ -237,7 +240,7 @@ export default function CsaApplicationPage() {
       <div className="grid gap-6 lg:grid-cols-2">
         <div className="space-y-6">
           <Card>
-            <h2 className="mb-4 text-lg font-semibold text-neutral-900">Borrower profile</h2>
+            <h2 className="mb-4 text-lg font-semibold text-ink">Borrower profile</h2>
             {data.borrower && editable ? (
               <form onSubmit={(e) => void handleSaveProfile(e)} className="grid gap-3">
                 <div>
@@ -284,7 +287,7 @@ export default function CsaApplicationPage() {
                 </Button>
               </form>
             ) : data.borrower ? (
-              <div className="space-y-1 text-sm text-neutral-700">
+              <div className="space-y-1 text-sm text-ink-muted">
                 <p>{data.borrower.email}</p>
                 <p>{data.borrower.mobilePhone ?? "No mobile on file"}</p>
               </div>
@@ -292,10 +295,10 @@ export default function CsaApplicationPage() {
           </Card>
 
           <Card>
-            <h2 className="mb-4 text-lg font-semibold text-neutral-900">NCL check</h2>
-            <p className="mb-3 text-sm text-neutral-600">
+            <h2 className="mb-4 text-lg font-semibold text-ink">NCL check</h2>
+            <p className="mb-3 text-sm text-ink-muted">
               Current result:{" "}
-              <span className="font-medium capitalize">{ncl.result}</span>
+              <Badge variant="neutral">{ncl.result}</Badge>
             </p>
             {editable ? (
               <div className="flex flex-wrap gap-2">
@@ -337,10 +340,10 @@ export default function CsaApplicationPage() {
           />
 
           <Card>
-            <h2 className="mb-4 text-lg font-semibold text-neutral-900">Endorse to CIG</h2>
-            <ul className="mb-4 list-inside list-disc text-sm text-neutral-600">
+            <h2 className="mb-4 text-lg font-semibold text-ink">Endorse to CIG</h2>
+            <ul className="mb-4 list-inside list-disc text-sm text-ink-muted">
               {data.endorseReadiness.ready ? (
-                <li className="text-success-700">All requirements met</li>
+                <li><Badge variant="success">All requirements met</Badge></li>
               ) : (
                 data.endorseReadiness.missing.map((item) => (
                   <li key={item}>{item}</li>
@@ -369,7 +372,7 @@ export default function CsaApplicationPage() {
                 </form>
               </div>
             ) : (
-              <p className="text-sm text-neutral-600">
+              <p className="text-sm text-ink-muted">
                 Endorsed — status is {formatStatusLabel(data.application.status)}.
               </p>
             )}

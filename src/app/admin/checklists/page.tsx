@@ -4,10 +4,12 @@ import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 
 import {
   Alert,
+  Badge,
   Button,
   Card,
   Label,
   PageHeader,
+  Select,
   Spinner,
   Table,
   Td,
@@ -168,18 +170,18 @@ export default function ChecklistsAdminPage() {
 
       <Card className="mb-6">
         <Label htmlFor="stage">Stage</Label>
-        <select
+        <Select
           id="stage"
           value={stage}
           onChange={(e) => setStage(e.target.value)}
-          className="mt-1 w-full max-w-xs rounded-md border border-neutral-300 px-3 py-2 text-sm text-neutral-900 focus:border-neutral-500 focus:outline-none focus:ring-1 focus:ring-neutral-500"
+          className="mt-1 max-w-xs"
         >
           {STAGES.map((s) => (
             <option key={s} value={s}>
               {s.replace(/_/g, " ")}
             </option>
           ))}
-        </select>
+        </Select>
       </Card>
 
       {loading ? (
@@ -187,7 +189,7 @@ export default function ChecklistsAdminPage() {
       ) : (
         <>
           <Card className="mb-6">
-            <h2 className="mb-3 font-medium text-neutral-900">
+            <h2 className="mb-3 font-medium text-ink">
               Checklist items — {stage.replace(/_/g, " ")}
             </h2>
             <Table>
@@ -207,14 +209,12 @@ export default function ChecklistsAdminPage() {
                     </Td>
                     <Td>
                       {item.isRequired ? (
-                        <span className="text-xs font-medium text-neutral-900">
-                          Required
-                        </span>
+                        <Badge variant="warning">Required</Badge>
                       ) : (
-                        <span className="text-xs text-neutral-500">Optional</span>
+                        <Badge variant="neutral">Optional</Badge>
                       )}
                     </Td>
-                    <Td>{item.sortOrder}</Td>
+                    <Td className="font-mono">{item.sortOrder}</Td>
                     <Td>
                       <div className="flex gap-2">
                         <Button
@@ -238,14 +238,14 @@ export default function ChecklistsAdminPage() {
               </tbody>
             </Table>
             {items.length === 0 ? (
-              <p className="py-4 text-sm text-neutral-500">No items for this stage.</p>
+              <p className="py-4 text-sm text-ink-faint">No items for this stage.</p>
             ) : null}
           </Card>
 
           <Card>
-            <h2 className="mb-3 font-medium text-neutral-900">Add document type</h2>
+            <h2 className="mb-3 font-medium text-ink">Add document type</h2>
             {availableTypes.length === 0 ? (
-              <p className="text-sm text-neutral-500">
+              <p className="text-sm text-ink-faint">
                 All known document types are already in this stage checklist.
               </p>
             ) : (
@@ -255,11 +255,11 @@ export default function ChecklistsAdminPage() {
               >
                 <div className="min-w-[200px] flex-1">
                   <Label htmlFor="docType">Document type</Label>
-                  <select
+                  <Select
                     id="docType"
                     value={newDocTypeId}
                     onChange={(e) => setNewDocTypeId(e.target.value)}
-                    className="mt-1 w-full rounded-md border border-neutral-300 px-3 py-2 text-sm text-neutral-900"
+                    className="mt-1"
                     required
                   >
                     <option value="">Select…</option>
@@ -268,7 +268,7 @@ export default function ChecklistsAdminPage() {
                         {dt.name}
                       </option>
                     ))}
-                  </select>
+                  </Select>
                 </div>
                 <Button type="submit" disabled={adding || !newDocTypeId}>
                   {adding ? "Adding…" : "Add to checklist"}

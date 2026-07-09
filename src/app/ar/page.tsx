@@ -5,6 +5,7 @@ import { useCallback, useEffect, useState } from "react";
 
 import {
   Alert,
+  Badge,
   Button,
   Card,
   PageHeader,
@@ -27,6 +28,25 @@ type QueueRow = {
   loan_application_id: string;
   queued_at: string;
 };
+
+function accountStatusVariant(
+  status: string,
+): "success" | "warning" | "danger" | "neutral" {
+  const s = status.toLowerCase();
+  if (s === "active" || s === "current") return "success";
+  if (s === "overdue" || s === "delinquent" || s === "past_due") return "danger";
+  return "neutral";
+}
+
+function agingBucketVariant(
+  bucket: string,
+): "success" | "warning" | "danger" | "neutral" {
+  const b = bucket.toLowerCase();
+  if (b === "current") return "success";
+  if (b.includes("91") || b.includes("120") || b.includes("180")) return "danger";
+  if (b.includes("dpd") || b.includes("day")) return "warning";
+  return "neutral";
+}
 
 export default function ArDashboardPage() {
   const [masterlist, setMasterlist] = useState<MasterlistRow[]>([]);
@@ -93,7 +113,7 @@ export default function ArDashboardPage() {
       {queue.length > 0 ? (
         <Card className="mb-6">
           <h2 className="mb-3 text-lg font-semibold">Incoming queue</h2>
-          <p className="mb-3 text-sm text-neutral-600">
+          <p className="mb-3 text-sm text-ink-muted">
             {queue.length} closed file(s) awaiting masterlist processing (auto-created on close).
           </p>
         </Card>
@@ -101,7 +121,7 @@ export default function ArDashboardPage() {
 
       {masterlist.length === 0 ? (
         <Card>
-          <p className="text-sm text-neutral-600">No masterlist records yet.</p>
+          <p className="text-sm text-ink-muted">No masterlist records yet.</p>
         </Card>
       ) : (
         <div className="space-y-3">
@@ -109,18 +129,27 @@ export default function ArDashboardPage() {
             <Card key={row.id}>
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
-                  <p className="font-medium text-neutral-900">
+                  <p className="font-medium text-ink">
                     {row.borrower_name}
-                    <span className="ml-2 text-sm font-normal text-neutral-500">
+                    <span className="ml-2 font-mono text-sm font-normal text-ink-muted">
                       {row.borrower_no}
                     </span>
                   </p>
-                  <p className="text-sm text-neutral-500">
-                    {row.loan_account_no ?? "—"} · Balance{" "}
-                    {Number(row.outstanding_balance).toLocaleString("en-PH", {
-                      minimumFractionDigits: 2,
-                    })}{" "}
-                    · {row.aging_bucket} · {row.account_status}
+                  <p className="flex flex-wrap items-center gap-1.5 text-sm text-ink-muted">
+                    <span className="font-mono">{row.loan_account_no ?? "—"}</span>
+                    {" · Balance "}
+                    <span className="font-mono">
+                      {Number(row.outstanding_balance).toLocaleString("en-PH", {
+                        minimumFractionDigits: 2,
+                      })}
+                    </span>
+                    {" · "}
+                    <Badge variant={agingBucketVariant(row.aging_bucket)}>
+                      {row.aging_bucket}
+                    </Badge>
+                    <Badge variant={accountStatusVariant(row.account_status)}>
+                      {row.account_status}
+                    </Badge>
                   </p>
                 </div>
                 <Link href={`/ar/masterlist/${row.id}`}>

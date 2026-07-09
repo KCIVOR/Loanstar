@@ -6,6 +6,7 @@ import { useParams } from "next/navigation";
 
 import {
   Alert,
+  Badge,
   Button,
   Card,
   ConfirmDialog,
@@ -266,21 +267,24 @@ export default function LraApplicationPage() {
       {message ? <div className="mb-4"><Alert variant="success">{message}</Alert></div> : null}
 
       <Card className="mb-6">
-        <p className="text-sm text-neutral-500">Borrower blocker</p>
-        <p className="font-medium text-neutral-900">
+        <p className="text-sm text-ink-faint">Borrower blocker</p>
+        <p className="font-medium text-ink">
           {data.application.blocker ?? formatStatusLabel(data.application.status)}
         </p>
         {data.computation ? (
-          <p className="mt-2 text-sm text-neutral-600">
-            Net release {formatMoney(data.computation.netReleased)} ·{" "}
-            {data.computation.terms} × {formatMoney(data.computation.monthlyAmortization)}
+          <p className="mt-2 text-sm text-ink-muted">
+            Net release{" "}
+            <span className="font-mono">{formatMoney(data.computation.netReleased)}</span>
+            {" · "}
+            {data.computation.terms} ×{" "}
+            <span className="font-mono">{formatMoney(data.computation.monthlyAmortization)}</span>
           </p>
         ) : null}
       </Card>
 
       {!rf ? (
         <Card>
-          <p className="mb-3 text-sm text-neutral-600">Open this file to begin LRA processing.</p>
+          <p className="mb-3 text-sm text-ink-muted">Open this file to begin LRA processing.</p>
           <Button disabled={saving} onClick={() => void startProcessing()}>
             Start processing
           </Button>
@@ -348,15 +352,27 @@ export default function LraApplicationPage() {
                 </div>
                 <div>
                   <Label>First check number</Label>
-                  <Input value={pdcCheckNo} onChange={(e) => setPdcCheckNo(e.target.value)} />
+                  <Input
+                    value={pdcCheckNo}
+                    onChange={(e) => setPdcCheckNo(e.target.value)}
+                    className="font-mono"
+                  />
                 </div>
                 <div>
                   <Label>Blank check from</Label>
-                  <Input value={blankFrom} onChange={(e) => setBlankFrom(e.target.value)} />
+                  <Input
+                    value={blankFrom}
+                    onChange={(e) => setBlankFrom(e.target.value)}
+                    className="font-mono"
+                  />
                 </div>
                 <div>
                   <Label>Blank check to</Label>
-                  <Input value={blankTo} onChange={(e) => setBlankTo(e.target.value)} />
+                  <Input
+                    value={blankTo}
+                    onChange={(e) => setBlankTo(e.target.value)}
+                    className="font-mono"
+                  />
                 </div>
                 <Button type="submit" disabled={saving}>Save PDC schedule</Button>
               </form>
@@ -367,10 +383,13 @@ export default function LraApplicationPage() {
             <Card>
               <h2 className="mb-3 text-lg font-semibold">Generate documents</h2>
               {data.blriPreview ? (
-                <div className="mb-3 text-sm text-neutral-600">
-                  BLRI preview: principal {formatMoney(data.blriPreview.principal)}, interest{" "}
-                  {formatMoney(data.blriPreview.totalInterest)}, total loan{" "}
-                  {formatMoney(data.blriPreview.totalLoan)}
+                <div className="mb-3 text-sm text-ink-muted">
+                  BLRI preview: principal{" "}
+                  <span className="font-mono">{formatMoney(data.blriPreview.principal)}</span>
+                  , interest{" "}
+                  <span className="font-mono">{formatMoney(data.blriPreview.totalInterest)}</span>
+                  , total loan{" "}
+                  <span className="font-mono">{formatMoney(data.blriPreview.totalLoan)}</span>
                 </div>
               ) : null}
               <Button disabled={saving} onClick={() => void generateDocs()}>
@@ -386,14 +405,16 @@ export default function LraApplicationPage() {
                 {data.generatedDocuments.map((doc) => (
                   <li key={doc.id} className="flex justify-between gap-2">
                     <span className="capitalize">{doc.slug.replace(/_/g, " ")}</span>
-                    <span>
-                      {doc.signedAt ? "Signed" : "Awaiting signature"}
+                    <span className="flex items-center gap-2">
+                      {doc.signedAt
+                        ? <Badge variant="success">Signed</Badge>
+                        : <Badge variant="neutral">Awaiting signature</Badge>}
                       {doc.downloadUrl ? (
                         <a
                           href={doc.downloadUrl}
                           target="_blank"
                           rel="noreferrer"
-                          className="ml-2 text-primary-600 underline"
+                          className="text-gold-600 underline"
                         >
                           PDF
                         </a>
@@ -408,7 +429,7 @@ export default function LraApplicationPage() {
           {briefingPending ? (
             <Card>
               <h2 className="mb-3 text-lg font-semibold">Briefing gate</h2>
-              <p className="text-sm text-neutral-600">
+              <p className="text-sm text-ink-muted">
                 All documents signed. Waiting for the borrower to sign the briefing
                 acknowledgment in their portal before release can proceed.
               </p>
@@ -426,7 +447,7 @@ export default function LraApplicationPage() {
               Record release
             </Button>
             {!canRelease && rf.status === "ready_release" ? (
-              <p className="mt-2 text-sm text-warning-700">Briefing sign-off required.</p>
+              <p className="mt-2 text-sm text-warning-ink">Briefing sign-off required.</p>
             ) : null}
 
             <ConfirmDialog
@@ -451,7 +472,7 @@ export default function LraApplicationPage() {
           {rf.status === "released" ? (
             <Card>
               <h2 className="mb-3 text-lg font-semibold">Close & transmit</h2>
-              <p className="mb-3 text-sm text-neutral-600">
+              <p className="mb-3 text-sm text-ink-muted">
                 Upload the signed check voucher on the release checklist below, then close
                 the file to queue it for AR.
               </p>

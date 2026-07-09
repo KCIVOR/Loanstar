@@ -5,6 +5,8 @@ import { useCallback, useEffect, useState } from "react";
 
 import {
   Alert,
+  Badge,
+  Button,
   Card,
   PageHeader,
   Spinner,
@@ -54,11 +56,8 @@ export default function AgentLeadsPage() {
         title="Leads"
         description="Track borrower leads and checklist completion"
         actions={
-          <Link
-            href="/agent/leads/new"
-            className="inline-flex items-center justify-center rounded-md bg-neutral-900 px-3 py-2 text-sm font-medium text-white hover:bg-neutral-800"
-          >
-            New lead
+          <Link href="/agent/leads/new">
+            <Button>New lead</Button>
           </Link>
         }
       />
@@ -85,14 +84,16 @@ export default function AgentLeadsPage() {
                 <Td>
                   <Link
                     href={`/agent/leads/${lead.id}`}
-                    className="font-medium text-neutral-900 hover:underline"
+                    className="font-medium text-ink hover:underline"
                   >
                     {lead.borrowerName}
                   </Link>
                 </Td>
                 <Td>{lead.businessName ?? "—"}</Td>
-                <Td className="capitalize">{lead.status}</Td>
-                <Td className="text-xs text-neutral-500">
+                <Td>
+                  <Badge variant="neutral">{lead.status}</Badge>
+                </Td>
+                <Td className="font-mono text-xs text-ink-faint">
                   {new Date(lead.createdAt).toLocaleDateString()}
                 </Td>
               </tr>
@@ -100,7 +101,7 @@ export default function AgentLeadsPage() {
           </tbody>
         </Table>
         {leads.length === 0 ? (
-          <p className="py-6 text-center text-sm text-neutral-500">No leads yet.</p>
+          <p className="py-6 text-center text-sm text-ink-muted">No leads yet.</p>
         ) : null}
       </Card>
     </div>

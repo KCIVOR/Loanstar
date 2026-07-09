@@ -6,6 +6,7 @@ import { useParams } from "next/navigation";
 
 import {
   Alert,
+  Badge,
   Button,
   Card,
   Input,
@@ -285,10 +286,10 @@ export default function CigApplicationPage() {
 
       {applicationStatus === "for_revision" ? (
         <Card className="mb-4">
-          <h2 className="mb-2 text-lg font-semibold text-neutral-900">
+          <h2 className="mb-2 text-lg font-semibold text-ink">
             Committee revisit
           </h2>
-          <p className="mb-3 text-sm text-neutral-600">
+          <p className="mb-3 text-sm text-ink-muted">
             Committee requested verification revisions. Complete updates and return
             the file to Committee.
           </p>
@@ -301,7 +302,8 @@ export default function CigApplicationPage() {
       {verification.forwardedAt ? (
         <div className="mb-4">
           <Alert variant="success">
-            Forwarded to Committee on {new Date(verification.forwardedAt).toLocaleString()}
+            Forwarded to Committee on{" "}
+            <span className="font-mono">{new Date(verification.forwardedAt).toLocaleString()}</span>
           </Alert>
         </div>
       ) : null}
@@ -353,7 +355,7 @@ export default function CigApplicationPage() {
                 >
                   <div>
                     <p className="text-sm font-medium">{check.name}</p>
-                    <p className="text-xs capitalize text-neutral-500">{check.result}</p>
+                    <Badge variant="neutral">{check.result}</Badge>
                   </div>
                   {editable && check.slug ? (
                     <div className="flex gap-2">
@@ -415,8 +417,8 @@ export default function CigApplicationPage() {
               <div className="space-y-1 text-sm">
                 {computation.lineItems.map((item) => (
                   <div key={item.label} className="flex justify-between">
-                    <span className="text-neutral-600">{item.label}</span>
-                    <span className="tabular-nums">{formatMoney(item.amount)}</span>
+                    <span className="text-ink-muted">{item.label}</span>
+                    <span className="font-mono tabular-nums">{formatMoney(item.amount)}</span>
                   </div>
                 ))}
               </div>
@@ -426,7 +428,7 @@ export default function CigApplicationPage() {
           <Card>
             <h2 className="mb-3 text-lg font-semibold">Verification form</h2>
             {!completeness.complete && editable ? (
-              <ul className="mb-4 list-inside list-disc text-sm text-warning-700">
+              <ul className="mb-4 list-inside list-disc text-sm text-warning-ink">
                 {completeness.missing.map((item) => (
                   <li key={item}>{item}</li>
                 ))}
@@ -575,7 +577,7 @@ export default function CigApplicationPage() {
                 </Button>
               </form>
             ) : (
-              <p className="text-sm text-neutral-600">Verification locked after forward.</p>
+              <p className="text-sm text-ink-muted">Verification locked after forward.</p>
             )}
           </Card>
         </div>

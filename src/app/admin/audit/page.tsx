@@ -87,25 +87,25 @@ export default function AuditPage() {
             <tbody className="divide-y divide-neutral-200 bg-white">
               {events.map((ev) => (
                 <tr key={ev.id}>
-                  <Td className="whitespace-nowrap text-xs">
+                  <Td className="whitespace-nowrap font-mono text-xs">
                     {new Date(ev.created_at).toLocaleString()}
                   </Td>
                   <Td>{ev.module_slug}</Td>
                   <Td>{ev.action}</Td>
-                  <Td className="text-xs">
+                  <Td className="font-mono text-xs">
                     {ev.entity_type ?? "—"}
                     {ev.entity_id ? ` / ${ev.entity_id.slice(0, 8)}…` : ""}
                   </Td>
                   <Td className="font-mono text-xs">
                     {ev.actor_id?.slice(0, 8) ?? "—"}…
                   </Td>
-                  <Td className="text-xs">{ev.ip_address ?? "—"}</Td>
+                  <Td className="font-mono text-xs">{ev.ip_address ?? "—"}</Td>
                 </tr>
               ))}
             </tbody>
           </Table>
 
-          <div className="mt-4 flex items-center justify-between text-sm text-neutral-600">
+          <div className="mt-4 flex items-center justify-between text-sm text-ink-muted">
             <span>
               Showing {offset + 1}–{Math.min(offset + limit, total)} of {total}
             </span>

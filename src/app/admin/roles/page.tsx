@@ -2,19 +2,8 @@
 
 import Link from "next/link";
 import { FormEvent, useCallback, useEffect, useState } from "react";
+import { Alert, Button, Input, Label, Modal, PageHeader, Spinner, Table, Td, Th, StatusBadge } from "@/components/ui";
 
-import {
-  Alert,
-  Button,
-  Input,
-  Label,
-  Modal,
-  PageHeader,
-  Spinner,
-  Table,
-  Td,
-  Th,
-} from "@/components/ui";
 
 type Role = {
   id: string;
@@ -155,15 +144,7 @@ export default function RolesPage() {
                 <Td>{role.slug}</Td>
                 <Td>{role.is_system ? "System" : "Custom"}</Td>
                 <Td>
-                  <span
-                    className={
-                      role.is_active
-                        ? "text-success-700"
-                        : "text-neutral-400"
-                    }
-                  >
-                    {role.is_active ? "Active" : "Inactive"}
-                  </span>
+                  <StatusBadge active={role.is_active} />
                 </Td>
                 <Td>
                   <Link

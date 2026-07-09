@@ -6,6 +6,7 @@ import { useParams } from "next/navigation";
 
 import {
   Alert,
+  Badge,
   Button,
   Card,
   PageHeader,
@@ -116,11 +117,9 @@ export default function AgentLeadDetailPage() {
       ) : null}
 
       <Card className="mb-6">
-        <p className="text-sm text-neutral-500">Status</p>
-        <p className="capitalize text-lg font-semibold text-neutral-900">
-          {lead.status}
-        </p>
-        <p className="mt-2 text-xs text-neutral-500">
+        <p className="text-sm text-ink-faint">Status</p>
+        <Badge variant="neutral">{lead.status}</Badge>
+        <p className="mt-2 text-xs text-ink-faint">
           You can see checklist completion flags only — document content is not
           accessible from the agent portal.
         </p>
@@ -138,7 +137,7 @@ export default function AgentLeadDetailPage() {
         />
       ) : (
         <Card>
-          <p className="text-sm text-neutral-600">
+          <p className="text-sm text-ink-muted">
             No application linked yet. Checklist will appear once the borrower
             registers or an application is created.
           </p>

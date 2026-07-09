@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 
 import {
   Alert,
+  Badge,
   Button,
   Card,
   PageHeader,
@@ -27,6 +28,15 @@ type Payment = {
   status: string;
   masterlist_id: string;
 };
+
+function paymentStatusVariant(
+  status: string,
+): "success" | "warning" | "danger" | "neutral" {
+  if (status === "confirmed") return "success";
+  if (status === "rejected") return "danger";
+  if (status.includes("pending")) return "warning";
+  return "neutral";
+}
 
 export default function CollectorDashboardPage() {
   const [accounts, setAccounts] = useState<Account[]>([]);
@@ -142,19 +152,34 @@ export default function CollectorDashboardPage() {
       <Card className="mb-6">
         <h2 className="mb-3 text-lg font-semibold">Assigned accounts</h2>
         {accounts.length === 0 ? (
-          <p className="text-sm text-neutral-600">No accounts assigned yet.</p>
+          <p className="text-sm text-ink-muted">No accounts assigned yet.</p>
         ) : (
           <ul className="divide-y divide-neutral-100 text-sm">
             {accounts.map((acc) => (
               <li key={acc.id} className="flex justify-between py-2">
                 <span>
-                  {acc.borrower_name} · {acc.loan_account_no ?? "—"}
+                  {acc.borrower_name}
+                  {" · "}
+                  <span className="font-mono">{acc.loan_account_no ?? "—"}</span>
                 </span>
-                <span>
-                  {Number(acc.outstanding_balance).toLocaleString("en-PH", {
-                    minimumFractionDigits: 2,
-                  })}{" "}
-                  · {acc.aging_bucket}
+                <span className="inline-flex items-center gap-2">
+                  <span className="font-mono">
+                    {Number(acc.outstanding_balance).toLocaleString("en-PH", {
+                      minimumFractionDigits: 2,
+                    })}
+                  </span>
+                  <Badge
+                    variant={
+                      acc.aging_bucket.toLowerCase().includes("91") ||
+                      acc.aging_bucket.toLowerCase().includes("120")
+                        ? "danger"
+                        : acc.aging_bucket.toLowerCase() === "current"
+                          ? "success"
+                          : "warning"
+                    }
+                  >
+                    {acc.aging_bucket}
+                  </Badge>
                 </span>
               </li>
             ))}
@@ -165,16 +190,25 @@ export default function CollectorDashboardPage() {
       <Card>
         <h2 className="mb-3 text-lg font-semibold">Pending payment proofs</h2>
         {pendingPayments.length === 0 ? (
-          <p className="text-sm text-neutral-600">No pending proofs.</p>
+          <p className="text-sm text-ink-muted">No pending proofs.</p>
         ) : (
           <ul className="space-y-3">
             {pendingPayments.map((pay) => (
               <li key={pay.id} className="rounded border border-neutral-200 p-3 text-sm">
                 <p>
-                  {pay.reference_no ?? "No ref"} · {pay.payment_date} ·{" "}
-                  {Number(pay.amount).toLocaleString("en-PH", { minimumFractionDigits: 2 })}
+                  <span className="font-mono">{pay.reference_no ?? "No ref"}</span>
+                  {" · "}
+                  <span className="font-mono">{pay.payment_date}</span>
+                  {" · "}
+                  <span className="font-mono">
+                    {Number(pay.amount).toLocaleString("en-PH", {
+                      minimumFractionDigits: 2,
+                    })}
+                  </span>
                 </p>
-                <p className="text-neutral-500">{pay.status}</p>
+                <p className="mt-1">
+                  <Badge variant={paymentStatusVariant(pay.status)}>{pay.status}</Badge>
+                </p>
                 <div className="mt-2 flex flex-wrap gap-2">
                   {pay.status === "pending_verification" ? (
                     <>
@@ -197,7 +231,7 @@ export default function CollectorDashboardPage() {
                     <Button onClick={() => void addToDcr(pay.id)}>Add to DCR</Button>
                   ) : null}
                   {selectedPayments.includes(pay.id) ? (
-                    <span className="text-success-700">In DCR</span>
+                    <Badge variant="success">In DCR</Badge>
                   ) : null}
                 </div>
               </li>

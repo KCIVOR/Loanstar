@@ -127,8 +127,9 @@ export default function ConfigPage() {
               required
               value={penaltyRate}
               onChange={(e) => setPenaltyRate(e.target.value)}
+              className="font-mono"
             />
-            <p className="mt-1 text-xs text-neutral-500">
+            <p className="mt-1 text-xs text-ink-faint">
               {settings.find((s) => s.key === "penalty_rate")?.description}
             </p>
           </div>
@@ -143,6 +144,7 @@ export default function ConfigPage() {
               required
               value={coverageRatio}
               onChange={(e) => setCoverageRatio(e.target.value)}
+              className="font-mono"
             />
           </div>
           <div>
@@ -153,18 +155,21 @@ export default function ConfigPage() {
                 placeholder="30"
                 value={aging30}
                 onChange={(e) => setAging30(e.target.value)}
+                className="font-mono"
               />
               <Input
                 type="number"
                 placeholder="60"
                 value={aging60}
                 onChange={(e) => setAging60(e.target.value)}
+                className="font-mono"
               />
               <Input
                 type="number"
                 placeholder="90"
                 value={aging90}
                 onChange={(e) => setAging90(e.target.value)}
+                className="font-mono"
               />
             </div>
           </div>

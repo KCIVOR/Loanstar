@@ -1,20 +1,22 @@
 "use client";
 
 import { FormEvent, useCallback, useEffect, useState } from "react";
-
 import {
   Alert,
   Button,
+  Checkbox,
   ConfirmDialog,
   Input,
   Label,
   Modal,
   PageHeader,
   Spinner,
+  StatusBadge,
   Table,
   Td,
   Th,
 } from "@/components/ui";
+
 
 type UserRow = {
   id: string;
@@ -192,20 +194,19 @@ export default function UsersPage() {
             <Label>Roles</Label>
             <div className="mt-1 flex flex-wrap gap-3">
               {roles.map((role) => (
-                <label key={role.id} className="flex items-center gap-1.5 text-sm">
-                  <input
-                    type="checkbox"
-                    checked={newRoleIds.includes(role.id)}
-                    onChange={(e) =>
-                      setNewRoleIds((prev) =>
-                        e.target.checked
-                          ? [...prev, role.id]
-                          : prev.filter((id) => id !== role.id),
-                      )
-                    }
-                  />
-                  {role.name}
-                </label>
+                <Checkbox
+                  key={role.id}
+                  id={`new-role-${role.id}`}
+                  label={role.name}
+                  checked={newRoleIds.includes(role.id)}
+                  onChange={(checked) =>
+                    setNewRoleIds((prev) =>
+                      checked
+                        ? [...prev, role.id]
+                        : prev.filter((id) => id !== role.id),
+                    )
+                  }
+                />
               ))}
             </div>
           </div>
@@ -243,33 +244,24 @@ export default function UsersPage() {
                 <Td className="font-medium">{user.email}</Td>
                 <Td>{user.full_name ?? "—"}</Td>
                 <Td>
-                  <span className={user.is_active ? "text-success-700" : "text-neutral-400"}>
-                    {user.is_active ? "Active" : "Inactive"}
-                  </span>
+                  <StatusBadge active={user.is_active} />
                 </Td>
                 <Td>
-                  <div className="flex flex-wrap gap-2">
+                  <div className="flex flex-wrap gap-2 text-xs">
                     {roles.map((role) => (
-                      <label
+                      <Checkbox
                         key={role.id}
-                        className="flex items-center gap-1 text-xs"
-                      >
-                        <input
-                          type="checkbox"
-                          checked={user.roles.some((r) => r.id === role.id)}
-                          onChange={(e) => {
-                            if (
-                              !e.target.checked &&
-                              role.slug === "super_admin"
-                            ) {
-                              setConfirmRoleRemoval({ user, role });
-                              return;
-                            }
-                            void updateRoles(user, role.id, e.target.checked);
-                          }}
-                        />
-                        {role.name}
-                      </label>
+                        id={`user-${user.id}-role-${role.id}`}
+                        label={role.name}
+                        checked={user.roles.some((r) => r.id === role.id)}
+                        onChange={(checked) => {
+                          if (!checked && role.slug === "super_admin") {
+                            setConfirmRoleRemoval({ user, role });
+                            return;
+                          }
+                          void updateRoles(user, role.id, checked);
+                        }}
+                      />
                     ))}
                   </div>
                 </Td>

@@ -1,26 +1,69 @@
 "use client";
 
-import { MODULES } from "@/lib/constants";
+import Link from "next/link";
+import { useCallback, useEffect, useState } from "react";
+
+import { Alert, Button, PageHeader } from "@/components/ui";
+import { DASHBOARD_WIDGETS, isWidgetSlug, WIDGET_SKELETON } from "@/components/dashboard/registry";
+import { SectionSkeleton, WidgetSection } from "@/components/dashboard/WidgetTile";
+import { MODULES, type ModuleSlug } from "@/lib/constants";
+import { isWidgetError, type WidgetsResponse } from "@/lib/dashboard/types";
+import { MODULE_HOME_PATHS } from "@/lib/permissions/home";
 import { usePermissions } from "@/hooks/usePermissions";
-import { Badge, Card, PageHeader, Spinner } from "@/components/ui";
 
 export default function DashboardPage() {
   const { permissions, loading, error, isSuperAdmin } = usePermissions();
+  const [widgets, setWidgets] = useState<WidgetsResponse["widgets"] | null>(null);
+  const [widgetsLoading, setWidgetsLoading] = useState(true);
+  const [widgetsError, setWidgetsError] = useState(false);
+  const [reloadKey, setReloadKey] = useState(0);
 
-  if (loading) return <Spinner />;
+  const loadWidgets = useCallback(() => {
+    setWidgetsLoading(true);
+    setWidgetsError(false);
+    setReloadKey((k) => k + 1);
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch("/api/dashboard/widgets");
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const body = (await res.json()) as WidgetsResponse;
+        if (!cancelled) setWidgets(body.widgets);
+      } catch {
+        if (!cancelled) setWidgetsError(true);
+      } finally {
+        if (!cancelled) setWidgetsLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [reloadKey]);
+
+  // Nothing to draw an accurate skeleton from until permissions resolve —
+  // the real per-module SectionSkeleton below is the only skeleton shown.
+  if (loading) return null;
   if (error) {
     return (
-      <div className="text-sm text-danger-600">
+      <div className="text-sm text-danger-ink">
         Failed to load permissions: {error}
       </div>
     );
   }
 
   const visibleModules = MODULES.filter((mod) =>
-    permissions?.modules.some(
-      (m) => m.moduleSlug === mod.slug && m.canView,
-    ),
+    permissions?.modules.some((m) => m.moduleSlug === mod.slug && m.canView),
   );
+  // Reports is the cross-cutting overview — render it first.
+  const orderedModules = [
+    ...visibleModules.filter((m) => m.slug === "reports"),
+    ...visibleModules.filter((m) => m.slug !== "reports"),
+  ];
+  const widgetModules = orderedModules.filter((m) => isWidgetSlug(m.slug as ModuleSlug));
+  const plainModules = orderedModules.filter((m) => !isWidgetSlug(m.slug as ModuleSlug));
 
   return (
     <div>
@@ -29,43 +72,93 @@ export default function DashboardPage() {
         description={
           isSuperAdmin
             ? "Super Admin — full system access"
-            : "Modules visible to your assigned roles"
+            : "Live overview of your modules"
+        }
+        actions={
+          <p className="text-xs text-ink-faint">
+            {new Date().toLocaleDateString(undefined, {
+              weekday: "long",
+              month: "long",
+              day: "numeric",
+            })}
+          </p>
         }
       />
 
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {visibleModules.map((mod) => {
-          const perm = permissions?.modules.find(
-            (m) => m.moduleSlug === mod.slug,
-          );
+      {widgetsError ? (
+        <div className="mb-4">
+          <Alert variant="error">
+            <span className="inline-flex flex-wrap items-center gap-2">
+              Couldn&apos;t load dashboard data.
+              <Button variant="ghost" size="sm" onClick={loadWidgets}>
+                Retry
+              </Button>
+            </span>
+          </Alert>
+        </div>
+      ) : null}
+
+      <div className="flex flex-col gap-8">
+        {widgetModules.map((mod) => {
+          const slug = mod.slug as ModuleSlug;
+          const href = MODULE_HOME_PATHS[slug] ?? "/dashboard";
+          const data = widgets?.[slug];
+          const failed = data != null && isWidgetError(data);
+
           return (
-            <Card key={mod.slug}>
-              <h2 className="font-medium text-neutral-900">{mod.name}</h2>
-              <p className="mt-1 text-sm text-neutral-500">{mod.description}</p>
-              {perm ? (
-                <div className="mt-3 flex flex-wrap gap-1">
-                  {perm.canView ? <Badge variant="neutral">view</Badge> : null}
-                  {perm.canCreate ? (
-                    <Badge variant="success">create</Badge>
-                  ) : null}
-                  {perm.canEdit ? <Badge variant="info">edit</Badge> : null}
-                  {perm.canDelete ? (
-                    <Badge variant="danger">delete</Badge>
-                  ) : null}
-                  {perm.canExecuteTrigger ? (
-                    <Badge variant="gold">trigger</Badge>
-                  ) : null}
-                </div>
+            <WidgetSection
+              key={slug}
+              title={mod.name}
+              href={href}
+              hint={mod.description}
+              error={failed}
+              onRetry={loadWidgets}
+            >
+              {widgetsLoading && data == null ? (
+                <SectionSkeleton {...WIDGET_SKELETON[slug as keyof typeof WIDGET_SKELETON]} />
+              ) : data != null && !isWidgetError(data) ? (
+                (() => {
+                  const Widget = DASHBOARD_WIDGETS[slug as keyof typeof DASHBOARD_WIDGETS] as React.ComponentType<{
+                    data: typeof data;
+                  }>;
+                  return <Widget data={data} />;
+                })()
               ) : null}
-            </Card>
+            </WidgetSection>
           );
         })}
+
+        {plainModules.length > 0 ? (
+          <div className="flex flex-wrap gap-3.5">
+            {plainModules.map((mod) => {
+              const slug = mod.slug as ModuleSlug;
+              const href = MODULE_HOME_PATHS[slug] ?? "/dashboard";
+              return (
+                <Link
+                  key={slug}
+                  href={href}
+                  className="group min-w-[220px] flex-1 rounded-[12px] border border-neutral-200 bg-white p-4 shadow-xs transition-shadow hover:shadow-md"
+                >
+                  <h2 className="text-[13.5px] font-bold text-ink group-hover:text-gold-600">
+                    {mod.name} <span aria-hidden>→</span>
+                  </h2>
+                  <p className="mt-1 text-xs text-ink-faint">{mod.description}</p>
+                </Link>
+              );
+            })}
+          </div>
+        ) : null}
       </div>
 
       {visibleModules.length === 0 ? (
-        <p className="mt-4 text-sm text-neutral-500">
-          No modules visible. Contact an administrator to assign roles.
-        </p>
+        <div className="mt-4 flex flex-col items-start gap-3">
+          <p className="text-sm text-ink-muted">
+            No modules visible. Contact an administrator to assign roles.
+          </p>
+          <Button variant="outline" size="sm" onClick={loadWidgets}>
+            Refresh
+          </Button>
+        </div>
       ) : null}
     </div>
   );

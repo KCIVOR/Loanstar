@@ -85,20 +85,40 @@ export default function ArDcrPage() {
 
       {queue.length === 0 ? (
         <Card>
-          <p className="text-sm text-neutral-600">No DCRs awaiting reconciliation.</p>
+          <p className="text-sm text-ink-muted">No DCRs awaiting reconciliation.</p>
         </Card>
       ) : (
         <div className="space-y-4">
           {queue.map((dcr) => (
             <Card key={dcr.id}>
-              <p className="mb-2 text-sm text-neutral-500">
-                Submitted {dcr.submitted_at ? new Date(dcr.submitted_at).toLocaleString() : "—"}
+              <p className="mb-2 text-sm text-ink-muted">
+                Submitted{" "}
+                <span className="font-mono">
+                  {dcr.submitted_at ? new Date(dcr.submitted_at).toLocaleString() : "—"}
+                </span>
               </p>
               <ul className="mb-4 space-y-1 text-sm">
                 {dcr.dcr_items.map((item, idx) => (
                   <li key={idx}>
-                    {item.payments?.masterlist?.borrower_name ?? "Borrower"} ·{" "}
-                    {Number(item.amount).toLocaleString("en-PH", { minimumFractionDigits: 2 })}
+                    {item.payments?.masterlist?.borrower_name ?? "Borrower"}
+                    {" · "}
+                    <span className="font-mono">
+                      {Number(item.amount).toLocaleString("en-PH", {
+                        minimumFractionDigits: 2,
+                      })}
+                    </span>
+                    {item.payments?.reference_no ? (
+                      <>
+                        {" · "}
+                        <span className="font-mono">{item.payments.reference_no}</span>
+                      </>
+                    ) : null}
+                    {item.payments?.payment_date ? (
+                      <>
+                        {" · "}
+                        <span className="font-mono">{item.payments.payment_date}</span>
+                      </>
+                    ) : null}
                   </li>
                 ))}
               </ul>
