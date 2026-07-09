@@ -15,3 +15,7 @@ export { ConfirmDialog } from "./ConfirmDialog";
 export { Spinner } from "./Spinner";
 export { Table, Th, Td } from "./Table";
 export { SegmentedControl } from "./SegmentedControl";
+export { Checkbox } from "./Checkbox";
+export { Radio } from "./Radio";
+export { Toggle } from "./Toggle";
+export { Chip } from "./Chip";
