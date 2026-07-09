@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 
-import { Card, PageHeader, Spinner } from "@/components/admin/ui";
+import { Card, PageHeader, Spinner } from "@/components/ui";
 
 type Account = {
   id: string;

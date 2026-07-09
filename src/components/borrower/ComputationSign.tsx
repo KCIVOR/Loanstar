@@ -2,7 +2,7 @@
 
 import { FormEvent, useState } from "react";
 
-import { Alert, Button, Card, Input, Label } from "@/components/admin/ui";
+import { Alert, Button, Card, Input, Label } from "@/components/ui";
 
 type ComputationSummary = {
   id: string;

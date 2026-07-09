@@ -10,7 +10,7 @@ import {
   Table,
   Td,
   Th,
-} from "@/components/admin/ui";
+} from "@/components/ui";
 
 type CheckType = {
   id: string;

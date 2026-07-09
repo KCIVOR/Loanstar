@@ -10,7 +10,7 @@ import {
   Label,
   Select,
   Spinner,
-} from "@/components/admin/ui";
+} from "@/components/ui";
 
 type LoanPanelProps = {
   applicationId: string;

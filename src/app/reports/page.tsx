@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 
-import { Alert, Card, Spinner } from "@/components/admin/ui";
+import { Alert, Card, Spinner } from "@/components/ui";
 import { formatStatusLabel } from "@/lib/applications/status";
 
 type Dashboard = {

@@ -12,7 +12,7 @@ import {
   Label,
   PageHeader,
   Spinner,
-} from "@/components/admin/ui";
+} from "@/components/ui";
 import { ComputationPanel } from "@/components/csa/ComputationPanel";
 import { NegotiationPanel } from "@/components/csa/NegotiationPanel";
 import { DocumentChecklist } from "@/components/DocumentChecklist";

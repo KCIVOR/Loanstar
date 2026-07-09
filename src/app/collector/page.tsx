@@ -8,7 +8,7 @@ import {
   Card,
   PageHeader,
   Spinner,
-} from "@/components/admin/ui";
+} from "@/components/ui";
 
 type Account = {
   id: string;

@@ -10,7 +10,7 @@ import {
   Label,
   PageHeader,
   Spinner,
-} from "@/components/admin/ui";
+} from "@/components/ui";
 import type {
   Address,
   AllotteeInfo,

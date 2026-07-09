@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { FormEvent, useState } from "react";
 
-import { Alert, Button, Input, Label } from "@/components/admin/ui";
+import { Alert, Button, Input, Label } from "@/components/ui";
 import { createClient } from "@/lib/supabase/client";
 
 export default function ForgotPasswordPage() {

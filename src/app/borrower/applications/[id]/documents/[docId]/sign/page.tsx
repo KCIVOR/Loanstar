@@ -9,7 +9,7 @@ import {
   Button,
   PageHeader,
   Spinner,
-} from "@/components/admin/ui";
+} from "@/components/ui";
 import { SignatureConfirm } from "@/components/SignatureConfirm";
 import type { ChecklistItem } from "@/lib/documents/checklist";
 

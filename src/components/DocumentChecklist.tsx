@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 
-import { Alert, Badge, Button, Card, Spinner } from "@/components/admin/ui";
+import { Alert, Badge, Button, Card, Spinner } from "@/components/ui";
 import { DOCUMENT_BUCKET } from "@/lib/constants";
 import type { ChecklistItem as ApiChecklistItem } from "@/lib/documents/checklist";
 import { createClient } from "@/lib/supabase/client";

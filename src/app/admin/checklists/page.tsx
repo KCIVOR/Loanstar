@@ -12,7 +12,7 @@ import {
   Table,
   Td,
   Th,
-} from "@/components/admin/ui";
+} from "@/components/ui";
 import { STAGES } from "@/lib/constants";
 
 type DocumentType = {

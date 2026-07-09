@@ -12,7 +12,7 @@ import {
   Label,
   PageHeader,
   Spinner,
-} from "@/components/admin/ui";
+} from "@/components/ui";
 import { MODULES } from "@/lib/constants";
 import type { FieldAccess } from "@/lib/permissions/types";
 

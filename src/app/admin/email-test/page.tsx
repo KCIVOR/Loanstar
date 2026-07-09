@@ -9,7 +9,7 @@ import {
   Input,
   Label,
   PageHeader,
-} from "@/components/admin/ui";
+} from "@/components/ui";
 
 export default function EmailTestPage() {
   const [to, setTo] = useState("");

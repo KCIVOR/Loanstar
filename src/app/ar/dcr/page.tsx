@@ -10,7 +10,7 @@ import {
   Label,
   PageHeader,
   Spinner,
-} from "@/components/admin/ui";
+} from "@/components/ui";
 
 type DcrRow = {
   id: string;

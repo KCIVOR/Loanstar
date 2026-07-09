@@ -15,7 +15,7 @@ import {
   Select,
   Spinner,
   Textarea,
-} from "@/components/admin/ui";
+} from "@/components/ui";
 import { formatStatusLabel } from "@/lib/applications/status";
 
 type CommitteeDetail = {

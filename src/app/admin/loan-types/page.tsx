@@ -13,7 +13,7 @@ import {
   Table,
   Td,
   Th,
-} from "@/components/admin/ui";
+} from "@/components/ui";
 import { MIN_PF_RATE } from "@/lib/loan-types/g2";
 
 type LoanType = {

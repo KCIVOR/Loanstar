@@ -9,7 +9,7 @@ import {
   Card,
   PageHeader,
   Spinner,
-} from "@/components/admin/ui";
+} from "@/components/ui";
 import { formatStatusLabel } from "@/lib/applications/status";
 
 type CommitteeItem = {

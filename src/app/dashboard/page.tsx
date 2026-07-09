@@ -2,7 +2,7 @@
 
 import { MODULES } from "@/lib/constants";
 import { usePermissions } from "@/hooks/usePermissions";
-import { Badge, Card, PageHeader, Spinner } from "@/components/admin/ui";
+import { Badge, Card, PageHeader, Spinner } from "@/components/ui";
 
 export default function DashboardPage() {
   const { permissions, loading, error, isSuperAdmin } = usePermissions();

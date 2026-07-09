@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 
-import { Alert, Button, Card } from "@/components/admin/ui";
+import { Alert, Button, Card } from "@/components/ui";
 
 type BriefingItem = {
   key: string;

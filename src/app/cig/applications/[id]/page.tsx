@@ -14,7 +14,7 @@ import {
   Select,
   Spinner,
   Textarea,
-} from "@/components/admin/ui";
+} from "@/components/ui";
 
 type VerificationData = {
   fieldCompletenessOk: boolean | null;

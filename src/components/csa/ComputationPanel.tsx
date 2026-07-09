@@ -9,7 +9,7 @@ import {
   Input,
   Label,
   Select,
-} from "@/components/admin/ui";
+} from "@/components/ui";
 
 type LoanType = {
   id: string;

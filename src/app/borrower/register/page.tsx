@@ -11,7 +11,7 @@ import {
   Input,
   Label,
   PageHeader,
-} from "@/components/admin/ui";
+} from "@/components/ui";
 import { createClient } from "@/lib/supabase/client";
 
 export default function BorrowerRegisterPage() {

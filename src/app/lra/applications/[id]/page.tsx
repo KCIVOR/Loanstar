@@ -14,7 +14,7 @@ import {
   PageHeader,
   Select,
   Spinner,
-} from "@/components/admin/ui";
+} from "@/components/ui";
 import { DocumentChecklist } from "@/components/DocumentChecklist";
 import { formatStatusLabel } from "@/lib/applications/status";
 import { releaseStageForPath, type ReleasePath } from "@/lib/lra/constants";

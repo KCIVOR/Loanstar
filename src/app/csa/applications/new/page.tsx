@@ -11,7 +11,7 @@ import {
   Input,
   Label,
   PageHeader,
-} from "@/components/admin/ui";
+} from "@/components/ui";
 
 export default function CsaNewApplicationPage() {
   const router = useRouter();

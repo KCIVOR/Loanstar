@@ -13,7 +13,7 @@ import {
   PageHeader,
   Select,
   Spinner,
-} from "@/components/admin/ui";
+} from "@/components/ui";
 
 type Lookup = {
   portfolios: Array<{ id: string; name: string }>;

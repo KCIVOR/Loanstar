@@ -10,7 +10,7 @@ import {
   Card,
   PageHeader,
   Spinner,
-} from "@/components/admin/ui";
+} from "@/components/ui";
 import { DocumentChecklist } from "@/components/DocumentChecklist";
 import type { ChecklistItem } from "@/lib/documents/checklist";
 

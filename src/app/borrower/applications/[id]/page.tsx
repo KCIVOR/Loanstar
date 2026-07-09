@@ -14,7 +14,7 @@ import {
   Card,
   PageHeader,
   Spinner,
-} from "@/components/admin/ui";
+} from "@/components/ui";
 import { DocumentChecklist } from "@/components/DocumentChecklist";
 import { StatusTimeline } from "@/components/StatusTimeline";
 import { formatStatusLabel } from "@/lib/applications/status";

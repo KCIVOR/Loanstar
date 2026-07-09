@@ -10,7 +10,7 @@ import {
   Card,
   PageHeader,
   Spinner,
-} from "@/components/admin/ui";
+} from "@/components/ui";
 import { StatusTimeline } from "@/components/StatusTimeline";
 import { formatStatusLabel } from "@/lib/applications/status";
 import type { BorrowerProfile } from "@/lib/borrowers/types";
