@@ -8,6 +8,7 @@ import {
   Alert,
   Button,
   Card,
+  Checkbox,
   Input,
   Label,
   PageHeader,
@@ -304,21 +305,18 @@ export default function RoleDetailPage() {
                     ] as const
                   ).map((key) => (
                     <Td key={key} className="text-center">
-                      {/* Compact matrix cells — full Checkbox label would clutter columns */}
-                      <input
-                        type="checkbox"
+                      <Checkbox
                         aria-label={`${mod.name} ${key}`}
                         checked={state?.[key] ?? false}
-                        onChange={(e) =>
+                        onChange={(checked) =>
                           setPermState((prev) => ({
                             ...prev,
                             [mod.slug]: {
                               ...prev[mod.slug],
-                              [key]: e.target.checked,
+                              [key]: checked,
                             },
                           }))
                         }
-                        className="h-4 w-4 rounded border-neutral-300 accent-gold-400"
                       />
                     </Td>
                   ))}

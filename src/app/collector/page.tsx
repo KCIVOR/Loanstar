@@ -7,6 +7,7 @@ import {
   Badge,
   Button,
   Card,
+  EmptyState,
   PageHeader,
   Spinner,
 } from "@/components/ui";
@@ -152,7 +153,12 @@ export default function CollectorDashboardPage() {
       <Card className="mb-6">
         <h2 className="mb-3 text-lg font-semibold">Assigned accounts</h2>
         {accounts.length === 0 ? (
-          <p className="text-sm text-ink-muted">No accounts assigned yet.</p>
+          <EmptyState
+            title="No accounts assigned"
+            description="Assigned borrower accounts will appear here."
+            showMark={false}
+            className="border-0 bg-transparent px-0 py-6"
+          />
         ) : (
           <ul className="divide-y divide-neutral-100 text-sm">
             {accounts.map((acc) => (
@@ -190,7 +196,12 @@ export default function CollectorDashboardPage() {
       <Card>
         <h2 className="mb-3 text-lg font-semibold">Pending payment proofs</h2>
         {pendingPayments.length === 0 ? (
-          <p className="text-sm text-ink-muted">No pending proofs.</p>
+          <EmptyState
+            title="No pending proofs"
+            description="Payment proofs awaiting review will appear here."
+            showMark={false}
+            className="border-0 bg-transparent px-0 py-6"
+          />
         ) : (
           <ul className="space-y-3">
             {pendingPayments.map((pay) => (

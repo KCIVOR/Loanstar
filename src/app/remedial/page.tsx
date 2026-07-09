@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 
-import { Badge, Card, PageHeader, Spinner } from "@/components/ui";
+import { Badge, Card, EmptyState, PageHeader, Spinner } from "@/components/ui";
 
 type Account = {
   id: string;
@@ -43,9 +43,10 @@ export default function RemedialDashboardPage() {
       />
 
       {accounts.length === 0 ? (
-        <Card>
-          <p className="text-sm text-ink-muted">No remedial accounts assigned.</p>
-        </Card>
+        <EmptyState
+          title="No remedial accounts"
+          description="No accounts assigned for remedial follow-up."
+        />
       ) : (
         <div className="space-y-3">
           {accounts.map((acc) => (

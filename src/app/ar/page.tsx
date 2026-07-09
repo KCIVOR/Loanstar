@@ -8,6 +8,7 @@ import {
   Badge,
   Button,
   Card,
+  EmptyState,
   PageHeader,
   Spinner,
 } from "@/components/ui";
@@ -120,9 +121,10 @@ export default function ArDashboardPage() {
       ) : null}
 
       {masterlist.length === 0 ? (
-        <Card>
-          <p className="text-sm text-ink-muted">No masterlist records yet.</p>
-        </Card>
+        <EmptyState
+          title="No masterlist records"
+          description="Closed files will appear here after release processing."
+        />
       ) : (
         <div className="space-y-3">
           {masterlist.map((row) => (

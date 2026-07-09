@@ -6,8 +6,8 @@ import {
   Alert,
   Button,
   Card,
+  EmptyState,
   Input,
-  Label,
   PageHeader,
   Spinner,
 } from "@/components/ui";
@@ -84,9 +84,10 @@ export default function ArDcrPage() {
       ) : null}
 
       {queue.length === 0 ? (
-        <Card>
-          <p className="text-sm text-ink-muted">No DCRs awaiting reconciliation.</p>
-        </Card>
+        <EmptyState
+          title="No DCRs pending"
+          description="No DCRs awaiting reconciliation."
+        />
       ) : (
         <div className="space-y-4">
           {queue.map((dcr) => (

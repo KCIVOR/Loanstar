@@ -8,6 +8,7 @@ import {
   Badge,
   Button,
   Card,
+  EmptyState,
   PageHeader,
   Spinner,
 } from "@/components/ui";
@@ -68,9 +69,10 @@ export default function LraDashboardPage() {
       ) : null}
 
       {queue.length === 0 ? (
-        <Card>
-          <p className="text-sm text-ink-muted">No files pending LRA processing.</p>
-        </Card>
+        <EmptyState
+          title="Queue is clear"
+          description="No files pending LRA processing."
+        />
       ) : (
         <div className="space-y-3">
           {queue.map((item) => (

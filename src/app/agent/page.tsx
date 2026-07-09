@@ -8,6 +8,7 @@ import {
   Badge,
   Button,
   Card,
+  EmptyState,
   PageHeader,
   Spinner,
   Table,
@@ -68,42 +69,51 @@ export default function AgentLeadsPage() {
         </div>
       ) : null}
 
-      <Card>
-        <Table>
-          <thead>
-            <tr>
-              <Th>Borrower</Th>
-              <Th>Business</Th>
-              <Th>Status</Th>
-              <Th>Created</Th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-neutral-200">
-            {leads.map((lead) => (
-              <tr key={lead.id}>
-                <Td>
-                  <Link
-                    href={`/agent/leads/${lead.id}`}
-                    className="font-medium text-ink hover:underline"
-                  >
-                    {lead.borrowerName}
-                  </Link>
-                </Td>
-                <Td>{lead.businessName ?? "—"}</Td>
-                <Td>
-                  <Badge variant="neutral">{lead.status}</Badge>
-                </Td>
-                <Td className="font-mono text-xs text-ink-faint">
-                  {new Date(lead.createdAt).toLocaleDateString()}
-                </Td>
+      {leads.length === 0 ? (
+        <EmptyState
+          title="No leads yet"
+          description="Create a lead to start tracking a borrower."
+          action={
+            <Link href="/agent/leads/new">
+              <Button>New lead</Button>
+            </Link>
+          }
+        />
+      ) : (
+        <Card>
+          <Table>
+            <thead>
+              <tr>
+                <Th>Borrower</Th>
+                <Th>Business</Th>
+                <Th>Status</Th>
+                <Th>Created</Th>
               </tr>
-            ))}
-          </tbody>
-        </Table>
-        {leads.length === 0 ? (
-          <p className="py-6 text-center text-sm text-ink-muted">No leads yet.</p>
-        ) : null}
-      </Card>
+            </thead>
+            <tbody className="divide-y divide-neutral-200">
+              {leads.map((lead) => (
+                <tr key={lead.id}>
+                  <Td>
+                    <Link
+                      href={`/agent/leads/${lead.id}`}
+                      className="font-medium text-ink hover:underline"
+                    >
+                      {lead.borrowerName}
+                    </Link>
+                  </Td>
+                  <Td>{lead.businessName ?? "—"}</Td>
+                  <Td>
+                    <Badge variant="neutral">{lead.status}</Badge>
+                  </Td>
+                  <Td className="font-mono text-xs text-ink-faint">
+                    {new Date(lead.createdAt).toLocaleDateString()}
+                  </Td>
+                </tr>
+              ))}
+            </tbody>
+          </Table>
+        </Card>
+      )}
     </div>
   );
 }

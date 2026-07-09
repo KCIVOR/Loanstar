@@ -8,6 +8,7 @@ import {
   Badge,
   Button,
   Card,
+  EmptyState,
   PageHeader,
   Spinner,
 } from "@/components/ui";
@@ -73,9 +74,15 @@ export default function CsaDashboardPage() {
       ) : null}
 
       {applications.length === 0 ? (
-        <Card>
-          <p className="text-sm text-ink-muted">No applications in the intake queue.</p>
-        </Card>
+        <EmptyState
+          title="Queue is clear"
+          description="No applications in the intake queue."
+          action={
+            <Link href="/csa/applications/new">
+              <Button>New application</Button>
+            </Link>
+          }
+        />
       ) : (
         <div className="space-y-3">
           {applications.map((app) => (
