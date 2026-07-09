@@ -1,145 +1,173 @@
 @import "tailwindcss";
 
-/* LoanStar brand fonts — "Deep Harbor" theme.
-   Albert Sans: headings + body. JetBrains Mono: amounts, loan IDs, OTP digits
-   (substitutes the source mockups' "SF Mono", which has no distributable web font). */
-@font-face {
-  font-family: "Albert Sans";
-  font-style: normal;
-  font-weight: 300 800;
-  font-display: swap;
-  src: url(https://fonts.gstatic.com/s/albertsans/v4/i7dOIFdwYjGaAMFtZd_QA1ZbYFeQGQyU.woff2)
-    format("woff2");
-}
-
-@font-face {
-  font-family: "JetBrains Mono";
-  font-style: normal;
-  font-weight: 400 700;
-  font-display: swap;
-  src: url(https://fonts.gstatic.com/s/jetbrainsmono/v18/tDbY2o-flEEny0FZhsfKu5WU4zr3E_BX0PnT8RD8yKxfSJk.woff2)
-    format("woff2");
-}
-
 :root {
-  /* Primary — navy, trust, authority, interactive */
-  --color-primary-50: #f3f5fa;
-  --color-primary-100: #e8edf7;
-  --color-primary-200: #c9d6ee;
-  --color-primary-300: #9fb0d8;
-  --color-primary-400: #7c97d8;
-  --color-primary-500: #4c6fc0;
-  --color-primary-600: #2f55b4; /* main interactive navy-blue — buttons, links, active states */
-  --color-primary-700: #22407f; /* hover */
-  --color-primary-800: #16233f;
-  --color-primary-900: #0e1e4b; /* deep navy — headers, hero KPI bands, sidebar */
+  /* Deep Harbor — navy surfaces */
+  --color-navy-950: #071230;
+  --color-navy-900: #0a1b3d;
+  --color-navy-800: #0e2149;
+  --color-navy-700: #152c5c;
+  --color-navy-border: #1b2e58;
+  --color-navy-muted: #9fb0d1;
+  --color-navy-subtle: #7c8cb0;
 
-  /* Brand accents — NOT semantic colors, reserved for brand identity moments */
-  --color-gold: #f2b705; /* star mark, active-nav indicator, KPI emphasis */
-  --color-gold-dark: #c89400; /* hover/pressed gold */
-  --color-brand-red: #e4574a; /* wordmark/logo ONLY — kept distinct from semantic danger */
+  --color-cream: #f4f1e8;
+  --color-gold-tint: rgba(217, 168, 85, 0.14);
 
-  /* Neutral — navy-tinted scaffolding */
+  /* Deep Harbor — gold accent (primary actions + KPI numbers only) */
+  --color-gold-300: #e8c078;
+  --color-gold-400: #d9a855;
+  --color-gold-600: #b3822f;
+
+  /* Deep Harbor — ink (warm neutral text on white) */
+  --color-ink: #0f2148;
+  --color-ink-muted: #5b6478;
+  --color-ink-faint: #8087a0;
+
+  /* Semantic — muted for UI scale */
+  --color-success: #4e9f6e;
+  --color-success-ink: #2f7a4e;
+  --color-success-50: rgba(78, 159, 110, 0.08);
+  --color-success-100: rgba(78, 159, 110, 0.14);
+  --color-success-600: #4e9f6e;
+  --color-success-700: #2f7a4e;
+
+  --color-danger: #d9695b;
+  --color-danger-ink: #c4453a;
+  --color-danger-50: rgba(217, 105, 91, 0.08);
+  --color-danger-100: rgba(217, 105, 91, 0.14);
+  --color-danger-600: #d9695b;
+  --color-danger-700: #c4453a;
+
+  --color-warning: #d6a23b;
+  --color-warning-ink: #9c7422;
+  --color-warning-50: rgba(214, 162, 59, 0.1);
+  --color-warning-100: rgba(214, 162, 59, 0.16);
+  --color-warning-600: #d6a23b;
+  --color-warning-700: #9c7422;
+
+  --color-info: #5b8fd9;
+  --color-info-ink: #3567ad;
+  --color-info-50: rgba(91, 143, 217, 0.08);
+  --color-info-100: rgba(91, 143, 217, 0.14);
+  --color-info-600: #5b8fd9;
+  --color-info-700: #3567ad;
+
+  /* Legacy aliases — map to Deep Harbor during rollout */
+  --color-primary-50: #fffdf6;
+  --color-primary-100: rgba(217, 168, 85, 0.1);
+  --color-primary-200: rgba(217, 168, 85, 0.2);
+  --color-primary-300: var(--color-gold-300);
+  --color-primary-400: var(--color-gold-400);
+  --color-primary-500: var(--color-gold-400);
+  --color-primary-600: var(--color-gold-600);
+  --color-primary-700: #8f6a26;
+  --color-primary-800: var(--color-navy-800);
+  --color-primary-900: var(--color-navy-900);
+
+  --color-gold: var(--color-gold-400);
+  --color-gold-dark: var(--color-gold-600);
+  --color-brand-red: #e4574a;
+
   --color-neutral-0: #ffffff;
-  --color-neutral-50: #f3f5fa;
-  --color-neutral-100: #e8edf7;
-  --color-neutral-200: #dfe5f0;
-  --color-neutral-300: #c3ccde;
-  --color-neutral-400: #8b99bc;
-  --color-neutral-500: #64708c;
-  --color-neutral-600: #4f5a78;
-  --color-neutral-700: #3d4a68;
-  --color-neutral-800: #232f4c;
-  --color-neutral-900: #16233f;
+  --color-neutral-50: #f7f8fb;
+  --color-neutral-100: #eef0f5;
+  --color-neutral-200: #e7e9f0;
+  --color-neutral-300: #d7dbe6;
+  --color-neutral-400: #aeb4c4;
+  --color-neutral-500: var(--color-ink-faint);
+  --color-neutral-600: var(--color-ink-muted);
+  --color-neutral-700: #3f4863;
+  --color-neutral-800: var(--color-ink);
+  --color-neutral-900: var(--color-ink);
 
-  /* Semantic */
-  --color-success-50: #eaf7e9;
-  --color-success-100: #d3efd1;
-  --color-success-200: #a6dfa3;
-  --color-success-600: #3e8e3c;
-  --color-success-700: #2f6e2d;
-  --color-success-text-strong: #1f4e1d;
+  /* Role accent colors — nav identity pills (secondary to gold) */
+  --color-role-csa: var(--color-navy-muted);
+  --color-role-cig: var(--color-navy-muted);
+  --color-role-committee: var(--color-navy-muted);
+  --color-role-lra: var(--color-navy-muted);
+  --color-role-ar: var(--color-navy-muted);
+  --color-role-collector: var(--color-navy-muted);
+  --color-role-remedial: var(--color-navy-muted);
+  --color-role-agent: var(--color-navy-muted);
+  --color-role-borrower: var(--color-navy-muted);
 
-  --color-warning-50: #fffbeb;
-  --color-warning-100: #fef3c7;
-  --color-warning-200: #fde68a;
-  --color-warning-600: #d97706;
-  --color-warning-700: #b45309;
-  --color-warning-text-strong: #92400e;
-
-  --color-danger-50: #fcebe9;
-  --color-danger-100: #f8d3ce;
-  --color-danger-200: #f0a99f;
-  --color-danger-600: #c24638;
-  --color-danger-700: #9e372b;
-  --color-danger-text-strong: #7a2a20;
-
-  --color-info-50: #f0f9ff;
-  --color-info-100: #e0f2fe;
-  --color-info-200: #bae6fd;
-  --color-info-600: #0ea5e9;
-  --color-info-700: #0369a1;
-  --color-info-text-strong: #0c4a6e;
-
-  /* Role accent colors — used for staff portal nav identity per workflow module */
-  --color-role-csa: #1e3a8a;
-  --color-role-cig: #312e81;
-  --color-role-committee: #4c1d95;
-  --color-role-lra: #064e3b;
-  --color-role-ar: #0b3d5c;
-  --color-role-collector: #164e63;
-  --color-role-remedial: #7f1d1d;
-  --color-role-agent: #78350f;
-  --color-role-borrower: #2f55b4;
-
-  /* Semantic aliases */
   --surface-page: var(--color-neutral-50);
   --surface-card: var(--color-neutral-0);
   --surface-sunken: var(--color-neutral-100);
   --border-default: var(--color-neutral-200);
   --border-strong: var(--color-neutral-300);
-  --text-heading: var(--color-neutral-900);
-  --text-body: var(--color-neutral-600);
-  --text-muted: var(--color-neutral-400);
-  --text-label: var(--color-neutral-700);
-  --link-color: var(--color-primary-600);
-  --link-hover-color: var(--color-primary-700);
+  --text-heading: var(--color-ink);
+  --text-body: var(--color-ink-muted);
+  --text-muted: var(--color-ink-faint);
+  --text-label: var(--color-ink-muted);
+  --link-color: var(--color-gold-600);
+  --link-hover-color: #8f6a26;
 
-  /* Fonts */
-  --font-heading: "Albert Sans", system-ui, sans-serif;
-  --font-body: "Albert Sans", system-ui, sans-serif;
-  --font-mono: "JetBrains Mono", ui-monospace, "SF Mono", monospace;
+  /* Fonts — --font-display, --font-sans, --font-mono set by next/font on <html> */
 
-  /* Spacing — 4px base grid */
-  --space-1: 4px;
-  --space-2: 8px;
-  --space-3: 12px;
-  --space-4: 16px;
-  --space-5: 20px;
-  --space-6: 24px;
-  --space-8: 32px;
-  --space-10: 40px;
-  --space-12: 48px;
-  --space-16: 64px;
+  --radius-xs: 4px;
+  --radius-sm: 6px;
+  --radius-md: 12px;
+  --radius-lg: 20px;
+  --radius-full: 9999px;
 
-  /* Radius */
-  --radius-xs: 4px; /* badges, tooltips */
-  --radius-sm: 6px; /* buttons, inputs, chips */
-  --radius-md: 12px; /* cards, panels, modals */
-  --radius-lg: 20px; /* feature cards, hero-to-tray transitions */
-  --radius-full: 9999px; /* pills, avatars, toggles */
-
-  /* Shadow */
-  --shadow-xs: 0 1px 2px rgba(15, 23, 42, 0.06);
-  --shadow-sm: 0 1px 3px rgba(15, 23, 42, 0.08);
-  --shadow-md: 0 4px 8px rgba(15, 23, 42, 0.07);
-  --shadow-lg: 0 12px 24px rgba(15, 23, 42, 0.08);
+  --shadow-xs: 0 1px 2px rgba(15, 33, 72, 0.06);
+  --shadow-sm: 0 1px 3px rgba(15, 33, 72, 0.08);
+  --shadow-md: 0 4px 8px rgba(15, 33, 72, 0.07);
+  --shadow-lg: 0 12px 24px rgba(15, 33, 72, 0.08);
 
   --background: var(--surface-page);
   --foreground: var(--text-heading);
 }
 
 @theme inline {
+  --color-navy-950: var(--color-navy-950);
+  --color-navy-900: var(--color-navy-900);
+  --color-navy-800: var(--color-navy-800);
+  --color-navy-700: var(--color-navy-700);
+  --color-navy-border: var(--color-navy-border);
+  --color-navy-muted: var(--color-navy-muted);
+  --color-navy-subtle: var(--color-navy-subtle);
+
+  --color-cream: var(--color-cream);
+  --color-gold-tint: var(--color-gold-tint);
+
+  --color-gold-300: var(--color-gold-300);
+  --color-gold-400: var(--color-gold-400);
+  --color-gold-600: var(--color-gold-600);
+
+  --color-ink: var(--color-ink);
+  --color-ink-muted: var(--color-ink-muted);
+  --color-ink-faint: var(--color-ink-faint);
+
+  --color-success: var(--color-success);
+  --color-success-ink: var(--color-success-ink);
+  --color-success-50: var(--color-success-50);
+  --color-success-100: var(--color-success-100);
+  --color-success-600: var(--color-success-600);
+  --color-success-700: var(--color-success-700);
+
+  --color-danger: var(--color-danger);
+  --color-danger-ink: var(--color-danger-ink);
+  --color-danger-50: var(--color-danger-50);
+  --color-danger-100: var(--color-danger-100);
+  --color-danger-600: var(--color-danger-600);
+  --color-danger-700: var(--color-danger-700);
+
+  --color-warning: var(--color-warning);
+  --color-warning-ink: var(--color-warning-ink);
+  --color-warning-50: var(--color-warning-50);
+  --color-warning-100: var(--color-warning-100);
+  --color-warning-600: var(--color-warning-600);
+  --color-warning-700: var(--color-warning-700);
+
+  --color-info: var(--color-info);
+  --color-info-ink: var(--color-info-ink);
+  --color-info-50: var(--color-info-50);
+  --color-info-100: var(--color-info-100);
+  --color-info-600: var(--color-info-600);
+  --color-info-700: var(--color-info-700);
+
   --color-primary-50: var(--color-primary-50);
   --color-primary-100: var(--color-primary-100);
   --color-primary-200: var(--color-primary-200);
@@ -167,30 +195,6 @@
   --color-neutral-800: var(--color-neutral-800);
   --color-neutral-900: var(--color-neutral-900);
 
-  --color-success-50: var(--color-success-50);
-  --color-success-100: var(--color-success-100);
-  --color-success-200: var(--color-success-200);
-  --color-success-600: var(--color-success-600);
-  --color-success-700: var(--color-success-700);
-
-  --color-warning-50: var(--color-warning-50);
-  --color-warning-100: var(--color-warning-100);
-  --color-warning-200: var(--color-warning-200);
-  --color-warning-600: var(--color-warning-600);
-  --color-warning-700: var(--color-warning-700);
-
-  --color-danger-50: var(--color-danger-50);
-  --color-danger-100: var(--color-danger-100);
-  --color-danger-200: var(--color-danger-200);
-  --color-danger-600: var(--color-danger-600);
-  --color-danger-700: var(--color-danger-700);
-
-  --color-info-50: var(--color-info-50);
-  --color-info-100: var(--color-info-100);
-  --color-info-200: var(--color-info-200);
-  --color-info-600: var(--color-info-600);
-  --color-info-700: var(--color-info-700);
-
   --color-role-csa: var(--color-role-csa);
   --color-role-cig: var(--color-role-cig);
   --color-role-committee: var(--color-role-committee);
@@ -204,10 +208,9 @@
   --color-background: var(--background);
   --color-foreground: var(--foreground);
 
-  --font-heading: var(--font-heading);
-  --font-body: var(--font-body);
+  --font-display: var(--font-display);
+  --font-sans: var(--font-sans);
   --font-mono: var(--font-mono);
-  --font-sans: var(--font-body);
 
   --radius-xs: var(--radius-xs);
   --radius-sm: var(--radius-sm);
@@ -224,10 +227,19 @@
 body {
   background: var(--surface-page);
   color: var(--text-heading);
-  font-family: var(--font-body);
+  font-family: var(--font-sans), "Albert Sans", system-ui, sans-serif;
 }
 
 ::selection {
-  background: var(--color-primary-100);
-  color: var(--color-primary-800);
+  background: rgba(217, 168, 85, 0.2);
+  color: var(--color-ink);
+}
+
+@utility scrollbar-hide {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+
+  &::-webkit-scrollbar {
+    display: none;
+  }
 }
