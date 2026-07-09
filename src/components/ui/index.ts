@@ -10,3 +10,8 @@ export { KpiCard } from "./KpiCard";
 export { PageHeader } from "./PageHeader";
 export { Badge, StatusBadge } from "./Badge";
 export { Alert } from "./Alert";
+export { Modal } from "./Modal";
+export { ConfirmDialog } from "./ConfirmDialog";
+export { Spinner } from "./Spinner";
+export { Table, Th, Td } from "./Table";
+export { SegmentedControl } from "./SegmentedControl";
