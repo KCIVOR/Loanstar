@@ -14,9 +14,9 @@ const variants = {
 } as const;
 
 const sizes = {
-  sm: "h-8 rounded-md px-3.5 text-xs",
+  sm: "h-8 rounded-sm px-3.5 text-xs",
   md: "h-10 rounded-lg px-5 text-sm",
-  lg: "h-12 rounded-lg px-7 text-[15px]",
+  lg: "h-12 rounded-[10px] px-7 text-[15px]",
 } as const;
 
 export type ButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & {
