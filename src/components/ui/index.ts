@@ -30,3 +30,8 @@ export { Avatar } from "./Avatar";
 export { Tooltip } from "./Tooltip";
 export { DropdownMenu } from "./DropdownMenu";
 export type { DropdownMenuItem } from "./DropdownMenu";
+export { FileDropzone, DocumentRow } from "./FileUpload";
+export { Accordion } from "./Accordion";
+export type { AccordionItem } from "./Accordion";
+export { Stepper } from "./Stepper";
+export type { StepperStep } from "./Stepper";
