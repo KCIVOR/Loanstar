@@ -365,6 +365,7 @@
       <a href="#progress" class="dh-nav-item" style="display:block;padding:8px 12px;border-radius:8px;font-size:12.5px;font-weight:600;color:#9FB0D1;text-decoration:none">Progress</a>
       <a href="#toast" class="dh-nav-item" style="display:block;padding:8px 12px;border-radius:8px;font-size:12.5px;font-weight:600;color:#9FB0D1;text-decoration:none">Toasts &amp; menus</a>
       <a href="#accordion" class="dh-nav-item" style="display:block;padding:8px 12px;border-radius:8px;font-size:12.5px;font-weight:600;color:#9FB0D1;text-decoration:none">Accordion &amp; empty state</a>
+      <a href="#queue-list" class="dh-nav-item" style="display:block;padding:8px 12px;border-radius:8px;font-size:12.5px;font-weight:600;color:#9FB0D1;text-decoration:none">Queue list item</a>
     </div>
     <div style="margin-top:24px;padding:14px 14px;background:#0E2149;border:1px solid #1B2E58;border-radius:10px;font-size:11px;line-height:1.6;color:#7C8CB0">Built from the SEC-registered navy/gold mark. Gold is reserved for primary actions and key numbers — never decorative.</div>
   </div>
@@ -411,12 +412,21 @@
       </div>
 
       <div style="font-size:11.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#8087A0;margin-bottom:10px">Semantic</div>
-      <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:12px">
+      <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin-bottom:26px">
         <div><div style="height:70px;border-radius:10px;background:#4E9F6E"></div><div style="font-size:12px;font-weight:600;color:#1B2440;margin-top:7px">Success</div><div style="font-size:11px;color:#8087A0;font-family:'IBM Plex Mono',monospace">#4E9F6E</div></div>
         <div><div style="height:70px;border-radius:10px;background:#D9695B"></div><div style="font-size:12px;font-weight:600;color:#1B2440;margin-top:7px">Danger</div><div style="font-size:11px;color:#8087A0;font-family:'IBM Plex Mono',monospace">#D9695B</div></div>
         <div><div style="height:70px;border-radius:10px;background:#D6A23B"></div><div style="font-size:12px;font-weight:600;color:#1B2440;margin-top:7px">Warning</div><div style="font-size:11px;color:#8087A0;font-family:'IBM Plex Mono',monospace">#D6A23B</div></div>
         <div><div style="height:70px;border-radius:10px;background:#5B8FD9"></div><div style="font-size:12px;font-weight:600;color:#1B2440;margin-top:7px">Info</div><div style="font-size:11px;color:#8087A0;font-family:'IBM Plex Mono',monospace">#5B8FD9</div></div>
         <div><div style="height:70px;border-radius:10px;background:#3A4A72"></div><div style="font-size:12px;font-weight:600;color:#1B2440;margin-top:7px">Neutral</div><div style="font-size:11px;color:#8087A0;font-family:'IBM Plex Mono',monospace">#3A4A72</div></div>
+      </div>
+
+      <div style="font-size:11.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#8087A0;margin-bottom:10px">Surfaces &amp; fields</div>
+      <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:12px">
+        <div><div style="height:70px;border-radius:10px;background:#FBFBFD;border:1px solid #E7E9F0"></div><div style="font-size:12px;font-weight:600;color:#1B2440;margin-top:7px">Field bg</div><div style="font-size:11px;color:#8087A0;font-family:'IBM Plex Mono',monospace">#FBFBFD · --color-field-bg</div></div>
+        <div><div style="height:70px;border-radius:10px;background:#F7F8FB;border:1px solid #E7E9F0"></div><div style="font-size:12px;font-weight:600;color:#1B2440;margin-top:7px">Page</div><div style="font-size:11px;color:#8087A0;font-family:'IBM Plex Mono',monospace">#F7F8FB · neutral-50</div></div>
+        <div><div style="height:70px;border-radius:10px;background:#FFFFFF;border:1px solid #E7E9F0"></div><div style="font-size:12px;font-weight:600;color:#1B2440;margin-top:7px">Card</div><div style="font-size:11px;color:#8087A0;font-family:'IBM Plex Mono',monospace">#FFFFFF · neutral-0</div></div>
+        <div><div style="height:70px;border-radius:10px;background:#EEF0F5;border:1px solid #E7E9F0"></div><div style="font-size:12px;font-weight:600;color:#1B2440;margin-top:7px">Sunken</div><div style="font-size:11px;color:#8087A0;font-family:'IBM Plex Mono',monospace">#EEF0F5 · neutral-100</div></div>
+        <div><div style="height:70px;border-radius:10px;background:#E7E9F0;border:1px solid #D7DBE6"></div><div style="font-size:12px;font-weight:600;color:#1B2440;margin-top:7px">Border</div><div style="font-size:11px;color:#8087A0;font-family:'IBM Plex Mono',monospace">#E7E9F0 · neutral-200</div></div>
       </div>
     </section>
 
@@ -461,7 +471,8 @@
     <!-- ============ INPUTS ============ -->
     <section id="inputs" style="padding:40px 56px;border-bottom:1px solid #E7E9F0">
       <div style="font-size:11px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:#B3822F;margin-bottom:6px">02 · Components</div>
-      <div style="font-family:'Newsreader',serif;font-size:24px;color:#0F2148;margin-bottom:18px">Text fields</div>
+      <div style="font-family:'Newsreader',serif;font-size:24px;color:#0F2148;margin-bottom:10px">Text fields</div>
+      <div style="font-size:12.5px;color:#5B6478;margin-bottom:18px;max-width:640px">Resting fill uses <code style="font-family:'IBM Plex Mono',monospace;font-size:12px">bg-field-bg</code> (<code style="font-family:'IBM Plex Mono',monospace;font-size:12px">--color-field-bg</code> / #FBFBFD); focus switches to white.</div>
       <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:18px;max-width:900px">
         <div>
           <div style="font-size:12px;font-weight:600;color:#3F4863;margin-bottom:6px">Default</div>
@@ -513,6 +524,10 @@
             <label style="display:flex;align-items:center;gap:9px;font-size:12.5px;color:#0F2148"><span style="width:16px;height:16px;border-radius:4px;background:#D9A855;color:#0A1B3D;font-size:11px;display:inline-flex;align-items:center;justify-content:center;font-weight:700">✓</span>View</label>
             <label style="display:flex;align-items:center;gap:9px;font-size:12.5px;color:#0F2148"><span style="width:16px;height:16px;border-radius:4px;background:#D9A855;color:#0A1B3D;font-size:11px;display:inline-flex;align-items:center;justify-content:center;font-weight:700">✓</span>Edit</label>
             <label style="display:flex;align-items:center;gap:9px;font-size:12.5px;color:#8087A0"><span style="width:16px;height:16px;border-radius:4px;border:1.5px solid #D7DBE6"></span>Delete</label>
+          </div>
+          <div style="margin-top:14px;font-size:11px;color:#8087A0;line-height:1.5">Compact / table cells: omit <code style="font-family:'IBM Plex Mono',monospace;font-size:10.5px">label</code> and pass <code style="font-family:'IBM Plex Mono',monospace;font-size:10.5px">aria-label</code> instead.</div>
+          <div style="margin-top:8px;display:inline-flex;align-items:center;justify-content:center;padding:6px 10px;border:1px solid #E7E9F0;border-radius:8px;background:#FFFFFF" title="aria-label only">
+            <span style="width:16px;height:16px;border-radius:4px;background:#D9A855;color:#0A1B3D;font-size:11px;display:inline-flex;align-items:center;justify-content:center;font-weight:700">✓</span>
           </div>
         </div>
 
@@ -1097,6 +1112,37 @@
         <div style="font-size:14.5px;font-weight:700;color:#0F2148">No leads yet</div>
         <div style="font-size:12.5px;color:#8087A0;margin-top:5px;max-width:320px;margin-left:auto;margin-right:auto;line-height:1.5">Once you add a borrower lead, it'll show up here with its checklist status.</div>
         <span style="display:inline-block;margin-top:16px;background:linear-gradient(155deg,#E8C078,#D9A855);color:#0A1B3D;font-size:12.5px;font-weight:700;padding:9px 18px;border-radius:8px">+ New lead</span>
+      </div>
+      <div style="margin-top:10px;font-size:11px;color:#8087A0;font-family:'IBM Plex Mono',monospace">bg-field-bg · --color-field-bg</div>
+    </section>
+
+    <!-- ============ QUEUE LIST ITEM ============ -->
+    <section id="queue-list" style="padding:40px 56px 60px">
+      <div style="font-size:11px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:#B3822F;margin-bottom:6px">05 · More components</div>
+      <div style="font-family:'Newsreader',serif;font-size:24px;color:#0F2148;margin-bottom:10px">QueueListItem</div>
+      <div style="font-size:13px;color:#5B6478;margin-bottom:18px;max-width:640px;line-height:1.55">Shared card row for CSA / CIG / LRA / committee / AR queues. Props: <code style="font-family:'IBM Plex Mono',monospace;font-size:12px">href</code>, <code style="font-family:'IBM Plex Mono',monospace;font-size:12px">title</code>, optional <code style="font-family:'IBM Plex Mono',monospace;font-size:12px">subtitle</code>, <code style="font-family:'IBM Plex Mono',monospace;font-size:12px">meta</code>, <code style="font-family:'IBM Plex Mono',monospace;font-size:12px">trailing</code>.</div>
+
+      <div style="display:flex;flex-direction:column;gap:12px;max-width:720px">
+        <div style="border:1px solid #E7E9F0;border-radius:12px;padding:24px;background:#FFFFFF;box-shadow:0 1px 3px rgba(15,33,72,.08);display:flex;flex-wrap:wrap;align-items:flex-start;justify-content:space-between;gap:12px">
+          <div>
+            <div style="font-size:14px;font-weight:600;color:#0F2148">Maria Santos <span style="margin-left:8px;font-family:'IBM Plex Mono',monospace;font-size:12.5px;font-weight:400;color:#5B6478">BRW-1042</span></div>
+            <div style="margin-top:4px;display:flex;flex-wrap:wrap;align-items:center;gap:6px;font-size:13px;color:#5B6478">
+              <span style="display:inline-block;padding:2px 8px;border-radius:999px;background:#EEF0F5;color:#3F4863;font-size:11px;font-weight:700">Intake</span>
+              <span>· Reloan</span>
+            </div>
+          </div>
+          <span style="display:inline-block;border:1px solid #D7DBE6;background:#FFFFFF;color:#0F2148;font-size:12.5px;font-weight:700;padding:8px 14px;border-radius:8px">Open</span>
+        </div>
+        <div style="border:1px solid #E7E9F0;border-radius:12px;padding:24px;background:#FFFFFF;box-shadow:0 1px 3px rgba(15,33,72,.08);display:flex;flex-wrap:wrap;align-items:flex-start;justify-content:space-between;gap:12px">
+          <div>
+            <div style="font-size:14px;font-weight:600;color:#0F2148">Juan Dela Cruz <span style="margin-left:8px;font-family:'IBM Plex Mono',monospace;font-size:12.5px;font-weight:400;color:#5B6478">BRW-0988</span></div>
+            <div style="margin-top:4px;display:flex;flex-wrap:wrap;align-items:center;gap:6px;font-size:13px;color:#5B6478">
+              <span style="display:inline-block;padding:2px 8px;border-radius:999px;background:#EEF0F5;color:#3F4863;font-size:11px;font-weight:700">Verification</span>
+              <span>· Endorsed <span style="font-family:'IBM Plex Mono',monospace;font-size:12px">7/9/2026, 2:14 PM</span></span>
+            </div>
+          </div>
+          <span style="display:inline-block;border:1px solid #D7DBE6;background:#FFFFFF;color:#0F2148;font-size:12.5px;font-weight:700;padding:8px 14px;border-radius:8px">Verify</span>
+        </div>
       </div>
     </section>
 

@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 
 import {
@@ -10,6 +9,7 @@ import {
   Card,
   EmptyState,
   PageHeader,
+  QueueListItem,
   Spinner,
 } from "@/components/ui";
 
@@ -128,37 +128,30 @@ export default function ArDashboardPage() {
       ) : (
         <div className="space-y-3">
           {masterlist.map((row) => (
-            <Card key={row.id}>
-              <div className="flex flex-wrap items-start justify-between gap-3">
-                <div>
-                  <p className="font-medium text-ink">
-                    {row.borrower_name}
-                    <span className="ml-2 font-mono text-sm font-normal text-ink-muted">
-                      {row.borrower_no}
-                    </span>
-                  </p>
-                  <p className="flex flex-wrap items-center gap-1.5 text-sm text-ink-muted">
-                    <span className="font-mono">{row.loan_account_no ?? "—"}</span>
-                    {" · Balance "}
-                    <span className="font-mono">
-                      {Number(row.outstanding_balance).toLocaleString("en-PH", {
-                        minimumFractionDigits: 2,
-                      })}
-                    </span>
-                    {" · "}
-                    <Badge variant={agingBucketVariant(row.aging_bucket)}>
-                      {row.aging_bucket}
-                    </Badge>
-                    <Badge variant={accountStatusVariant(row.account_status)}>
-                      {row.account_status}
-                    </Badge>
-                  </p>
-                </div>
-                <Link href={`/ar/masterlist/${row.id}`}>
-                  <Button variant="secondary">Open</Button>
-                </Link>
-              </div>
-            </Card>
+            <QueueListItem
+              key={row.id}
+              href={`/ar/masterlist/${row.id}`}
+              title={row.borrower_name}
+              subtitle={row.borrower_no}
+              meta={
+                <>
+                  <span className="font-mono">{row.loan_account_no ?? "—"}</span>
+                  {" · Balance "}
+                  <span className="font-mono">
+                    {Number(row.outstanding_balance).toLocaleString("en-PH", {
+                      minimumFractionDigits: 2,
+                    })}
+                  </span>
+                  {" · "}
+                  <Badge variant={agingBucketVariant(row.aging_bucket)}>
+                    {row.aging_bucket}
+                  </Badge>
+                  <Badge variant={accountStatusVariant(row.account_status)}>
+                    {row.account_status}
+                  </Badge>
+                </>
+              }
+            />
           ))}
         </div>
       )}

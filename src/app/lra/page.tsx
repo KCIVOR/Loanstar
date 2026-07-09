@@ -1,15 +1,13 @@
 "use client";
 
-import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 
 import {
   Alert,
   Badge,
-  Button,
-  Card,
   EmptyState,
   PageHeader,
+  QueueListItem,
   Spinner,
 } from "@/components/ui";
 import { formatStatusLabel } from "@/lib/applications/status";
@@ -76,39 +74,32 @@ export default function LraDashboardPage() {
       ) : (
         <div className="space-y-3">
           {queue.map((item) => (
-            <Card key={item.applicationId}>
-              <div className="flex flex-wrap items-start justify-between gap-3">
-                <div>
-                  <p className="font-medium text-ink">
-                    {item.borrower
-                      ? `${item.borrower.firstName} ${item.borrower.lastName}`
-                      : "Unknown"}
-                    {item.borrower ? (
-                      <span className="ml-2 font-mono text-sm font-normal text-ink-muted">
-                        {item.borrower.borrowerNo}
-                      </span>
-                    ) : null}
-                  </p>
-                  <p className="flex flex-wrap items-center gap-1.5 text-sm text-ink-muted">
-                    {item.application ? (
-                      <Badge variant="neutral">
-                        {formatStatusLabel(item.application.status)}
-                      </Badge>
-                    ) : null}
-                    {item.application?.blocker
-                      ? `· ${item.application.blocker}`
-                      : ""}
-                    {" · Queued "}
-                    <span className="font-mono">
-                      {new Date(item.queuedAt).toLocaleString()}
-                    </span>
-                  </p>
-                </div>
-                <Link href={`/lra/applications/${item.applicationId}`}>
-                  <Button variant="secondary">Open</Button>
-                </Link>
-              </div>
-            </Card>
+            <QueueListItem
+              key={item.applicationId}
+              href={`/lra/applications/${item.applicationId}`}
+              title={
+                item.borrower
+                  ? `${item.borrower.firstName} ${item.borrower.lastName}`
+                  : "Unknown"
+              }
+              subtitle={item.borrower?.borrowerNo}
+              meta={
+                <>
+                  {item.application ? (
+                    <Badge variant="neutral">
+                      {formatStatusLabel(item.application.status)}
+                    </Badge>
+                  ) : null}
+                  {item.application?.blocker
+                    ? `· ${item.application.blocker}`
+                    : null}
+                  {" · Queued "}
+                  <span className="font-mono">
+                    {new Date(item.queuedAt).toLocaleString()}
+                  </span>
+                </>
+              }
+            />
           ))}
         </div>
       )}

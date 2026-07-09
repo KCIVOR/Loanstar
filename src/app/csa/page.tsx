@@ -7,9 +7,9 @@ import {
   Alert,
   Badge,
   Button,
-  Card,
   EmptyState,
   PageHeader,
+  QueueListItem,
   Spinner,
 } from "@/components/ui";
 import { formatStatusLabel } from "@/lib/applications/status";
@@ -86,28 +86,23 @@ export default function CsaDashboardPage() {
       ) : (
         <div className="space-y-3">
           {applications.map((app) => (
-            <Card key={app.id} className="flex flex-wrap items-center justify-between gap-3">
-              <div>
-                <p className="font-medium text-ink">
-                  {app.borrower
-                    ? `${app.borrower.firstName} ${app.borrower.lastName}`
-                    : "Unknown borrower"}
-                  {app.borrower ? (
-                    <span className="ml-2 font-mono text-sm font-normal text-ink-muted">
-                      {app.borrower.borrowerNo}
-                    </span>
-                  ) : null}
-                </p>
-                <p className="flex flex-wrap items-center gap-1.5 text-sm text-ink-muted">
+            <QueueListItem
+              key={app.id}
+              href={`/csa/applications/${app.id}`}
+              title={
+                app.borrower
+                  ? `${app.borrower.firstName} ${app.borrower.lastName}`
+                  : "Unknown borrower"
+              }
+              subtitle={app.borrower?.borrowerNo}
+              meta={
+                <>
                   <Badge variant="neutral">{formatStatusLabel(app.status)}</Badge>
-                  {app.isReloan ? "· Reloan" : ""}
-                  {app.blocker ? `· ${app.blocker}` : ""}
-                </p>
-              </div>
-              <Link href={`/csa/applications/${app.id}`}>
-                <Button variant="secondary">Open</Button>
-              </Link>
-            </Card>
+                  {app.isReloan ? "· Reloan" : null}
+                  {app.blocker ? `· ${app.blocker}` : null}
+                </>
+              }
+            />
           ))}
         </div>
       )}

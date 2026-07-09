@@ -1,15 +1,14 @@
 "use client";
 
-import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 
 import {
   Alert,
   Badge,
   Button,
-  Card,
   EmptyState,
   PageHeader,
+  QueueListItem,
   Spinner,
 } from "@/components/ui";
 import { formatStatusLabel } from "@/lib/applications/status";
@@ -73,22 +72,17 @@ export default function CigDashboardPage() {
       ) : (
         <div className="space-y-3">
           {applications.map((app) => (
-            <Card
+            <QueueListItem
               key={app.id}
-              className="flex flex-wrap items-center justify-between gap-3"
-            >
-              <div>
-                <p className="font-medium text-ink">
-                  {app.borrower
-                    ? `${app.borrower.firstName} ${app.borrower.lastName}`
-                    : "Unknown"}
-                  {app.borrower ? (
-                    <span className="ml-2 font-mono text-sm font-normal text-ink-muted">
-                      {app.borrower.borrowerNo}
-                    </span>
-                  ) : null}
-                </p>
-                <p className="flex flex-wrap items-center gap-1.5 text-sm text-ink-muted">
+              href={`/cig/applications/${app.id}`}
+              title={
+                app.borrower
+                  ? `${app.borrower.firstName} ${app.borrower.lastName}`
+                  : "Unknown"
+              }
+              subtitle={app.borrower?.borrowerNo}
+              meta={
+                <>
                   <Badge variant="neutral">{formatStatusLabel(app.status)}</Badge>
                   {app.endorsedAt ? (
                     <>
@@ -98,12 +92,10 @@ export default function CigDashboardPage() {
                       </span>
                     </>
                   ) : null}
-                </p>
-              </div>
-              <Link href={`/cig/applications/${app.id}`}>
-                <Button variant="secondary">Verify</Button>
-              </Link>
-            </Card>
+                </>
+              }
+              trailing={<Button variant="secondary">Verify</Button>}
+            />
           ))}
         </div>
       )}

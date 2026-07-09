@@ -17,7 +17,7 @@ export function EmptyState({
   return (
     <div
       className={cn(
-        "rounded-xl border border-neutral-200 bg-[#FBFBFD] px-[30px] py-11 text-center",
+        "rounded-xl border border-neutral-200 bg-field-bg px-[30px] py-11 text-center",
         className
       )}
     >

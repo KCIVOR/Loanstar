@@ -80,6 +80,9 @@
   --color-neutral-800: var(--color-ink);
   --color-neutral-900: var(--color-ink);
 
+  /* Resting fill for inputs, selects, textareas, empty states */
+  --color-field-bg: #fbfbfd;
+
   /* Role accent colors — nav identity pills (secondary to gold) */
   --color-role-csa: var(--color-navy-muted);
   --color-role-cig: var(--color-navy-muted);
@@ -194,6 +197,7 @@
   --color-neutral-700: var(--color-neutral-700);
   --color-neutral-800: var(--color-neutral-800);
   --color-neutral-900: var(--color-neutral-900);
+  --color-field-bg: var(--color-field-bg);
 
   --color-role-csa: var(--color-role-csa);
   --color-role-cig: var(--color-role-cig);

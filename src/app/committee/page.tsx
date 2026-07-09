@@ -1,15 +1,13 @@
 "use client";
 
-import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 
 import {
   Alert,
   Badge,
-  Button,
-  Card,
   EmptyState,
   PageHeader,
+  QueueListItem,
   Spinner,
 } from "@/components/ui";
 import { formatStatusLabel } from "@/lib/applications/status";
@@ -78,40 +76,33 @@ export default function CommitteeDashboardPage() {
       ) : (
         <div className="space-y-3">
           {applications.map((app) => (
-            <Card key={app.id}>
-              <div className="flex flex-wrap items-start justify-between gap-3">
-                <div>
-                  <p className="font-medium text-ink">
-                    {app.borrower
-                      ? `${app.borrower.firstName} ${app.borrower.lastName}`
-                      : "Unknown"}
-                    {app.borrower ? (
-                      <span className="ml-2 font-mono text-sm font-normal text-ink-muted">
-                        {app.borrower.borrowerNo}
+            <QueueListItem
+              key={app.id}
+              href={`/committee/applications/${app.id}`}
+              title={
+                app.borrower
+                  ? `${app.borrower.firstName} ${app.borrower.lastName}`
+                  : "Unknown"
+              }
+              subtitle={app.borrower?.borrowerNo}
+              meta={
+                <>
+                  <Badge variant="neutral">{formatStatusLabel(app.status)}</Badge>
+                  {app.verification?.finding
+                    ? `· CIG finding: ${app.verification.finding}`
+                    : null}
+                  {app.verification?.forwardedAt ? (
+                    <>
+                      {" · Forwarded "}
+                      <span className="font-mono">
+                        {new Date(app.verification.forwardedAt).toLocaleString()}
                       </span>
-                    ) : null}
-                  </p>
-                  <p className="flex flex-wrap items-center gap-1.5 text-sm text-ink-muted">
-                    <Badge variant="neutral">{formatStatusLabel(app.status)}</Badge>
-                    {app.verification?.finding
-                      ? `· CIG finding: ${app.verification.finding}`
-                      : ""}
-                    {app.verification?.forwardedAt ? (
-                      <>
-                        {" · Forwarded "}
-                        <span className="font-mono">
-                          {new Date(app.verification.forwardedAt).toLocaleString()}
-                        </span>
-                      </>
-                    ) : null}
-                    {app.tatDays != null ? ` · TAT ${app.tatDays}d` : ""}
-                  </p>
-                </div>
-                <Link href={`/committee/applications/${app.id}`}>
-                  <Button variant="secondary">Open</Button>
-                </Link>
-              </div>
-            </Card>
+                    </>
+                  ) : null}
+                  {app.tatDays != null ? ` · TAT ${app.tatDays}d` : null}
+                </>
+              }
+            />
           ))}
         </div>
       )}

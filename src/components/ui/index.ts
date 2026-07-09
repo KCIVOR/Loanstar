@@ -24,6 +24,7 @@ export { Toast } from "./Toast";
 export { Progress } from "./Progress";
 export { Skeleton } from "./Skeleton";
 export { EmptyState } from "./EmptyState";
+export { QueueListItem } from "./QueueListItem";
 export { Pagination } from "./Pagination";
 export { Breadcrumbs } from "./Breadcrumbs";
 export type { BreadcrumbItem } from "./Breadcrumbs";
