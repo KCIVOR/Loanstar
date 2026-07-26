@@ -37,7 +37,14 @@ export async function GET(_request: Request, context: RouteContext) {
       return NextResponse.json({ error: "Role not found" }, { status: 404 });
     }
 
-    return jsonOk({ role });
+    const { data: modules, error: modulesError } = await supabase
+      .from("modules")
+      .select("id, slug, name")
+      .order("sort_order", { ascending: true });
+
+    if (modulesError) throw new Error(modulesError.message);
+
+    return jsonOk({ role, modules: modules ?? [] });
   } catch (error) {
     return handleApiError(error);
   }

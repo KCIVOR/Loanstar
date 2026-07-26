@@ -1,11 +1,11 @@
 "use client";
 
-import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 
 import {
   Alert,
+  Breadcrumbs,
   Button,
   Card,
   Checkbox,
@@ -242,14 +242,16 @@ export default function RoleDetailPage() {
 
   return (
     <div>
+      <Breadcrumbs
+        className="mb-3"
+        items={[
+          { label: "Roles", href: "/admin/roles" },
+          { label: role.name },
+        ]}
+      />
       <PageHeader
         title={role.name}
         description={`Slug: ${role.slug}${role.is_system ? " (system role)" : ""}`}
-        actions={
-          <Link href="/admin/roles" className="text-sm text-ink-muted hover:underline">
-            ← Back to roles
-          </Link>
-        }
       />
 
       {error ? (
@@ -264,10 +266,12 @@ export default function RoleDetailPage() {
       ) : null}
 
       <Card className="mb-6">
-        <h2 className="mb-3 font-medium text-ink">Role name</h2>
+        <h2 className="mb-3 font-display text-lg font-semibold text-navy-900">
+          Role name
+        </h2>
         <div className="flex gap-2">
           <Input value={name} onChange={(e) => setName(e.target.value)} />
-          <Button onClick={() => void saveName()} disabled={saving}>
+          <Button onClick={() => void saveName()} loading={saving}>
             Save
           </Button>
         </div>
@@ -275,8 +279,10 @@ export default function RoleDetailPage() {
 
       <Card className="mb-6">
         <div className="mb-3 flex items-center justify-between">
-          <h2 className="font-medium text-ink">Module permissions</h2>
-          <Button onClick={() => void savePermissions()} disabled={saving}>
+          <h2 className="font-display text-lg font-semibold text-navy-900">
+            Module permissions
+          </h2>
+          <Button onClick={() => void savePermissions()} loading={saving}>
             Save permissions
           </Button>
         </div>
@@ -294,7 +300,7 @@ export default function RoleDetailPage() {
               const state = permState[mod.slug];
               return (
                 <tr key={mod.slug}>
-                  <Td className="font-medium text-ink">{mod.name}</Td>
+                  <Td className="font-medium text-ink-900">{mod.name}</Td>
                   {(
                     [
                       "canView",
@@ -329,8 +335,10 @@ export default function RoleDetailPage() {
 
       <Card>
         <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-          <h2 className="font-medium text-ink">Field rules</h2>
-          <Button onClick={() => void saveFieldRules()} disabled={saving}>
+          <h2 className="font-display text-lg font-semibold text-navy-900">
+            Field rules
+          </h2>
+          <Button onClick={() => void saveFieldRules()} loading={saving}>
             Save field rules
           </Button>
         </div>

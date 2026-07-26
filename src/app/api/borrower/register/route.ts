@@ -1,10 +1,15 @@
 import { NextResponse } from "next/server";
+import { createClient as createSupabaseClient } from "@supabase/supabase-js";
 import { z } from "zod";
 
-import { writeAuditEvent } from "@/lib/audit/writer";
 import { mapBorrowerRow, type Address } from "@/lib/borrowers/types";
+import {
+  buildClaimProfilePatch,
+  classifyBorrowerForRegistration,
+  normalizeBorrowerEmail,
+  type ClaimableBorrowerRow,
+} from "@/lib/borrowers/claim";
 import { handleApiError, jsonOk } from "@/lib/api/handler";
-import { ensureDocumentSlots } from "@/lib/documents/checklist";
 import { getRequestIp } from "@/lib/permissions/server";
 import { createServiceClient } from "@/lib/supabase/server";
 
@@ -35,9 +40,32 @@ const registerSchema = z.object({
   permanentAddress: addressSchema.optional(),
 });
 
-async function writeServiceAudit(
-  input: Parameters<typeof writeAuditEvent>[0],
-) {
+/** Anon client for Auth signUp so Supabase sends the confirmation email. */
+function createSignupClient() {
+  return createSupabaseClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false,
+        detectSessionInUrl: false,
+      },
+    },
+  );
+}
+
+async function writeServiceAudit(input: {
+  actorId: string;
+  actorRoleId?: string | null;
+  moduleSlug: string;
+  action: string;
+  entityType?: string | null;
+  entityId?: string | null;
+  beforeData?: unknown;
+  afterData?: unknown;
+  ipAddress?: string | null;
+}) {
   const service = createServiceClient();
   const ipAddress = input.ipAddress ?? (await getRequestIp());
 
@@ -62,102 +90,157 @@ export async function POST(request: Request) {
   try {
     const body = registerSchema.parse(await request.json());
     const service = createServiceClient();
+    const email = normalizeBorrowerEmail(body.email);
+    const origin = new URL(request.url).origin;
 
-    const { data: authData, error: authError } =
-      await service.auth.admin.createUser({
-        email: body.email,
-        password: body.password,
-        email_confirm: true,
-        user_metadata: {
+    const { data: existingRows, error: lookupError } = await service
+      .from("borrowers")
+      .select(
+        "id, user_id, email, first_name, middle_name, last_name, suffix, date_of_birth, place_of_birth, citizenship, civil_status, gender, mobile_phone, landline",
+      )
+      .ilike("email", email);
+
+    if (lookupError) {
+      throw new Error(lookupError.message);
+    }
+
+    const existing = (existingRows ?? []).find(
+      (row) => normalizeBorrowerEmail(row.email as string) === email,
+    ) as ClaimableBorrowerRow | undefined;
+
+    const classification = classifyBorrowerForRegistration(existing);
+    if (classification === "already_claimed") {
+      return NextResponse.json(
+        { error: "An account with this email already exists." },
+        { status: 409 },
+      );
+    }
+
+    // Supabase Auth sends the confirmation email when "Confirm email" is
+    // enabled in Authentication → Providers → Email (not Resend).
+    const signup = createSignupClient();
+    const { data: authData, error: authError } = await signup.auth.signUp({
+      email,
+      password: body.password,
+      options: {
+        emailRedirectTo: `${origin}/login?redirect=/borrower`,
+        data: {
           full_name: [body.firstName, body.middleName, body.lastName]
             .filter(Boolean)
             .join(" "),
         },
-      });
+      },
+    });
 
     if (authError || !authData.user) {
-      throw new Error(authError?.message ?? "Failed to create user account");
+      const message = authError?.message ?? "Failed to create user account";
+      if (/already|registered|exists/i.test(message)) {
+        return NextResponse.json(
+          { error: "An account with this email already exists." },
+          { status: 409 },
+        );
+      }
+      throw new Error(message);
     }
 
     const userId = authData.user.id;
+    // No session ⇒ confirmations are on and Supabase queued the email.
+    // Session present ⇒ confirmations are off (user can log in immediately).
+    const requiresEmailConfirmation = !authData.session;
+    const confirmationSent = requiresEmailConfirmation;
 
-    const { data: borrower, error: borrowerError } = await service
-      .from("borrowers")
-      .insert({
-        user_id: userId,
-        email: body.email,
-        first_name: body.firstName,
-        middle_name: body.middleName ?? null,
-        last_name: body.lastName,
-        suffix: body.suffix ?? null,
-        date_of_birth: body.dateOfBirth ?? null,
-        place_of_birth: body.placeOfBirth ?? null,
-        citizenship: body.citizenship ?? "Filipino",
-        civil_status: body.civilStatus ?? null,
-        gender: body.gender ?? null,
-        mobile_phone: body.mobilePhone ?? null,
-        landline: body.landline ?? null,
-        present_address: (body.presentAddress ?? {}) as Address,
-        permanent_address: (body.permanentAddress ?? {}) as Address,
-      })
-      .select("*")
-      .single();
+    let borrower: Record<string, unknown> | null = null;
+    const claimed = classification === "claimable";
 
-    if (borrowerError || !borrower) {
-      await service.auth.admin.deleteUser(userId);
-      throw new Error(borrowerError?.message ?? "Failed to create borrower profile");
-    }
+    try {
+      if (claimed && existing) {
+        const patch = buildClaimProfilePatch(existing, {
+          userId,
+          firstName: body.firstName,
+          middleName: body.middleName,
+          lastName: body.lastName,
+          suffix: body.suffix,
+          dateOfBirth: body.dateOfBirth,
+          placeOfBirth: body.placeOfBirth,
+          citizenship: body.citizenship,
+          civilStatus: body.civilStatus,
+          gender: body.gender,
+          mobilePhone: body.mobilePhone,
+          landline: body.landline,
+        });
 
-    const initialHistory = [
-      {
-        status: "registered",
-        at: new Date().toISOString(),
-        actorId: userId,
-        note: "Self-registration",
-      },
-      {
-        status: "documents_pending",
-        at: new Date().toISOString(),
-        actorId: userId,
-        note: null,
-      },
-    ];
+        const { data: updated, error: updateError } = await service
+          .from("borrowers")
+          .update(patch)
+          .eq("id", existing.id)
+          .is("user_id", null)
+          .select("*")
+          .single();
 
-    const { data: application, error: applicationError } = await service
-      .from("loan_applications")
-      .insert({
-        borrower_id: borrower.id,
-        status: "documents_pending",
-        status_history: initialHistory,
-      })
-      .select("id, status, status_history, created_at")
-      .single();
+        if (updateError || !updated) {
+          throw new Error(
+            updateError?.message ?? "Failed to claim borrower profile",
+          );
+        }
+        borrower = updated;
+      } else {
+        const { data: created, error: borrowerError } = await service
+          .from("borrowers")
+          .insert({
+            user_id: userId,
+            email,
+            first_name: body.firstName,
+            middle_name: body.middleName ?? null,
+            last_name: body.lastName,
+            suffix: body.suffix ?? null,
+            date_of_birth: body.dateOfBirth ?? null,
+            place_of_birth: body.placeOfBirth ?? null,
+            citizenship: body.citizenship ?? "Filipino",
+            civil_status: body.civilStatus ?? null,
+            gender: body.gender ?? null,
+            mobile_phone: body.mobilePhone ?? null,
+            landline: body.landline ?? null,
+            present_address: (body.presentAddress ?? {}) as Address,
+            permanent_address: (body.permanentAddress ?? {}) as Address,
+          })
+          .select("*")
+          .single();
 
-    if (applicationError || !application) {
-      await service.from("borrowers").delete().eq("id", borrower.id);
-      await service.auth.admin.deleteUser(userId);
-      throw new Error(
-        applicationError?.message ?? "Failed to create loan application",
-      );
-    }
-
-    await ensureDocumentSlots(service, "intake", application.id, borrower.id);
-
-    const { data: borrowerRole } = await service
-      .from("roles")
-      .select("id")
-      .eq("slug", "borrower")
-      .single();
-
-    if (borrowerRole) {
-      const { error: roleError } = await service.from("user_roles").insert({
-        user_id: userId,
-        role_id: borrowerRole.id,
-        assigned_by: userId,
-      });
-      if (roleError) {
-        throw new Error(`Failed to assign borrower role: ${roleError.message}`);
+        if (borrowerError || !created) {
+          throw new Error(
+            borrowerError?.message ?? "Failed to create borrower profile",
+          );
+        }
+        borrower = created;
       }
+
+      const { data: borrowerRole } = await service
+        .from("roles")
+        .select("id")
+        .eq("slug", "borrower")
+        .single();
+
+      if (borrowerRole) {
+        const { error: roleError } = await service.from("user_roles").insert({
+          user_id: userId,
+          role_id: borrowerRole.id,
+          assigned_by: userId,
+        });
+        if (roleError) {
+          throw new Error(`Failed to assign borrower role: ${roleError.message}`);
+        }
+      }
+    } catch (profileError) {
+      if (borrower?.id && !claimed) {
+        await service.from("borrowers").delete().eq("id", borrower.id);
+      } else if (claimed && existing) {
+        await service
+          .from("borrowers")
+          .update({ user_id: null })
+          .eq("id", existing.id);
+      }
+      await service.auth.admin.deleteUser(userId);
+      throw profileError;
     }
 
     await writeServiceAudit({
@@ -165,23 +248,23 @@ export async function POST(request: Request) {
       moduleSlug: "borrower_portal",
       action: "create",
       entityType: "borrower",
-      entityId: borrower.id,
+      entityId: borrower.id as string,
       afterData: {
         borrowerNo: borrower.borrower_no,
-        email: body.email,
-        applicationId: application.id,
+        email,
+        claimed,
+        confirmationSent,
+        requiresEmailConfirmation,
+        provider: "supabase_auth",
       },
     });
 
     return jsonOk(
       {
-        borrower: mapBorrowerRow(borrower),
-        application: {
-          id: application.id,
-          status: application.status,
-          statusHistory: application.status_history,
-          createdAt: application.created_at,
-        },
+        borrower: mapBorrowerRow(borrower as never),
+        claimed,
+        requiresEmailConfirmation,
+        confirmationSent,
       },
       201,
     );

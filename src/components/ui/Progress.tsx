@@ -1,5 +1,7 @@
 import { cn } from "./cn";
 
+/* Meridian §08 progress — teal fill by default, navy and warn variants.
+   Legacy tones map: gold → teal (default), danger → warn. */
 export function Progress({
   value,
   max = 100,
@@ -9,20 +11,14 @@ export function Progress({
   value: number;
   max?: number;
   label?: string;
-  tone?: "gold" | "success" | "danger";
+  tone?: "gold" | "success" | "danger" | "teal" | "navy" | "warn";
 }) {
   const pct = max > 0 ? (value / max) * 100 : 0;
   const over = pct > 100;
-  const resolved: "gold" | "success" | "danger" =
-    tone ?? (over ? "danger" : "gold");
+  const resolved = tone ?? (over ? "warn" : "teal");
+  const variant =
+    resolved === "navy" ? "navy" : resolved === "danger" || resolved === "warn" ? "warn" : "";
   const fillWidth = Math.min(Math.max(pct, 0), 100);
-
-  const fillClass =
-    resolved === "danger"
-      ? "bg-danger"
-      : resolved === "success"
-        ? "bg-success"
-        : "bg-gradient-to-r from-gold-300 to-gold-400";
 
   const valueText =
     max === 100
@@ -32,30 +28,20 @@ export function Progress({
   return (
     <div className="w-full">
       {(label || valueText) && (
-        <div
-          className={cn(
-            "mb-1.5 flex justify-between text-xs",
-            resolved === "danger" ? "text-[#E9948A]" : "text-neutral-700"
-          )}
-        >
+        <div className="prog-lbl">
           <span>{label}</span>
-          <b className={resolved === "gold" ? "font-bold text-ink" : "font-bold"}>
-            {valueText}
-          </b>
+          <b>{valueText}</b>
         </div>
       )}
       <div
-        className="h-[9px] overflow-hidden rounded-[5px] bg-neutral-100"
+        className={cn("prog", variant)}
         role="progressbar"
         aria-valuenow={value}
         aria-valuemin={0}
         aria-valuemax={max}
         aria-label={label}
       >
-        <span
-          className={cn("block h-full rounded-[5px] transition-[width]", fillClass)}
-          style={{ width: `${fillWidth}%` }}
-        />
+        <i style={{ width: `${fillWidth}%` }} />
       </div>
     </div>
   );

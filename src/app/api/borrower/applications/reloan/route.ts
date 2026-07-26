@@ -1,4 +1,11 @@
+import { NextResponse } from "next/server";
+
 import { writeAuditEvent } from "@/lib/audit/writer";
+import {
+  canStartReloan,
+  findResumableDraft,
+  nextApplicationKind,
+} from "@/lib/borrowers/reloan";
 import { mapBorrowerRow } from "@/lib/borrowers/types";
 import { handleApiError, jsonOk } from "@/lib/api/handler";
 import { ensureDocumentSlots } from "@/lib/documents/checklist";
@@ -29,29 +36,65 @@ export async function POST() {
     const supabase = await createClient();
     const borrower = await getOwnBorrower(user.id);
 
-    const { data: latestApp } = await supabase
+    const { data: existingApps, error: existingError } = await supabase
       .from("loan_applications")
-      .select("id")
+      .select("id, status, status_history, is_reloan, parent_application_id, created_at")
       .eq("borrower_id", borrower.id)
-      .order("created_at", { ascending: false })
-      .limit(1)
-      .maybeSingle();
+      .order("created_at", { ascending: false });
+
+    if (existingError) {
+      throw new Error(existingError.message);
+    }
+
+    // Resume an existing draft rather than error or duplicate — a draft is
+    // not a terminal status, so canStartReloan would otherwise permanently
+    // block anyone who starts and abandons one.
+    const resumable = findResumableDraft(existingApps ?? []);
+    if (resumable) {
+      return jsonOk(
+        {
+          application: {
+            id: resumable.id,
+            status: resumable.status,
+            statusHistory: resumable.status_history,
+            isReloan: resumable.is_reloan,
+            parentApplicationId: resumable.parent_application_id,
+            createdAt: resumable.created_at,
+            kind: resumable.is_reloan ? "reloan" : "first",
+          },
+          profile: mapBorrowerRow(borrower),
+          resumed: true,
+        },
+        200,
+      );
+    }
+
+    const statuses = (existingApps ?? []).map((app) => String(app.status));
+    const eligibility = canStartReloan({ applicationStatuses: statuses });
+    if (!eligibility.ok) {
+      return NextResponse.json({ error: eligibility.reason }, { status: 400 });
+    }
+
+    const kind = nextApplicationKind({ applicationStatuses: statuses });
+    const isReloan = kind === "reloan";
+    const latestApp = existingApps?.[0] ?? null;
+    const now = new Date().toISOString();
 
     const { data: application, error: applicationError } = await supabase
       .from("loan_applications")
       .insert({
         borrower_id: borrower.id,
-        status: "documents_pending",
+        status: "draft",
         status_history: [
           {
-            status: "documents_pending",
-            at: new Date().toISOString(),
+            status: "draft",
+            at: now,
             actorId: user.id,
-            note: "Reloan application",
+            note: isReloan ? "Reloan draft created" : "Application draft created",
           },
         ],
-        is_reloan: true,
-        parent_application_id: latestApp?.id ?? null,
+        is_reloan: isReloan,
+        parent_application_id: isReloan ? (latestApp?.id ?? null) : null,
       })
       .select(
         "id, status, status_history, is_reloan, parent_application_id, created_at",
@@ -60,7 +103,10 @@ export async function POST() {
 
     if (applicationError || !application) {
       throw new Error(
-        applicationError?.message ?? "Failed to create reloan application",
+        applicationError?.message ??
+          (isReloan
+            ? "Failed to create reloan application"
+            : "Failed to create loan application"),
       );
     }
 
@@ -78,9 +124,11 @@ export async function POST() {
       entityType: "loan_application",
       entityId: application.id,
       afterData: {
-        isReloan: true,
-        parentApplicationId: latestApp?.id ?? null,
+        isReloan,
+        parentApplicationId: application.parent_application_id,
         borrowerNo: borrower.borrower_no,
+        kind,
+        status: "draft",
       },
     });
 
@@ -93,8 +141,10 @@ export async function POST() {
           isReloan: application.is_reloan,
           parentApplicationId: application.parent_application_id,
           createdAt: application.created_at,
+          kind,
         },
         profile: mapBorrowerRow(borrower),
+        resumed: false,
       },
       201,
     );

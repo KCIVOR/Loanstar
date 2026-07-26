@@ -2,7 +2,11 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 
 import type { Stage } from "@/lib/constants";
 
-export type DocumentStatus = "pending" | "uploaded" | "confirmed";
+export type DocumentStatus =
+  | "pending"
+  | "uploaded"
+  | "confirmed"
+  | "needs_revision";
 
 export type ChecklistItem = {
   documentTypeId: string;
@@ -20,6 +24,7 @@ export type ChecklistItem = {
   uploadedBy: string | null;
   confirmedBy: string | null;
   confirmedAt: string | null;
+  revisionRemarks: string | null;
 };
 
 export type CompletionSummary = {
@@ -59,6 +64,7 @@ type DocumentRow = {
   uploaded_by: string | null;
   confirmed_by: string | null;
   confirmed_at: string | null;
+  revision_remarks: string | null;
 };
 
 export async function getStageChecklist(
@@ -88,7 +94,7 @@ export async function getStageChecklist(
   const { data: documentRows, error: documentsError } = await supabase
     .from("documents")
     .select(
-      "id, document_type_id, stage, status, file_name, mime_type, file_size, uploaded_by, confirmed_by, confirmed_at",
+      "id, document_type_id, stage, status, file_name, mime_type, file_size, uploaded_by, confirmed_by, confirmed_at, revision_remarks",
     )
     .eq("loan_application_id", applicationId)
     .eq("stage", stage);
@@ -124,6 +130,7 @@ export async function getStageChecklist(
       uploadedBy: doc?.uploaded_by ?? null,
       confirmedBy: doc?.confirmed_by ?? null,
       confirmedAt: doc?.confirmed_at ?? null,
+      revisionRemarks: doc?.revision_remarks ?? null,
     };
   });
 }

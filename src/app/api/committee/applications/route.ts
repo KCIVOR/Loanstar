@@ -15,6 +15,7 @@ export async function GET() {
         id,
         application_no,
         status,
+        is_reloan,
         endorsed_at,
         created_at,
         updated_at,
@@ -31,7 +32,7 @@ export async function GET() {
         )
       `,
       )
-      .in("status", ["for_approval", "negotiating_terms"])
+      .in("status", ["for_approval", "negotiating_terms", "committee_hold"])
       .order("updated_at", { ascending: true });
 
     if (error) {
@@ -50,6 +51,7 @@ export async function GET() {
         id: row.id,
         applicationNo: row.application_no,
         status: row.status,
+        isReloan: row.is_reloan,
         createdAt: row.created_at,
         updatedAt: row.updated_at,
         tatDays: computeTatDays(

@@ -5,7 +5,8 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 
-import { Button } from "@/components/ui";
+import { Avatar, Button } from "@/components/ui";
+import { cn } from "@/components/ui/cn";
 import { usePermissions } from "@/hooks/usePermissions";
 import { createClient } from "@/lib/supabase/client";
 
@@ -88,6 +89,7 @@ const SignOutIcon = (
 
 const SEGMENT_LABELS: Record<string, string> = {
   dashboard: "Dashboard",
+  account: "Account",
   admin: "Admin",
   roles: "Roles",
   users: "Users",
@@ -132,13 +134,13 @@ function Breadcrumbs() {
   const segments = pathname.split("/").filter(Boolean);
 
   return (
-    <nav aria-label="Breadcrumb" className="hidden min-w-0 sm:block">
+    <nav aria-label="Breadcrumb" className="min-w-0">
       <ol className="flex items-center gap-1.5 text-[12px]">
         <li>
           <Link
             href="/dashboard"
             title="Dashboard"
-            className="flex items-center text-ink-faint transition-colors hover:text-ink"
+            className="flex items-center text-ink-400 transition-colors hover:text-ink-700"
           >
             {HomeIcon}
           </Link>
@@ -148,13 +150,13 @@ function Breadcrumbs() {
           const last = i === segments.length - 1;
           return (
             <li key={href} className="flex min-w-0 items-center gap-1.5">
-              <span className="text-ink-faint/60">{ChevronRightIcon}</span>
+              <span className="text-ink-300">{ChevronRightIcon}</span>
               {last ? (
-                <span className="truncate font-bold text-ink">{segmentLabel(segment)}</span>
+                <span className="truncate font-semibold text-ink-900">{segmentLabel(segment)}</span>
               ) : (
                 <Link
                   href={href}
-                  className="truncate font-semibold text-ink-faint transition-colors hover:text-ink"
+                  className="truncate font-medium text-ink-400 transition-colors hover:text-ink-700"
                 >
                   {segmentLabel(segment)}
                 </Link>
@@ -183,28 +185,87 @@ function initialsOf(name: string) {
 export function Header({
   title,
   links,
+  onOpenNav,
 }: {
   title: string;
   links?: HeaderLink[];
+  onOpenNav?: () => void;
 }) {
   const pathname = usePathname();
   const router = useRouter();
   const { permissions } = usePermissions();
   const displayName = permissions?.fullName ?? null;
   const email = permissions?.email ?? null;
+  const avatarUrl = permissions?.avatarUrl ?? null;
 
   const [openMenu, setOpenMenu] = useState<"bell" | "profile" | null>(null);
   const menusRef = useRef<HTMLDivElement>(null);
+  const [notifItems, setNotifItems] = useState<
+    Array<{
+      id: string;
+      title: string;
+      body: string;
+      link: string | null;
+      readAt: string | null;
+      createdAt: string;
+    }>
+  >([]);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const [notifLoading, setNotifLoading] = useState(false);
 
-  // Close dropdowns on route change — adjusted during render rather than in
-  // an effect, per https://react.dev/learn/you-might-not-need-an-effect
+  async function loadNotifications() {
+    setNotifLoading(true);
+    try {
+      const res = await fetch("/api/account/notifications?limit=8", {
+        credentials: "include",
+      });
+      if (!res.ok) return;
+      const body = (await res.json()) as {
+        notifications?: typeof notifItems;
+        unreadCount?: number;
+      };
+      setNotifItems(body.notifications ?? []);
+      setUnreadCount(body.unreadCount ?? 0);
+    } finally {
+      setNotifLoading(false);
+    }
+  }
+
+  async function markAllNotificationsRead() {
+    await fetch("/api/account/notifications", {
+      method: "PATCH",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ all: true }),
+    });
+    setNotifItems((prev) =>
+      prev.map((n) => ({ ...n, readAt: n.readAt ?? new Date().toISOString() })),
+    );
+    setUnreadCount(0);
+  }
+
   const [prevPathname, setPrevPathname] = useState(pathname);
   if (pathname !== prevPathname) {
     setPrevPathname(pathname);
     setOpenMenu(null);
   }
 
-  // Close dropdowns on outside click / Escape
+  useEffect(() => {
+    if (!permissions?.userId) return;
+    void (async () => {
+      try {
+        const res = await fetch("/api/account/notifications?limit=1", {
+          credentials: "include",
+        });
+        if (!res.ok) return;
+        const body = (await res.json()) as { unreadCount?: number };
+        setUnreadCount(body.unreadCount ?? 0);
+      } catch {
+        /* ignore badge fetch errors */
+      }
+    })();
+  }, [permissions?.userId]);
+
   useEffect(() => {
     if (!openMenu) return;
     function onPointerDown(e: MouseEvent) {
@@ -231,17 +292,31 @@ export function Header({
   }
 
   return (
-    <header className="flex h-14 shrink-0 items-center justify-between gap-4 border-b border-neutral-200 bg-neutral-0 px-4 sm:px-6">
-      {/* Left — title, breadcrumbs, optional section tabs */}
-      <div className="flex h-full min-w-0 items-center gap-4">
-        <p className="hidden max-w-[180px] truncate text-sm font-bold text-ink lg:block">
+    <header className="flex h-14 shrink-0 items-center justify-between gap-3 border-b border-line-soft bg-surface px-4 sm:px-6">
+      {/* Left — mobile menu + title / breadcrumbs / optional section tabs */}
+      <div className="flex h-full min-w-0 items-center gap-3">
+        {onOpenNav ? (
+          <button
+            type="button"
+            aria-label="Open navigation"
+            onClick={onOpenNav}
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-ink-700 transition-colors hover:bg-surface-2 lg:hidden"
+          >
+            <svg width="18" height="14" viewBox="0 0 18 14" fill="none" aria-hidden>
+              <rect y="0" width="18" height="2" rx="1" fill="currentColor" />
+              <rect y="6" width="18" height="2" rx="1" fill="currentColor" />
+              <rect y="12" width="18" height="2" rx="1" fill="currentColor" />
+            </svg>
+          </button>
+        ) : null}
+        <p className="hidden max-w-[180px] truncate font-display text-sm font-semibold text-navy-900 lg:block">
           {title}
         </p>
-        <span className="hidden h-5 w-px bg-neutral-200 lg:block" aria-hidden />
+        <span className="hidden h-5 w-px bg-line-soft lg:block" aria-hidden />
         <Breadcrumbs />
         {links && links.length > 0 ? (
           <>
-            <span className="hidden h-5 w-px bg-neutral-200 sm:block" aria-hidden />
+            <span className="hidden h-5 w-px bg-line-soft sm:block" aria-hidden />
             <nav className="hidden h-full items-center gap-4 sm:flex">
               {links.map((item) => {
                 const active = item.exact
@@ -251,11 +326,12 @@ export function Header({
                   <Link
                     key={item.href}
                     href={item.href}
-                    className={`flex h-full items-center border-b-2 text-[12.5px] font-semibold transition-colors ${
+                    className={cn(
+                      "flex h-full items-center border-b-2 text-[12.5px] font-semibold transition-colors",
                       active
-                        ? "border-gold-400 text-ink"
-                        : "border-transparent text-ink-faint hover:text-ink-muted"
-                    }`}
+                        ? "border-teal-600 text-ink-900"
+                        : "border-transparent text-ink-400 hover:text-ink-700",
+                    )}
                   >
                     {item.label}
                   </Link>
@@ -276,28 +352,111 @@ export function Header({
             size="sm"
             aria-label="Notifications"
             aria-expanded={openMenu === "bell"}
-            onClick={() => setOpenMenu(openMenu === "bell" ? null : "bell")}
-            className={`relative h-9 w-9 shrink-0 rounded-lg px-0 ${
-              openMenu === "bell" ? "bg-neutral-100 text-ink" : ""
-            }`}
+            onClick={() => {
+              const next = openMenu === "bell" ? null : "bell";
+              setOpenMenu(next);
+              if (next === "bell") void loadNotifications();
+            }}
+            className={cn(
+              "relative h-9 w-9 shrink-0 rounded-lg px-0",
+              openMenu === "bell" && "bg-surface-2 text-ink-900",
+            )}
           >
             {BellIcon}
+            {unreadCount > 0 ? (
+              <span className="absolute right-1 top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-danger px-1 text-[10px] font-bold text-white">
+                {unreadCount > 9 ? "9+" : unreadCount}
+              </span>
+            ) : null}
           </Button>
 
           {openMenu === "bell" ? (
-            <div className="absolute right-0 top-11 z-50 w-72 rounded-xl border border-neutral-200 bg-neutral-0 py-2 shadow-lg">
-              <p className="border-b border-neutral-100 px-4 pb-2 text-[11px] font-bold uppercase tracking-wide text-ink-faint">
-                Notifications
-              </p>
-              {/* Placeholder until notifications are wired up */}
-              <div className="flex flex-col items-center gap-2 px-4 py-8 text-center">
-                <span className="flex h-10 w-10 items-center justify-center rounded-full bg-neutral-100 text-ink-faint">
-                  {BellIcon}
-                </span>
-                <p className="text-[13px] font-semibold text-ink-muted">No notifications yet</p>
-                <p className="text-xs text-ink-faint">
-                  Updates about applications and approvals will appear here.
+            <div className="menu absolute right-0 top-11 z-50 w-80">
+              <div className="flex items-center justify-between px-3 pb-2 pt-1">
+                <p className="font-mono text-[10.5px] font-normal uppercase tracking-[0.14em] text-ink-400 opacity-70">
+                  Notifications
                 </p>
+                {unreadCount > 0 ? (
+                  <button
+                    type="button"
+                    className="text-[11px] font-semibold text-teal-700"
+                    onClick={() => void markAllNotificationsRead()}
+                  >
+                    Mark all read
+                  </button>
+                ) : null}
+              </div>
+              <hr />
+              {notifLoading ? (
+                <p className="px-4 py-6 text-center text-xs text-ink-400">
+                  Loading…
+                </p>
+              ) : notifItems.length === 0 ? (
+                <div className="flex flex-col items-center gap-2 px-4 py-8 text-center">
+                  <span className="flex h-10 w-10 items-center justify-center rounded-full bg-surface-2 text-ink-400">
+                    {BellIcon}
+                  </span>
+                  <p className="text-[13px] font-semibold text-ink-700">
+                    No notifications yet
+                  </p>
+                  <p className="text-xs text-ink-400">
+                    Updates about applications and approvals will appear here.
+                  </p>
+                </div>
+              ) : (
+                <ul className="max-h-80 overflow-y-auto py-1">
+                  {notifItems.map((n) => (
+                    <li key={n.id}>
+                      {n.link ? (
+                        <Link
+                          href={n.link}
+                          className="mi block px-3 py-2"
+                          onClick={() => setOpenMenu(null)}
+                        >
+                          <p
+                            className={cn(
+                              "text-[13px]",
+                              n.readAt
+                                ? "font-medium text-ink-700"
+                                : "font-semibold text-ink-900",
+                            )}
+                          >
+                            {n.title}
+                          </p>
+                          <p className="mt-0.5 line-clamp-2 text-xs text-ink-400">
+                            {n.body}
+                          </p>
+                        </Link>
+                      ) : (
+                        <div className="px-3 py-2">
+                          <p
+                            className={cn(
+                              "text-[13px]",
+                              n.readAt
+                                ? "font-medium text-ink-700"
+                                : "font-semibold text-ink-900",
+                            )}
+                          >
+                            {n.title}
+                          </p>
+                          <p className="mt-0.5 line-clamp-2 text-xs text-ink-400">
+                            {n.body}
+                          </p>
+                        </div>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              )}
+              <hr />
+              <div style={{ padding: "6px" }}>
+                <Link
+                  href="/account#notifications"
+                  className="mi flex w-full items-center justify-center text-[12.5px] font-semibold"
+                  onClick={() => setOpenMenu(null)}
+                >
+                  View all
+                </Link>
               </div>
             </div>
           ) : null}
@@ -311,48 +470,53 @@ export function Header({
             size="sm"
             aria-expanded={openMenu === "profile"}
             onClick={() => setOpenMenu(openMenu === "profile" ? null : "profile")}
-            className={`h-auto gap-2 rounded-lg py-1.5 pl-1.5 pr-2 font-semibold ${
-              openMenu === "profile" ? "bg-neutral-100" : ""
-            }`}
+            className={cn(
+              "h-auto gap-2 rounded-lg py-1.5 pl-1.5 pr-2 font-semibold",
+              openMenu === "profile" && "bg-surface-2",
+            )}
           >
-            <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-gold-300 to-gold-600 text-[11px] font-bold text-navy-900">
-              {displayName ? initialsOf(displayName) : "…"}
-            </span>
-            <span className="hidden max-w-[140px] truncate text-[12.5px] font-semibold text-ink sm:block">
+            {avatarUrl ? (
+              <Avatar
+                src={avatarUrl}
+                initials={displayName ? initialsOf(displayName) : "…"}
+                size="sm"
+              />
+            ) : (
+              <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-teal-400 to-teal-700 font-display text-[11px] font-bold text-white">
+                {displayName ? initialsOf(displayName) : "…"}
+              </span>
+            )}
+            <span className="hidden max-w-[140px] truncate text-[12.5px] font-semibold text-ink-700 sm:block">
               {displayName ?? "Loading…"}
             </span>
-            <span className="hidden text-ink-faint sm:block">{ChevronDownIcon}</span>
+            <span className="hidden text-ink-400 sm:block">{ChevronDownIcon}</span>
           </Button>
 
           {openMenu === "profile" ? (
-            <div className="absolute right-0 top-11 z-50 w-60 rounded-xl border border-neutral-200 bg-neutral-0 py-1.5 shadow-lg">
-              <div className="border-b border-neutral-100 px-4 py-2.5">
-                <p className="truncate text-[13px] font-bold text-ink">{displayName}</p>
-                {email ? <p className="truncate text-xs text-ink-faint">{email}</p> : null}
+            <div className="menu absolute right-0 top-11 z-50 w-60">
+              <div style={{ padding: "10px 12px 8px", borderBottom: "1px solid var(--line-soft)" }}>
+                <p className="truncate text-[13px] font-semibold text-ink-900">{displayName}</p>
+                {email ? <p className="truncate text-xs text-ink-400">{email}</p> : null}
               </div>
-              <div className="p-1.5">
-                <Link
-                  href="/borrower/profile"
-                  className="flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-[12.5px] font-semibold text-ink-muted transition-colors hover:bg-neutral-100 hover:text-ink"
-                >
+              <div style={{ padding: "6px" }}>
+                <Link href="/account" className="mi flex items-center gap-2.5">
                   {UserIcon}
-                  Profile
+                  Account
                 </Link>
-                <button
-                  type="button"
-                  disabled
-                  title="Coming soon"
-                  className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-[12.5px] font-semibold text-ink-muted opacity-50"
+                <Link
+                  href="/account#preferences"
+                  className="mi flex items-center gap-2.5"
                 >
                   {SettingsIcon}
                   Settings
-                </button>
+                </Link>
               </div>
-              <div className="border-t border-neutral-100 p-1.5">
+              <hr />
+              <div style={{ padding: "6px" }}>
                 <button
                   type="button"
                   onClick={() => void handleSignOut()}
-                  className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-[12.5px] font-semibold text-danger-ink transition-colors hover:bg-danger-50"
+                  className="mi danger flex w-full items-center gap-2.5"
                 >
                   {SignOutIcon}
                   Sign out

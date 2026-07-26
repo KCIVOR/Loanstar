@@ -93,7 +93,7 @@ export default function ReportsDashboardPage() {
       <PageHeader
         title="Portfolio at a glance"
         actions={
-          <p className="font-mono text-xs text-ink-faint">
+          <p className="mono text-xs text-ink-400">
             Generated {new Date(data.generatedAt).toLocaleString()}
           </p>
         }
@@ -116,7 +116,7 @@ export default function ReportsDashboardPage() {
 
       <div className="grid gap-6 lg:grid-cols-2">
         <Card>
-          <h2 className="mb-3 font-display text-lg font-semibold text-ink">
+          <h2 className="mb-3 font-display text-lg font-semibold text-navy-900">
             Pipeline by stage
           </h2>
           <ul className="space-y-2 text-sm">
@@ -124,15 +124,15 @@ export default function ReportsDashboardPage() {
               .sort((a, b) => b[1] - a[1])
               .map(([status, count]) => (
                 <li key={status} className="flex items-center justify-between">
-                  <span className="text-ink-muted">{formatStatusLabel(status)}</span>
-                  <span className="font-mono font-medium text-ink">{count}</span>
+                  <span className="text-ink-500">{formatStatusLabel(status)}</span>
+                  <span className="mono font-medium text-ink-900">{count}</span>
                 </li>
               ))}
           </ul>
         </Card>
 
         <Card>
-          <h2 className="mb-3 font-display text-lg font-semibold text-ink">
+          <h2 className="mb-3 font-display text-lg font-semibold text-navy-900">
             Aging buckets
           </h2>
           <ul className="space-y-3 text-sm">
@@ -141,24 +141,24 @@ export default function ReportsDashboardPage() {
               { label: "1–30 days", value: data.aging.bucket1_30, tone: "info" as const },
               { label: "31–60 days", value: data.aging.bucket31_60, tone: "warning" as const },
               { label: "61–90 days", value: data.aging.bucket61_90, tone: "warning" as const },
-              { label: "91+ days", value: data.aging.bucket91_plus, tone: "danger" as const },
+              { label: "90+ days", value: data.aging.bucket91_plus, tone: "danger" as const },
             ].map((row) => (
               <li key={row.label}>
                 <div className="mb-1 flex justify-between">
-                  <span className="text-ink-muted">{row.label}</span>
-                  <span className="font-mono font-medium text-ink">{row.value}</span>
+                  <span className="text-ink-500">{row.label}</span>
+                  <span className="mono font-medium text-ink-900">{row.value}</span>
                 </div>
-                <div className="h-1.5 overflow-hidden rounded-full bg-neutral-100">
-                  <div
-                    className={`h-full rounded-full ${
+                <div className="prog">
+                  <i
+                    className={
                       row.tone === "success"
-                        ? "bg-success"
+                        ? ""
                         : row.tone === "info"
-                          ? "bg-info"
+                          ? "bg-[var(--info)]"
                           : row.tone === "warning"
-                            ? "bg-warning"
-                            : "bg-danger"
-                    }`}
+                            ? "bg-[var(--warning)]"
+                            : "bg-[var(--danger)]"
+                    }
                     style={{ width: `${Math.max(4, (row.value / maxAging) * 100)}%` }}
                   />
                 </div>
@@ -168,59 +168,59 @@ export default function ReportsDashboardPage() {
         </Card>
 
         <Card>
-          <h2 className="mb-3 font-display text-lg font-semibold text-ink">
+          <h2 className="mb-3 font-display text-lg font-semibold text-navy-900">
             Income recognition
           </h2>
           <ul className="space-y-2 text-sm">
             <li className="flex justify-between">
-              <span className="text-ink-muted">Posted payments</span>
-              <span className="font-mono text-ink">{money(data.income.totalPosted)}</span>
+              <span className="text-ink-500">Posted payments</span>
+              <span className="mono text-ink-900">{money(data.income.totalPosted)}</span>
             </li>
             <li className="flex justify-between">
-              <span className="text-ink-muted">Penalties collected</span>
-              <span className="font-mono text-ink">{money(data.income.totalPenalties)}</span>
+              <span className="text-ink-500">Penalties collected</span>
+              <span className="mono text-ink-900">{money(data.income.totalPenalties)}</span>
             </li>
             <li className="flex justify-between">
-              <span className="text-ink-muted">Posting count</span>
-              <span className="font-mono text-ink">{data.income.paymentCount}</span>
+              <span className="text-ink-500">Posting count</span>
+              <span className="mono text-ink-900">{data.income.paymentCount}</span>
             </li>
           </ul>
         </Card>
 
         <Card>
-          <h2 className="mb-3 font-display text-lg font-semibold text-ink">
+          <h2 className="mb-3 font-display text-lg font-semibold text-navy-900">
             Collection performance
           </h2>
           <ul className="space-y-2 text-sm">
             <li className="flex justify-between">
-              <span className="text-ink-muted">DCRs awaiting AR</span>
-              <span className="font-mono text-ink">{data.collection.dcrsSubmitted}</span>
+              <span className="text-ink-500">DCRs awaiting AR</span>
+              <span className="mono text-ink-900">{data.collection.dcrsSubmitted}</span>
             </li>
             <li className="flex justify-between">
-              <span className="text-ink-muted">DCRs reconciled</span>
-              <span className="font-mono text-ink">{data.collection.dcrsReconciled}</span>
+              <span className="text-ink-500">DCRs reconciled</span>
+              <span className="mono text-ink-900">{data.collection.dcrsReconciled}</span>
             </li>
             <li className="flex justify-between">
-              <span className="text-ink-muted">Pending proofs</span>
-              <span className="font-mono text-ink">{data.collection.pendingProofs}</span>
+              <span className="text-ink-500">Pending proofs</span>
+              <span className="mono text-ink-900">{data.collection.pendingProofs}</span>
             </li>
             <li className="flex justify-between">
-              <span className="text-ink-muted">Posted payments</span>
-              <span className="font-mono text-ink">{data.collection.postedPayments}</span>
+              <span className="text-ink-500">Posted payments</span>
+              <span className="mono text-ink-900">{data.collection.postedPayments}</span>
             </li>
           </ul>
         </Card>
       </div>
 
       <Card className="mt-6">
-        <h2 className="mb-3 font-display text-lg font-semibold text-ink">
+        <h2 className="mb-3 font-display text-lg font-semibold text-navy-900">
           Turnaround time (TAT) by step
         </h2>
-        <ul className="divide-y divide-neutral-100 text-sm">
+        <ul className="divide-y divide-line-soft text-sm">
           {data.tat.map((row) => (
             <li key={row.label} className="flex justify-between py-2.5">
-              <span className="text-ink-muted">{row.label}</span>
-              <span className="font-mono text-ink">
+              <span className="text-ink-500">{row.label}</span>
+              <span className="mono text-ink-900">
                 {row.averageDays != null
                   ? `${row.averageDays} days (n=${row.sampleCount})`
                   : "—"}
@@ -230,7 +230,7 @@ export default function ReportsDashboardPage() {
         </ul>
         {overdue91 > 0 ? (
           <div className="mt-4">
-            <Badge variant="danger">{overdue91} accounts 91+ days overdue</Badge>
+            <Badge variant="danger">{overdue91} accounts at 90+ days overdue</Badge>
           </div>
         ) : null}
       </Card>

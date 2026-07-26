@@ -1,9 +1,11 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
+import { mapBorrowerRow, type BorrowerRow } from "@/lib/borrowers/types";
 import { getActiveComputation } from "@/lib/csa/computation";
 import { ensureDocumentSlots } from "@/lib/documents/checklist";
+import { hashPdf, renderTemplateToPdf } from "@/lib/documents/render";
 import { uploadDocumentBytes } from "@/lib/documents/storage";
-import { initializeArAccount } from "@/lib/ar/masterlist";
+import { getPublishedTemplate } from "@/lib/documents/templates/service";
 import { createServiceClient } from "@/lib/supabase/server";
 
 import { syncApplicationBlocker, mapReleaseFileRow } from "./blockers";
@@ -11,12 +13,23 @@ import { loadBlriContext } from "./blri-data";
 import {
   AUTO_GENERATED_SLUGS,
   canRecordRelease,
-  readyReleaseBlocker,
   releaseStageForPath,
   type ReleasePath,
   type ReleaseFileStatus,
 } from "./constants";
-import { hashPdfContent, renderDocumentPdf } from "./pdf/documents";
+import { assertPdcShortfallAcknowledged } from "./pdc-shortfall";
+import {
+  assertPdcCollectedForClose,
+  maybePdcCollectBlocker,
+} from "./pdc-collect";
+import {
+  assertEmploymentContractForRelease,
+  hasEmploymentContractUploaded,
+  releaseBlockerForReadyRelease,
+} from "./employment-contract";
+import { buildReleaseTemplateContext } from "./template-context";
+
+export { confirmPdcCollected } from "./pdc-collect";
 
 export async function getOrCreateReleaseFile(
   supabase: SupabaseClient,
@@ -163,12 +176,27 @@ export async function savePdcChecks(
   }>,
   blankRange?: { from?: string; to?: string },
   actorId?: string,
+  options?: { acknowledgeShortfall?: boolean },
 ) {
   const file = await getReleaseFile(supabase, releaseFileId);
 
   if (file.releasePath !== "with_pdc") {
     throw new Error("PDC encoding only applies to With PDC path");
   }
+
+  const computation = await getActiveComputation(
+    supabase,
+    file.loanApplicationId,
+  );
+  if (!computation) {
+    throw new Error("No active computation found for this application");
+  }
+
+  assertPdcShortfallAcknowledged(
+    checks.length,
+    computation.terms,
+    options?.acknowledgeShortfall,
+  );
 
   await supabase.from("pdc_checks").delete().eq("release_file_id", releaseFileId);
 
@@ -211,7 +239,14 @@ export async function savePdcChecks(
     { actorId },
   );
 
-  return { status: "ready_generate" as const };
+  return {
+    status: "ready_generate" as const,
+    checkCount: checks.length,
+    terms: computation.terms,
+    shortfallAcknowledged:
+      checks.length < computation.terms &&
+      options?.acknowledgeShortfall === true,
+  };
 }
 
 export async function generateReleaseDocuments(
@@ -240,10 +275,11 @@ export async function generateReleaseDocuments(
     releaseFileId,
   );
 
-  const slugs = AUTO_GENERATED_SLUGS[file.releasePath as ReleasePath];
+  const releasePath = file.releasePath as ReleasePath;
+  const slugs = AUTO_GENERATED_SLUGS[releasePath];
   const { data: app } = await supabase
     .from("loan_applications")
-    .select("borrower_id")
+    .select("borrower_id, borrowers (*)")
     .eq("id", file.loanApplicationId)
     .single();
 
@@ -251,9 +287,44 @@ export async function generateReleaseDocuments(
     throw new Error("Borrower not found");
   }
 
+  // Template merge context is path-level — identical for every slug in this
+  // release — so build it once.
+  const borrowerRaw = app.borrowers;
+  const borrowerProfile = mapBorrowerRow(
+    (Array.isArray(borrowerRaw) ? borrowerRaw[0] : borrowerRaw) as BorrowerRow,
+  );
+  const templateContext = buildReleaseTemplateContext(
+    blri,
+    {
+      netReleased: computation.netReleased,
+      releaseDate: computation.releaseDate,
+      addonMonths: computation.addonMonths,
+      interestRate: computation.interestRate,
+      loanTypeName: computation.loanTypeName,
+      processingFee: computation.processingFee,
+      securityFee: computation.securityFee,
+      docStamp: computation.docStamp,
+      adminCost: computation.adminCost,
+      notaryFee: computation.notaryFee,
+    },
+    borrowerProfile,
+    releasePath,
+  );
+
   for (const slug of slugs) {
-    const pdf = renderDocumentPdf(slug, blri, computation.netReleased);
-    const contentHash = hashPdfContent(pdf);
+    // All release documents render from published templates (the legacy
+    // hardcoded renderer was retired in Phase 7). A missing published template
+    // is a hard error — every release slug is seeded + published.
+    const published = await getPublishedTemplate(supabase, slug);
+    if (!published) {
+      throw new Error(
+        `No published template for release document "${slug}" — cannot generate.`,
+      );
+    }
+    const pdf = await renderTemplateToPdf(published.body, templateContext);
+    const templateVersionId = published.versionId;
+
+    const contentHash = hashPdf(pdf);
     const docId = crypto.randomUUID();
     const storagePath = `${app.borrower_id}/release/${releaseFileId}/${slug}-${docId}.pdf`;
 
@@ -265,6 +336,7 @@ export async function generateReleaseDocuments(
         document_slug: slug,
         storage_path: storagePath,
         content_hash: contentHash,
+        template_version_id: templateVersionId,
         is_finalized: false,
         signed_at: null,
         signed_by: null,
@@ -305,10 +377,10 @@ export async function generateReleaseDocuments(
   return { status: "awaiting_signatures" as const, slugs };
 }
 
-export async function signGeneratedDocument(
+export async function witnessSignGeneratedDocument(
   supabase: SupabaseClient,
   documentId: string,
-  signerId: string,
+  witnessedById: string,
 ) {
   const { data: doc, error } = await supabase
     .from("generated_documents")
@@ -324,6 +396,26 @@ export async function signGeneratedDocument(
     throw new Error("Document already signed");
   }
 
+  const releaseFileRaw = doc.release_files;
+  const releaseFile = Array.isArray(releaseFileRaw)
+    ? releaseFileRaw[0]
+    : releaseFileRaw;
+
+  if (releaseFile?.status !== "awaiting_signatures") {
+    throw new Error("Release file is not in the signing stage");
+  }
+
+  // signed_by stays the borrower — it's their signature on the paper; the LRA
+  // staffer who ran the in-branch session is recorded as witnessed_by.
+  const { data: app } = await supabase
+    .from("loan_applications")
+    .select("borrowers ( user_id )")
+    .eq("id", releaseFile.loan_application_id as string)
+    .single();
+
+  const borrowerRaw = app?.borrowers;
+  const borrower = Array.isArray(borrowerRaw) ? borrowerRaw[0] : borrowerRaw;
+
   const signedAt = new Date().toISOString();
   const signatureHash = doc.content_hash as string;
 
@@ -331,22 +423,14 @@ export async function signGeneratedDocument(
     .from("generated_documents")
     .update({
       signed_at: signedAt,
-      signed_by: signerId,
+      signed_by: (borrower?.user_id as string | null) ?? null,
+      witnessed_by: witnessedById,
       signature_hash: signatureHash,
     })
     .eq("id", documentId);
 
   if (updateError) {
     throw new Error(updateError.message);
-  }
-
-  const releaseFileRaw = doc.release_files;
-  const releaseFile = Array.isArray(releaseFileRaw)
-    ? releaseFileRaw[0]
-    : releaseFileRaw;
-
-  if (!releaseFile) {
-    return { signedAt, allSigned: false };
   }
 
   const { data: allDocs } = await supabase
@@ -370,21 +454,21 @@ export async function signGeneratedDocument(
       admin,
       releaseFile.loan_application_id as string,
       "awaiting_briefing",
-      { actorId: signerId, applicationStatus: "release_briefing" },
+      { actorId: witnessedById, applicationStatus: "release_briefing" },
     );
   }
 
   return { signedAt, allSigned };
 }
 
-export async function signBriefingAsBorrower(
+export async function acknowledgeBriefing(
   supabase: SupabaseClient,
   releaseFileId: string,
-  borrowerUserId: string,
+  collectorUserId: string,
 ) {
   const file = await getReleaseFile(supabase, releaseFileId);
 
-  if (file.status !== "awaiting_briefing") {
+  if (file.status !== "awaiting_briefing" && file.status !== "ready_release") {
     throw new Error("Briefing not pending");
   }
 
@@ -398,55 +482,120 @@ export async function signBriefingAsBorrower(
     throw new Error("Briefing record not found");
   }
 
-  if (briefing.acknowledged_at) {
-    throw new Error("Briefing already signed");
+  const now = new Date().toISOString();
+  const alreadySigned = Boolean(briefing.acknowledged_at);
+
+  // Collector may update briefings (briefings_collector_ack). Skip if already acked.
+  if (!alreadySigned) {
+    if (file.status !== "awaiting_briefing") {
+      throw new Error("Briefing not pending");
+    }
+
+    const checklist = Array.isArray(briefing.checklist)
+      ? (briefing.checklist as Array<{ key: string; label: string }>).map(
+          (item) => ({ ...item, signedAt: now }),
+        )
+      : [];
+
+    const { error: signError } = await supabase
+      .from("briefings")
+      .update({
+        acknowledged_at: now,
+        acknowledged_by: collectorUserId,
+        checklist,
+      })
+      .eq("release_file_id", releaseFileId);
+
+    if (signError) {
+      throw new Error(signError.message);
+    }
   }
 
-  const now = new Date().toISOString();
-  const checklist = Array.isArray(briefing.checklist)
-    ? (briefing.checklist as Array<{ key: string; label: string }>).map(
-        (item) => ({ ...item, signedAt: now }),
-      )
-    : [];
+  // Privileged side-effects: collectors cannot UPDATE release_files or advance
+  // application status under RLS (release_files_write is LRA-only). Same pattern
+  // as queueForLra / discloseTerms — permission already verified by the caller.
+  const admin = createServiceClient();
+  const signedAt = (briefing.acknowledged_at as string | null) ?? now;
 
-  await supabase
-    .from("briefings")
-    .update({
-      acknowledged_at: now,
-      acknowledged_by: borrowerUserId,
-      checklist,
-    })
-    .eq("release_file_id", releaseFileId);
+  if (file.status !== "ready_release") {
+    const { error: fileError } = await admin
+      .from("release_files")
+      .update({
+        status: "ready_release",
+        updated_at: now,
+      })
+      .eq("id", releaseFileId);
 
-  await supabase
-    .from("release_files")
-    .update({
-      status: "ready_release",
-      updated_at: now,
-    })
-    .eq("id", releaseFileId);
+    if (fileError) {
+      throw new Error(fileError.message);
+    }
 
-  const blocker = readyReleaseBlocker(file.releasePath as ReleasePath | null);
+    const hasContract = await hasEmploymentContractUploaded(
+      admin,
+      file.loanApplicationId,
+    );
+    const blocker = releaseBlockerForReadyRelease(
+      file.releasePath as ReleasePath | null,
+      hasContract,
+    );
 
-  await syncApplicationBlocker(
-    supabase,
-    file.loanApplicationId,
-    "ready_release",
-    { actorId: borrowerUserId, applicationStatus: "release_ready" },
-  );
+    await syncApplicationBlocker(
+      admin,
+      file.loanApplicationId,
+      "ready_release",
+      { actorId: collectorUserId, applicationStatus: "release_ready" },
+    );
 
-  await supabase
-    .from("loan_applications")
-    .update({ blocker })
-    .eq("id", file.loanApplicationId);
+    const { error: blockerError } = await admin
+      .from("loan_applications")
+      .update({ blocker })
+      .eq("id", file.loanApplicationId);
 
-  return { status: "ready_release" as const, signedAt: now };
+    if (blockerError) {
+      throw new Error(blockerError.message);
+    }
+  }
+
+  return { status: "ready_release" as const, signedAt };
 }
 
-export async function resolveSignedVoucherDocumentId(
+/**
+ * Signed-scan document slugs that must be uploaded on the release checklist
+ * before a release can close. The Promissory Note (notarized) and Disclosure
+ * Statement follow generate -> wet-sign/notarize -> scan-back-in, same as the
+ * signed check voucher.
+ */
+export const REQUIRED_SIGNED_RELEASE_SLUGS = [
+  "signed_check_voucher",
+  "signed_promissory_note",
+  "signed_disclosure_statement",
+] as const;
+
+const SIGNED_SLUG_LABEL: Record<string, string> = {
+  signed_check_voucher: "signed check voucher",
+  signed_promissory_note: "signed/notarized promissory note",
+  signed_disclosure_statement: "signed disclosure statement",
+};
+
+/** Required signed slugs not present in `present` (pure — for close gating). */
+export function missingSignedReleaseSlugs(present: Iterable<string>): string[] {
+  const set = new Set(present);
+  return REQUIRED_SIGNED_RELEASE_SLUGS.filter((slug) => !set.has(slug));
+}
+
+/** Human labels for a set of signed slugs. */
+export function signedReleaseSlugLabels(slugs: readonly string[]): string[] {
+  return slugs.map((slug) => SIGNED_SLUG_LABEL[slug] ?? slug);
+}
+
+/**
+ * Map each uploaded/confirmed release-stage signed scan to its document id.
+ * Latest upload per slug wins.
+ */
+export async function resolveSignedReleaseDocuments(
   supabase: SupabaseClient,
   applicationId: string,
-) {
+): Promise<Map<string, string>> {
   const { data, error } = await supabase
     .from("documents")
     .select("id, document_types!inner ( slug )")
@@ -459,14 +608,25 @@ export async function resolveSignedVoucherDocumentId(
     throw new Error(error.message);
   }
 
-  const match = (data ?? []).find((row) => {
+  const bySlug = new Map<string, string>();
+  for (const row of data ?? []) {
     const docType = Array.isArray(row.document_types)
       ? row.document_types[0]
       : row.document_types;
-    return docType?.slug === "signed_check_voucher";
-  });
+    const slug = docType?.slug as string | undefined;
+    if (slug && !bySlug.has(slug)) {
+      bySlug.set(slug, row.id as string);
+    }
+  }
+  return bySlug;
+}
 
-  return (match?.id as string | undefined) ?? null;
+export async function resolveSignedVoucherDocumentId(
+  supabase: SupabaseClient,
+  applicationId: string,
+) {
+  const bySlug = await resolveSignedReleaseDocuments(supabase, applicationId);
+  return bySlug.get("signed_check_voucher") ?? null;
 }
 
 export async function recordRelease(
@@ -476,6 +636,12 @@ export async function recordRelease(
   notes?: string,
 ) {
   const file = await getReleaseFile(supabase, releaseFileId);
+
+  const hasContract = await hasEmploymentContractUploaded(
+    supabase,
+    file.loanApplicationId,
+  );
+  assertEmploymentContractForRelease(hasContract);
 
   const { data: briefing } = await supabase
     .from("briefings")
@@ -510,6 +676,20 @@ export async function recordRelease(
     applicationStatus: "released",
   });
 
+  // Prefer a close-stage pending message when with_pdc physical collection
+  // is still outstanding — does not touch earlier briefing/contract blockers.
+  const collectBlocker = maybePdcCollectBlocker({
+    releasePath: file.releasePath,
+    status: "released",
+    pdcCollectedAt: file.pdcCollectedAt,
+  });
+  if (collectBlocker) {
+    await supabase
+      .from("loan_applications")
+      .update({ blocker: collectBlocker })
+      .eq("id", file.loanApplicationId);
+  }
+
   return { status: "released" as const };
 }
 
@@ -525,15 +705,31 @@ export async function closeRelease(
     throw new Error("Release must be recorded before closure");
   }
 
-  const voucherId =
-    signedVoucherDocumentId ??
-    (await resolveSignedVoucherDocumentId(supabase, file.loanApplicationId));
+  assertPdcCollectedForClose({
+    releasePath: file.releasePath,
+    pdcCollectedAt: file.pdcCollectedAt,
+  });
 
-  if (!voucherId) {
+  // Every signed scan must be back in before closing. The signed check voucher
+  // may be passed explicitly (back-compat); the rest resolve from the release
+  // checklist. The notarized PN especially cannot be skipped.
+  const signedDocs = await resolveSignedReleaseDocuments(
+    supabase,
+    file.loanApplicationId,
+  );
+  if (signedVoucherDocumentId) {
+    signedDocs.set("signed_check_voucher", signedVoucherDocumentId);
+  }
+
+  const missing = missingSignedReleaseSlugs(signedDocs.keys());
+  if (missing.length > 0) {
+    const labels = signedReleaseSlugLabels(missing);
     throw new Error(
-      "Upload the signed check voucher on the release checklist before closing",
+      `Upload the following signed scan(s) on the release checklist before closing: ${labels.join(", ")}`,
     );
   }
+
+  const voucherId = signedDocs.get("signed_check_voucher") as string;
 
   await supabase.from("release_events").insert({
     release_file_id: releaseFileId,
@@ -581,13 +777,9 @@ export async function closeRelease(
     applicationStatus: "closed",
   });
 
-  await initializeArAccount(
-    supabase,
-    file.loanApplicationId,
-    releaseFileId,
-    actorId,
-  );
-
+  // AR hand-off stops here: the ar_queue row is AR's work item. The masterlist
+  // account is created when AR explicitly receives the file (ar_receive_file
+  // trigger), not automatically at close.
   return { status: "closed" as const };
 }
 
@@ -609,6 +801,10 @@ export async function listLraQueue(supabase: SupabaseClient) {
           borrower_no,
           first_name,
           last_name
+        ),
+        release_files (
+          status,
+          release_path
         )
       )
     `,
@@ -624,6 +820,8 @@ export async function listLraQueue(supabase: SupabaseClient) {
     const app = Array.isArray(appRaw) ? appRaw[0] : appRaw;
     const borrowerRaw = app?.borrowers;
     const borrower = Array.isArray(borrowerRaw) ? borrowerRaw[0] : borrowerRaw;
+    const releaseRaw = app?.release_files;
+    const releaseFile = Array.isArray(releaseRaw) ? releaseRaw[0] : releaseRaw;
 
     return {
       applicationId: row.loan_application_id as string,
@@ -642,6 +840,12 @@ export async function listLraQueue(supabase: SupabaseClient) {
             borrowerNo: borrower.borrower_no as string,
             firstName: borrower.first_name as string,
             lastName: borrower.last_name as string,
+          }
+        : null,
+      releaseFile: releaseFile
+        ? {
+            status: releaseFile.status as string,
+            releasePath: (releaseFile.release_path as string | null) ?? null,
           }
         : null,
     };

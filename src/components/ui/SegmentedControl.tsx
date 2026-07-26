@@ -1,3 +1,6 @@
+import { cn } from "./cn";
+
+/* Meridian §04 button group — segmented filter. */
 export function SegmentedControl<T extends string>({
   value,
   options,
@@ -10,18 +13,14 @@ export function SegmentedControl<T extends string>({
   disabled?: boolean;
 }) {
   return (
-    <div className="inline-flex overflow-hidden rounded-full border border-neutral-300 text-xs font-semibold">
+    <div className="btn-group">
       {options.map((opt) => (
         <button
           key={opt.value}
           type="button"
           disabled={disabled}
           onClick={() => onChange(opt.value)}
-          className={`px-3.5 py-1.5 transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
-            value === opt.value
-              ? "bg-gold-400 text-navy-900"
-              : "bg-white text-ink-faint hover:text-ink-muted"
-          }`}
+          className={cn("btn btn-sm", value === opt.value && "is-active")}
         >
           {opt.label}
         </button>

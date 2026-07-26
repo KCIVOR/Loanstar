@@ -1,14 +1,9 @@
-import { Sidebar } from "@/components/admin/Sidebar";
+import { AppShell } from "@/components/admin/AppShell";
 
 export default function AdminLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  return (
-    <div className="flex min-h-full bg-neutral-100">
-      <Sidebar />
-      <main className="flex-1 overflow-auto p-6 lg:p-8">{children}</main>
-    </div>
-  );
+  return <AppShell title="Admin Console">{children}</AppShell>;
 }

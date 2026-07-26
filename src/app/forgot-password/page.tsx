@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { FormEvent, useState } from "react";
 
-import { Alert, Button, Card, Input, Label, LoanStarMark } from "@/components/ui";
+import { Alert, Button, Card, Input, Label, LoanStarLogo } from "@/components/ui";
 import { createClient } from "@/lib/supabase/client";
 
 export default function ForgotPasswordPage() {
@@ -20,10 +20,7 @@ export default function ForgotPasswordPage() {
 
     const supabase = createClient();
     const redirectTo = `${window.location.origin}/reset-password`;
-    const { error: resetError } = await supabase.auth.resetPasswordForEmail(
-      email,
-      { redirectTo },
-    );
+    const { error: resetError } = await supabase.auth.resetPasswordForEmail(email, { redirectTo });
 
     if (resetError) {
       setError(resetError.message);
@@ -37,12 +34,9 @@ export default function ForgotPasswordPage() {
     <div className="flex min-h-full flex-1 items-center justify-center bg-navy-950 px-4 py-12">
       <Card className="w-full max-w-sm">
         <div className="flex flex-col items-center text-center">
-          <LoanStarMark size={40} />
-          <p className="mt-3 font-display text-lg font-semibold text-ink">LoanStar</p>
-          <h1 className="mt-4 font-display text-xl font-semibold text-ink">Reset password</h1>
-          <p className="mt-1 text-sm text-ink-faint">
-            Enter your email to receive a reset link.
-          </p>
+          <LoanStarLogo height={48} />
+          <h1 className="mt-4 font-display text-xl font-semibold text-navy-900">Reset password</h1>
+          <p className="mt-1 text-sm text-ink-400">Enter your email to receive a reset link.</p>
         </div>
 
         <form onSubmit={(e) => void handleSubmit(e)} className="mt-6 space-y-4">
@@ -63,8 +57,11 @@ export default function ForgotPasswordPage() {
           </Button>
         </form>
 
-        <p className="mt-4 text-center text-sm text-ink-faint">
-          <Link href="/login" className="text-ink hover:underline">
+        <p className="mt-4 text-center text-sm text-ink-400">
+          <Link
+            href="/login"
+            className="font-medium text-teal-700 underline-offset-2 hover:underline"
+          >
             Back to sign in
           </Link>
         </p>

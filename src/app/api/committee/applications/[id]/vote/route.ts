@@ -12,6 +12,7 @@ type RouteParams = { params: Promise<{ id: string }> };
 
 const voteSchema = z.object({
   vote: z.enum(["approve", "deny"]),
+  comment: z.string().trim().max(2000).optional(),
 });
 
 export async function POST(request: Request, { params }: RouteParams) {
@@ -21,7 +22,13 @@ export async function POST(request: Request, { params }: RouteParams) {
     const body = voteSchema.parse(await request.json());
     const supabase = await createClient();
 
-    const votes = await castCommitteeVote(supabase, id, user.id, body.vote);
+    const votes = await castCommitteeVote(
+      supabase,
+      id,
+      user.id,
+      body.vote,
+      body.comment || null,
+    );
     const tally = computeVoteTally(votes);
 
     await writeAuditEvent({
@@ -30,7 +37,7 @@ export async function POST(request: Request, { params }: RouteParams) {
       action: "update",
       entityType: "committee_vote",
       entityId: id,
-      afterData: { vote: body.vote, tally },
+      afterData: { vote: body.vote, comment: body.comment ?? null, tally },
     });
 
     return jsonOk({ votes, tally });

@@ -1,8 +1,10 @@
 export { cn } from "./cn";
-export { LoanStarMark } from "./LoanStarMark";
+export { LoanStarMark, LoanStarLogo } from "./LoanStarMark";
 export { Button } from "./Button";
 export type { ButtonProps } from "./Button";
 export { Input } from "./Input";
+export { PhoneInput } from "./PhoneInput";
+export type { PhoneInputProps } from "./PhoneInput";
 export { Select } from "./Select";
 export { Textarea } from "./Textarea";
 export { Label } from "./Label";

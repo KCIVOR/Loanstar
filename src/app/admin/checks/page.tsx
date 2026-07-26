@@ -71,7 +71,9 @@ export default function ChecksPage() {
       ) : null}
 
       <Card className="mb-6">
-        <h2 className="mb-3 font-medium text-ink">Check types</h2>
+        <h2 className="mb-3 font-display text-lg font-semibold text-navy-900">
+          Check types
+        </h2>
         <Table>
           <thead>
             <tr>
@@ -80,11 +82,11 @@ export default function ChecksPage() {
               <Th>Description</Th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-neutral-200">
+          <tbody>
             {checkTypes.map((ct) => (
               <tr key={ct.id}>
-                <Td className="font-mono text-xs">{ct.slug}</Td>
-                <Td className="font-medium">{ct.name}</Td>
+                <Td className="id">{ct.slug}</Td>
+                <Td className="font-medium text-ink-900">{ct.name}</Td>
                 <Td>{ct.description ?? "—"}</Td>
               </tr>
             ))}
@@ -93,16 +95,18 @@ export default function ChecksPage() {
       </Card>
 
       <Card>
-        <h2 className="mb-3 font-medium text-ink">Stage check mapping</h2>
+        <h2 className="mb-3 font-display text-lg font-semibold text-navy-900">
+          Stage check mapping
+        </h2>
         <Table>
           <thead>
             <tr>
               <Th>Stage</Th>
-              <Th>Order</Th>
+              <Th num>Order</Th>
               <Th>Check</Th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-neutral-200">
+          <tbody>
             {mappings.map((m) => {
               const ct = Array.isArray(m.check_types)
                 ? m.check_types[0]
@@ -110,7 +114,7 @@ export default function ChecksPage() {
               return (
                 <tr key={m.id}>
                   <Td className="uppercase">{m.stage}</Td>
-                  <Td className="font-mono">{m.sort_order}</Td>
+                  <Td num>{m.sort_order}</Td>
                   <Td>{ct?.name ?? "—"}</Td>
                 </tr>
               );

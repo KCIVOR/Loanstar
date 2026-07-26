@@ -122,6 +122,7 @@ export const MODULES: readonly ModuleDefinition[] = [
 
 /** Application status values for the borrower timeline (End-to-End workflow). */
 export const APPLICATION_STATUSES = [
+  "draft",
   "registered",
   "documents_pending",
   "submitted",
@@ -132,6 +133,7 @@ export const APPLICATION_STATUSES = [
   "negotiating_terms",
   "awaiting_confirmation",
   "on_hold",
+  "committee_hold",
   "for_revision",
   "lra_pending",
   "release_signing",
@@ -140,6 +142,7 @@ export const APPLICATION_STATUSES = [
   "released",
   "closed",
   "loan_active",
+  "paid_off",
 ] as const;
 
 export type ApplicationStatus = (typeof APPLICATION_STATUSES)[number];

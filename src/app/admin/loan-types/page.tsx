@@ -18,7 +18,6 @@ import {
   Th,
 } from "@/components/ui";
 
-
 type LoanType = {
   id: string;
   name: string;
@@ -149,10 +148,30 @@ export default function LoanTypesPage() {
         open={showForm}
         title="Enroll new rate version"
         onClose={() => setShowForm(false)}
+        footer={
+          <>
+            <Button
+              variant="ghost"
+              onClick={() => setShowForm(false)}
+              disabled={saving}
+            >
+              Cancel
+            </Button>
+            <Button type="submit" form="enroll-rate-form" loading={saving}>
+              Enroll new rate version
+            </Button>
+          </>
+        }
       >
-        <form onSubmit={(e) => void handleEnroll(e)} className="space-y-4">
+        <form
+          id="enroll-rate-form"
+          onSubmit={(e) => void handleEnroll(e)}
+          className="space-y-4"
+        >
           <div>
-            <Label htmlFor="lt-name">Loan type name</Label>
+            <Label htmlFor="lt-name" required>
+              Loan type name
+            </Label>
             <Input
               id="lt-name"
               required
@@ -163,7 +182,9 @@ export default function LoanTypesPage() {
           </div>
           <div className="grid gap-4 sm:grid-cols-2">
             <div>
-              <Label htmlFor="lt-interest">Interest rate (decimal)</Label>
+              <Label htmlFor="lt-interest" required>
+                Interest rate (decimal)
+              </Label>
               <Input
                 id="lt-interest"
                 type="number"
@@ -171,10 +192,13 @@ export default function LoanTypesPage() {
                 required
                 value={interestRate}
                 onChange={(e) => setInterestRate(e.target.value)}
+                className="mono"
               />
             </div>
             <div>
-              <Label htmlFor="lt-pf">PF rate (decimal, min {(MIN_PF_RATE * 100).toFixed(3)}%)</Label>
+              <Label htmlFor="lt-pf" required>
+                PF rate (decimal, min {(MIN_PF_RATE * 100).toFixed(3)}%)
+              </Label>
               <Input
                 id="lt-pf"
                 type="number"
@@ -182,11 +206,14 @@ export default function LoanTypesPage() {
                 required
                 value={pfRate}
                 onChange={(e) => setPfRate(e.target.value)}
+                className="mono"
               />
             </div>
           </div>
           <div>
-            <Label htmlFor="lt-effective">Effective from</Label>
+            <Label htmlFor="lt-effective" required>
+              Effective from
+            </Label>
             <Input
               id="lt-effective"
               type="date"
@@ -194,18 +221,6 @@ export default function LoanTypesPage() {
               value={effectiveFrom}
               onChange={(e) => setEffectiveFrom(e.target.value)}
             />
-          </div>
-          <div className="flex justify-end gap-2">
-            <Button
-              variant="secondary"
-              onClick={() => setShowForm(false)}
-              disabled={saving}
-            >
-              Cancel
-            </Button>
-            <Button type="submit" disabled={saving}>
-              {saving ? "Enrolling…" : "Enroll new rate version"}
-            </Button>
           </div>
         </form>
       </Modal>
@@ -217,27 +232,27 @@ export default function LoanTypesPage() {
           <thead>
             <tr>
               <Th>Name</Th>
-              <Th>Interest</Th>
-              <Th>PF Rate</Th>
+              <Th num>Interest</Th>
+              <Th num>PF Rate</Th>
               <Th>Status</Th>
               <Th>Effective</Th>
               <Th>Enrolled</Th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-neutral-200 bg-white">
+          <tbody>
             {loanTypes.map((lt) => (
               <tr key={lt.id}>
-                <Td className="font-medium">{lt.name}</Td>
-                <Td>{formatRate(lt.interest_rate)}</Td>
-                <Td>{formatRate(lt.pf_rate)}</Td>
+                <Td className="font-medium text-ink-900">{lt.name}</Td>
+                <Td num>{formatRate(lt.interest_rate)}</Td>
+                <Td num>{formatRate(lt.pf_rate)}</Td>
                 <Td>
                   <StatusBadge active={lt.is_active} />
                 </Td>
-                <Td className="font-mono text-sm">
+                <Td className="mono text-sm">
                   {lt.effective_from}
                   {lt.effective_to ? ` → ${lt.effective_to}` : ""}
                 </Td>
-                <Td className="font-mono text-xs text-ink-faint">
+                <Td className="mono text-xs text-ink-400">
                   {new Date(lt.enrolled_at).toLocaleString()}
                 </Td>
               </tr>

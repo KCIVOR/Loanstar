@@ -11,6 +11,7 @@ type RouteParams = { params: Promise<{ id: string }> };
 
 const schema = z.object({
   depositReference: z.string().min(1),
+  depositAmount: z.number().positive(),
   depositProofPath: z.string().optional(),
 });
 

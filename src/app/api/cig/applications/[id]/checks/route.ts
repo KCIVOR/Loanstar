@@ -4,7 +4,15 @@ import { z } from "zod";
 import { writeAuditEvent } from "@/lib/audit/writer";
 import { handleApiError, jsonOk } from "@/lib/api/handler";
 import { assertCigVerificationStage } from "@/lib/cig/queue";
-import { tryAutoForwardToCommittee } from "@/lib/cig/forward";
+import {
+  assertChecksRecordingAllowed,
+  CigSequenceError,
+  getCigSequenceState,
+} from "@/lib/cig/sequence";
+import {
+  getCigChecksComplete,
+  getOrCreateVerification,
+} from "@/lib/cig/verification";
 import { requireModulePermission } from "@/lib/permissions/server";
 import { createClient } from "@/lib/supabase/server";
 
@@ -87,6 +95,12 @@ export async function POST(request: Request, { params }: RouteParams) {
     const supabase = await createClient();
     await assertCigVerificationStage(supabase, id);
 
+    const verification = await getOrCreateVerification(supabase, id);
+    const checksBefore = await getCigChecksComplete(supabase, id);
+    assertChecksRecordingAllowed(
+      getCigSequenceState(verification, checksBefore.complete),
+    );
+
     const { data: checkType, error: typeError } = await supabase
       .from("check_types")
       .select("id, slug")
@@ -135,19 +149,6 @@ export async function POST(request: Request, { params }: RouteParams) {
       },
     });
 
-    const forward = await tryAutoForwardToCommittee(supabase, id, user.id);
-
-    if (forward.forwarded) {
-      await writeAuditEvent({
-        actorId: user.id,
-        moduleSlug: "verification",
-        action: "execute_trigger",
-        entityType: "loan_application",
-        entityId: id,
-        afterData: { trigger: "auto_forward_committee", status: "for_approval" },
-      });
-    }
-
     return jsonOk({
       check: {
         id: data.id,
@@ -155,11 +156,12 @@ export async function POST(request: Request, { params }: RouteParams) {
         result: data.result,
         checkedAt: data.checked_at,
       },
-      forwarded: forward.forwarded,
-      missing: forward.missing,
     });
   } catch (error) {
     if (error instanceof z.ZodError) {
+      return NextResponse.json({ error: error.message }, { status: 400 });
+    }
+    if (error instanceof CigSequenceError) {
       return NextResponse.json({ error: error.message }, { status: 400 });
     }
     return handleApiError(error);

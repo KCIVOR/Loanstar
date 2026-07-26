@@ -3,7 +3,10 @@ import { z } from "zod";
 
 import { writeAuditEvent } from "@/lib/audit/writer";
 import { handleApiError, jsonOk } from "@/lib/api/handler";
-import { committeeOverrideAmount } from "@/lib/negotiation/service";
+import {
+  committeeAdjustPreDecision,
+  committeeOverrideAmount,
+} from "@/lib/negotiation/service";
 import { requireModulePermission } from "@/lib/permissions/server";
 import { createClient } from "@/lib/supabase/server";
 
@@ -30,14 +33,20 @@ export async function POST(request: Request, { params }: RouteParams) {
       .eq("id", id)
       .single();
 
-    if (!app || app.status !== "negotiating_terms") {
+    if (!app || !["for_approval", "negotiating_terms"].includes(app.status)) {
       return NextResponse.json(
-        { error: "Override only available during negotiation" },
+        { error: "Override only available before or during negotiation" },
         { status: 400 },
       );
     }
 
-    const saved = await committeeOverrideAmount(supabase, id, user.id, body);
+    // Before the decision (for_approval): adjust the active computation only,
+    // no status/negotiation change. During negotiation: the full override —
+    // updates the negotiation record and moves status to awaiting_confirmation.
+    const isPreDecision = app.status === "for_approval";
+    const saved = isPreDecision
+      ? await committeeAdjustPreDecision(supabase, id, user.id, body)
+      : await committeeOverrideAmount(supabase, id, user.id, body);
 
     await writeAuditEvent({
       actorId: user.id,
@@ -47,7 +56,9 @@ export async function POST(request: Request, { params }: RouteParams) {
       entityId: saved.computation.id,
       afterData: {
         applicationId: id,
-        trigger: "committee_override",
+        trigger: isPreDecision
+          ? "committee_adjust_pre_decision"
+          : "committee_override",
         netReleased: saved.computation.netReleased,
       },
     });

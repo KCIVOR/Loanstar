@@ -1,6 +1,6 @@
-import { createClient } from "@/lib/supabase/server";
 import { getRequestIp } from "@/lib/permissions/server";
 import type { ModuleSlug } from "@/lib/permissions/types";
+import { createServiceClient } from "@/lib/supabase/server";
 
 export type AuditAction =
   | "create"
@@ -29,8 +29,12 @@ export type AuditEvent = WriteAuditEventInput & {
 };
 
 /**
- * Appends an immutable row to `audit_events`.
- * RLS requires `actor_id = auth.uid()` for authenticated inserts.
+ * Appends an immutable row to `audit_events` via the service-role client.
+ *
+ * Authenticated INSERT is allowed (`actor_id = auth.uid()`), but SELECT is
+ * limited to audit_log viewers. `insert().select()` therefore fails RLS for
+ * most portal roles (e.g. committee). Service role matches the original
+ * "insert via service" design and lets RETURNING succeed.
  *
  * Audit logging is best-effort: callers invoke this after their primary
  * mutation has already succeeded, so a failed audit write must never turn
@@ -41,7 +45,7 @@ export async function writeAuditEvent(
   input: WriteAuditEventInput,
 ): Promise<AuditEvent | null> {
   try {
-    const supabase = await createClient();
+    const supabase = createServiceClient();
     const ipAddress = input.ipAddress ?? (await getRequestIp());
 
     const { data, error } = await supabase

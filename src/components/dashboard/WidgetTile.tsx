@@ -3,16 +3,18 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 
-type Tone = "default" | "gold" | "danger" | "success";
+import { cn } from "@/components/ui/cn";
+
+type Tone = "default" | "gold" | "teal" | "danger" | "success";
 
 function toneClass(tone: Tone): string {
-  return tone === "gold"
-    ? "text-gold-600"
+  return tone === "gold" || tone === "teal"
+    ? "text-teal-600"
     : tone === "danger"
-      ? "text-danger-ink"
+      ? "text-danger"
       : tone === "success"
-        ? "text-success-ink"
-        : "text-ink";
+        ? "text-success"
+        : "text-ink-900";
 }
 
 /** Full-width module heading — link to the portal, plus a short hint. */
@@ -29,22 +31,22 @@ export function SectionHeader({
     <div className="mb-3 flex flex-wrap items-baseline justify-between gap-2">
       <Link
         href={href}
-        className="group inline-flex items-center gap-1.5 text-[15px] font-bold text-ink hover:text-gold-600"
+        className="group inline-flex items-center gap-1.5 text-[15px] font-bold text-ink-900 hover:text-teal-700"
       >
         {title}
         <span
           aria-hidden
-          className="text-ink-faint transition-transform group-hover:translate-x-0.5 group-hover:text-gold-600"
+          className="text-ink-400 transition-transform group-hover:translate-x-0.5 group-hover:text-teal-700"
         >
           →
         </span>
       </Link>
-      {hint ? <span className="text-xs text-ink-faint">{hint}</span> : null}
+      {hint ? <span className="text-xs text-ink-400">{hint}</span> : null}
     </div>
   );
 }
 
-/** A single white-surface stat card for dashboard modules (not the navy ui/KpiCard). */
+/** A single white-surface stat card for dashboard modules. */
 export function StatCard({
   label,
   value,
@@ -55,18 +57,18 @@ export function StatCard({
   tone?: Tone;
 }) {
   return (
-    <div className="min-w-[132px] flex-1 rounded-[12px] border border-neutral-200 bg-white p-4 shadow-xs">
-      <p className="truncate text-[10.5px] font-semibold uppercase tracking-[0.05em] text-ink-faint">
+    <div className="card min-w-[132px] flex-1 p-4">
+      <p className="truncate font-mono text-[10.5px] uppercase tracking-[0.05em] text-ink-400">
         {label}
       </p>
-      <p className={`mt-1 font-display text-2xl font-semibold leading-tight ${toneClass(tone)}`}>
+      <p className={cn("mt-1 font-display text-2xl font-semibold leading-tight", toneClass(tone))}>
         {value}
       </p>
     </div>
   );
 }
 
-/** A single chart, as its own bordered card. `size` controls its share of the row. */
+/** A single chart card. `size` controls its grid share. */
 export function ChartCard({
   title,
   caption,
@@ -79,19 +81,15 @@ export function ChartCard({
   children: ReactNode;
 }) {
   return (
-    <div
-      className={`rounded-[12px] border border-neutral-200 bg-white p-4 shadow-xs ${
-        size === "full" ? "md:col-span-2" : ""
-      }`}
-    >
-      <p className="mb-2 text-[11px] font-semibold text-ink-muted">{title}</p>
+    <div className={cn("card p-4", size === "full" && "md:col-span-2")}>
+      <p className="mb-2 text-[11px] font-semibold text-ink-500">{title}</p>
       {children}
-      {caption ? <p className="mt-1.5 text-[10px] text-ink-faint">{caption}</p> : null}
+      {caption ? <p className="mt-1.5 text-[10px] text-ink-400">{caption}</p> : null}
     </div>
   );
 }
 
-/** A small data table, as its own bordered card. */
+/** A small data table card. */
 export function TableCard<T>({
   title,
   columns,
@@ -106,8 +104,8 @@ export function TableCard<T>({
   emptyText?: string;
 }) {
   return (
-    <div className="rounded-[12px] border border-neutral-200 bg-white p-4 shadow-xs md:col-span-2">
-      <p className="mb-2 text-[11px] font-semibold text-ink-muted">{title}</p>
+    <div className="card p-4 md:col-span-2">
+      <p className="mb-2 text-[11px] font-semibold text-ink-500">{title}</p>
       {rows.length > 0 ? (
         <div className="overflow-x-auto">
           <table className="w-full min-w-[420px] text-left text-[11.5px]">
@@ -116,14 +114,14 @@ export function TableCard<T>({
                 {columns.map((col) => (
                   <th
                     key={col}
-                    className="pb-2 pr-3 text-[10.5px] font-semibold uppercase tracking-[0.05em] text-ink-faint"
+                    className="pb-2 pr-3 font-mono text-[10.5px] uppercase tracking-[0.05em] text-ink-400"
                   >
                     {col}
                   </th>
                 ))}
               </tr>
             </thead>
-            <tbody className="divide-y divide-neutral-100">
+            <tbody className="divide-y divide-line-soft">
               {rows.map((row, i) => renderRow(row, i))}
             </tbody>
           </table>
@@ -166,13 +164,13 @@ export function WidgetSection({
     <section className={className}>
       <SectionHeader title={title} href={href} hint={hint} />
       {error ? (
-        <div className="flex flex-col items-start gap-2 rounded-[12px] border border-neutral-200 bg-white p-4 shadow-xs">
-          <p className="text-xs text-danger-ink">Couldn&apos;t load this section.</p>
+        <div className="card flex flex-col items-start gap-2 p-4">
+          <p className="text-xs text-danger">Couldn&apos;t load this section.</p>
           {onRetry ? (
             <button
               type="button"
               onClick={onRetry}
-              className="text-xs font-semibold text-gold-600 hover:underline"
+              className="text-xs font-semibold text-teal-700 hover:underline"
             >
               Retry
             </button>
@@ -185,14 +183,14 @@ export function WidgetSection({
   );
 }
 
-/** Pulsing gray block — base unit for all skeletons. */
+/** Pulsing skeleton bone. */
 function Bone({ className = "" }: { className?: string }) {
-  return <div className={`animate-pulse rounded bg-neutral-200 ${className}`} />;
+  return <div className={cn("skel", className)} />;
 }
 
 export function KpiCardSkeleton() {
   return (
-    <div className="min-w-[132px] flex-1 rounded-[12px] border border-neutral-200 bg-white p-4 shadow-xs">
+    <div className="card min-w-[132px] flex-1 p-4">
       <Bone className="h-2.5 w-16" />
       <Bone className="mt-2.5 h-6 w-12" />
     </div>
@@ -201,11 +199,7 @@ export function KpiCardSkeleton() {
 
 export function ChartCardSkeleton({ size = "half" }: { size?: "half" | "full" }) {
   return (
-    <div
-      className={`rounded-[12px] border border-neutral-200 bg-white p-4 shadow-xs ${
-        size === "full" ? "md:col-span-2" : ""
-      }`}
-    >
+    <div className={cn("card p-4", size === "full" && "md:col-span-2")}>
       <Bone className="h-2.5 w-28" />
       <Bone className="mt-3 h-[140px] w-full" />
     </div>
@@ -214,7 +208,7 @@ export function ChartCardSkeleton({ size = "half" }: { size?: "half" | "full" })
 
 export function TableCardSkeleton({ rows = 3 }: { rows?: number }) {
   return (
-    <div className="rounded-[12px] border border-neutral-200 bg-white p-4 shadow-xs md:col-span-2">
+    <div className="card p-4 md:col-span-2">
       <Bone className="h-2.5 w-24" />
       <div className="mt-3 space-y-2.5">
         {Array.from({ length: rows }).map((_, i) => (
@@ -225,7 +219,7 @@ export function TableCardSkeleton({ rows = 3 }: { rows?: number }) {
   );
 }
 
-/** Skeleton shaped like a module's actual card layout, to avoid loading-state jump. */
+/** Skeleton shaped like a module's actual card layout. */
 export function SectionSkeleton({
   kpis,
   charts,
@@ -257,7 +251,7 @@ export function SectionSkeleton({
 export function EmptyNote({ children = "No data yet." }: { children?: ReactNode }) {
   return (
     <div className="flex items-center justify-center py-6">
-      <p className="text-xs text-ink-faint">{children}</p>
+      <p className="text-xs text-ink-400">{children}</p>
     </div>
   );
 }

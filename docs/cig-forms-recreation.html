@@ -1,0 +1,976 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CIG Source Files — Recreated</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700;800&family=Public+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --navy-950:#071633; --navy-900:#0C2247; --navy-800:#123061; --navy-700:#1A407D; --navy-600:#23539E; --navy-500:#2F68BE;
+  --navy-200:#B9CBE7; --navy-100:#DCE5F3; --navy-50:#EEF3FA;
+  --teal-700:#0A7D71; --teal-600:#0D9488; --teal-500:#12A797; --teal-400:#2DC7B6; --teal-100:#C9F0EA; --teal-50:#E9FAF7;
+  --ink-900:#16233B; --ink-700:#3E4C66; --ink-500:#62708A; --ink-400:#8C99B0; --ink-300:#B4BECF;
+  --line:#D9E0EB; --line-soft:#E7ECF3; --surface:#FFFFFF; --surface-2:#F3F6FA; --canvas:#F7F9FC;
+  --success:#178A50; --success-bg:#E8F6EE; --success-line:#BCE4CD;
+  --warning:#B96A00; --warning-bg:#FDF3E3; --warning-line:#F2D9AC;
+  --danger:#C2362F; --danger-bg:#FCEBEA; --danger-line:#F2C4C1;
+  --info:#23539E; --info-bg:#E8F0FB; --info-line:#C4D6EF;
+  --font-display:'Sora',sans-serif; --font-body:'Public Sans',sans-serif; --font-mono:'JetBrains Mono',monospace;
+  --r-sm:6px; --r-md:10px; --r-lg:14px; --r-xl:20px; --r-full:999px;
+  --sh-1:0 1px 2px rgba(12,34,71,.06); --sh-2:0 2px 8px rgba(12,34,71,.08); --sh-3:0 8px 24px rgba(12,34,71,.12);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:var(--font-body);color:var(--ink-900);background:var(--canvas);font-size:14.5px;line-height:1.55;-webkit-font-smoothing:antialiased}
+
+/* ---------- header ---------- */
+.doc-header{background:linear-gradient(135deg,var(--navy-950) 0%,var(--navy-900) 55%,var(--navy-800) 100%);color:#fff;padding:34px 32px 26px;position:relative;overflow:hidden}
+.doc-header::after{content:"";position:absolute;inset:0;background-image:radial-gradient(circle at 85% 20%,rgba(45,199,182,.14),transparent 45%);pointer-events:none}
+.doc-header-inner{max-width:1280px;margin:0 auto;position:relative;z-index:1}
+.doc-kicker{font-family:var(--font-mono);font-size:11.5px;letter-spacing:.16em;text-transform:uppercase;color:var(--teal-400);display:flex;align-items:center;gap:12px;margin-bottom:12px}
+.doc-kicker::after{content:"";height:1px;width:64px;background:var(--teal-400);opacity:.6}
+.doc-header h1{font-family:var(--font-display);font-size:27px;font-weight:800;letter-spacing:-.02em}
+.doc-header p{margin-top:8px;max-width:820px;color:var(--navy-100);font-size:13.5px}
+
+/* ---------- file tabs (one per actual xlsx) ---------- */
+.tabbar-wrap{position:sticky;top:0;z-index:50;background:var(--canvas);border-bottom:1px solid var(--line);box-shadow:var(--sh-1)}
+.tabbar{max-width:1280px;margin:0 auto;padding:0 32px;display:flex;gap:4px;overflow-x:auto}
+.tabbtn{padding:13px 16px;font-family:var(--font-mono);font-size:12px;font-weight:600;color:var(--ink-500);background:none;border:none;border-bottom:3px solid transparent;cursor:pointer;white-space:nowrap;transition:color .12s,border-color .12s;display:flex;align-items:center;gap:7px}
+.tabbtn:hover{color:var(--navy-800)}
+.tabbtn.is-active{color:var(--navy-900);border-bottom-color:var(--teal-600)}
+.tabbtn svg{width:14px;height:14px;color:var(--teal-600);flex-shrink:0}
+
+.wrap{max-width:1280px;margin:0 auto;padding:28px 32px 96px}
+.view{display:none}
+.view.is-active{display:block}
+
+.filehead{display:flex;align-items:center;gap:14px;margin-bottom:4px;flex-wrap:wrap}
+.filehead .fname{font-family:var(--font-mono);font-size:19px;font-weight:700;color:var(--navy-900)}
+.filehead .fmeta{font-size:12px;color:var(--ink-400);font-family:var(--font-mono)}
+.sec-rule{height:1px;background:var(--line);position:relative;margin:12px 0 18px}
+.sec-rule::before{content:"";position:absolute;left:0;top:-2px;width:48px;height:4px;background:var(--teal-600);border-radius:3px}
+.lede{color:var(--ink-500);max-width:900px;margin-bottom:18px;font-size:13.3px}
+
+/* sheet strip: real sheet names from the workbook */
+.sheetstrip-wrap{margin-bottom:22px}
+.sheetstrip-label{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--ink-400);margin-bottom:8px}
+.sheetstrip{display:flex;gap:6px;overflow-x:auto;padding-bottom:8px}
+.sheetpill{font-family:var(--font-mono);font-size:11px;background:#fff;border:1px solid var(--line);color:var(--ink-500);padding:5px 10px;border-radius:var(--r-sm);white-space:nowrap;flex-shrink:0}
+.sheetpill.is-active{background:var(--navy-900);border-color:var(--navy-900);color:#fff}
+.sheetpill.irregular{border-style:dashed;color:var(--warning);background:var(--warning-bg);border-color:var(--warning-line)}
+
+.note{display:flex;gap:10px;background:var(--info-bg);border:1px solid var(--info-line);color:var(--info);padding:10px 14px;border-radius:var(--r-md);font-size:12.3px;margin-bottom:20px}
+.note b{color:var(--info)}
+.ribbon{display:flex;align-items:center;gap:10px;background:var(--warning-bg);border:1px solid var(--warning-line);color:var(--warning);padding:8px 14px;border-radius:var(--r-md);font-size:12px;font-weight:600;margin-bottom:20px}
+
+/* ---------- cards ---------- */
+.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r-lg);box-shadow:var(--sh-1);margin-bottom:18px}
+.card-head{padding:13px 20px;border-bottom:1px solid var(--line-soft);display:flex;align-items:center;justify-content:space-between;gap:12px;background:var(--surface-2);border-radius:var(--r-lg) var(--r-lg) 0 0}
+.card-head h4{font-family:var(--font-display);font-size:13.5px;font-weight:700;color:var(--navy-900);display:flex;align-items:center;gap:8px}
+.card-head h4 .idx{font-family:var(--font-mono);font-size:11px;color:#fff;background:var(--navy-700);width:20px;height:20px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;flex-shrink:0}
+.card-pad{padding:19px 20px}
+.card-foot{padding:11px 20px;border-top:1px dashed var(--line);font-size:11.5px;color:var(--ink-400)}
+
+/* ---------- form fields ---------- */
+.grid{display:grid;gap:16px 18px}
+.g2{grid-template-columns:repeat(2,1fr)}
+.g3{grid-template-columns:repeat(3,1fr)}
+.g4{grid-template-columns:repeat(4,1fr)}
+@media (max-width:760px){.g2,.g3,.g4{grid-template-columns:1fr}}
+
+.field{display:flex;flex-direction:column;gap:5px;min-width:0}
+.field label{font-size:12px;font-weight:600;color:var(--ink-700)}
+.field label .opt{font-weight:500;color:var(--ink-400);font-size:11px}
+.field .input,.field .select,.field .textarea{
+  font-family:var(--font-body);font-size:13.5px;color:var(--ink-900);background:#fff;
+  border:1px solid var(--line);border-radius:var(--r-md);height:38px;padding:0 11px;width:100%;
+}
+.field .textarea{height:auto;min-height:60px;padding:9px 11px;resize:vertical;line-height:1.5}
+.field .input:disabled{background:var(--surface-2)}
+.mono{font-family:var(--font-mono) !important;font-variant-numeric:tabular-nums}
+
+.radiorow{display:flex;gap:16px;align-items:center;height:38px;flex-wrap:wrap}
+.check,.radio{display:flex;align-items:center;gap:7px;cursor:pointer;font-size:13px;color:var(--ink-700)}
+.check input,.radio input{appearance:none;width:16px;height:16px;flex-shrink:0;border:1.5px solid var(--ink-300);background:#fff}
+.check input{border-radius:4px}
+.radio input{border-radius:50%}
+.check input:checked{background:var(--teal-600) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='3.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M20 6 9 17l-5-5'/%3E%3C/svg%3E") center/11px no-repeat;border-color:var(--teal-600)}
+.radio input:checked{border:5px solid var(--teal-600)}
+
+.subhead{font-family:var(--font-display);font-size:12px;font-weight:700;color:var(--navy-800);text-transform:uppercase;letter-spacing:.05em;margin:16px 0 11px;display:flex;align-items:center;gap:8px}
+.subhead:first-child{margin-top:0}
+.subhead::after{content:"";flex:1;height:1px;background:var(--line-soft)}
+.subhead .opt-tag{font-family:var(--font-mono);text-transform:none;letter-spacing:0;font-size:10.5px;color:var(--ink-400);background:var(--surface-2);border:1px solid var(--line);padding:2px 7px;border-radius:var(--r-full);font-weight:500}
+
+.reprow{display:grid;grid-template-columns:2fr .6fr 1.4fr;gap:10px;margin-bottom:10px}
+@media (max-width:760px){.reprow{grid-template-columns:1fr}}
+
+.itbl{width:100%;border-collapse:collapse;font-size:12.8px}
+.itbl th{text-align:left;padding:8px 10px;background:var(--surface-2);font-size:10.3px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-500);border-bottom:1px solid var(--line)}
+.itbl td{padding:8px 10px;border-bottom:1px solid var(--line-soft)}
+.itbl td.num{text-align:right;font-family:var(--font-mono)}
+.itbl tr.tot td{font-weight:700;color:var(--navy-900);border-top:1.5px solid var(--line);border-bottom:none}
+.itbl tr.gtot td{font-weight:800;color:#fff;background:var(--navy-900)}
+.itbl tr.gtot td:first-child{border-radius:var(--r-sm) 0 0 var(--r-sm)}
+.itbl tr.gtot td:last-child{border-radius:0 var(--r-sm) var(--r-sm) 0}
+
+.badge{display:inline-flex;align-items:center;gap:6px;height:22px;padding:0 9px;border-radius:var(--r-full);font-size:11px;font-weight:700;letter-spacing:.01em;border:1px solid transparent;white-space:nowrap}
+.badge .dot{width:6px;height:6px;border-radius:50%;background:currentColor}
+.badge-navy{background:var(--navy-50);color:var(--navy-700);border-color:var(--navy-100)}
+.badge-teal{background:var(--teal-50);color:var(--teal-700);border-color:var(--teal-100)}
+.badge-success{background:var(--success-bg);color:var(--success);border-color:var(--success-line)}
+.badge-warning{background:var(--warning-bg);color:var(--warning);border-color:var(--warning-line)}
+.badge-danger{background:var(--danger-bg);color:var(--danger);border-color:var(--danger-line)}
+.badge-neutral{background:var(--surface-2);color:var(--ink-500);border-color:var(--line)}
+
+.table-wrap{width:100%;overflow-x:auto;border:1px solid var(--line);border-radius:var(--r-lg);background:#fff}
+table.tbl{width:100%;border-collapse:collapse;font-size:12.3px;min-width:900px}
+.tbl thead th{text-align:left;padding:10px 13px;background:var(--surface-2);font-size:10.3px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-500);border-bottom:1px solid var(--line);white-space:nowrap}
+.tbl thead tr.grp th{background:var(--navy-50);color:var(--navy-700);border-bottom:1px solid var(--navy-100);text-align:center}
+.tbl tbody td{padding:11px 13px;border-bottom:1px solid var(--line-soft);vertical-align:middle;white-space:nowrap}
+.tbl tbody tr:last-child td{border-bottom:none}
+.tbl tbody tr:hover{background:var(--navy-50)}
+.tbl td.num,.tbl th.num{text-align:right;font-family:var(--font-mono)}
+.tbl .wraptxt{white-space:normal;max-width:220px}
+
+.tl{position:relative;padding-left:28px;width:100%;max-width:640px}
+.tl::before{content:"";position:absolute;left:9px;top:6px;bottom:6px;width:2px;background:var(--line)}
+.tl-item{position:relative;padding-bottom:20px}
+.tl-item:last-child{padding-bottom:0}
+.tl-item .pt{position:absolute;left:-28px;top:1px;width:19px;height:19px;border-radius:50%;background:#fff;border:2px solid var(--ink-300)}
+.tl-item.done .pt{background:var(--teal-600);border-color:var(--teal-600)}
+.tl-item.cur .pt{border-color:var(--teal-600);box-shadow:0 0 0 4px var(--teal-100)}
+.tl-item.warn .pt{background:var(--warning-bg);border-color:var(--warning)}
+.tl-item .tl-h{display:flex;align-items:center;gap:9px;flex-wrap:wrap}
+.tl-item .tl-h b{font-size:13.3px;font-weight:700;color:var(--ink-900)}
+.tl-item .when{font-family:var(--font-mono);font-size:11px;color:var(--ink-400);margin-left:auto}
+.tl-item p{font-size:12.3px;color:var(--ink-500);margin-top:4px;max-width:560px}
+.tl-item .by{font-size:11.5px;color:var(--ink-400);margin-top:3px}
+
+.xwalk{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+.xwalk .xi{font-size:11px;font-family:var(--font-mono);background:var(--surface-2);border:1px solid var(--line);padding:4px 9px;border-radius:var(--r-sm);color:var(--ink-500)}
+
+.two-col{display:grid;grid-template-columns:1.15fr .85fr;gap:18px}
+@media (max-width:980px){.two-col{grid-template-columns:1fr}}
+
+.script{font-family:var(--font-body);font-style:italic;font-size:13px;color:var(--ink-700);background:var(--teal-50);border-left:3px solid var(--teal-500);padding:9px 13px;border-radius:0 var(--r-sm) var(--r-sm) 0;margin-bottom:12px;line-height:1.5}
+.script::before{content:"\201C";font-style:normal;color:var(--teal-600);font-weight:700;margin-right:2px}
+.script::after{content:"\201D";font-style:normal;color:var(--teal-600);font-weight:700}
+.script b{font-style:normal;font-weight:700}
+.formtoggle{display:inline-flex;background:var(--surface-2);border:1px solid var(--line);border-radius:var(--r-full);padding:3px;gap:2px;margin-bottom:18px}
+.ftbtn{border:none;border-radius:var(--r-full);padding:7px 16px;margin:0;font-size:12.5px;font-family:var(--font-mono);font-weight:600;background:none;color:var(--ink-500);cursor:pointer}
+.ftbtn.is-active{background:#fff;color:var(--navy-900);box-shadow:var(--sh-1)}
+.formview{display:none}
+.formview.is-active{display:block}
+</style>
+</head>
+<body>
+
+<div class="doc-header">
+  <div class="doc-header-inner">
+    <div class="doc-kicker">SF · CIG · Step 2</div>
+    <h1>CIG Source Files — Recreated 1:1</h1>
+    <p>Each tab below is one actual .xlsx file from <code>Step 2 - CIG/SF/</code>, rebuilt as a form using its real sheet names, column layout, and field order — styled with the Meridian tokens so it reads like the eventual in-system page. Sample data on every field is fictional; only structure comes from your files. No app code was touched.</p>
+  </div>
+</div>
+
+<div class="tabbar-wrap">
+  <div class="tabbar" id="tabbar">
+    <button class="tabbtn is-active" data-view="f1"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg>CI AND REFERENCES FORM 1.xlsx</button>
+    <button class="tabbtn" data-view="f2"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg>CI MONITORING.xlsx</button>
+    <button class="tabbtn" data-view="f3"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg>FOR ASSESMENT.xlsx</button>
+    <button class="tabbtn" data-view="f4"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg>UPDATED REPORT AS CANCELLED.xlsx</button>
+    <button class="tabbtn" data-view="f5"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg>UPDATED REPORT AS TO DENIED.xlsx</button>
+    <button class="tabbtn" data-view="f6"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg>UPDATED REPORT TO PROCESSING.xlsx</button>
+  </div>
+</div>
+
+<div class="wrap">
+
+<!-- ============================================================ FILE 1 — CI AND REFERENCES FORM 1.xlsx ============================================================ -->
+<div class="view is-active" id="f1">
+  <div class="filehead"><span class="fname">CI AND REFERENCES FORM 1.xlsx</span><span class="fmeta">26 KB · 2 sheets</span></div>
+  <div class="sec-rule"></div>
+  <p class="lede">The phone-verification script used when calling the PIC (Person In Charge to pay) and the two character References. Two sheets exist in the file — <code>Sheet1 (2)</code> is the newer, more complete version; <code>Sheet1</code> is the older/shorter one it replaced. Toggle below to compare.</p>
+
+  <div class="sheetstrip-wrap">
+    <div class="sheetstrip-label">Sheets in this workbook</div>
+    <div class="sheetstrip">
+      <span class="sheetpill">Sheet1 (older)</span>
+      <span class="sheetpill is-active">Sheet1 (2) (current)</span>
+    </div>
+  </div>
+
+  <div class="formtoggle">
+    <button class="ftbtn" data-form="pic-v1">Sheet1 — older version</button>
+    <button class="ftbtn is-active" data-form="pic-v2">Sheet1 (2) — current version</button>
+  </div>
+  <div class="ribbon">⚠ Sample data shown is fictional — for layout demonstration only.</div>
+
+  <!-- ---- v2 (current) ---- -->
+  <div class="formview is-active" id="pic-v2">
+    <div class="card">
+      <div class="card-head"><h4>I. Allottee / Person-in-Charge Information</h4></div>
+      <div class="card-pad">
+        <div class="grid g3">
+          <div class="field" style="grid-column:span 2"><label>Borrower's Name</label><input class="input" value="DELA CRUZ, JUAN SANTOS" disabled></div>
+          <div class="field"><label>Name</label><input class="input" value="DELA CRUZ, MARIA LOURDES" disabled></div>
+        </div>
+        <div class="grid g3" style="margin-top:16px">
+          <div class="field"><label>Birthday</label><input class="input" value="04/12/1992" disabled></div>
+          <div class="field" style="grid-column:span 2"><label>Present Address</label><input class="input" value="Blk 5 Lot 12 Sampaguita St., Brgy. San Isidro, Cavite City" disabled></div>
+        </div>
+        <div class="grid g4" style="margin-top:16px">
+          <div class="field"><label>Ownership</label><div class="radiorow"><label class="radio"><input type="radio" name="own1" checked disabled><span>Owned</span></label><label class="radio"><input type="radio" name="own1" disabled><span>Rented</span></label></div></div>
+          <div class="field"><label>Years of Stay</label><input class="input" value="5 yrs" disabled></div>
+          <div class="field" style="grid-column:span 2"><label>Provincial Address</label><input class="input" value="Brgy. Poblacion, Roxas City, Capiz" disabled></div>
+        </div>
+        <div class="grid g4" style="margin-top:16px">
+          <div class="field"><label>Ownership</label><div class="radiorow"><label class="radio"><input type="radio" name="own2" checked disabled><span>Owned</span></label><label class="radio"><input type="radio" name="own2" disabled><span>Rented</span></label></div></div>
+          <div class="field"><label>Years of Stay</label><input class="input" value="Since birth" disabled></div>
+          <div class="field"><label>Contact Number</label><input class="input mono" value="0917 234 5678" disabled></div>
+          <div class="field"><label>Relation to the Client</label><input class="input" value="Wife" disabled></div>
+        </div>
+        <div class="grid g4" style="margin-top:16px">
+          <div class="field"><label>Other Number</label><input class="input mono" value="—" disabled></div>
+          <div class="field"><label>Since When</label><input class="input" value="—" disabled></div>
+          <div class="field"><label>Facebook/Skype/Viber</label><input class="input" value="maria.delacruz.92" disabled></div>
+          <div class="field"><label>Email Address</label><input class="input" value="maria.delacruz@gmail.com" disabled></div>
+        </div>
+        <div class="grid g3" style="margin-top:16px">
+          <div class="field"><label>Username <span class="opt">(v2 only)</span></label><input class="input" value="—" disabled></div>
+          <div class="field" style="grid-column:span 2"><label>Source of Communication to the Borrower when on board <span class="opt">(v2 only)</span></label><input class="input" placeholder="e.g. Wi-Fi at port calls, satellite phone" disabled></div>
+        </div>
+
+        <div class="subhead">Work Information</div>
+        <div class="grid g3">
+          <div class="field"><label>Name of Company</label><input class="input" value="Cavite City Elem. School (DepEd)" disabled></div>
+          <div class="field"><label>Years of Stay</label><input class="input" value="6 yrs" disabled></div>
+          <div class="field"><label>Company Phone Number</label><input class="input mono" value="(046) 123-4567" disabled></div>
+        </div>
+
+        <div class="subhead">Siblings <span class="opt-tag">repeatable</span></div>
+        <div class="reprow"><div class="field"><label>Name</label><input class="input" value="DELA CRUZ, ROSA S." disabled></div><div class="field"><label>Age</label><input class="input" value="38" disabled></div><div class="field"><label>Occupation</label><input class="input" value="OFW — Domestic Worker (HK)" disabled></div></div>
+        <div class="reprow"><div class="field"><label>Name</label><input class="input" value="DELA CRUZ, MARK S." disabled></div><div class="field"><label>Age</label><input class="input" value="30" disabled></div><div class="field"><label>Occupation</label><input class="input" value="Tricycle Driver" disabled></div></div>
+
+        <div class="subhead">Other Informations</div>
+        <div class="script">Are you inform that he will avail the loan ?</div>
+        <div class="field" style="max-width:220px">
+          <div class="radiorow"><label class="radio"><input type="radio" name="q1" checked disabled><span>YES</span></label><label class="radio"><input type="radio" name="q1" disabled><span>NO</span></label></div>
+        </div>
+
+        <div class="script" style="margin-top:16px">Aside from LOAN STAR LENDING GROUP CORP., is there any other FINANCING / BANK that He / She applied for? For the last 4 years?</div>
+        <table class="itbl">
+          <thead><tr><th>YES / NO</th><th>What company ? Was it FINANCING / BANK ?</th><th>When?</th><th class="num">Loan Amount :</th><th class="num">Monthly :</th><th>Start / End :</th><th>REMARKS :</th></tr></thead>
+          <tbody><tr><td><span class="badge badge-neutral">NO</span></td><td colspan="6" style="color:var(--ink-400)">—</td></tr></tbody>
+        </table>
+
+        <div class="grid g3" style="margin-top:16px">
+          <div class="field"><label>Housing Loan:</label><div class="radiorow"><label class="radio"><input type="radio" name="hl" disabled><span>YES</span></label></div></div>
+          <div class="field"><label>Loan Amount :</label><input class="input" disabled></div>
+          <div class="field"><label>Monthly Amort:</label><input class="input" disabled></div>
+          <div class="field"><label>Start of payment:</label><input class="input" disabled></div>
+          <div class="field" style="grid-column:span 2"><label>End of payment: / REMARKS :</label><input class="input" placeholder="— not applicable —" disabled></div>
+        </div>
+        <div class="grid g3" style="margin-top:16px">
+          <div class="field"><label>Car Loan:</label><div class="radiorow"><label class="radio"><input type="radio" name="cl" disabled><span>YES</span></label></div></div>
+          <div class="field"><label>Loan Amount :</label><input class="input" disabled></div>
+          <div class="field"><label>Monthly Amort:</label><input class="input" disabled></div>
+          <div class="field"><label>Start of payment:</label><input class="input" disabled></div>
+          <div class="field" style="grid-column:span 2"><label>End of payment: / REMARKS :</label><input class="input" placeholder="— not applicable —" disabled></div>
+        </div>
+
+        <div class="script" style="margin-top:16px">Aside from us is there any person called for verification ?</div>
+
+        <div class="grid g3">
+          <div class="field"><label>BANK Loan:</label><div class="radiorow"><label class="radio"><input type="radio" name="bl" checked disabled><span>YES</span></label></div></div>
+          <div class="field"><label>Loan Amount :</label><input class="input" value="150,000" disabled></div>
+          <div class="field"><label>Monthly Amort:</label><input class="input" value="4,800" disabled></div>
+          <div class="field"><label>Start of payment:</label><input class="input" value="Feb 2024" disabled></div>
+          <div class="field" style="grid-column:span 2"><label>End of payment: / REMARKS :</label><input class="input" value="Feb 2027 — BDO Personal Loan" disabled></div>
+        </div>
+
+        <div class="grid g2" style="margin-top:16px">
+          <div class="field"><label>None</label><div class="radiorow"><label class="radio"><input type="radio" name="q2" checked disabled><span>checked</span></label></div></div>
+        </div>
+        <div class="script">Have you recall that somebody called up for verification for the last 3 months</div>
+        <div class="field"><label>What company ? Was it lending ?</label><input class="input" placeholder="— none —" disabled></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-head"><h4>II. References Information — Reference 1</h4></div>
+      <div class="card-pad">
+        <div class="grid g3">
+          <div class="field"><label>Name :</label><input class="input" value="SANTOS, PEDRO REYES" disabled></div>
+          <div class="field"><label>Age :</label><input class="input" value="40" disabled></div>
+          <div class="field"><label>Work :</label><input class="input" value="Tricycle Driver" disabled></div>
+        </div>
+        <div class="grid g2" style="margin-top:14px">
+          <div class="field"><label>Relation to the Client</label><input class="input" value="Brother-in-law" disabled></div>
+          <div class="field"><label>How long do you know the client :</label><input class="input" value="10 yrs" disabled></div>
+        </div>
+        <div class="grid g2" style="margin-top:14px">
+          <div class="field"><label>Contact Number :</label><input class="input mono" value="0918 555 1122" disabled></div>
+          <div class="field"><label>Other Contact Number :</label><input class="input mono" value="—" disabled></div>
+        </div>
+        <div class="grid g2" style="margin-top:14px">
+          <div class="field"><label>Facebook Account : (Optional)</label><input class="input" value="pedro.reyes.santos" disabled></div>
+        </div>
+        <div class="script" style="margin-top:14px">The last time You had a conversation with the Borrower? ___________ Person in Charge? ________</div>
+        <div class="radiorow"><label class="check"><input type="checkbox" checked disabled><span>* Personal</span></label><label class="check"><input type="checkbox" checked disabled><span>* Text or Calls</span></label><label class="check"><input type="checkbox" disabled><span>* FB</span></label><label class="check"><input type="checkbox" disabled><span>* Others</span></label></div>
+
+        <div class="subhead">Spill of Information :</div>
+        <div class="script">* Is this the first time that the Borrower used you as a Character Reference?</div>
+        <div class="grid g2">
+          <div class="field"><div class="radiorow"><label class="radio"><input type="radio" name="r1a" checked disabled><span>YES</span></label><label class="radio"><input type="radio" name="r1a" disabled><span>NO</span></label></div></div>
+          <div class="field"><label>What is Company Name:</label><input class="input" placeholder="— not applicable —" disabled></div>
+        </div>
+        <div class="field" style="margin-top:10px"><label>REMARKS:</label><textarea class="textarea" disabled>Cooperative, confirmed relationship and address readily.</textarea></div>
+
+        <div class="script" style="margin-top:14px">* Aside from us, is there any person called you for verification?</div>
+        <div class="grid g2">
+          <div class="field"><label>YES — What was the name of the Company / Financing?</label><input class="input" placeholder="— not applicable —" disabled></div>
+          <div class="field"><label>NO — have you recalled that somebody called up for verification for the last 3 months?</label><input class="input" value="No" disabled></div>
+        </div>
+
+        <div class="field" style="margin-top:14px"><label>Closing Spill :</label>
+          <div class="script" style="margin-bottom:0">Sir/Maam as reference we will call you if the borrowers relative is not available / we will ask your help if needed</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-head"><h4>II. References Information — Reference 2</h4><span class="badge badge-neutral">identical field set to Reference 1</span></div>
+      <div class="card-pad">
+        <div class="grid g3">
+          <div class="field"><label>Name :</label><input class="input" value="REYES, ANA MARIE" disabled></div>
+          <div class="field"><label>Age :</label><input class="input" value="45" disabled></div>
+          <div class="field"><label>Work :</label><input class="input" value="Sari-sari Store Owner" disabled></div>
+        </div>
+        <div class="grid g2" style="margin-top:14px">
+          <div class="field"><label>Relation to the Client</label><input class="input" value="Neighbor" disabled></div>
+          <div class="field"><label>How long do you know the client :</label><input class="input" value="6 yrs" disabled></div>
+        </div>
+        <div class="grid g2" style="margin-top:14px">
+          <div class="field"><label>Contact Number :</label><input class="input mono" value="0919 222 3344" disabled></div>
+          <div class="field"><label>Other Contact Number :</label><input class="input mono" value="—" disabled></div>
+        </div>
+        <div class="grid g2" style="margin-top:14px">
+          <div class="field"><label>Facebook Account : (Optional)</label><input class="input" value="anamarie.reyes.98" disabled></div>
+        </div>
+        <div class="script" style="margin-top:14px">The last time You had a conversation with the Borrower? ___________ Person in Charge? ________</div>
+        <div class="radiorow"><label class="check"><input type="checkbox" checked disabled><span>* Personal</span></label><label class="check"><input type="checkbox" disabled><span>* Text or Calls</span></label><label class="check"><input type="checkbox" checked disabled><span>* FB</span></label><label class="check"><input type="checkbox" disabled><span>* Others</span></label></div>
+
+        <div class="subhead">Spill of Information :</div>
+        <div class="script">* Is this the first time that the Borrower used you as a Character Reference?</div>
+        <div class="grid g2">
+          <div class="field"><div class="radiorow"><label class="radio"><input type="radio" name="r2a" checked disabled><span>YES</span></label><label class="radio"><input type="radio" name="r2a" disabled><span>NO</span></label></div></div>
+          <div class="field"><label>What is Company Name:</label><input class="input" placeholder="— not applicable —" disabled></div>
+        </div>
+        <div class="field" style="margin-top:10px"><label>REMARKS:</label><textarea class="textarea" disabled>Neighbor for over 6 years, confirmed borrower's household details.</textarea></div>
+
+        <div class="script" style="margin-top:14px">* Aside from us, is there any person called you for verification?</div>
+        <div class="grid g2">
+          <div class="field"><label>YES — What was the name of the Company / Financing?</label><input class="input" placeholder="— not applicable —" disabled></div>
+          <div class="field"><label>NO — have you recalled that somebody called up for verification for the last 3 months?</label><input class="input" value="No" disabled></div>
+        </div>
+
+        <div class="field" style="margin-top:14px"><label>Closing Spill :</label>
+          <div class="script" style="margin-bottom:0">Sir/Maam as reference we will call you if the borrowers relative is not available / we will ask your help if needed</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-head"><h4>OTHER REMARKS :</h4></div>
+      <div class="card-pad">
+        <div class="grid g2">
+          <div class="field"><label>Please check if you verified the following :</label>
+            <div style="display:flex;flex-direction:column;gap:8px;margin-top:4px">
+              <label class="check"><input type="checkbox" checked disabled><span>Validate Borrower's Information</span></label>
+              <label class="check"><input type="checkbox" checked disabled><span>Validate PIC Information</span></label>
+              <label class="check"><input type="checkbox" checked disabled><span>Preside PIC Obligation / Spill</span></label>
+              <label class="check"><input type="checkbox" checked disabled><span>Verified Character References</span></label>
+            </div>
+          </div>
+          <div class="field"><label>PIC preffered payment?</label>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:4px">
+              <label class="check"><input type="checkbox" checked disabled><span>BDO</span></label><label class="check"><input type="checkbox" disabled><span>PBB</span></label>
+              <label class="check"><input type="checkbox" disabled><span>EASTWEST</span></label><label class="check"><input type="checkbox" disabled><span>UCPB</span></label>
+              <label class="check"><input type="checkbox" disabled><span>METROBANK <span class="opt">(v2)</span></span></label><label class="check"><input type="checkbox" disabled><span>BPI <span class="opt">(v2)</span></span></label>
+              <label class="check"><input type="checkbox" disabled><span>PERSONAL CHECK</span></label><label class="check"><input type="checkbox" disabled><span>OTHERS</span></label>
+            </div>
+            <input class="input" style="margin-top:8px" placeholder="BANK   :" disabled>
+            <input class="input" style="margin-top:8px" placeholder="SPECIFY :" disabled>
+          </div>
+        </div>
+        <div class="field" style="margin-top:14px"><label>REMARKS:</label><textarea class="textarea" disabled>PIC prefers salary deduction to BDO account on payday.</textarea></div>
+        <div class="script" style="margin-top:16px">How the Person In charge dealt with the verification?</div>
+        <div class="grid g4">
+          <label class="check"><input type="checkbox" checked disabled><span>Cooperative</span></label>
+          <label class="check"><input type="checkbox" disabled><span>Arrogant</span></label>
+          <label class="check"><input type="checkbox" disabled><span>Hard to Understand</span></label>
+          <label class="check"><input type="checkbox" disabled><span>Inconsistent</span></label>
+        </div>
+        <div class="field" style="margin-top:10px"><label>Others : <span class="opt">(v2 only, free text)</span></label><input class="input" value="—" disabled></div>
+        <div class="script" style="margin-top:16px">How will you rate PIC from 5 (highest) 1(lowest)</div>
+        <div class="grid g3">
+          <div class="field">
+            <div class="radiorow">
+              <label class="radio"><input type="radio" name="rate" disabled><span>1</span></label>
+              <label class="radio"><input type="radio" name="rate" disabled><span>2</span></label>
+              <label class="radio"><input type="radio" name="rate" disabled><span>3</span></label>
+              <label class="radio"><input type="radio" name="rate" disabled><span>4</span></label>
+              <label class="radio"><input type="radio" name="rate" checked disabled><span>5</span></label>
+            </div>
+          </div>
+          <div class="field" style="grid-column:span 2"><label>Why?</label><input class="input" value="Answered promptly, all details consistent with SF's declaration." disabled></div>
+        </div>
+        <div class="grid g2" style="margin-top:16px">
+          <div class="field"><label>Verified by:</label><input class="input" value="WINNIE | TONY" disabled></div>
+          <div class="field"><label>Date :</label><input class="input" value="07.23.26" disabled></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ---- v1 (older) ---- -->
+  <div class="formview" id="pic-v1">
+    <div class="note"><b>What changed vs. current:</b>&nbsp; no "Borrower's Name" header field, no Username, no "Source of Communication when on board", Housing/Car Loan and "anyone else called" folded into one question block, no Bank Loan line item, no reference contact-method checkboxes or "last conversation" field, and the payment-method checklist has no METROBANK/BPI.</div>
+    <div class="card">
+      <div class="card-head"><h4>I. Allottee / Person-in-Charge Information</h4></div>
+      <div class="card-pad">
+        <div class="grid g3">
+          <div class="field"><label>Name (PIC)</label><input class="input" value="DELA CRUZ, MARIA LOURDES" disabled></div>
+          <div class="field"><label>Birthday</label><input class="input" value="04/12/1992" disabled></div>
+          <div class="field"><label>Contact Number</label><input class="input mono" value="0917 234 5678" disabled></div>
+        </div>
+        <div class="grid g3" style="margin-top:16px">
+          <div class="field" style="grid-column:span 2"><label>Present Address</label><input class="input" value="Blk 5 Lot 12 Sampaguita St., Brgy. San Isidro, Cavite City" disabled></div>
+          <div class="field"><label>Owned / Rented — Years of Stay</label><input class="input" value="Owned — 5 yrs" disabled></div>
+        </div>
+        <div class="grid g3" style="margin-top:16px">
+          <div class="field" style="grid-column:span 2"><label>Provincial Address</label><input class="input" value="Brgy. Poblacion, Roxas City, Capiz" disabled></div>
+          <div class="field"><label>Owned / Rented — Years of Stay</label><input class="input" value="Owned — Since birth" disabled></div>
+        </div>
+        <div class="grid g2" style="margin-top:16px">
+          <div class="field"><label>Relation to the Client</label><input class="input" value="Wife" disabled></div>
+          <div class="field"><label>Other Number / Since When</label><input class="input" value="—" disabled></div>
+        </div>
+        <div class="grid g2" style="margin-top:16px">
+          <div class="field"><label>Facebook / Skype / Viber</label><input class="input" value="maria.delacruz.92" disabled></div>
+          <div class="field"><label>Email Address</label><input class="input" value="maria.delacruz@gmail.com" disabled></div>
+        </div>
+        <div class="subhead">Work Information</div>
+        <div class="grid g3">
+          <div class="field"><label>Name of Company</label><input class="input" value="Cavite City Elem. School (DepEd)" disabled></div>
+          <div class="field"><label>Years of Stay</label><input class="input" value="6 yrs" disabled></div>
+          <div class="field"><label>Company Phone Number</label><input class="input mono" value="(046) 123-4567" disabled></div>
+        </div>
+        <div class="subhead">Siblings <span class="opt-tag">repeatable</span></div>
+        <div class="reprow"><div class="field"><label>Name</label><input class="input" value="DELA CRUZ, ROSA S." disabled></div><div class="field"><label>Age</label><input class="input" value="38" disabled></div><div class="field"><label>Occupation</label><input class="input" value="OFW — Domestic Worker (HK)" disabled></div></div>
+
+        <div class="subhead">Other Informations:</div>
+        <div class="script">Are you inform that he will avail the loan ?</div>
+        <div class="field" style="max-width:220px"><div class="radiorow"><label class="radio"><input type="radio" name="v1q1" checked disabled><span>YES</span></label><label class="radio"><input type="radio" name="v1q1" disabled><span>NO</span></label></div></div>
+
+        <div class="script" style="margin-top:16px">Aside from LOAN STAR is there any other FINANCING / BANK that he applied for? For the last 4years?</div>
+        <div class="grid g3">
+          <div class="field"><div class="radiorow"><label class="radio"><input type="radio" name="v1fin" disabled><span>YES</span></label></div></div>
+          <div class="field"><label>What company ? Was it FINANCING / BANK ?</label><input class="input" disabled></div>
+          <div class="field"><label>When?</label><input class="input" disabled></div>
+          <div class="field"><label>Loan Amount :</label><input class="input" disabled></div>
+          <div class="field"><label>Monthly:</label><input class="input" disabled></div>
+          <div class="field"><label>Start / End :</label><input class="input" disabled></div>
+        </div>
+
+        <div class="grid g3" style="margin-top:16px">
+          <div class="field"><label>Housing Loan?</label><div class="radiorow"><label class="radio"><input type="radio" name="v1hl" disabled><span>YES</span></label></div></div>
+          <div class="field"><label>Loan Amount :</label><input class="input" disabled></div>
+          <div class="field"><label>Monthly Amort:</label><input class="input" disabled></div>
+        </div>
+        <div class="grid g3" style="margin-top:16px">
+          <div class="field"><label>Car Loan?</label><div class="radiorow"><label class="radio"><input type="radio" name="v1cl" disabled><span>YES</span></label></div></div>
+          <div class="field"><label>Loan Amount :</label><input class="input" disabled></div>
+          <div class="field"><label>Monthly Amort:</label><input class="input" disabled></div>
+        </div>
+
+        <div class="script" style="margin-top:16px">Aside from us is there any person called for verification ?</div>
+        <div class="grid g2">
+          <div class="field"><div class="radiorow"><label class="radio"><input type="radio" name="v1q2" disabled><span>YES</span></label></div></div>
+          <div class="field"><label>What company ? Was it a lending ?</label><input class="input" placeholder="— not applicable —" disabled></div>
+        </div>
+        <div class="grid g2" style="margin-top:10px">
+          <div class="field"><div class="radiorow"><label class="radio"><input type="radio" name="v1q2" checked disabled><span>None</span></label></div></div>
+          <div class="field"><label>Have you recall that somebody called up for verification for the last 3 months</label><input class="input" value="No" disabled></div>
+        </div>
+        <div class="field" style="margin-top:10px"><label>What company ? Was it lending ?</label><input class="input" placeholder="— not applicable —" disabled></div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-head"><h4>II. References Information — Reference 1</h4></div>
+      <div class="card-pad grid g3">
+        <div class="field"><label>Name :</label><input class="input" value="SANTOS, PEDRO REYES" disabled></div>
+        <div class="field"><label>Age :</label><input class="input" value="40" disabled></div>
+        <div class="field"><label>Work :</label><input class="input" value="Tricycle Driver" disabled></div>
+        <div class="field"><label>Relation to the Client</label><input class="input" value="Brother-in-law" disabled></div>
+        <div class="field" style="grid-column:span 2"><label>How long you know the client</label><input class="input" value="10 yrs" disabled></div>
+        <div class="field"><label>Contact Number :</label><input class="input mono" value="0918 555 1122" disabled></div>
+        <div class="field" style="grid-column:span 2"><label>Facebook Account :</label><input class="input" value="pedro.reyes.santos" disabled></div>
+        <div class="field" style="grid-column:span 3"><label>Other contact Number :</label><input class="input mono" value="—" disabled></div>
+      </div>
+      <div class="card-pad" style="padding-top:0">
+        <div class="field"><label>Spill of Information :</label></div>
+        <div class="script">* Is this the first time that the Borrower used you as a Character Reference?</div>
+        <div class="field" style="max-width:220px"><div class="radiorow"><label class="radio"><input type="radio" name="v1r" checked disabled><span>YES</span></label><label class="radio"><input type="radio" name="v1r" disabled><span>NO</span></label></div></div>
+        <div class="script" style="margin-top:10px">* Aside from us, is there any person called you for verification?</div>
+        <div class="grid g2">
+          <div class="field"><label>YES — What was the name of the Company / Financing?</label><input class="input" placeholder="— not applicable —" disabled></div>
+          <div class="field"><label>NO — have you recalled that somebody called up for verification for the last 3 months?</label><input class="input" value="No" disabled></div>
+        </div>
+        <div class="field" style="margin-top:14px"><label>Closing Spill :</label><div class="script" style="margin-bottom:0">Sir/Maam as reference we will call you if the borrowers relative is not available / we will ask your help if needed</div></div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-head"><h4>II. References Information — Reference 2</h4><span class="badge badge-neutral">identical field set to Reference 1</span></div>
+      <div class="card-pad grid g3">
+        <div class="field"><label>Name :</label><input class="input" value="REYES, ANA MARIE" disabled></div>
+        <div class="field"><label>Age :</label><input class="input" value="45" disabled></div>
+        <div class="field"><label>Work :</label><input class="input" value="Sari-sari Store Owner" disabled></div>
+        <div class="field"><label>Relation to the Client</label><input class="input" value="Neighbor" disabled></div>
+        <div class="field" style="grid-column:span 2"><label>How long you know the client</label><input class="input" value="6 yrs" disabled></div>
+        <div class="field"><label>Contact Number :</label><input class="input mono" value="0919 222 3344" disabled></div>
+        <div class="field" style="grid-column:span 2"><label>Facebook Account :</label><input class="input" value="anamarie.reyes.98" disabled></div>
+        <div class="field" style="grid-column:span 3"><label>Other contact Number :</label><input class="input mono" value="—" disabled></div>
+      </div>
+      <div class="card-pad" style="padding-top:0">
+        <div class="field"><label>Spill of Information :</label></div>
+        <div class="script">* Is this the first time that the Borrower used you as a Character Reference?</div>
+        <div class="field" style="max-width:220px"><div class="radiorow"><label class="radio"><input type="radio" name="v1r3" checked disabled><span>YES</span></label><label class="radio"><input type="radio" name="v1r3" disabled><span>NO</span></label></div></div>
+        <div class="script" style="margin-top:10px">* Aside from us, is there any person called you for verification?</div>
+        <div class="grid g2">
+          <div class="field"><label>YES — What was the name of the Company / Financing?</label><input class="input" placeholder="— not applicable —" disabled></div>
+          <div class="field"><label>NO — have you recalled that somebody called up for verification for the last 3 months?</label><input class="input" value="No" disabled></div>
+        </div>
+        <div class="field" style="margin-top:14px"><label>Closing Spill :</label><div class="script" style="margin-bottom:0">Sir/Maam as reference we will call you if the borrowers relative is not available / we will ask your help if needed</div></div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-head"><h4>OTHER REMARKS :</h4></div>
+      <div class="card-pad">
+        <div class="grid g2">
+          <div class="field"><label>Please check if you verified the following :</label>
+            <div style="display:flex;flex-direction:column;gap:8px;margin-top:4px">
+              <label class="check"><input type="checkbox" checked disabled><span>Validate Borrower's Information</span></label>
+              <label class="check"><input type="checkbox" checked disabled><span>Validate PIC Information</span></label>
+              <label class="check"><input type="checkbox" checked disabled><span>Preside PIC Obligation / Spill</span></label>
+              <label class="check"><input type="checkbox" checked disabled><span>Verified Character References</span></label>
+            </div>
+          </div>
+          <div class="field"><label>PIC preffered payment?</label>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:4px">
+              <label class="check"><input type="checkbox" checked disabled><span>BDO</span></label><label class="check"><input type="checkbox" disabled><span>PBB</span></label>
+              <label class="check"><input type="checkbox" disabled><span>EASTWEST</span></label><label class="check"><input type="checkbox" disabled><span>UCPB</span></label>
+              <label class="check"><input type="checkbox" disabled><span>PERSONAL CHECK</span></label><label class="check"><input type="checkbox" disabled><span>OTHERS</span></label>
+            </div>
+            <input class="input" style="margin-top:8px" placeholder="BANK   :" disabled>
+            <input class="input" style="margin-top:8px" placeholder="SPECIFY :" disabled>
+            <input class="input" style="margin-top:8px" placeholder="REMARKS:" disabled>
+          </div>
+        </div>
+        <div class="script" style="margin-top:16px">How the Person In charge dealt with the verification?</div>
+        <div class="grid g4">
+          <label class="check"><input type="checkbox" checked disabled><span>Cooperative</span></label>
+          <label class="check"><input type="checkbox" disabled><span>Arrogant</span></label>
+          <label class="check"><input type="checkbox" disabled><span>Hard to Understand</span></label>
+          <label class="check"><input type="checkbox" disabled><span>Inconsistent</span></label>
+        </div>
+        <div class="script" style="margin-top:16px">How will you rate PIC from 5 (highest) 1(lowest)</div>
+        <div class="grid g2">
+          <div class="field">
+            <div class="radiorow">
+              <label class="radio"><input type="radio" name="v1rate" disabled><span>1</span></label>
+              <label class="radio"><input type="radio" name="v1rate" disabled><span>2</span></label>
+              <label class="radio"><input type="radio" name="v1rate" disabled><span>3</span></label>
+              <label class="radio"><input type="radio" name="v1rate" disabled><span>4</span></label>
+              <label class="radio"><input type="radio" name="v1rate" checked disabled><span>5</span></label>
+            </div>
+          </div>
+          <div class="field"><label>Why?</label><input class="input" value="Cooperative, consistent answers" disabled></div>
+        </div>
+        <div class="grid g2" style="margin-top:16px">
+          <div class="field"><label>Verified by:</label><input class="input" value="WINNIE | TONY" disabled></div>
+          <div class="field"><label>Date :</label><input class="input" value="07.23.26" disabled></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============================================================ FILE 2 — CI MONITORING.xlsx ============================================================ -->
+<div class="view" id="f2">
+  <div class="filehead"><span class="fname">CI MONITORING.xlsx</span><span class="fmeta">55 KB · 1 sheet</span></div>
+  <div class="sec-rule"></div>
+  <p class="lede">The live, current-month monitoring pull — same masterfile column layout as the Cancelled/Denied monthly exports, but unfiltered (shows applications regardless of outcome, mid-flight).</p>
+  <div class="sheetstrip-wrap">
+    <div class="sheetstrip-label">Sheets in this workbook</div>
+    <div class="sheetstrip"><span class="sheetpill is-active">JUNE 2026 (2)</span></div>
+  </div>
+  <div id="masterfile-f2"></div>
+</div>
+
+<!-- ============================================================ FILE 3 — FOR ASSESMENT.xlsx ============================================================ -->
+<div class="view" id="f3">
+  <div class="filehead"><span class="fname">FOR ASSESMENT.xlsx</span><span class="fmeta">17 KB · 1 sheet</span></div>
+  <div class="sec-rule"></div>
+  <p class="lede">A single-day snapshot pulled while applications are actively in CI. Same exact layout as each daily sheet inside <b>UPDATED REPORT TO PROCESSING.xlsx</b> (Tab 6) — queue table up top, full narrative report typed into the Remarks column per application, status timeline underneath.</p>
+  <div class="sheetstrip-wrap">
+    <div class="sheetstrip-label">Sheets in this workbook</div>
+    <div class="sheetstrip"><span class="sheetpill is-active">JDT 06.16.26</span></div>
+  </div>
+  <div id="queue-f3"></div>
+</div>
+
+<!-- ============================================================ FILE 4 — UPDATED REPORT AS CANCELLED.xlsx ============================================================ -->
+<div class="view" id="f4">
+  <div class="filehead"><span class="fname">UPDATED REPORT AS CANCELLED.xlsx</span><span class="fmeta">373 KB · 8 sheets</span></div>
+  <div class="sec-rule"></div>
+  <p class="lede">Monthly masterfile export, one sheet per month (Jan–Jun 2026), filtered to applications whose final status = <b>CANCELLED</b>. Same column layout as CI Monitoring / As To Denied.</p>
+  <div class="sheetstrip-wrap">
+    <div class="sheetstrip-label">Sheets in this workbook</div>
+    <div class="sheetstrip">
+      <span class="sheetpill is-active">JANUARY 2026</span><span class="sheetpill">FEBRUARY 2026</span><span class="sheetpill">MARCH 2026</span><span class="sheetpill">APRIL 2026</span><span class="sheetpill">MAY 2026</span><span class="sheetpill">JUNE 2026</span><span class="sheetpill">JUNE 2026 (2)</span><span class="sheetpill irregular">Sheet2 ⚠</span>
+    </div>
+  </div>
+  <div class="note"><b>Data-quality note —</b>&nbsp;<code>Sheet2</code> isn't a structured row like the rest; it's 3 loose text lines ("*Borrowers Name: …*", "Agent : …", "Sub-Agent : …") — looks like a stray scratch note, not part of the real template.</div>
+  <div id="masterfile-f4"></div>
+</div>
+
+<!-- ============================================================ FILE 5 — UPDATED REPORT AS TO DENIED.xlsx ============================================================ -->
+<div class="view" id="f5">
+  <div class="filehead"><span class="fname">UPDATED REPORT AS TO DENIED.xlsx</span><span class="fmeta">376 KB · 9 sheets</span></div>
+  <div class="sec-rule"></div>
+  <p class="lede">Same monthly masterfile export as the Cancelled workbook, filtered instead to applications whose final status = <b>DENIED</b>.</p>
+  <div class="sheetstrip-wrap">
+    <div class="sheetstrip-label">Sheets in this workbook</div>
+    <div class="sheetstrip">
+      <span class="sheetpill is-active">JANUARY 2026</span><span class="sheetpill">FEBRUARY 2026</span><span class="sheetpill">MARCH 2026</span><span class="sheetpill">APRIL 2026</span><span class="sheetpill">MAY 2026</span><span class="sheetpill">JUNE 2026</span><span class="sheetpill">JUNE 2026 (2)</span><span class="sheetpill irregular">Sheet2 ⚠</span><span class="sheetpill irregular">Sheet2 (2) ⚠</span>
+    </div>
+  </div>
+  <div class="note"><b>Data-quality note —</b>&nbsp;same as the Cancelled workbook: <code>Sheet2</code> and <code>Sheet2 (2)</code> are stray 3-line scratch notes, not the real row-per-application template.</div>
+  <div id="masterfile-f5"></div>
+</div>
+
+<!-- ============================================================ FILE 6 — UPDATED REPORT TO PROCESSING.xlsx ============================================================ -->
+<div class="view" id="f6">
+  <div class="filehead"><span class="fname">UPDATED REPORT TO PROCESSING.xlsx</span><span class="fmeta">1,021 KB · ~113 sheets</span></div>
+  <div class="sec-rule"></div>
+  <p class="lede">The full working archive: one sheet per business day, Jan–Jun 2026, each identical in layout to <b>FOR ASSESMENT.xlsx</b> (Tab 3) — that file is effectively a single day pulled out of this archive. Two trailing sheets (<code>Sheet4</code>, <code>Sheet1</code>) don't follow the daily pattern.</p>
+  <div class="sheetstrip-wrap">
+    <div class="sheetstrip-label">Sheets in this workbook (real names, scroll →)</div>
+    <div class="sheetstrip" id="processing-sheetstrip"></div>
+  </div>
+  <div id="queue-f6"></div>
+</div>
+
+</div>
+
+<!-- ============================================================ REUSABLE TEMPLATES ============================================================ -->
+<template id="tpl-masterfile">
+  <div class="table-wrap">
+    <table class="tbl" style="min-width:1600px">
+      <thead>
+        <tr class="grp">
+          <th>—</th><th>—</th><th>—</th><th>—</th><th>—</th><th>—</th>
+          <th colspan="2">Borrower's Contact Number</th>
+          <th>—</th><th>—</th><th>—</th>
+          <th colspan="4">Internal Verification Result</th>
+          <th colspan="3">Person In Charge To Pay</th>
+          <th colspan="3">Work Information</th>
+          <th>—</th><th>—</th><th>—</th><th>—</th><th>—</th><th>—</th><th>—</th><th>—</th><th colspan="3">FB Verification Breakdown <span class="opt" style="font-size:9px">(Apr 2026+)</span></th>
+        </tr>
+        <tr>
+          <th>No.</th><th>Types of Loan</th><th>Borrowers Name</th><th>Released Date</th><th>Agency</th><th>Position</th>
+          <th>Mobile Number</th><th>Roaming Number</th>
+          <th>Verified Crewing Manager</th><th>Deployment Date</th><th>Agent</th>
+          <th>NFIS</th><th>Masterlist</th><th>LSLG Denied Listing</th><th>SB Validation</th>
+          <th>Fullname</th><th>Relation</th><th>Contact Number</th>
+          <th>Name of Company</th><th>Position</th><th>Landline Number</th>
+          <th>CI Assigned</th><th>Portfolio</th><th>Educational Attainment</th><th class="num">Salary</th><th>Place/Provinces</th><th>Region</th><th>Check Status</th>
+          <th>FB'S <span class="opt" style="font-size:9px">(all months)</span></th><th>SF FB'S</th><th>PIC'S FB</th><th>GROUP FB'S</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td class="mono">1</td><td>FRESH</td><td class="wraptxt"><b>DELA CRUZ, JUAN SANTOS</b></td><td class="mono">07.15.2026</td><td>Magsaysay Maritime Corporation</td><td>Able Seaman</td>
+          <td class="mono">0917 234 5678</td><td>Same</td>
+          <td>Ma'am Grace Villanueva</td><td class="mono">Aug 5, 2026</td><td>MARIA | NO SUB</td>
+          <td><span class="badge badge-success">No Hit</span></td><td><span class="badge badge-success">No Hit</span></td><td><span class="badge badge-success">No Hit</span></td><td><span class="badge badge-teal">Validated</span></td>
+          <td class="wraptxt">DELA CRUZ, MARIA LOURDES</td><td>Wife</td><td class="mono">0917 234 5678</td>
+          <td>Cavite City Elem. School</td><td>Teacher</td><td>—</td>
+          <td>JDT</td><td>None</td><td>College Graduate</td><td class="num">28,000</td><td>Cavite City</td><td>Region IV-A</td><td><span class="badge badge-neutral">W/PDC</span></td>
+          <td class="wraptxt">SF and PIC FB's are verified</td>
+          <td class="wraptxt">Verified</td><td class="wraptxt">Verified</td><td class="wraptxt">Verified</td>
+        </tr>
+        <tr>
+          <td class="mono">2</td><td>RELOAN</td><td class="wraptxt"><b>SANTOS, PEDRO REYES</b></td><td class="mono">07.16.2026</td><td>PTC — Philippine Transmarine Carriers</td><td>Bosun</td>
+          <td class="mono">0918 555 1122</td><td>N/A</td>
+          <td>Sir Ramil Javier</td><td class="mono">Aug 20, 2026</td><td>WINNIE | TONY</td>
+          <td><span class="badge badge-warning">W/ Hit</span></td><td><span class="badge badge-success">No Hit</span></td><td><span class="badge badge-success">No Hit</span></td><td><span class="badge badge-teal">Validated</span></td>
+          <td class="wraptxt">SURRENDER ATM</td><td>—</td><td>—</td>
+          <td>Housewife</td><td>N/A</td><td>N/A</td>
+          <td>JDT</td><td>None</td><td>College Graduate</td><td class="num">137,500</td><td>Roxas City</td><td>Region VI</td><td><span class="badge badge-neutral">W/PDC AND ATM</span></td>
+          <td class="wraptxt">SF and PIC FB's are verified</td>
+          <td>—</td><td>—</td><td>—</td>
+        </tr>
+        <tr>
+          <td class="mono">3</td><td>FRESH</td><td class="wraptxt">REYES, ANA MARIE</td><td class="mono">07.18.2026</td><td>OSM Maritime Services, Inc.</td><td>Chief Cook</td>
+          <td class="mono">0919 888 4433</td><td>Same</td>
+          <td>Ma'am Thea Rio</td><td class="mono">Sep 1, 2026</td><td>DIRECT | NO SUB</td>
+          <td><span class="badge badge-success">No Hit</span></td><td><span class="badge badge-success">No Hit</span></td><td><span class="badge badge-success">No Hit</span></td><td><span class="badge badge-teal">Validated</span></td>
+          <td class="wraptxt">REYES, CARLITO M.</td><td>Father</td><td class="mono">0919 111 2222</td>
+          <td>Sari-sari Store</td><td>Owner</td><td>—</td>
+          <td>JDT</td><td>None</td><td>High School Graduate</td><td class="num">65,000</td><td>General Santos</td><td>Region XII</td><td><span class="badge badge-neutral">NO PDC</span></td>
+          <td class="wraptxt">SF and PIC FB's are verified</td>
+          <td>—</td><td>—</td><td>—</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="note" style="margin-top:14px"><b>Column note —</b>&nbsp;<code>FB'S</code> (a general remark, e.g. "SF AND PIC FB'S ARE VERIFIED") runs across every month. The <code>SF FB'S / PIC'S FB / GROUP FB'S</code> breakdown is additional, appearing only from April 2026 onward — it does not replace the general column.</div>
+</template>
+
+<template id="tpl-queue">
+  <div class="card">
+    <div class="card-head"><h4>Queue table — columns A–K</h4><span class="badge badge-navy">sample rows</span></div>
+    <div class="table-wrap" style="border:none;border-radius:0">
+      <table class="tbl">
+        <thead><tr><th>No.</th><th>Loan Type</th><th>Borrower's Name</th><th>CI Assigned</th><th>Time Assigned</th><th>Status</th><th>Date</th><th>Time</th><th>Agent</th></tr></thead>
+        <tbody>
+          <tr>
+            <td class="mono">1</td><td>FRESH</td><td><b>DELA CRUZ, JUAN SANTOS</b></td><td>JDT</td><td class="mono">10:19 AM</td>
+            <td><span class="badge badge-teal"><span class="dot"></span>ON GOING</span></td><td class="mono">07.23.26</td><td class="mono">1:29 PM</td><td>MARIA | NO SUB</td>
+          </tr>
+          <tr style="background:var(--navy-50)">
+            <td class="mono">2</td><td>RELOAN</td><td><b>SANTOS, PEDRO REYES</b></td><td>JDT</td><td class="mono">10:43 AM</td>
+            <td><span class="badge badge-warning"><span class="dot"></span>HOLD</span></td><td class="mono">07.23.26</td><td class="mono">11:16 AM</td><td>WINNIE | TONY</td>
+          </tr>
+          <tr>
+            <td class="mono">3</td><td>FRESH</td><td>REYES, ANA MARIE</td><td>JDT</td><td class="mono">1:00 PM</td>
+            <td><span class="badge badge-navy"><span class="dot"></span>ASSESSMENT RESULT</span></td><td class="mono">07.23.26</td><td class="mono">3:54 PM</td><td>WINNIE | NO SUB</td>
+          </tr>
+          <tr>
+            <td class="mono">4</td><td>RELOAN | 2024</td><td>BAUTISTA, MARK ANTHONY</td><td>JDT</td><td class="mono">8:00 AM</td>
+            <td><span class="badge badge-success"><span class="dot"></span>VERIFIED</span></td><td class="mono">07.23.26</td><td class="mono">4:10 PM</td><td>DIRECT | NO SUB</td>
+          </tr>
+          <tr>
+            <td class="mono">5</td><td>FRESH</td><td>GARCIA, LOURDES TAN</td><td>JDT</td><td class="mono">9:05 AM</td>
+            <td><span class="badge badge-danger"><span class="dot"></span>CANCELLED</span></td><td class="mono">07.23.26</td><td class="mono">9:32 AM</td><td>WINNIE | LYDIA</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="card-foot">Status normalized from the source's free-typed variants (e.g. "0N GOING", "VERIFEID", "ASSESEMENT RESULT" all map to one canonical value).</div>
+  </div>
+
+  <div class="two-col">
+  <div>
+    <div class="card"><div class="card-head"><h4><span class="idx">A</span>Header — Remarks column, row 2</h4><span class="badge badge-teal">FOR ASSESSMENT</span></div>
+      <div class="card-pad grid g3">
+        <div class="field" style="grid-column:span 2"><label>Borrower's Name</label><input class="input" value="DELA CRUZ, JUAN SANTOS" disabled></div>
+        <div class="field"><label>Type of Loan</label><input class="input" value="FRESH" disabled></div>
+        <div class="field" style="grid-column:span 3"><label>Agent / Sub-Agent</label><input class="input" value="MARIA | NO SUB" disabled></div>
+      </div>
+    </div>
+    <div class="card"><div class="card-head"><h4><span class="idx">B</span>Address Verification</h4></div>
+      <div class="card-pad">
+        <div class="subhead">Present Address</div>
+        <div class="grid g3">
+          <div class="field" style="grid-column:span 3"><label>Present Address</label><input class="input" value="Blk 5 Lot 12 Sampaguita St., Brgy. San Isidro, Cavite City, Cavite" disabled></div>
+          <div class="field"><label>Years of Stay</label><input class="input" value="5 YRS" disabled></div>
+          <div class="field" style="grid-column:span 2"><label>Ownership (Rented or Owned)</label><input class="input" value="Owned" disabled></div>
+        </div>
+        <div class="subhead">Additional Address <span class="opt-tag">repeatable — 0, 1, or 2 blocks seen in source</span></div>
+        <div class="grid g3">
+          <div class="field" style="grid-column:span 3"><label>Additional Address</label><input class="input" placeholder="— not applicable for this applicant —" disabled></div>
+          <div class="field"><label>Years of Stay</label><input class="input" disabled></div>
+          <div class="field" style="grid-column:span 2"><label>Ownership (Rented or Owned)</label><input class="input" disabled></div>
+        </div>
+        <p style="font-size:11px;color:var(--ink-400);margin-top:6px">Source labels this block inconsistently: <code>Other Address</code>, <code>Add Address</code>, or <code>Parents Address</code> — same 3 sub-fields each time. Some entries repeat this block twice (e.g. a previous address + a parents' address). Occasionally Present + this block are merged into one line as <code>Present and Permanent Address</code>, and "Present Address" itself is sometimes labeled <code>Permanent Address</code> instead.</p>
+        <div class="subhead">Provincial Address</div>
+        <div class="grid g3">
+          <div class="field" style="grid-column:span 3"><label>Provincial Address</label><input class="input" value="Brgy. Poblacion, Roxas City, Capiz" disabled></div>
+          <div class="field"><label>Years of Stay</label><input class="input" value="Since Birth" disabled></div>
+          <div class="field" style="grid-column:span 2"><label>Ownership (Rented or Owned)</label><input class="input" value="Owned by Parents" disabled></div>
+        </div>
+      </div>
+    </div>
+    <div class="card"><div class="card-head"><h4><span class="idx">C</span>Deployment / Vessel Info</h4></div>
+      <div class="card-pad grid g2">
+        <div class="field"><label>Name of Vessel</label><input class="input" value="MV Pacific Star" disabled></div>
+        <div class="field"><label>Type of Vessel <span class="opt">(source labels this "type of vessel" but stores rank/position)</span></label><input class="input" value="Able Seaman" disabled></div>
+      </div>
+    </div>
+    <div class="card"><div class="card-head"><h4><span class="idx">D</span>NFIS Remarks</h4></div>
+      <div class="card-pad"><div class="field"><label>NFIS Remarks</label><textarea class="textarea" disabled>No NFIS hit.</textarea></div></div>
+    </div>
+    <div class="card"><div class="card-head"><h4><span class="idx">E</span>CI Remarks — Family Background</h4></div>
+      <div class="card-pad grid g3">
+        <div class="field"><label>Father</label><input class="input" value="Retired farmer" disabled></div>
+        <div class="field"><label>Mother</label><input class="input" value="Housewife" disabled></div>
+        <div class="field"><label>Siblings</label><input class="input" value="3" disabled></div>
+        <div class="field" style="grid-column:span 3"><label>Remarks</label><textarea class="textarea" disabled>SF is cooperative; provided immediate family contact details without issue.</textarea></div>
+        <div class="field" style="grid-column:span 3"><label>Note <span class="opt">(optional freeform aside — investigator flags inconsistencies here, e.g. SF vs PIC giving conflicting answers)</span></label><textarea class="textarea" disabled placeholder="— none for this applicant —"></textarea></div>
+      </div>
+    </div>
+    <div class="card"><div class="card-head"><h4><span class="idx">F</span>Undeclared and Declared Loans (both SF and PIC)</h4></div>
+      <div class="card-pad grid g2">
+        <div class="field"><label>SF (Borrower) Loans</label><textarea class="textarea" disabled>None declared.</textarea></div>
+        <div class="field"><label>PIC Loans</label><textarea class="textarea" disabled>BDO Personal Loan — ₱150,000, 3 yrs to pay, ₱4,800/mo, taken 2024, payment ongoing.</textarea></div>
+      </div>
+    </div>
+    <div class="card"><div class="card-head"><h4><span class="idx">G</span>Breakdown of Loans (PIC)</h4></div>
+      <div class="card-pad"><table class="itbl"><thead><tr><th>Line item</th><th class="num" style="text-align:right">Monthly Amort.</th></tr></thead><tbody><tr><td>BDO Personal Loan</td><td class="num">4,800</td></tr><tr class="tot"><td>Total</td><td class="num">4,800</td></tr></tbody></table></div>
+    </div>
+    <div class="card"><div class="card-head"><h4><span class="idx">H</span>Household Expenses</h4></div>
+      <div class="card-pad"><table class="itbl"><thead><tr><th>Item</th><th class="num" style="text-align:right">Amount</th></tr></thead><tbody>
+        <tr><td>Foods</td><td class="num">12,000</td></tr><tr><td>Groceries</td><td class="num">—</td></tr><tr><td>Electricity</td><td class="num">1,200</td></tr><tr><td>Water</td><td class="num">400</td></tr>
+        <tr><td>School Allowance</td><td class="num">3,000</td></tr><tr><td>Tuition Fees — 1st Dependent</td><td class="num">2,500</td></tr><tr><td>Internet / Data</td><td class="num">—</td></tr><tr><td>Renting House <span class="opt">(if applicable)</span></td><td class="num">—</td></tr>
+        <tr class="tot"><td>Total</td><td class="num">19,100</td></tr><tr class="gtot"><td>Overall Total (loans + household)</td><td class="num">23,900</td></tr>
+      </tbody></table>
+      <p style="font-size:11px;color:var(--ink-400);margin-top:8px">Item labels vary by investigator — e.g. "Kuryente" (Tagalog for Electricity), "Foods and Groceries" combined into one line, "Allowance of Child" instead of School Allowance, and Tuition Fees sometimes written per-dependent with the annual figure noted alongside the monthly average.</p>
+      </div>
+    </div>
+  </div>
+  <div>
+    <div class="card"><div class="card-head"><h4><span class="idx">I</span>Declared PIC</h4></div>
+      <div class="card-pad grid g2">
+        <div class="field" style="grid-column:span 2"><label>Name (+ Age)</label><input class="input" value="DELA CRUZ, MARIA LOURDES — 34 yrs" disabled></div>
+        <div class="field"><label>Relation (+ years known)</label><input class="input" value="Wife — 8 yrs" disabled></div>
+        <div class="field"><label>Work</label><input class="input" value="Public School Teacher" disabled></div>
+        <div class="field"><label>Salary (Gross / Net)</label><input class="input" value="Gross 28,000 | Net 22,000" disabled></div>
+        <div class="field" style="grid-column:span 2"><label>PIC Permanent / Provincial Address</label><textarea class="textarea" disabled>Same as present address — 5 yrs, owned.</textarea></div>
+      </div>
+    </div>
+    <div class="card"><div class="card-head"><h4><span class="idx">J</span>Declared Reference 1</h4></div>
+      <div class="card-pad grid g3">
+        <div class="field" style="grid-column:span 3"><label>Name (+ Age)</label><input class="input" value="SANTOS, PEDRO REYES — 40 yrs" disabled></div>
+        <div class="field"><label>Relation</label><input class="input" value="Brother-in-law" disabled></div>
+        <div class="field" style="grid-column:span 2"><label>Work</label><input class="input" value="Tricycle Driver" disabled></div>
+      </div>
+    </div>
+    <div class="card"><div class="card-head"><h4><span class="idx">K</span>Declared Reference 2</h4></div>
+      <div class="card-pad grid g3">
+        <div class="field" style="grid-column:span 3"><label>Name (+ Age)</label><input class="input" value="REYES, ANA MARIE — 45 yrs" disabled></div>
+        <div class="field"><label>Relation</label><input class="input" value="Neighbor" disabled></div>
+        <div class="field" style="grid-column:span 2"><label>Work</label><input class="input" value="Sari-sari Store Owner" disabled></div>
+      </div>
+    </div>
+    <div class="card"><div class="card-head"><h4><span class="idx">L</span>Borrower Employment</h4></div>
+      <div class="card-pad grid g2">
+        <div class="field" style="grid-column:span 2"><label>Agency</label><input class="input" value="Magsaysay Maritime Corporation" disabled></div>
+        <div class="field"><label>Position</label><input class="input" value="Able Seaman" disabled></div>
+        <div class="field"><label>Salary (Basic / All-in)</label><input class="input" value="Basic $650 | All-in $1,450" disabled></div>
+      </div>
+    </div>
+    <div class="card"><div class="card-head"><h4><span class="idx">M</span>Loan Request Summary</h4></div>
+      <div class="card-pad grid g2">
+        <div class="field"><label>Household Expenses <span class="opt">(restated)</span></label><input class="input mono" value="₱ 19,100" disabled></div>
+        <div class="field"><label>Number of Children</label><input class="input" value="2" disabled></div>
+        <div class="field"><label>Loan Desire</label><input class="input mono" value="₱ 80,000" disabled></div>
+        <div class="field"><label>Purpose of Loan</label><input class="input" value="Family Allowance" disabled></div>
+      </div>
+    </div>
+    <div class="card"><div class="card-head"><h4><span class="idx">N</span>Decision</h4><span class="badge badge-navy">status timeline</span></div>
+      <div class="card-pad">
+        <div class="tl">
+          <div class="tl-item done"><div class="pt"></div><div class="tl-h"><b>ON GOING</b><span class="when">07.23.26 · 10:43 AM</span></div><p>SF, references and agency verified.</p></div>
+          <div class="tl-item done"><div class="pt"></div><div class="tl-h"><b>ASSESSMENT RESULT</b><span class="when">07.23.26 · 1:12 PM</span></div><p>Approving Officer Remarks: "Please get PIC's school name and address / please proceed."</p></div>
+          <div class="tl-item warn cur"><div class="pt"></div><div class="tl-h"><b>HOLD</b><span class="when">07.23.26 · 1:16 PM</span></div><p>SF, PIC and references are verified. Agency requires consent letter — none provided yet.</p><div class="by">by <b>WINNIE | TONY</b></div></div>
+          <div class="tl-item"><div class="pt"></div><div class="tl-h"><b style="color:var(--ink-400)">VERIFIED / CANCELLED / DENIED</b><span class="when">Pending</span></div></div>
+        </div>
+        <p style="font-size:11px;color:var(--ink-400);margin-top:12px">When the outcome is <code>CANCELLED</code>, the remarks field is sometimes headed <code>Approving Officers For Cancelled</code> instead of the generic "Approving Officer Remarks" — same field, cancellation-specific label, usually stating the reason (e.g. "SF has been undeployed for 2 years / no medical and contract yet").</p>
+      </div>
+    </div>
+    <div class="card"><div class="card-head"><h4><span class="idx">O</span>Verification Confirmation <span class="opt-tag">attached to the VERIFIED status entry</span></h4></div>
+      <div class="card-pad">
+        <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:14px">
+          <label class="check"><input type="checkbox" checked disabled><span>SF is Verified</span></label>
+          <label class="check"><input type="checkbox" checked disabled><span>PIC and References were Verified</span></label>
+          <label class="check"><input type="checkbox" checked disabled><span>SF and PIC FB Verified</span></label>
+          <label class="check"><input type="checkbox" disabled><span>Re-transmit <span class="opt">(flag — sent back for re-processing)</span></span></label>
+        </div>
+        <div class="grid g2">
+          <div class="field"><label>CM Verified To <span class="opt">(crewing manager who confirmed)</span></label><input class="input" value="Ma'am Grace Villanueva" disabled></div>
+          <div class="field"><label>Port of Entry</label><input class="input" value="Tentative in China" disabled></div>
+          <div class="field"><label>SF Fully Vaccinated?</label><div class="radiorow"><label class="radio"><input type="radio" name="vax" checked disabled><span>Yes</span></label><label class="radio"><input type="radio" name="vax" disabled><span>No</span></label></div></div>
+          <div class="field"><label>Verification Standard</label><input class="input" value="Passed / Up for Next Process" disabled></div>
+        </div>
+        <div class="subhead">On-board / active-contract variant <span class="opt-tag">seen on reloan applications while SF is already deployed</span></div>
+        <div class="grid g3">
+          <div class="field"><label>Departure Date</label><input class="input" value="On board" disabled></div>
+          <div class="field" style="grid-column:span 2"><label>Contract Duration</label><input class="input" value="3 months (Mar–Jun 2026)" disabled></div>
+          <div class="field"><label>Medical Fit?</label><div class="radiorow"><label class="radio"><input type="radio" name="medfit" checked disabled><span>Yes</span></label><label class="radio"><input type="radio" name="medfit" disabled><span>No</span></label></div></div>
+          <div class="field" style="grid-column:span 2"><label>Allotment Received</label><input class="input mono" value="$ 1,760" disabled></div>
+        </div>
+      </div>
+    </div>
+  </div>
+  </div>
+</template>
+
+<script>
+// ---- top-level file tabs ----
+document.querySelectorAll('.tabbtn').forEach(function(btn){
+  btn.addEventListener('click', function(){
+    document.querySelectorAll('.tabbtn').forEach(function(b){ b.classList.remove('is-active'); });
+    document.querySelectorAll('.view').forEach(function(v){ v.classList.remove('is-active'); });
+    btn.classList.add('is-active');
+    document.getElementById(btn.dataset.view).classList.add('is-active');
+    window.scrollTo({top:0, behavior:'instant'});
+  });
+});
+
+// ---- PIC form v1/v2 toggle ----
+document.querySelectorAll('.ftbtn').forEach(function(btn){
+  btn.addEventListener('click', function(){
+    document.querySelectorAll('.ftbtn').forEach(function(b){ b.classList.remove('is-active'); });
+    document.querySelectorAll('.formview').forEach(function(v){ v.classList.remove('is-active'); });
+    btn.classList.add('is-active');
+    document.getElementById(btn.dataset.form).classList.add('is-active');
+  });
+});
+
+// ---- clone reusable templates into each file tab ----
+var masterfileTpl = document.getElementById('tpl-masterfile');
+['masterfile-f2','masterfile-f4','masterfile-f5'].forEach(function(id){
+  document.getElementById(id).appendChild(masterfileTpl.content.cloneNode(true));
+});
+var queueTpl = document.getElementById('tpl-queue');
+['queue-f3','queue-f6'].forEach(function(id){
+  document.getElementById(id).appendChild(queueTpl.content.cloneNode(true));
+});
+
+// ---- real sheet-name strip for UPDATED REPORT TO PROCESSING.xlsx ----
+var processingSheets = ['JDT 01.02.26','JDT 01.05.26','JDT 01.06.26','JDT 01.07.26','JDT 01.08.26','JDT 01.09.26','JDT 01.12.26','JDT 01.13.26','JDT 01.14.26','JDT 01.15.26','JDT 01.16.26','JDT 01.19.26','JDT 01.20.26','JDT 01.21.26','JDT 01.22.26','JDT 01.23.26','JDT 01.27.26','JDT 01.28.26','JDT 01.29.26','JDT 01.30.26','JDT 02.02.26','JDT 02.3.26','JDT 02.4.26','JDT 02.5.26','JDT 02.6.26','JDT 02.9.26','JDT 02.10.26','JDT 02.11.26','JDT 02.12.26','JDT 02.13.26','JDT 02.16.26','JDT 02.18.26','JDT 02.19.26','JDT 02.20.26','JDT 02.23.26','JDT 02.24.26','JDT 02.25.26','JDT 02.26.26','JDT 02.27.26','JDT 03.02.26','JDT 03.03.26','JDT 03.04.26','JDT 03.05.26','JDT 03.06.26','JDT 03.09.26','JDT 03.10.26','JDT 03.11.26','JDT 03.12.26','JDT 03.13.26','JDT 03.16.26','JDT 03.17.26','JDT 03.18.26','JDT 03.19.26','JDT 03.23.26','JDT 03.24.26','JDT 03.25.26','JDT 03.26.26','JDT 03.27.26','JDT 03.30.26','JDT 04.6.26','JDT 4.07.26','JDT 04.8.26','JDT 4.10.26','JDT 04.13.26','JDT 4.14.26','JDT 04.15.26','JDT 04.16.26','JDT 04.17.26','JDT 04.20.26','JDT 04.21.26','JDT 04.22.26','JDT 04.23.26','JDT 04.24.26','JDT 04.27.26','JDT 04.28.26','JDT 04.29.26','JDT 04.30.26','JDT 5.04.26','JDT 05.05.26','JDT 05.06.26','JDT 05.07.26','JDT 05.08.26','JDT 05.11.26','JDT 05.12.26','JDT 05.13.26','JDT 05.14.26','JDT 05.15.26','JDT 05.18.26','JDT 05.19.26','JDT 05.20.26','JDT 05.21.26','JDT 05.22.26','JDT 05.25.26','JDT 05.26.26','JDT 05.27.26','JDT 05.28.26','JDT 05.29.26','JDT 06.01.26','JDT 06.02.26','JDT 06.03.26','JDT 06.04.26','JDT 06.05.26','JDT 06.05.26 (2)','JDT 06.08.26','JDT 06.09.26','JDT 06.10.26','JDT 06.11.26','JDT 06.15.26','JDT 06.15.26 (2)','JDT 06.16.26','JDT 06.16.26 (2)','JDT 06.17.26'];
+var irregular = ['Sheet4','Sheet1'];
+var strip = document.getElementById('processing-sheetstrip');
+processingSheets.forEach(function(name, i){
+  var pill = document.createElement('span');
+  pill.className = 'sheetpill' + (i===4 ? ' is-active' : '');
+  pill.textContent = name;
+  strip.appendChild(pill);
+});
+irregular.forEach(function(name){
+  var pill = document.createElement('span');
+  pill.className = 'sheetpill irregular';
+  pill.textContent = name + ' ⚠';
+  strip.appendChild(pill);
+});
+</script>
+
+</body>
+</html>

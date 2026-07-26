@@ -20,9 +20,28 @@ export async function POST(_request: Request, { params }: RouteParams) {
       .eq("id", id)
       .single();
 
-    if (!app || app.status !== "approved") {
+    if (!app || (app.status !== "approved" && app.status !== "negotiating_terms")) {
       return NextResponse.json(
         { error: "Application must be approved before disclosure" },
+        { status: 400 },
+      );
+    }
+
+    // Disclosure is only valid while terms are still pending disclosure
+    // (or after a mistaken early counter that left status negotiating_terms).
+    const { data: existing } = await supabase
+      .from("negotiations")
+      .select("status")
+      .eq("loan_application_id", id)
+      .maybeSingle();
+
+    if (
+      existing &&
+      existing.status !== "pending_disclosure" &&
+      existing.status !== "awaiting_signature"
+    ) {
+      return NextResponse.json(
+        { error: "Terms are not awaiting disclosure" },
         { status: 400 },
       );
     }

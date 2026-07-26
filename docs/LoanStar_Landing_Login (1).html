@@ -1,0 +1,505 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>LoanStar — Lending, charted clearly</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700;800&family=Public+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+/* MERIDIAN tokens */
+:root{
+  --navy-950:#071633;--navy-900:#0C2247;--navy-800:#123061;--navy-700:#1A407D;
+  --navy-600:#23539E;--navy-500:#2F68BE;--navy-200:#B9CBE7;--navy-100:#DCE5F3;--navy-50:#EEF3FA;
+  --teal-700:#0A7D71;--teal-600:#0D9488;--teal-500:#12A797;--teal-400:#2DC7B6;--teal-100:#C9F0EA;--teal-50:#E9FAF7;
+  --ink-900:#16233B;--ink-700:#3E4C66;--ink-500:#62708A;--ink-400:#8C99B0;--ink-300:#B4BECF;
+  --line:#D9E0EB;--line-soft:#E7ECF3;--surface:#FFF;--surface-2:#F3F6FA;--canvas:#F7F9FC;
+  --success:#178A50;--success-bg:#E8F6EE;
+  --font-display:'Sora',sans-serif;--font-body:'Public Sans',sans-serif;--font-mono:'JetBrains Mono',monospace;
+  --r-sm:6px;--r-md:10px;--r-lg:14px;--r-xl:20px;--r-full:999px;
+  --sh-1:0 1px 2px rgba(12,34,71,.06);--sh-2:0 2px 8px rgba(12,34,71,.08);
+  --sh-3:0 8px 24px rgba(12,34,71,.12);--sh-4:0 16px 48px rgba(12,34,71,.18);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{font-family:var(--font-body);color:var(--ink-900);background:var(--canvas);font-size:15px;line-height:1.55;-webkit-font-smoothing:antialiased}
+.mono{font-family:var(--font-mono);font-variant-numeric:tabular-nums}
+a{color:inherit}
+
+.btn{font-family:var(--font-body);font-weight:600;font-size:14px;display:inline-flex;align-items:center;justify-content:center;gap:8px;padding:0 18px;height:40px;border-radius:var(--r-md);border:1px solid transparent;cursor:pointer;transition:all .15s;white-space:nowrap;text-decoration:none;user-select:none}
+.btn:focus-visible{outline:2px solid var(--teal-500);outline-offset:2px}
+.btn-accent{background:var(--teal-600);color:#fff}
+.btn-accent:hover{background:var(--teal-700)}
+.btn-primary{background:var(--navy-900);color:#fff}
+.btn-primary:hover{background:var(--navy-800)}
+.btn-ghost-inv{background:transparent;color:#fff;border-color:rgba(255,255,255,.28)}
+.btn-ghost-inv:hover{background:rgba(255,255,255,.08)}
+.btn-lg{height:48px;padding:0 26px;font-size:15px;border-radius:var(--r-lg)}
+.btn-block{width:100%}
+
+.logo{display:inline-flex;align-items:center;gap:10px;font-family:var(--font-display);font-weight:700;font-size:17px;letter-spacing:-.01em;text-decoration:none}
+.logo-mark{width:30px;height:30px;border-radius:8px;background:linear-gradient(135deg,var(--teal-400),var(--teal-600));display:inline-flex;align-items:center;justify-content:center;flex-shrink:0}
+.logo-mark svg{width:17px;height:17px;color:var(--navy-950)}
+
+/* ========== PAGE SWITCH ========== */
+.page{display:none}
+.page.is-visible{display:block}
+
+/* ========== LANDING · NAV ========== */
+.topnav{position:sticky;top:0;z-index:20;background:rgba(7,22,51,.92);backdrop-filter:blur(10px);border-bottom:1px solid rgba(255,255,255,.06)}
+.topnav-in{max-width:1120px;margin:0 auto;padding:0 28px;height:66px;display:flex;align-items:center;gap:28px;color:#fff}
+.topnav nav{display:flex;gap:2px;margin-left:6px}
+.topnav nav a{color:var(--navy-200);text-decoration:none;font-size:13.5px;font-weight:500;padding:8px 13px;border-radius:var(--r-sm)}
+.topnav nav a:hover{color:#fff;background:rgba(255,255,255,.06)}
+.topnav .right{margin-left:auto;display:flex;gap:10px;align-items:center}
+.topnav .login-link{color:var(--navy-100);font-size:13.5px;font-weight:600;text-decoration:none;padding:8px 12px}
+.topnav .login-link:hover{color:#fff}
+
+/* ========== LANDING · HERO ========== */
+.hero{background:linear-gradient(160deg,var(--navy-950) 0%,var(--navy-900) 60%,var(--navy-800) 100%);color:#fff;position:relative;overflow:hidden}
+.hero::before{content:"";position:absolute;inset:0;background:radial-gradient(circle at 82% 15%,rgba(45,199,182,.16),transparent 42%),radial-gradient(circle at 8% 90%,rgba(35,83,158,.28),transparent 45%);pointer-events:none}
+.hero-grid{position:absolute;inset:0;background-image:linear-gradient(rgba(255,255,255,.035) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.035) 1px,transparent 1px);background-size:56px 56px;mask-image:radial-gradient(ellipse at 70% 30%,black 20%,transparent 70%);pointer-events:none}
+.hero-in{max-width:1120px;margin:0 auto;padding:84px 28px 92px;display:grid;grid-template-columns:1.05fr .95fr;gap:56px;align-items:center;position:relative;z-index:1}
+.kicker{font-family:var(--font-mono);font-size:12px;letter-spacing:.18em;text-transform:uppercase;color:var(--teal-400);display:flex;align-items:center;gap:12px;margin-bottom:22px}
+.kicker::after{content:"";height:1px;width:56px;background:var(--teal-400);opacity:.6}
+.hero h1{font-family:var(--font-display);font-size:52px;font-weight:800;letter-spacing:-.025em;line-height:1.06}
+.hero h1 em{font-style:normal;color:var(--teal-400)}
+.hero .sub{margin-top:20px;font-size:16.5px;color:var(--navy-100);max-width:480px}
+.hero .cta{margin-top:32px;display:flex;gap:14px;flex-wrap:wrap}
+.hero-proof{margin-top:44px;display:flex;gap:36px;flex-wrap:wrap}
+.hero-proof .p b{display:block;font-family:var(--font-mono);font-size:24px;font-weight:600;letter-spacing:-.01em}
+.hero-proof .p span{font-size:12.5px;color:var(--navy-200)}
+
+/* hero quote card */
+.quote-card{background:#fff;color:var(--ink-900);border-radius:var(--r-xl);box-shadow:var(--sh-4);overflow:hidden;max-width:420px;justify-self:end;width:100%}
+.quote-h{padding:18px 24px;background:var(--surface-2);border-bottom:1px solid var(--line-soft);display:flex;align-items:center;justify-content:space-between}
+.quote-h b{font-family:var(--font-display);font-size:14.5px;font-weight:600;color:var(--navy-900)}
+.pill{display:inline-flex;align-items:center;gap:6px;height:22px;padding:0 10px;border-radius:var(--r-full);font-size:11px;font-weight:600;background:var(--teal-50);color:var(--teal-700);border:1px solid var(--teal-100)}
+.pill i{width:6px;height:6px;border-radius:50%;background:currentColor}
+.quote-b{padding:22px 24px}
+.q-amt{font-family:var(--font-mono);font-size:34px;font-weight:600;color:var(--navy-900);letter-spacing:-.01em}
+.q-amt small{font-size:14px;color:var(--ink-400);font-weight:500}
+.q-slider{margin:16px 0 4px}
+.q-slider input{width:100%;appearance:none;height:6px;border-radius:var(--r-full);background:linear-gradient(90deg,var(--teal-600) 50%,var(--line) 50%);outline:none}
+.q-slider input::-webkit-slider-thumb{appearance:none;width:20px;height:20px;border-radius:50%;background:#fff;border:3px solid var(--teal-600);box-shadow:var(--sh-2);cursor:pointer}
+.q-slider input::-moz-range-thumb{width:14px;height:14px;border-radius:50%;background:#fff;border:3px solid var(--teal-600);cursor:pointer}
+.q-range{display:flex;justify-content:space-between;font-family:var(--font-mono);font-size:11px;color:var(--ink-400)}
+.q-kv{margin-top:16px;border-top:1px dashed var(--line);padding-top:14px}
+.q-kv .row{display:flex;justify-content:space-between;padding:6px 0;font-size:13.5px}
+.q-kv .row span{color:var(--ink-500)}
+.q-kv .row b{font-family:var(--font-mono);font-weight:600}
+.q-kv .row.hl b{color:var(--teal-700);font-size:15px}
+.quote-f{padding:0 24px 22px}
+.quote-note{text-align:center;font-size:11.5px;color:var(--ink-400);margin-top:10px}
+
+/* ========== LANDING · SECTIONS ========== */
+.wrap{max-width:1120px;margin:0 auto;padding:0 28px}
+.sec{padding:84px 0}
+.sec-kicker{font-family:var(--font-mono);font-size:12px;letter-spacing:.18em;text-transform:uppercase;color:var(--teal-700);display:flex;align-items:center;gap:12px;margin-bottom:16px}
+.sec-kicker::after{content:"";height:1px;width:56px;background:var(--teal-600);opacity:.5}
+.sec h2{font-family:var(--font-display);font-size:34px;font-weight:700;letter-spacing:-.02em;color:var(--navy-900);max-width:560px}
+.sec .lede{margin-top:14px;color:var(--ink-500);max-width:560px;font-size:15.5px}
+
+.feat-grid{margin-top:44px;display:grid;grid-template-columns:repeat(3,1fr);gap:20px}
+.feat{background:#fff;border:1px solid var(--line);border-radius:var(--r-lg);padding:26px;box-shadow:var(--sh-1);transition:box-shadow .2s,transform .2s}
+.feat:hover{box-shadow:var(--sh-3);transform:translateY(-2px)}
+.feat .ic{width:42px;height:42px;border-radius:var(--r-md);background:var(--navy-50);color:var(--navy-700);display:flex;align-items:center;justify-content:center;margin-bottom:16px}
+.feat .ic svg{width:20px;height:20px}
+.feat h3{font-family:var(--font-display);font-size:16px;font-weight:600;color:var(--navy-900);margin-bottom:8px}
+.feat p{font-size:13.5px;color:var(--ink-500)}
+
+/* how it works — meridian steps */
+.how{background:#fff;border-top:1px solid var(--line-soft);border-bottom:1px solid var(--line-soft)}
+.how-steps{margin-top:48px;display:grid;grid-template-columns:repeat(4,1fr);gap:0;position:relative}
+.how-steps::before{content:"";position:absolute;top:15px;left:12.5%;right:12.5%;height:2px;background:var(--line)}
+.how-step{text-align:center;padding:0 18px;position:relative}
+.how-step .pt{width:32px;height:32px;border-radius:50%;background:#fff;border:2px solid var(--teal-600);color:var(--teal-700);font-family:var(--font-mono);font-size:13px;font-weight:600;display:inline-flex;align-items:center;justify-content:center;position:relative;z-index:1;box-shadow:0 0 0 5px #fff}
+.how-step h4{font-family:var(--font-display);font-size:15px;font-weight:600;color:var(--navy-900);margin-top:16px}
+.how-step p{font-size:13px;color:var(--ink-500);margin-top:6px}
+.how-step .tag{font-family:var(--font-mono);font-size:11px;color:var(--teal-700);margin-top:10px;display:inline-block;background:var(--teal-50);border:1px solid var(--teal-100);border-radius:var(--r-full);padding:2px 10px}
+
+/* trust band */
+.band{background:var(--navy-950);color:#fff;position:relative;overflow:hidden}
+.band::before{content:"";position:absolute;inset:0;background:radial-gradient(circle at 15% 20%,rgba(45,199,182,.12),transparent 40%)}
+.band .wrap{position:relative;z-index:1;display:grid;grid-template-columns:1fr 1fr;gap:56px;align-items:center;padding-top:76px;padding-bottom:76px}
+.band h2{color:#fff}
+.band .lede{color:var(--navy-100)}
+.band ul{list-style:none;margin-top:24px;display:flex;flex-direction:column;gap:14px}
+.band li{display:flex;gap:12px;font-size:14.5px;color:var(--navy-100)}
+.band li svg{width:18px;height:18px;color:var(--teal-400);flex-shrink:0;margin-top:2px}
+.band-card{background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);border-radius:var(--r-xl);padding:28px;backdrop-filter:blur(4px)}
+.band-card .row{display:flex;justify-content:space-between;align-items:center;padding:13px 0;border-bottom:1px dashed rgba(255,255,255,.14);font-size:14px}
+.band-card .row:last-child{border-bottom:none}
+.band-card .row span{color:var(--navy-200)}
+.band-card .row b{font-family:var(--font-mono);font-weight:600}
+.band-card .row b.ok{color:var(--teal-400)}
+
+/* final CTA */
+.cta-final{text-align:center;padding:92px 28px}
+.cta-final h2{margin:0 auto}
+.cta-final .lede{margin-left:auto;margin-right:auto}
+.cta-final .btns{margin-top:30px;display:flex;gap:14px;justify-content:center;flex-wrap:wrap}
+
+/* footer */
+.foot{background:var(--navy-950);color:var(--navy-200);padding:52px 28px 36px}
+.foot-in{max-width:1120px;margin:0 auto}
+.foot-top{display:flex;justify-content:space-between;gap:40px;flex-wrap:wrap;padding-bottom:36px;border-bottom:1px solid rgba(255,255,255,.08)}
+.foot .logo{color:#fff}
+.foot p{font-size:13px;max-width:300px;margin-top:12px}
+.foot-cols{display:flex;gap:64px;flex-wrap:wrap}
+.foot-cols h5{font-family:var(--font-mono);font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:#fff;opacity:.7;margin-bottom:14px}
+.foot-cols a{display:block;font-size:13.5px;color:var(--navy-200);text-decoration:none;margin-bottom:9px}
+.foot-cols a:hover{color:var(--teal-400)}
+.foot-btm{padding-top:24px;display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap;font-family:var(--font-mono);font-size:11.5px;color:var(--navy-200);opacity:.8}
+
+/* ========== LOGIN PAGE ========== */
+.login-shell{min-height:100vh;display:grid;grid-template-columns:1fr 1fr}
+.login-brand{background:linear-gradient(165deg,var(--navy-950) 0%,var(--navy-900) 58%,var(--navy-800) 100%);color:#fff;padding:56px;display:flex;flex-direction:column;position:relative;overflow:hidden}
+.login-brand::before{content:"";position:absolute;inset:0;background:radial-gradient(circle at 80% 85%,rgba(45,199,182,.16),transparent 45%)}
+.login-brand>*{position:relative;z-index:1}
+.login-brand .mid{margin:auto 0;max-width:420px}
+.login-brand h2{font-family:var(--font-display);font-size:34px;font-weight:700;letter-spacing:-.02em;line-height:1.15}
+.login-brand h2 em{font-style:normal;color:var(--teal-400)}
+.login-brand .mid p{margin-top:16px;color:var(--navy-100);font-size:15px}
+.login-quote{margin-top:36px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);border-radius:var(--r-lg);padding:20px 22px}
+.login-quote .q{font-size:14px;color:var(--navy-100);font-style:italic}
+.login-quote .who{margin-top:12px;display:flex;align-items:center;gap:10px}
+.login-quote .av{width:32px;height:32px;border-radius:50%;background:var(--teal-600);color:#fff;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700}
+.login-quote .who b{display:block;font-size:13px}
+.login-quote .who span{font-size:11.5px;color:var(--navy-200)}
+.login-brand .foot-note{font-family:var(--font-mono);font-size:11px;letter-spacing:.12em;color:var(--navy-200);opacity:.7}
+
+.login-panel{background:var(--canvas);display:flex;align-items:center;justify-content:center;padding:48px 28px}
+.login-card{width:100%;max-width:400px}
+.login-card h3{font-family:var(--font-display);font-size:26px;font-weight:700;color:var(--navy-900);letter-spacing:-.015em}
+.login-card .s{color:var(--ink-500);font-size:14px;margin-top:6px;margin-bottom:28px}
+.field{display:flex;flex-direction:column;gap:6px;margin-bottom:18px}
+.field label{font-size:13px;font-weight:600;color:var(--ink-700)}
+.input{font-family:var(--font-body);font-size:14px;color:var(--ink-900);background:#fff;border:1px solid var(--line);border-radius:var(--r-md);height:44px;padding:0 14px;width:100%;transition:border-color .15s,box-shadow .15s}
+.input::placeholder{color:var(--ink-400)}
+.input:hover{border-color:var(--ink-300)}
+.input:focus{outline:none;border-color:var(--teal-600);box-shadow:0 0 0 3px var(--teal-100)}
+.pw-wrap{position:relative}
+.pw-wrap .input{padding-right:44px}
+.pw-toggle{position:absolute;right:6px;top:50%;transform:translateY(-50%);background:none;border:none;color:var(--ink-400);cursor:pointer;padding:8px;display:flex}
+.pw-toggle svg{width:17px;height:17px}
+.login-row{display:flex;justify-content:space-between;align-items:center;margin:4px 0 22px}
+.check{display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;color:var(--ink-700)}
+.check input{appearance:none;width:17px;height:17px;border-radius:5px;border:1.5px solid var(--ink-300);background:#fff;cursor:pointer;flex-shrink:0}
+.check input:checked{background:var(--teal-600) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='3.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M20 6 9 17l-5-5'/%3E%3C/svg%3E") center/11px no-repeat;border-color:var(--teal-600)}
+.check input:focus-visible{outline:2px solid var(--teal-500);outline-offset:2px}
+.link{color:var(--teal-700);font-size:13px;font-weight:600;text-decoration:none}
+.link:hover{text-decoration:underline}
+.divider{display:flex;align-items:center;gap:14px;margin:22px 0;color:var(--ink-400);font-size:12px}
+.divider::before,.divider::after{content:"";flex:1;height:1px;background:var(--line)}
+.role-hint{margin-top:24px;background:var(--navy-50);border:1px solid var(--navy-100);border-radius:var(--r-md);padding:13px 16px;font-size:12.5px;color:var(--ink-500)}
+.role-hint b{color:var(--navy-800)}
+.login-foot{margin-top:28px;text-align:center;font-size:13.5px;color:var(--ink-500)}
+.back-link{display:inline-flex;align-items:center;gap:6px;font-size:13px;font-weight:600;color:var(--ink-500);text-decoration:none;margin-bottom:32px}
+.back-link:hover{color:var(--navy-800)}
+.back-link svg{width:14px;height:14px}
+
+@media (max-width:900px){
+  .hero-in{grid-template-columns:1fr;padding:64px 24px}
+  .quote-card{justify-self:start}
+  .feat-grid{grid-template-columns:1fr}
+  .how-steps{grid-template-columns:1fr;gap:32px}
+  .how-steps::before{display:none}
+  .band .wrap{grid-template-columns:1fr}
+  .login-shell{grid-template-columns:1fr}
+  .login-brand{display:none}
+  .topnav nav{display:none}
+  .hero h1{font-size:38px}
+  .sec h2{font-size:28px}
+}
+@media (prefers-reduced-motion:reduce){
+  *,*::before,*::after{animation-duration:.01ms !important;transition-duration:.01ms !important}
+}
+</style>
+</head>
+<body>
+
+<!-- ==================== LANDING PAGE ==================== -->
+<div class="page is-visible" id="page-landing">
+
+<header class="topnav">
+  <div class="topnav-in">
+    <a class="logo" href="#" onclick="return false" style="color:#fff">
+      <span class="logo-mark"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l2.4 6.9L21 11l-6.6 2.1L12 20l-2.4-6.9L3 11l6.6-2.1z"/></svg></span>
+      LoanStar
+    </a>
+    <nav>
+      <a href="#products">Products</a>
+      <a href="#how">How it works</a>
+      <a href="#why">Why LoanStar</a>
+    </nav>
+    <div class="right">
+      <a class="login-link" href="#" onclick="showLogin();return false">Log in</a>
+      <a class="btn btn-accent" href="#" onclick="showLogin();return false">Apply now</a>
+    </div>
+  </div>
+</header>
+
+<section class="hero">
+  <div class="hero-grid"></div>
+  <div class="hero-in">
+    <div>
+      <div class="kicker">Seafarer lending · Est. Manila</div>
+      <h1>Lending, <em>charted clearly</em> for Filipino seafarers.</h1>
+      <p class="sub">Apply before you board, get verified fast, and track every peso of your loan — from committee approval to final payment — in one transparent portal.</p>
+      <div class="cta">
+        <a class="btn btn-accent btn-lg" href="#" onclick="showLogin();return false">Start your application</a>
+        <a class="btn btn-ghost-inv btn-lg" href="#how">See how it works</a>
+      </div>
+      <div class="hero-proof">
+        <div class="p"><b class="mono">₱48M+</b><span>Loans released</span></div>
+        <div class="p"><b class="mono">1,200+</b><span>Seafarers served</span></div>
+        <div class="p"><b class="mono">48 hrs</b><span>Typical approval</span></div>
+      </div>
+    </div>
+
+    <div class="quote-card">
+      <div class="quote-h"><b>Quick loan estimate</b><span class="pill"><i></i>SF Loan</span></div>
+      <div class="quote-b">
+        <div style="font-size:12.5px;font-weight:600;color:var(--ink-500);text-transform:uppercase;letter-spacing:.06em">Loan amount</div>
+        <div class="q-amt mono" id="qAmt">₱150,000<small>.00</small></div>
+        <div class="q-slider"><input type="range" min="20000" max="300000" step="10000" value="150000" id="qRange" aria-label="Loan amount"></div>
+        <div class="q-range"><span>₱20,000</span><span>₱300,000</span></div>
+        <div class="q-kv">
+          <div class="row"><span>Term</span><b class="mono">10 months</b></div>
+          <div class="row"><span>Rate</span><b class="mono">4.50% / mo</b></div>
+          <div class="row hl"><span>Est. monthly payment</span><b class="mono" id="qMo">₱21,750.00</b></div>
+        </div>
+      </div>
+      <div class="quote-f">
+        <a class="btn btn-primary btn-block" href="#" onclick="showLogin();return false">Get your exact quote</a>
+        <div class="quote-note">Estimate only. Final terms are confirmed after verification.</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="sec" id="products">
+  <div class="wrap">
+    <div class="sec-kicker">Products</div>
+    <h2>Built around the seafarer's contract cycle.</h2>
+    <p class="lede">Every product is designed to align repayment with allotment schedules — so payments happen while you earn, not after.</p>
+    <div class="feat-grid">
+      <div class="feat">
+        <span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12h20M2 12c0-3 4-9 10-9s10 6 10 9M2 12c0 3 4 9 10 9s10-6 10-9"/><path d="M12 3v18"/></svg></span>
+        <h3>SF Loan</h3>
+        <p>Our standard seafarer loan. Up to ₱300,000, released before deployment, repaid through allotment deductions across your contract.</p>
+      </div>
+      <div class="feat">
+        <span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1v22M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg></span>
+        <h3>Allotment Advance</h3>
+        <p>Bridge the gap between boarding and your first allotment. Smaller amounts, shorter terms, same-week release.</p>
+      </div>
+      <div class="feat">
+        <span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-9-9"/><path d="M21 3v6h-6"/></svg></span>
+        <h3>Reloan</h3>
+        <p>Good payment history unlocks faster reloans — pre-verified documents, higher limits, and committee fast-tracking.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="sec how" id="how">
+  <div class="wrap">
+    <div class="sec-kicker">How it works</div>
+    <h2>From application to release in four charted steps.</h2>
+    <div class="how-steps">
+      <div class="how-step">
+        <span class="pt">1</span>
+        <h4>Apply online</h4>
+        <p>Complete the form and upload your contract, seafarer's book, and allotment slip.</p>
+        <span class="tag">~15 mins</span>
+      </div>
+      <div class="how-step">
+        <span class="pt">2</span>
+        <h4>Get verified</h4>
+        <p>Our credit team confirms your contract directly with your manning agency.</p>
+        <span class="tag">1 business day</span>
+      </div>
+      <div class="how-step">
+        <span class="pt">3</span>
+        <h4>Committee approval</h4>
+        <p>Your application is reviewed and voted on — you can track the status live in your portal.</p>
+        <span class="tag">~24 hrs</span>
+      </div>
+      <div class="how-step">
+        <span class="pt">4</span>
+        <h4>Receive funds</h4>
+        <p>Proceeds are transferred to your nominated bank account, with a full statement of account.</p>
+        <span class="tag">Same day</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="band" id="why">
+  <div class="wrap">
+    <div>
+      <div class="sec-kicker" style="color:var(--teal-400)">Why LoanStar</div>
+      <h2>No surprises. Every peso accounted for.</h2>
+      <p class="lede">Your portal shows the same ledger our officers see — the full computation, every fee, every payment posted.</p>
+      <ul>
+        <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>Transparent computation — see interest, fees, and net proceeds before you sign</li>
+        <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>Live status tracking through verification, committee, and release</li>
+        <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>Payment schedule aligned to your allotment dates</li>
+        <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>SMS and email reminders before every due date</li>
+      </ul>
+    </div>
+    <div class="band-card">
+      <div style="font-family:var(--font-display);font-weight:600;margin-bottom:8px">Sample statement · <span class="mono" style="font-size:12px;color:var(--teal-400)">LN-2026-004518</span></div>
+      <div class="row"><span>Principal</span><b>₱150,000.00</b></div>
+      <div class="row"><span>Interest (4.50% × 10 mo)</span><b>₱67,500.00</b></div>
+      <div class="row"><span>Service fee</span><b>₱7,250.00</b></div>
+      <div class="row"><span>Net proceeds</span><b class="ok">₱142,750.00</b></div>
+      <div class="row"><span>Monthly amortization</span><b class="ok">₱21,750.00</b></div>
+      <div class="row"><span>Payments posted</span><b>4 of 10 · on time</b></div>
+    </div>
+  </div>
+</section>
+
+<section class="cta-final">
+  <div class="sec-kicker" style="justify-content:center">Ready when you are</div>
+  <h2>Set your course before you sail.</h2>
+  <p class="lede" style="text-align:center">Apply today and have your proceeds released before your next deployment.</p>
+  <div class="btns">
+    <a class="btn btn-accent btn-lg" href="#" onclick="showLogin();return false">Start your application</a>
+    <a class="btn btn-lg" style="border:1px solid var(--line);color:var(--navy-800);background:#fff" href="#" onclick="showLogin();return false">Log in to your portal</a>
+  </div>
+</section>
+
+<footer class="foot">
+  <div class="foot-in">
+    <div class="foot-top">
+      <div>
+        <a class="logo" href="#" onclick="return false">
+          <span class="logo-mark"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l2.4 6.9L21 11l-6.6 2.1L12 20l-2.4-6.9L3 11l6.6-2.1z"/></svg></span>
+          LoanStar
+        </a>
+        <p>Loan Star Lending Group Corp. — trusted lending for Filipino seafarers and their families.</p>
+      </div>
+      <div class="foot-cols">
+        <div>
+          <h5>Products</h5>
+          <a href="#products">SF Loan</a>
+          <a href="#products">Allotment Advance</a>
+          <a href="#products">Reloan</a>
+        </div>
+        <div>
+          <h5>Company</h5>
+          <a href="#why">About us</a>
+          <a href="#how">How it works</a>
+          <a href="#" onclick="return false">Contact</a>
+        </div>
+        <div>
+          <h5>Legal</h5>
+          <a href="#" onclick="return false">Privacy policy</a>
+          <a href="#" onclick="return false">Terms of service</a>
+          <a href="#" onclick="return false">Disclosure statement</a>
+        </div>
+      </div>
+    </div>
+    <div class="foot-btm">
+      <span>© 2026 LOAN STAR LENDING GROUP CORP.</span>
+      <span>SEC REG. NO. ····· · MERIDIAN DS V1.0</span>
+    </div>
+  </div>
+</footer>
+
+</div>
+
+<!-- ==================== LOGIN PAGE ==================== -->
+<div class="page" id="page-login">
+  <div class="login-shell">
+    <div class="login-brand">
+      <a class="logo" href="#" onclick="showLanding();return false" style="color:#fff">
+        <span class="logo-mark"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l2.4 6.9L21 11l-6.6 2.1L12 20l-2.4-6.9L3 11l6.6-2.1z"/></svg></span>
+        LoanStar
+      </a>
+      <div class="mid">
+        <h2>Your loan, <em>charted clearly</em> — wherever you sail.</h2>
+        <p>Track your application, view your payment schedule, and download your statement of account from any port in the world.</p>
+        <div class="login-quote">
+          <div class="q">"Na-approve yung loan ko bago pa ako sumakay. Kitang-kita ko rin lahat ng bawas at schedule — walang gulat."</div>
+          <div class="who"><span class="av">JD</span><div><b>Juan D.</b><span>Able Seaman · MV Pacific Star</span></div></div>
+        </div>
+      </div>
+      <div class="foot-note">MERIDIAN · SECURE PORTAL · LOANSTAR 2026</div>
+    </div>
+
+    <div class="login-panel">
+      <div class="login-card">
+        <a class="back-link" href="#" onclick="showLanding();return false">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+          Back to home
+        </a>
+        <h3>Welcome back</h3>
+        <p class="s">Log in to your LoanStar portal.</p>
+
+        <div class="field">
+          <label for="em">Email or borrower ID</label>
+          <input class="input" id="em" type="text" placeholder="you@email.com or BR-000000" autocomplete="username">
+        </div>
+        <div class="field">
+          <label for="pw">Password</label>
+          <div class="pw-wrap">
+            <input class="input" id="pw" type="password" placeholder="Enter your password" autocomplete="current-password">
+            <button class="pw-toggle" type="button" onclick="togglePw()" aria-label="Show password">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8Z"/><circle cx="12" cy="12" r="3"/></svg>
+            </button>
+          </div>
+        </div>
+        <div class="login-row">
+          <label class="check"><input type="checkbox" checked>Remember me</label>
+          <a class="link" href="#" onclick="return false">Forgot password?</a>
+        </div>
+        <button class="btn btn-accent btn-lg btn-block" onclick="return false">Log in</button>
+
+        <div class="divider">or</div>
+        <button class="btn btn-block" style="border:1px solid var(--line);background:#fff;color:var(--ink-700);height:44px" onclick="return false">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/></svg>
+          Log in with a one-time code
+        </button>
+
+        <div class="role-hint"><b>Staff?</b> CSA, CIG, LRA, Committee, and Collections accounts use the same login — you'll land on your role's workspace.</div>
+        <div class="login-foot">New borrower? <a class="link" href="#" onclick="return false">Create an account</a></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+function showLogin(){
+  document.getElementById('page-landing').classList.remove('is-visible');
+  document.getElementById('page-login').classList.add('is-visible');
+  window.scrollTo(0,0);
+}
+function showLanding(){
+  document.getElementById('page-login').classList.remove('is-visible');
+  document.getElementById('page-landing').classList.add('is-visible');
+  window.scrollTo(0,0);
+}
+function togglePw(){
+  var pw=document.getElementById('pw');
+  pw.type=pw.type==='password'?'text':'password';
+}
+var range=document.getElementById('qRange');
+function peso(n){return '₱'+n.toLocaleString('en-PH');}
+range.addEventListener('input',function(){
+  var v=+range.value;
+  document.getElementById('qAmt').innerHTML=peso(v)+'<small>.00</small>';
+  // simple flat add-on estimate: (P + P*4.5%*10)/10
+  var mo=(v+v*0.045*10)/10;
+  document.getElementById('qMo').textContent=peso(Math.round(mo))+'.00';
+  var pct=((v-20000)/(300000-20000))*100;
+  range.style.background='linear-gradient(90deg,var(--teal-600) '+pct+'%,var(--line) '+pct+'%)';
+});
+</script>
+
+</body>
+</html>

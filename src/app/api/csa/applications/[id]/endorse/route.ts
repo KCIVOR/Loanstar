@@ -7,6 +7,7 @@ import {
   assertCsaCanEdit,
   getEndorseReadiness,
 } from "@/lib/csa/application";
+import { notifyBorrowerForApplication } from "@/lib/notifications/write";
 import { requireModulePermission } from "@/lib/permissions/server";
 import { createClient } from "@/lib/supabase/server";
 
@@ -56,6 +57,15 @@ export async function POST(_request: Request, { params }: RouteParams) {
       entityType: "loan_application",
       entityId: id,
       afterData: { trigger: "endorse_to_cig", status: "for_verification" },
+    });
+
+    void notifyBorrowerForApplication(id, {
+      title: "Application sent for verification",
+      body: "Your loan application was endorsed to CIG for credit verification.",
+      link: "/borrower",
+      kind: "application_for_verification",
+      entityType: "loan_application",
+      entityId: id,
     });
 
     return jsonOk({ success: true, status: "for_verification" });

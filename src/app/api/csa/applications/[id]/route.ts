@@ -47,6 +47,7 @@ const patchSchema = z.object({
       picWork: z.record(z.string(), z.unknown()).optional(),
       dependents: z.array(z.record(z.string(), z.unknown())).optional(),
       references: z.array(z.record(z.string(), z.unknown())).optional(),
+      profileData: z.record(z.string(), z.unknown()).optional(),
     })
     .optional(),
   details: z
@@ -80,6 +81,28 @@ export async function GET(_request: Request, { params }: RouteParams) {
     const endorseReadiness = await getEndorseReadiness(supabase, id);
     const negotiation = await getNegotiation(supabase, id);
 
+    let privacyOrientationByName: string | null = null;
+    if (application.privacy_orientation_by) {
+      const { data: orientationProfile } = await supabase
+        .from("profiles")
+        .select("full_name")
+        .eq("id", application.privacy_orientation_by as string)
+        .maybeSingle();
+      privacyOrientationByName =
+        (orientationProfile?.full_name as string | null | undefined) ?? null;
+    }
+
+    let initialInterviewByName: string | null = null;
+    if (application.initial_interview_by) {
+      const { data: interviewProfile } = await supabase
+        .from("profiles")
+        .select("full_name")
+        .eq("id", application.initial_interview_by as string)
+        .maybeSingle();
+      initialInterviewByName =
+        (interviewProfile?.full_name as string | null | undefined) ?? null;
+    }
+
     return jsonOk({
       application: {
         id: application.id,
@@ -90,6 +113,18 @@ export async function GET(_request: Request, { params }: RouteParams) {
         blocker: application.blocker,
         isReloan: application.is_reloan,
         endorsedAt: application.endorsed_at,
+        privacyOrientationAt:
+          (application.privacy_orientation_at as string | null) ?? null,
+        privacyOrientationBy:
+          (application.privacy_orientation_by as string | null) ?? null,
+        privacyOrientationByName,
+        initialInterviewAt:
+          (application.initial_interview_at as string | null) ?? null,
+        initialInterviewBy:
+          (application.initial_interview_by as string | null) ?? null,
+        initialInterviewNotes:
+          (application.initial_interview_notes as string | null) ?? null,
+        initialInterviewByName,
         createdAt: application.created_at,
         updatedAt: application.updated_at,
         editable: isCsaEditableStatus(application.status),
@@ -141,6 +176,7 @@ export async function PATCH(request: Request, { params }: RouteParams) {
         picWork: body.borrower.picWork as never,
         dependents: body.borrower.dependents as never,
         references: body.borrower.references,
+        profileData: body.borrower.profileData,
       });
 
       const { error: borrowerError } = await supabase

@@ -14,11 +14,17 @@ export type CigQueueItem = {
     lastName: string;
     email: string;
   } | null;
-  hasPendingCallback: boolean;
-  callbackScheduledAt: string | null;
+  isRevision: boolean;
+  callbackOverdueAt: string | null;
 };
 
-/** Active CIG queue: for_verification, excluding future callbacks. */
+/**
+ * Active CIG queue: applications currently in verification, plus
+ * for_revision files Committee routed back to CIG specifically (checked via
+ * the open revisit_notices row, since "for_revision" alone is shared with
+ * CSA-routed revisions). Files with a future callback are hidden until due;
+ * ones with an already-due callback stay visible and are flagged overdue.
+ */
 export async function getCigQueue(supabase: SupabaseClient): Promise<CigQueueItem[]> {
   const now = new Date().toISOString();
 
@@ -39,39 +45,67 @@ export async function getCigQueue(supabase: SupabaseClient): Promise<CigQueueIte
       )
     `,
     )
-    .eq("status", "for_verification")
+    .in("status", ["for_verification", "for_revision"])
     .order("endorsed_at", { ascending: true, nullsFirst: false });
 
   if (error) {
     throw new Error(error.message);
   }
 
-  const ids = (applications ?? []).map((a) => a.id as string);
+  const revisionIds = (applications ?? [])
+    .filter((row) => row.status === "for_revision")
+    .map((row) => row.id as string);
+
+  let cigRevisionIds = new Set<string>();
+  if (revisionIds.length) {
+    const { data: notices, error: noticeError } = await supabase
+      .from("revisit_notices")
+      .select("loan_application_id, route_to")
+      .in("loan_application_id", revisionIds)
+      .eq("route_to", "cig")
+      .is("resolved_at", null);
+
+    if (noticeError) {
+      throw new Error(noticeError.message);
+    }
+
+    cigRevisionIds = new Set(
+      (notices ?? []).map((n) => n.loan_application_id as string),
+    );
+  }
+
+  const inQueue = (applications ?? []).filter(
+    (row) =>
+      row.status === "for_verification" ||
+      cigRevisionIds.has(row.id as string),
+  );
+
+  const ids = inQueue.map((a) => a.id as string);
   if (!ids.length) return [];
 
   const { data: callbacks, error: cbError } = await supabase
     .from("callbacks")
     .select("loan_application_id, scheduled_at")
     .in("loan_application_id", ids)
-    .is("resolved_at", null)
-    .gt("scheduled_at", now);
+    .is("resolved_at", null);
 
   if (cbError) {
     throw new Error(cbError.message);
   }
 
   const hiddenIds = new Set(
-    (callbacks ?? []).map((c) => c.loan_application_id as string),
+    (callbacks ?? [])
+      .filter((c) => (c.scheduled_at as string) > now)
+      .map((c) => c.loan_application_id as string),
   );
 
-  const callbackTimes = new Map(
-    (callbacks ?? []).map((c) => [
-      c.loan_application_id as string,
-      c.scheduled_at as string,
-    ]),
+  const overdueTimes = new Map(
+    (callbacks ?? [])
+      .filter((c) => (c.scheduled_at as string) <= now)
+      .map((c) => [c.loan_application_id as string, c.scheduled_at as string]),
   );
 
-  return (applications ?? [])
+  return inQueue
     .filter((row) => !hiddenIds.has(row.id as string))
     .map((row) => {
       const borrower = Array.isArray(row.borrowers)
@@ -91,8 +125,8 @@ export async function getCigQueue(supabase: SupabaseClient): Promise<CigQueueIte
               email: borrower.email as string,
             }
           : null,
-        hasPendingCallback: callbackTimes.has(row.id as string),
-        callbackScheduledAt: callbackTimes.get(row.id as string) ?? null,
+        isRevision: row.status === "for_revision",
+        callbackOverdueAt: overdueTimes.get(row.id as string) ?? null,
       };
     });
 }

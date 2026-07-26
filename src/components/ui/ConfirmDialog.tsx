@@ -1,6 +1,8 @@
 import type { ReactNode } from "react";
 import { Button } from "./Button";
 
+/* Meridian §19 confirmation modal — ghost cancel, accent confirm
+   (danger for destructive actions). */
 export function ConfirmDialog({
   open,
   title,
@@ -9,6 +11,7 @@ export function ConfirmDialog({
   cancelLabel = "Cancel",
   variant = "primary",
   loading = false,
+  confirmDisabled = false,
   onConfirm,
   onCancel,
   children,
@@ -18,26 +21,37 @@ export function ConfirmDialog({
   message?: ReactNode;
   confirmLabel?: string;
   cancelLabel?: string;
-  variant?: "primary" | "danger";
+  variant?: "primary" | "danger" | "accent";
   loading?: boolean;
+  confirmDisabled?: boolean;
   onConfirm: () => void;
   onCancel: () => void;
   children?: ReactNode;
 }) {
   if (!open) return null;
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
-      <div className="w-full max-w-md rounded-xl border border-neutral-200 bg-white p-6 shadow-lg">
-        <h3 className="font-display text-lg font-semibold text-ink">{title}</h3>
-        {message ? (
-          <p className="mt-2 text-sm text-ink-muted">{message}</p>
-        ) : null}
-        {children ? <div className="mt-4">{children}</div> : null}
-        <div className="mt-6 flex justify-end gap-2">
-          <Button variant="outline" onClick={onCancel} disabled={loading}>
+    <div className="overlay">
+      <div className="modal">
+        <div className="modal-h">
+          <h4>{title}</h4>
+          <button type="button" className="x" onClick={onCancel} aria-label="Close">
+            ×
+          </button>
+        </div>
+        <div className="modal-b">
+          {message ? <p>{message}</p> : null}
+          {children ? <div className="mt-3">{children}</div> : null}
+        </div>
+        <div className="modal-f">
+          <Button variant="ghost" onClick={onCancel} disabled={loading}>
             {cancelLabel}
           </Button>
-          <Button variant={variant} onClick={onConfirm} loading={loading}>
+          <Button
+            variant={variant}
+            onClick={onConfirm}
+            loading={loading}
+            disabled={confirmDisabled}
+          >
             {confirmLabel}
           </Button>
         </div>

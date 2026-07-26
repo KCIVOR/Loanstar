@@ -7,6 +7,8 @@ import {
   Badge,
   Button,
   Card,
+  ConfirmDialog,
+  EmptyState,
   Label,
   PageHeader,
   Select,
@@ -41,6 +43,7 @@ export default function ChecklistsAdminPage() {
   const [message, setMessage] = useState<string | null>(null);
   const [adding, setAdding] = useState(false);
   const [newDocTypeId, setNewDocTypeId] = useState("");
+  const [confirmRemoveId, setConfirmRemoveId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -137,7 +140,6 @@ export default function ChecklistsAdminPage() {
   }
 
   async function handleRemove(id: string) {
-    if (!confirm("Remove this checklist item?")) return;
     setError(null);
     try {
       const res = await fetch(`/api/admin/stage-checklists/${id}`, {
@@ -189,65 +191,74 @@ export default function ChecklistsAdminPage() {
       ) : (
         <>
           <Card className="mb-6">
-            <h2 className="mb-3 font-medium text-ink">
+            <h2 className="mb-3 font-display text-lg font-semibold text-navy-900">
               Checklist items — {stage.replace(/_/g, " ")}
             </h2>
-            <Table>
-              <thead>
-                <tr>
-                  <Th>Document</Th>
-                  <Th>Required</Th>
-                  <Th>Order</Th>
-                  <Th>Actions</Th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-neutral-200">
-                {items.map((item) => (
-                  <tr key={item.id}>
-                    <Td className="font-medium">
-                      {item.documentType?.name ?? "—"}
-                    </Td>
-                    <Td>
-                      {item.isRequired ? (
-                        <Badge variant="warning">Required</Badge>
-                      ) : (
-                        <Badge variant="neutral">Optional</Badge>
-                      )}
-                    </Td>
-                    <Td className="font-mono">{item.sortOrder}</Td>
-                    <Td>
-                      <div className="flex gap-2">
-                        <Button
-                          variant="secondary"
-                          className="text-xs"
-                          onClick={() => void handleToggleRequired(item)}
-                        >
-                          Toggle req/opt
-                        </Button>
-                        <Button
-                          variant="danger"
-                          className="text-xs"
-                          onClick={() => void handleRemove(item.id)}
-                        >
-                          Remove
-                        </Button>
-                      </div>
-                    </Td>
-                  </tr>
-                ))}
-              </tbody>
-            </Table>
             {items.length === 0 ? (
-              <p className="py-4 text-sm text-ink-faint">No items for this stage.</p>
-            ) : null}
+              <EmptyState
+                title="No items for this stage"
+                description="Add a document type below."
+                showMark={false}
+              />
+            ) : (
+              <Table>
+                <thead>
+                  <tr>
+                    <Th>Document</Th>
+                    <Th>Required</Th>
+                    <Th num>Order</Th>
+                    <Th>Actions</Th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {items.map((item) => (
+                    <tr key={item.id}>
+                      <Td className="font-medium text-ink-900">
+                        {item.documentType?.name ?? "—"}
+                      </Td>
+                      <Td>
+                        {item.isRequired ? (
+                          <Badge variant="warning">Required</Badge>
+                        ) : (
+                          <Badge variant="neutral">Optional</Badge>
+                        )}
+                      </Td>
+                      <Td num>{item.sortOrder}</Td>
+                      <Td>
+                        <div className="flex gap-2">
+                          <Button
+                            variant="secondary"
+                            size="sm"
+                            onClick={() => void handleToggleRequired(item)}
+                          >
+                            Toggle req/opt
+                          </Button>
+                          <Button
+                            variant="danger"
+                            size="sm"
+                            onClick={() => setConfirmRemoveId(item.id)}
+                          >
+                            Remove
+                          </Button>
+                        </div>
+                      </Td>
+                    </tr>
+                  ))}
+                </tbody>
+              </Table>
+            )}
           </Card>
 
           <Card>
-            <h2 className="mb-3 font-medium text-ink">Add document type</h2>
+            <h2 className="mb-3 font-display text-lg font-semibold text-navy-900">
+              Add document type
+            </h2>
             {availableTypes.length === 0 ? (
-              <p className="text-sm text-ink-faint">
-                All known document types are already in this stage checklist.
-              </p>
+              <EmptyState
+                title="All document types assigned"
+                description="Every known document type is already in this stage checklist."
+                showMark={false}
+              />
             ) : (
               <form
                 onSubmit={(e) => void handleAdd(e)}
@@ -270,14 +281,33 @@ export default function ChecklistsAdminPage() {
                     ))}
                   </Select>
                 </div>
-                <Button type="submit" disabled={adding || !newDocTypeId}>
-                  {adding ? "Adding…" : "Add to checklist"}
+                <Button
+                  type="submit"
+                  loading={adding}
+                  disabled={!newDocTypeId}
+                >
+                  Add to checklist
                 </Button>
               </form>
             )}
           </Card>
         </>
       )}
+
+      <ConfirmDialog
+        open={confirmRemoveId !== null}
+        title="Remove checklist item?"
+        message="This document type will be removed from the stage checklist."
+        confirmLabel="Remove"
+        variant="danger"
+        onCancel={() => setConfirmRemoveId(null)}
+        onConfirm={() => {
+          if (!confirmRemoveId) return;
+          void handleRemove(confirmRemoveId).then(() =>
+            setConfirmRemoveId(null),
+          );
+        }}
+      />
     </div>
   );
 }

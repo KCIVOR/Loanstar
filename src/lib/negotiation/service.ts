@@ -3,6 +3,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { appendStatusHistory } from "@/lib/applications/status";
 import { persistComputation } from "@/lib/csa/computation";
 import type { InputMode } from "@/lib/computation/types";
+import { createServiceClient } from "@/lib/supabase/server";
 
 export type NegotiationRecord = {
   id: string;
@@ -64,7 +65,34 @@ export async function discloseTerms(
 
   const now = new Date().toISOString();
 
-  await supabase
+  // Intake-era signatures must not count as post-approval acceptance.
+  // Borrower confirms again after CSA discloses committee-approved terms.
+  //
+  // Privileged clear: computations_update RLS requires signed_at IS NULL and
+  // CSA-editable application statuses, so the CSA user client silently no-ops
+  // on already-signed rows after approval. Same pattern as queueForLra.
+  const admin = createServiceClient();
+  const clearPayload = {
+    signed_at: null,
+    signed_by: null,
+    signature_hash: null,
+  };
+  const { error: clearError } = negotiation.activeComputationId
+    ? await admin
+        .from("computations")
+        .update(clearPayload)
+        .eq("id", negotiation.activeComputationId)
+    : await admin
+        .from("computations")
+        .update(clearPayload)
+        .eq("loan_application_id", applicationId)
+        .eq("is_active", true);
+
+  if (clearError) {
+    throw new Error(clearError.message);
+  }
+
+  const { error: negotiationError } = await admin
     .from("negotiations")
     .update({
       disclosed_at: now,
@@ -75,7 +103,11 @@ export async function discloseTerms(
     })
     .eq("loan_application_id", applicationId);
 
-  await appendStatusHistory(supabase, applicationId, "awaiting_confirmation", {
+  if (negotiationError) {
+    throw new Error(negotiationError.message);
+  }
+
+  await appendStatusHistory(admin, applicationId, "awaiting_confirmation", {
     actorId,
     note: "CSA disclosed approved terms",
   });
@@ -95,9 +127,19 @@ export async function recordCounterOffer(
     throw new Error("Negotiation not found");
   }
 
+  if (
+    counterBy === "borrower" &&
+    negotiation.status !== "awaiting_signature" &&
+    negotiation.status !== "negotiating"
+  ) {
+    throw new Error(
+      "Counter-offer is only available after CSA discloses approved terms",
+    );
+  }
+
   const now = new Date().toISOString();
 
-  await supabase
+  const { error: updateError } = await supabase
     .from("negotiations")
     .update({
       last_counter_amount: amount,
@@ -108,6 +150,10 @@ export async function recordCounterOffer(
     })
     .eq("loan_application_id", applicationId);
 
+  if (updateError) {
+    throw new Error(updateError.message);
+  }
+
   await appendStatusHistory(supabase, applicationId, "negotiating_terms", {
     actorId,
     note: `Counter-offer: ${amount.toFixed(2)} by ${counterBy}`,
@@ -116,17 +162,20 @@ export async function recordCounterOffer(
   return getNegotiation(supabase, applicationId);
 }
 
-export async function committeeOverrideAmount(
+type OverrideInput = {
+  amount: number;
+  inputMode: InputMode;
+  terms: number;
+  addonMonths?: number;
+  loanTypeId?: string;
+};
+
+/** Shared by both committee override paths: resolve the loan type, persist a new computation snapshot, and clear any prior signature since the amount changed. */
+async function persistOverrideComputation(
   supabase: SupabaseClient,
   applicationId: string,
   actorId: string,
-  input: {
-    amount: number;
-    inputMode: InputMode;
-    terms: number;
-    addonMonths?: number;
-    loanTypeId?: string;
-  },
+  input: OverrideInput,
 ) {
   const { data: existingComp } = await supabase
     .from("computations")
@@ -189,6 +238,17 @@ export async function committeeOverrideAmount(
     })
     .eq("id", saved.computation.id);
 
+  return saved;
+}
+
+export async function committeeOverrideAmount(
+  supabase: SupabaseClient,
+  applicationId: string,
+  actorId: string,
+  input: OverrideInput,
+) {
+  const saved = await persistOverrideComputation(supabase, applicationId, actorId, input);
+
   const now = new Date().toISOString();
 
   await supabase
@@ -209,13 +269,35 @@ export async function committeeOverrideAmount(
   return saved;
 }
 
-export async function queueForLra(
+/**
+ * Committee adjusting the amount before the initial decision — status is
+ * still for_approval, so there's no negotiation record yet and no status
+ * change. discloseTerms() clears the signature again after Approve regardless,
+ * so this just keeps the displayed "signed" state honest in the meantime.
+ */
+export async function committeeAdjustPreDecision(
   supabase: SupabaseClient,
+  applicationId: string,
+  actorId: string,
+  input: OverrideInput,
+) {
+  return persistOverrideComputation(supabase, applicationId, actorId, input);
+}
+
+export async function queueForLra(
+  _supabase: SupabaseClient,
   applicationId: string,
   computationId: string,
   actorId: string,
 ) {
-  const { error: queueError } = await supabase.from("release_queue").upsert(
+  // Privileged workflow side-effects: borrowers can sign via borrower_portal,
+  // but release_queue upsert + status → lra_pending are blocked by RLS for
+  // that role (insert-only on queue; applications WITH CHECK only allows
+  // CSA-editable statuses). Use service role after ownership was already
+  // verified by the caller.
+  const admin = createServiceClient();
+
+  const { error: queueError } = await admin.from("release_queue").upsert(
     {
       loan_application_id: applicationId,
       computation_id: computationId,
@@ -229,7 +311,7 @@ export async function queueForLra(
     throw new Error(queueError.message);
   }
 
-  await supabase
+  const { error: negotiationError } = await admin
     .from("negotiations")
     .update({
       status: "signed",
@@ -237,7 +319,11 @@ export async function queueForLra(
     })
     .eq("loan_application_id", applicationId);
 
-  await appendStatusHistory(supabase, applicationId, "lra_pending", {
+  if (negotiationError) {
+    throw new Error(negotiationError.message);
+  }
+
+  await appendStatusHistory(admin, applicationId, "lra_pending", {
     actorId,
     note: "Borrower signed computation — queued for LRA",
   });

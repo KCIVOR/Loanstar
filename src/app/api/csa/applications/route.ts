@@ -1,28 +1,13 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
-import { appendStatusHistory } from "@/lib/applications/status";
-import { writeAuditEvent } from "@/lib/audit/writer";
 import { handleApiError, jsonOk } from "@/lib/api/handler";
-import { isCsaEditableStatus } from "@/lib/csa/application";
 import {
-  borrowerProfileToRow,
-  mapBorrowerRow,
-  type BorrowerRow,
-} from "@/lib/borrowers/types";
-import { ensureDocumentSlots } from "@/lib/documents/checklist";
-import {
-  requireModulePermission,
-} from "@/lib/permissions/server";
+  createApplicationSchema,
+  createCsaApplication,
+} from "@/lib/csa/create-application";
+import { requireModulePermission } from "@/lib/permissions/server";
 import { createClient } from "@/lib/supabase/server";
-
-const createSchema = z.object({
-  email: z.string().email(),
-  firstName: z.string().min(1),
-  lastName: z.string().min(1),
-  middleName: z.string().optional(),
-  mobilePhone: z.string().optional(),
-});
 
 export async function GET() {
   try {
@@ -55,6 +40,9 @@ export async function GET() {
         "submitted",
         "on_hold",
         "for_revision",
+        "approved",
+        "awaiting_confirmation",
+        "negotiating_terms",
       ])
       .order("created_at", { ascending: false });
 
@@ -95,74 +83,10 @@ export async function GET() {
 export async function POST(request: Request) {
   try {
     const user = await requireModulePermission("intake", "create");
-    const body = createSchema.parse(await request.json());
+    const body = createApplicationSchema.parse(await request.json());
     const supabase = await createClient();
-
-    const { data: existingBorrower } = await supabase
-      .from("borrowers")
-      .select("id")
-      .eq("email", body.email.toLowerCase())
-      .maybeSingle();
-
-    let borrowerId = existingBorrower?.id;
-
-    if (!borrowerId) {
-      const { data: createdBorrower, error: borrowerError } = await supabase
-        .from("borrowers")
-        .insert({
-          email: body.email.toLowerCase(),
-          first_name: body.firstName,
-          middle_name: body.middleName ?? null,
-          last_name: body.lastName,
-          mobile_phone: body.mobilePhone ?? null,
-        })
-        .select("id")
-        .single();
-
-      if (borrowerError) {
-        throw new Error(borrowerError.message);
-      }
-      borrowerId = createdBorrower.id;
-    }
-
-    const { data: application, error: appError } = await supabase
-      .from("loan_applications")
-      .insert({
-        borrower_id: borrowerId,
-        status: "submitted",
-        status_history: [
-          {
-            status: "submitted",
-            at: new Date().toISOString(),
-            actorId: user.id,
-            note: "CSA created application",
-          },
-        ],
-      })
-      .select("id, status, created_at")
-      .single();
-
-    if (appError) {
-      throw new Error(appError.message);
-    }
-
-    await supabase.from("application_details").upsert({
-      loan_application_id: application.id,
-      internal_flags: {},
-    });
-
-    await ensureDocumentSlots(supabase, "intake", application.id, borrowerId);
-
-    await writeAuditEvent({
-      actorId: user.id,
-      moduleSlug: "intake",
-      action: "create",
-      entityType: "loan_application",
-      entityId: application.id,
-      afterData: { borrowerId, email: body.email },
-    });
-
-    return jsonOk({ applicationId: application.id }, 201);
+    const result = await createCsaApplication(supabase, user.id, body);
+    return jsonOk({ applicationId: result.applicationId }, 201);
   } catch (error) {
     if (error instanceof z.ZodError) {
       return NextResponse.json({ error: error.message }, { status: 400 });

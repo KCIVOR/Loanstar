@@ -1,10 +1,127 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
+// CI & References Form types (loanstar/docs/cig-references-form-plan.md, Phase 2).
+// Field names/order follow CI AND REFERENCES FORM 1.xlsx, Sheet1.
+export type PicAddress = {
+  street?: string;
+  barangay?: string;
+  city?: string;
+  province?: string;
+  zipCode?: string;
+  ownership?: "owned" | "rented" | null;
+  yearsOfStay?: string;
+};
+
+export type PicSibling = {
+  name?: string;
+  age?: string;
+  occupation?: string;
+};
+
+export type PicOtherFinancing = {
+  hasOther?: boolean | null;
+  company?: string;
+  financingOrBank?: string;
+  when?: string;
+  loanAmount?: number;
+  monthly?: number;
+  startEnd?: string;
+};
+
+export type PicLoanFlag = {
+  has?: boolean | null;
+  loanAmount?: number;
+  monthlyAmort?: number;
+};
+
+export type PicOtherVerificationCalls = {
+  status?: "yes" | "none" | null;
+  company?: string;
+  wasLending?: boolean;
+  recalledLast3Months?: boolean;
+};
+
+// All fields optional: this is filled in incrementally over the course of a
+// phone call and saved as a partial draft (see loanstar/docs/cig-references-form-plan.md).
+export type PicVerification = {
+  name?: string | null;
+  birthday?: string | null;
+  presentAddress?: PicAddress | null;
+  provincialAddress?: PicAddress | null;
+  contactNumber?: string | null;
+  relationToClient?: string | null;
+  otherNumber?: string | null;
+  sinceWhen?: string | null;
+  socialContact?: string | null;
+  email?: string | null;
+  companyName?: string | null;
+  companyYearsOfStay?: string | null;
+  companyPhone?: string | null;
+  siblings?: PicSibling[];
+  willAvailLoanAware?: boolean | null;
+  otherFinancing?: PicOtherFinancing | null;
+  housingLoan?: PicLoanFlag | null;
+  carLoan?: PicLoanFlag | null;
+  otherVerificationCalls?: PicOtherVerificationCalls | null;
+};
+
+export type ReferenceOtherVerificationCalls = {
+  status?: "yes" | "no" | null;
+  company?: string;
+  recalledLast3Months?: boolean;
+};
+
+export type ReferenceVerification = {
+  name?: string | null;
+  age?: string | null;
+  work?: string | null;
+  relationToClient?: string | null;
+  howLongKnowClient?: string | null;
+  contactNumber?: string | null;
+  otherContactNumber?: string | null;
+  facebookAccount?: string | null;
+  firstTimeAsReference?: boolean | null;
+  otherVerificationCalls?: ReferenceOtherVerificationCalls | null;
+  remarks?: string | null;
+};
+
+export type VerificationChecklist = {
+  validateBorrowerInfo: boolean;
+  validatePicInfo: boolean;
+  presidePicObligationSpill: boolean;
+  verifiedCharacterReferences: boolean;
+};
+
+export type PicPaymentPreference = {
+  method:
+    | "BDO"
+    | "PBB"
+    | "EASTWEST"
+    | "UCPB"
+    | "PERSONAL_CHECK"
+    | "BANK"
+    | "OTHERS"
+    | null;
+  bankSpecify?: string;
+  othersSpecify?: string;
+  remarks?: string;
+};
+
+export type PicDemeanorTag =
+  | "cooperative"
+  | "arrogant"
+  | "hard_to_understand"
+  | "inconsistent";
+
 export type VerificationRecord = {
   id: string;
   loanApplicationId: string;
   fieldCompletenessOk: boolean | null;
   fieldCompletenessNotes: string | null;
+  biIdentityConfirmed: boolean | null;
+  biPurposeConfirmed: boolean | null;
+  biDetailsConfirmed: boolean | null;
+  biNotes: string | null;
   picAllotmentAwareness: string | null;
   picPaymentReliability: string | null;
   picInterviewNotes: string | null;
@@ -12,8 +129,19 @@ export type VerificationRecord = {
   cmSalary: number | null;
   cmPosition: string | null;
   cmContractStatus: string | null;
+  cmFitToWork: boolean | null;
   cmNotes: string | null;
   characterReferencesNotes: string | null;
+  charRefOtherLenders: boolean | null;
+  picVerification: PicVerification | null;
+  referenceVerifications: ReferenceVerification[] | null;
+  verificationChecklist: VerificationChecklist | null;
+  picPaymentPreference: PicPaymentPreference | null;
+  picDemeanor: PicDemeanorTag[] | null;
+  picRating: number | null;
+  picRatingReason: string | null;
+  cifVerifiedBy: string | null;
+  cifVerifiedDate: string | null;
   finding: "positive" | "negative" | null;
   findingNotes: string | null;
   isComplete: boolean;
@@ -35,6 +163,19 @@ export function mapVerificationRow(row: Record<string, unknown>): VerificationRe
         ? Boolean(row.field_completeness_ok)
         : null,
     fieldCompletenessNotes: (row.field_completeness_notes as string) ?? null,
+    biIdentityConfirmed:
+      row.bi_identity_confirmed != null
+        ? Boolean(row.bi_identity_confirmed)
+        : null,
+    biPurposeConfirmed:
+      row.bi_purpose_confirmed != null
+        ? Boolean(row.bi_purpose_confirmed)
+        : null,
+    biDetailsConfirmed:
+      row.bi_details_confirmed != null
+        ? Boolean(row.bi_details_confirmed)
+        : null,
+    biNotes: (row.bi_notes as string) ?? null,
     picAllotmentAwareness: (row.pic_allotment_awareness as string) ?? null,
     picPaymentReliability: (row.pic_payment_reliability as string) ?? null,
     picInterviewNotes: (row.pic_interview_notes as string) ?? null,
@@ -42,8 +183,26 @@ export function mapVerificationRow(row: Record<string, unknown>): VerificationRe
     cmSalary: row.cm_salary != null ? Number(row.cm_salary) : null,
     cmPosition: (row.cm_position as string) ?? null,
     cmContractStatus: (row.cm_contract_status as string) ?? null,
+    cmFitToWork:
+      row.cm_fit_to_work != null ? Boolean(row.cm_fit_to_work) : null,
     cmNotes: (row.cm_notes as string) ?? null,
     characterReferencesNotes: (row.character_references_notes as string) ?? null,
+    charRefOtherLenders:
+      row.char_ref_other_lenders != null
+        ? Boolean(row.char_ref_other_lenders)
+        : null,
+    picVerification: (row.pic_verification as PicVerification) ?? null,
+    referenceVerifications:
+      (row.reference_verifications as ReferenceVerification[]) ?? null,
+    verificationChecklist:
+      (row.verification_checklist as VerificationChecklist) ?? null,
+    picPaymentPreference:
+      (row.pic_payment_preference as PicPaymentPreference) ?? null,
+    picDemeanor: (row.pic_demeanor as PicDemeanorTag[]) ?? null,
+    picRating: row.pic_rating != null ? Number(row.pic_rating) : null,
+    picRatingReason: (row.pic_rating_reason as string) ?? null,
+    cifVerifiedBy: (row.cif_verified_by as string) ?? null,
+    cifVerifiedDate: (row.cif_verified_date as string) ?? null,
     finding: (row.finding as VerificationRecord["finding"]) ?? null,
     findingNotes: (row.finding_notes as string) ?? null,
     isComplete: Boolean(row.is_complete),
@@ -52,8 +211,97 @@ export function mapVerificationRow(row: Record<string, unknown>): VerificationRe
   };
 }
 
-function isFilled(value: string | null | undefined): boolean {
+export function isFilled(value: string | null | undefined): boolean {
   return Boolean(value?.trim());
+}
+
+/** S1 — field completeness answered + borrower interview 3× confirmed (Yes or No). */
+export function isBorrowerReviewComplete(
+  verification: VerificationRecord,
+): boolean {
+  return (
+    verification.fieldCompletenessOk != null &&
+    verification.biIdentityConfirmed != null &&
+    verification.biPurposeConfirmed != null &&
+    verification.biDetailsConfirmed != null
+  );
+}
+
+/** Required subset for CI & References (unlocks Crewing / Submit gate). */
+export function assessCiReferencesRequired(input: {
+  pic: PicVerification | null | undefined;
+  references: ReferenceVerification[] | null | undefined;
+  checklist: VerificationChecklist | null | undefined;
+  picRating: number | null | undefined;
+}): VerificationCompleteness {
+  const missing: string[] = [];
+  const pic = input.pic;
+
+  if (!isFilled(pic?.name)) missing.push("PIC name");
+  if (!isFilled(pic?.contactNumber)) missing.push("PIC contact number");
+  if (!isFilled(pic?.relationToClient)) missing.push("PIC relation to client");
+
+  const refs = input.references ?? [];
+  const completeRefCount = refs.filter(
+    (ref) =>
+      isFilled(ref?.name) &&
+      isFilled(ref?.contactNumber) &&
+      isFilled(ref?.relationToClient),
+  ).length;
+  if (completeRefCount < 1) {
+    missing.push(
+      `At least 1 complete reference (name, contact, relation) — ${completeRefCount} of 1`,
+    );
+  }
+
+  const checklist = input.checklist;
+  if (!checklist?.validateBorrowerInfo) {
+    missing.push("Checklist: Validate Borrower's Information");
+  }
+  if (!checklist?.validatePicInfo) {
+    missing.push("Checklist: Validate PIC Information");
+  }
+  if (!checklist?.presidePicObligationSpill) {
+    missing.push("Checklist: Preside PIC Obligation / Spill");
+  }
+  if (!checklist?.verifiedCharacterReferences) {
+    missing.push("Checklist: Verified Character References");
+  }
+
+  if (input.picRating == null) {
+    missing.push("PIC rating (1–5)");
+  }
+
+  return { complete: missing.length === 0, missing };
+}
+
+/** S3 — same required subset as Submit (`assessVerificationCompleteness`). */
+export function isCiReferencesComplete(
+  verification: VerificationRecord,
+): boolean {
+  return assessCiReferencesRequired({
+    pic: verification.picVerification,
+    references: verification.referenceVerifications,
+    checklist: verification.verificationChecklist,
+    picRating: verification.picRating,
+  }).complete;
+}
+
+/** S4 — crewing manager required fields. */
+export function isCrewingManagerComplete(
+  verification: VerificationRecord,
+): boolean {
+  return (
+    isFilled(verification.cmPosition) &&
+    isFilled(verification.cmContractStatus) &&
+    Boolean(verification.cmDepartureDate) &&
+    verification.cmFitToWork != null
+  );
+}
+
+/** S5 — finding recorded. */
+export function isFindingRecorded(verification: VerificationRecord): boolean {
+  return verification.finding === "positive" || verification.finding === "negative";
 }
 
 export async function getCigChecksComplete(
@@ -116,11 +364,14 @@ export function assessVerificationCompleteness(
     missing.push("Field completeness review required");
   }
 
-  if (!isFilled(verification.picAllotmentAwareness)) {
-    missing.push("PIC allotment awareness notes required");
+  if (verification.biIdentityConfirmed == null) {
+    missing.push("Borrower interview: identity confirmation required");
   }
-  if (!isFilled(verification.picPaymentReliability)) {
-    missing.push("PIC payment reliability notes required");
+  if (verification.biPurposeConfirmed == null) {
+    missing.push("Borrower interview: loan purpose confirmation required");
+  }
+  if (verification.biDetailsConfirmed == null) {
+    missing.push("Borrower interview: application details confirmation required");
   }
 
   if (!isFilled(verification.cmPosition)) {
@@ -132,9 +383,53 @@ export function assessVerificationCompleteness(
   if (!verification.cmDepartureDate) {
     missing.push("Crewing manager departure date required");
   }
+  if (verification.cmFitToWork == null) {
+    missing.push("Crewing manager fit-to-work status required");
+  }
 
-  if (!isFilled(verification.characterReferencesNotes)) {
-    missing.push("Character references notes required");
+  // CI & References Form (loanstar/docs/cig-references-form-plan.md, Phase 4) —
+  // required subset only; the rest of Sheet1's fields are captured but not
+  // gating, since a real call can legitimately leave some of them blank
+  // (e.g. the PIC has no other financing to declare).
+  const pic = verification.picVerification;
+  if (!isFilled(pic?.name)) {
+    missing.push("PIC name required");
+  }
+  if (!isFilled(pic?.contactNumber)) {
+    missing.push("PIC contact number required");
+  }
+  if (!isFilled(pic?.relationToClient)) {
+    missing.push("PIC relation to client required");
+  }
+
+  // References are a free add/remove list now (CIG can add/remove rows), not
+  // a fixed Ref 1/Ref 2 pair — so completeness counts how many are actually
+  // filled out rather than checking specific array positions.
+  const refs = verification.referenceVerifications ?? [];
+  const completeRefCount = refs.filter(
+    (ref) =>
+      isFilled(ref?.name) &&
+      isFilled(ref?.contactNumber) &&
+      isFilled(ref?.relationToClient),
+  ).length;
+  if (completeRefCount < 1) {
+    missing.push(
+      `At least 1 complete reference required (name, contact number, relation) — ${completeRefCount} of 1 so far`,
+    );
+  }
+
+  const checklist = verification.verificationChecklist;
+  if (
+    !checklist ||
+    !checklist.validateBorrowerInfo ||
+    !checklist.validatePicInfo ||
+    !checklist.presidePicObligationSpill ||
+    !checklist.verifiedCharacterReferences
+  ) {
+    missing.push("CI & References Form verification checklist must be fully checked");
+  }
+  if (verification.picRating == null) {
+    missing.push("PIC rating required");
   }
 
   if (!verification.finding) {
@@ -145,7 +440,16 @@ export function assessVerificationCompleteness(
     // checksMissing already added
   }
 
-  return { complete: missing.length === 0, missing };
+  // `complete` uses the same section predicates as hard sequence (S1–S5 + checks)
+  // so Submit readiness cannot drift from getCigSequenceState unlock of forward.
+  const complete =
+    isBorrowerReviewComplete(verification) &&
+    checksComplete &&
+    isCiReferencesComplete(verification) &&
+    isCrewingManagerComplete(verification) &&
+    isFindingRecorded(verification);
+
+  return { complete, missing };
 }
 
 export async function getOrCreateVerification(

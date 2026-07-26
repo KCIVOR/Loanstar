@@ -15,6 +15,7 @@ import { CardGrid, ChartCard, EmptyNote, KpiRow, StatCard, TableCard } from "../
 import { days, pct, peso } from "./format";
 
 const STATUS_LABELS: Record<string, string> = {
+  draft: "Draft",
   registered: "Registered",
   documents_pending: "Docs pending",
   submitted: "Submitted",
@@ -33,11 +34,15 @@ const STATUS_LABELS: Record<string, string> = {
   released: "Released",
   closed: "Closed",
   loan_active: "Active loan",
+  paid_off: "Paid off",
 };
 
 export function IntakeWidget({ data }: { data: IntakeWidgetData }) {
   const inFlight = data.statusCounts.filter(
-    (s) => !["released", "closed", "loan_active", "denied"].includes(s.status),
+    (s) =>
+      !["released", "closed", "loan_active", "paid_off", "denied"].includes(
+        s.status,
+      ),
   );
   const chartData = inFlight
     .map((s) => ({ status: STATUS_LABELS[s.status] ?? s.status, count: s.count }))
@@ -235,15 +240,15 @@ export function LeadsWidget({ data }: { data: LeadsWidgetData }) {
           emptyText="No leads yet."
           renderRow={(lead) => (
             <tr key={lead.id}>
-              <td className="py-1.5 pr-3 font-semibold text-ink">{lead.borrowerName}</td>
+              <td className="py-1.5 pr-3 font-semibold text-ink-900">{lead.borrowerName}</td>
               <td className="py-1.5 pr-3">
                 {lead.converted ? (
-                  <span className="text-success-ink">Converted</span>
+                  <span className="text-success">Converted</span>
                 ) : (
-                  <span className="text-ink-muted">Open</span>
+                  <span className="text-ink-500">Open</span>
                 )}
               </td>
-              <td className="py-1.5 text-ink-faint">
+              <td className="py-1.5 text-ink-400">
                 {RECENT_LEAD_DATE.format(new Date(lead.createdAt))}
               </td>
             </tr>

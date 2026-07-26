@@ -4,6 +4,7 @@ import type { ReactNode } from "react";
 import { useEffect, useId, useRef, useState } from "react";
 import { cn } from "./cn";
 
+/* Meridian §10 dropdown menu — .menu panel; danger items separated by a rule. */
 export type DropdownMenuItem = {
   label: string;
   onClick: () => void;
@@ -70,13 +71,11 @@ export function DropdownMenu({
         <div
           id={menuId}
           role="menu"
-          className="absolute right-0 top-[calc(100%+8px)] z-50 flex w-[170px] flex-col rounded-[10px] border border-neutral-200 bg-white p-1.5 shadow-[0_14px_32px_rgba(15,33,72,0.14)]"
+          className="menu absolute right-0 top-[calc(100%+8px)] z-50"
         >
           {items.map((item, index) => (
             <div key={`${item.label}-${index}`}>
-              {item.danger && dangerIndex === index && index > 0 ? (
-                <div className="mx-1.5 my-1 h-px bg-neutral-100" role="separator" />
-              ) : null}
+              {item.danger && dangerIndex === index && index > 0 ? <hr /> : null}
               <button
                 type="button"
                 role="menuitem"
@@ -84,10 +83,7 @@ export function DropdownMenu({
                   setOpen(false);
                   item.onClick();
                 }}
-                className={cn(
-                  "w-full rounded-[7px] px-2.5 py-2 text-left text-[12.5px] transition-colors hover:bg-neutral-50",
-                  item.danger ? "text-danger" : "text-ink"
-                )}
+                className={cn("mi", item.danger && "danger")}
               >
                 {item.label}
               </button>

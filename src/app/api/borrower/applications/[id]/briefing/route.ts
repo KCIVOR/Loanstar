@@ -1,9 +1,4 @@
-import { NextResponse } from "next/server";
-import { z } from "zod";
-
-import { writeAuditEvent } from "@/lib/audit/writer";
 import { handleApiError, jsonOk } from "@/lib/api/handler";
-import { signBriefingAsBorrower } from "@/lib/lra/release-service";
 import {
   ForbiddenError,
   requireModulePermission,
@@ -11,8 +6,6 @@ import {
 import { createClient } from "@/lib/supabase/server";
 
 type RouteParams = { params: Promise<{ id: string }> };
-
-const signSchema = z.object({ confirm: z.literal(true) });
 
 async function assertOwnReleaseBriefing(userId: string, applicationId: string) {
   const supabase = await createClient();
@@ -73,38 +66,6 @@ export async function GET(_request: Request, { params }: RouteParams) {
         : null,
     });
   } catch (error) {
-    return handleApiError(error);
-  }
-}
-
-export async function POST(request: Request, { params }: RouteParams) {
-  try {
-    const user = await requireModulePermission("borrower_portal", "edit");
-    const { id } = await params;
-    signSchema.parse(await request.json());
-    const { releaseFile } = await assertOwnReleaseBriefing(user.id, id);
-    const supabase = await createClient();
-
-    const result = await signBriefingAsBorrower(
-      supabase,
-      releaseFile.id,
-      user.id,
-    );
-
-    await writeAuditEvent({
-      actorId: user.id,
-      moduleSlug: "borrower_portal",
-      action: "execute_trigger",
-      entityType: "briefing",
-      entityId: releaseFile.id,
-      afterData: { trigger: "borrower_sign_briefing", ...result },
-    });
-
-    return jsonOk(result);
-  } catch (error) {
-    if (error instanceof z.ZodError) {
-      return NextResponse.json({ error: error.message }, { status: 400 });
-    }
     return handleApiError(error);
   }
 }

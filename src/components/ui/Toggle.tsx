@@ -2,6 +2,7 @@
 
 import { cn } from "./cn";
 
+/* Meridian §05 toggle — 40×22 pill, teal when on. */
 export function Toggle({
   checked,
   onChange,
@@ -14,35 +15,17 @@ export function Toggle({
   disabled?: boolean;
 }) {
   return (
-    <div
-      className={cn(
-        "inline-flex items-center gap-3 text-sm",
-        label ? "w-full justify-between" : "",
-        checked ? "text-ink" : "text-ink-faint",
-        disabled && "opacity-50"
-      )}
-    >
-      {label ? <span>{label}</span> : null}
-      <button
-        type="button"
+    <label className={cn("toggle", label && "w-full justify-between", disabled && "opacity-60")}>
+      {label ? <span className="order-first">{label}</span> : null}
+      <input
+        type="checkbox"
         role="switch"
         aria-checked={checked}
         aria-label={label}
+        checked={checked}
         disabled={disabled}
-        onClick={() => onChange(!checked)}
-        className={cn(
-          "relative inline-block h-[18px] w-8 shrink-0 rounded-full transition-colors",
-          "disabled:cursor-not-allowed",
-          checked ? "bg-gold-400" : "bg-[#E4E7EF]"
-        )}
-      >
-        <span
-          className={cn(
-            "absolute top-0.5 h-3.5 w-3.5 rounded-full bg-white transition-all",
-            checked ? "right-0.5" : "left-0.5"
-          )}
-        />
-      </button>
-    </div>
+        onChange={(e) => onChange(e.target.checked)}
+      />
+    </label>
   );
 }

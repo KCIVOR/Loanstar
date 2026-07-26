@@ -1,29 +1,41 @@
 import { cn } from "./cn";
 
+/* Meridian §08 avatar — navy-100 disc (teal variant available); with a name it
+   renders the .person row. Optional `src` shows a photo with initials fallback. */
 const sizes = {
-  sm: "h-[26px] w-[26px] text-[10.5px]",
-  md: "h-10 w-10 text-[13px]",
-  lg: "h-12 w-12 text-[15px]",
+  sm: "sm",
+  md: "",
+  lg: "lg",
 } as const;
 
 export function Avatar({
   initials,
   name,
+  subtitle,
+  src,
   size = "md",
+  teal = false,
   className = "",
 }: {
   initials: string;
   name?: string;
+  subtitle?: string;
+  src?: string | null;
   size?: keyof typeof sizes;
+  teal?: boolean;
   className?: string;
 }) {
-  const mark = (
+  const mark = src ? (
+    // eslint-disable-next-line @next/next/no-img-element -- public avatar URL from Supabase storage
+    <img
+      src={src}
+      alt={name ? `${name} avatar` : "Avatar"}
+      className={cn("avatar", sizes[size], "has-photo", className)}
+      title={name}
+    />
+  ) : (
     <span
-      className={cn(
-        "inline-flex shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-gold-300 to-gold-600 font-bold text-navy-900",
-        sizes[size],
-        className
-      )}
+      className={cn("avatar", sizes[size], teal && "teal", className)}
       aria-hidden={name ? true : undefined}
       title={name}
     >
@@ -34,9 +46,12 @@ export function Avatar({
   if (!name) return mark;
 
   return (
-    <span className="inline-flex items-center gap-2.5 text-[12.5px] text-ink-muted">
+    <span className="person">
       {mark}
-      <span className="text-ink-muted">{name}</span>
+      <span>
+        <span className="nm block">{name}</span>
+        {subtitle ? <span className="sub2 block">{subtitle}</span> : null}
+      </span>
     </span>
   );
 }

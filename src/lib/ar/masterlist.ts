@@ -3,6 +3,10 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { appendStatusHistory } from "@/lib/applications/status";
 import { getActiveComputation } from "@/lib/csa/computation";
 import { mapBorrowerRow } from "@/lib/borrowers/types";
+import {
+  canMarkPaidOff,
+  PaidOffEligibilityError,
+} from "@/lib/ar/paid-off";
 import { generateAmortizationSchedule } from "@/lib/ar/schedule";
 
 export async function initializeArAccount(
@@ -171,6 +175,78 @@ export async function assignMasterlist(
 
     if (error) throw new Error(error.message);
   }
+}
+
+/**
+ * AR confirms the loan is fully paid — advances application to paid_off.
+ * Does not auto-run on last payment; requires explicit AR action.
+ */
+export async function markPaidOff(
+  supabase: SupabaseClient,
+  masterlistId: string,
+  actorId: string,
+) {
+  const { data: record, error } = await supabase
+    .from("masterlist")
+    .select(
+      `
+      id,
+      outstanding_balance,
+      account_status,
+      loan_application_id,
+      amortization_schedules ( status )
+    `,
+    )
+    .eq("id", masterlistId)
+    .single();
+
+  if (error || !record) {
+    throw new Error(error?.message ?? "Masterlist record not found");
+  }
+
+  const applicationId = record.loan_application_id as string;
+
+  const { data: app, error: appError } = await supabase
+    .from("loan_applications")
+    .select("id, status")
+    .eq("id", applicationId)
+    .single();
+
+  if (appError || !app) {
+    throw new Error(appError?.message ?? "Application not found");
+  }
+
+  const schedulesRaw = record.amortization_schedules;
+  const schedules = Array.isArray(schedulesRaw) ? schedulesRaw : [];
+  const scheduleStatuses = schedules.map((row) =>
+    String((row as { status?: string }).status ?? ""),
+  );
+
+  const eligibility = canMarkPaidOff({
+    applicationStatus: String(app.status),
+    outstandingBalance: Number(record.outstanding_balance),
+    scheduleStatuses,
+  });
+
+  if (!eligibility.ok) {
+    throw new PaidOffEligibilityError(eligibility.reason);
+  }
+
+  if (record.account_status !== "paid") {
+    const { error: mlError } = await supabase
+      .from("masterlist")
+      .update({ account_status: "paid" })
+      .eq("id", masterlistId);
+
+    if (mlError) throw new Error(mlError.message);
+  }
+
+  await appendStatusHistory(supabase, applicationId, "paid_off", {
+    actorId,
+    note: "AR confirmed paid off",
+  });
+
+  return { applicationId, status: "paid_off" as const };
 }
 
 export async function assignRemedial(

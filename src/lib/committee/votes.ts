@@ -5,6 +5,7 @@ export type VoteRecord = {
   voterId: string;
   vote: CommitteeVoteValue;
   votedAt: string;
+  comment: string | null;
 };
 
 export type VoteTally = {
@@ -15,7 +16,16 @@ export type VoteTally = {
   hasMajority: boolean;
 };
 
-const COMMITTEE_SIZE = 3;
+export const COMMITTEE_SIZE = 3;
+
+/** Server-side gate: every final action requires a full committee ballot. */
+export function assertAllVotesCast(votes: VoteRecord[]): void {
+  if (votes.length < COMMITTEE_SIZE) {
+    throw new Error(
+      "All 3 committee votes must be cast before a final action",
+    );
+  }
+}
 
 export function computeVoteTally(votes: VoteRecord[]): VoteTally {
   const approve = votes.filter((v) => v.vote === "approve").length;
@@ -45,4 +55,14 @@ export function computeTatDays(
   const end = finalActionAt ? new Date(finalActionAt) : new Date();
   const diffMs = end.getTime() - start.getTime();
   return Math.max(0, Math.floor(diffMs / (1000 * 60 * 60 * 24)));
+}
+
+/** TAT thresholds per LoanStar_System_Design.md §6.13: warning at 5+, danger at 10+. */
+export function tatTone(
+  days: number | null,
+): "success" | "warning" | "danger" | "neutral" {
+  if (days == null) return "neutral";
+  if (days >= 10) return "danger";
+  if (days >= 5) return "warning";
+  return "success";
 }

@@ -3,6 +3,7 @@ import { handleApiError, jsonOk } from "@/lib/api/handler";
 import { getActiveComputation } from "@/lib/csa/computation";
 import { createSignedDownloadUrl } from "@/lib/documents/storage";
 import { loadBlriContext } from "@/lib/lra/blri-data";
+import { hasEmploymentContractUploaded } from "@/lib/lra/employment-contract";
 import {
   getOrCreateReleaseFile,
 } from "@/lib/lra/release-service";
@@ -66,11 +67,26 @@ export async function GET(_request: Request, { params }: RouteParams) {
       : { data: null };
 
     const computation = await getActiveComputation(supabase, id);
+    const employmentContractPresent = await hasEmploymentContractUploaded(
+      supabase,
+      id,
+    );
     const blriPreview = await loadBlriContext(
       supabase,
       id,
       releaseRow?.id,
     ).catch(() => null);
+
+    let pdcCollectedByName: string | null = null;
+    if (releaseRow?.pdc_collected_by) {
+      const { data: collectorProfile } = await supabase
+        .from("profiles")
+        .select("full_name")
+        .eq("id", releaseRow.pdc_collected_by as string)
+        .maybeSingle();
+      pdcCollectedByName =
+        (collectorProfile?.full_name as string | null | undefined) ?? null;
+    }
 
     const borrowerRaw = app.borrowers;
     const borrower = Array.isArray(borrowerRaw) ? borrowerRaw[0] : borrowerRaw;
@@ -109,6 +125,8 @@ export async function GET(_request: Request, { params }: RouteParams) {
           }
         : null,
       blriPreview,
+      employmentContractPresent,
+      pdcCollectedByName,
     });
   } catch (error) {
     return handleApiError(error);

@@ -4,8 +4,8 @@ import { useCallback, useEffect, useState } from "react";
 
 import {
   Alert,
-  Button,
   PageHeader,
+  Pagination,
   Spinner,
   Table,
   Td,
@@ -56,6 +56,9 @@ export default function AuditPage() {
     void load();
   }, [load]);
 
+  const page = Math.floor(offset / limit) + 1;
+  const pageCount = Math.max(1, Math.ceil(total / limit));
+
   return (
     <div>
       <PageHeader
@@ -73,59 +76,51 @@ export default function AuditPage() {
         <Spinner />
       ) : (
         <>
-          <Table>
-            <thead>
-              <tr>
-                <Th>Time</Th>
-                <Th>Module</Th>
-                <Th>Action</Th>
-                <Th>Entity</Th>
-                <Th>Actor</Th>
-                <Th>IP</Th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-neutral-200 bg-white">
-              {events.map((ev) => (
-                <tr key={ev.id}>
-                  <Td className="whitespace-nowrap font-mono text-xs">
-                    {new Date(ev.created_at).toLocaleString()}
-                  </Td>
-                  <Td>{ev.module_slug}</Td>
-                  <Td>{ev.action}</Td>
-                  <Td className="font-mono text-xs">
-                    {ev.entity_type ?? "—"}
-                    {ev.entity_id ? ` / ${ev.entity_id.slice(0, 8)}…` : ""}
-                  </Td>
-                  <Td className="font-mono text-xs">
-                    {ev.actor_id?.slice(0, 8) ?? "—"}…
-                  </Td>
-                  <Td className="font-mono text-xs">{ev.ip_address ?? "—"}</Td>
+          <div className="audit">
+            <Table>
+              <thead>
+                <tr>
+                  <Th>Time</Th>
+                  <Th>Module</Th>
+                  <Th>Action</Th>
+                  <Th>Entity</Th>
+                  <Th>Actor</Th>
+                  <Th>IP</Th>
                 </tr>
-              ))}
-            </tbody>
-          </Table>
-
-          <div className="mt-4 flex items-center justify-between text-sm text-ink-muted">
-            <span>
-              Showing {offset + 1}–{Math.min(offset + limit, total)} of {total}
-            </span>
-            <div className="flex gap-2">
-              <Button
-                variant="secondary"
-                disabled={offset === 0}
-                onClick={() => setOffset(Math.max(0, offset - limit))}
-              >
-                Previous
-              </Button>
-              <Button
-                variant="secondary"
-                disabled={offset + limit >= total}
-                onClick={() => setOffset(offset + limit)}
-              >
-                Next
-              </Button>
-            </div>
+              </thead>
+              <tbody>
+                {events.map((ev) => (
+                  <tr key={ev.id}>
+                    <Td className="id whitespace-nowrap">
+                      {new Date(ev.created_at).toLocaleString()}
+                    </Td>
+                    <Td>{ev.module_slug}</Td>
+                    <Td>{ev.action}</Td>
+                    <Td className="id">
+                      {ev.entity_type ?? "—"}
+                      {ev.entity_id ? ` / ${ev.entity_id.slice(0, 8)}…` : ""}
+                    </Td>
+                    <Td className="id">
+                      {ev.actor_id ? `${ev.actor_id.slice(0, 8)}…` : "—"}
+                    </Td>
+                    <Td className="id">{ev.ip_address ?? "—"}</Td>
+                  </tr>
+                ))}
+              </tbody>
+            </Table>
           </div>
+
+          <Pagination
+            className="mt-4"
+            page={page}
+            pageCount={pageCount}
+            onPageChange={(p) => setOffset((p - 1) * limit)}
+            summary={
+              total === 0
+                ? "No events"
+                : `Showing ${offset + 1}–${Math.min(offset + limit, total)} of ${total}`
+            }
+          />
         </>
       )}
     </div>

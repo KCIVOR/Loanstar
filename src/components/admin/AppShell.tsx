@@ -1,6 +1,6 @@
 "use client";
 
-import type { ReactNode } from "react";
+import { useCallback, useState, type ReactNode } from "react";
 
 import { Header, type HeaderLink } from "./Header";
 import { Sidebar } from "./Sidebar";
@@ -14,12 +14,24 @@ export function AppShell({
   links?: HeaderLink[];
   children: ReactNode;
 }) {
+  const [mobileOpen, setMobileOpen] = useState(false);
+  const onMobileOpenChange = useCallback((open: boolean) => {
+    setMobileOpen(open);
+  }, []);
+
   return (
-    <div className="flex h-dvh overflow-hidden bg-neutral-50">
-      <Sidebar />
-      <div className="flex min-w-0 flex-1 flex-col overflow-hidden bg-neutral-0 pt-14 lg:pt-0">
-        <Header title={title} links={links} />
-        <main className="flex-1 overflow-y-auto bg-neutral-50 p-4 sm:p-6 lg:p-8">
+    <div className="flex h-dvh overflow-hidden bg-canvas">
+      <Sidebar mobileOpen={mobileOpen} onMobileOpenChange={onMobileOpenChange} />
+      <div className="flex min-w-0 flex-1 flex-col overflow-hidden bg-surface">
+        <Header
+          title={title}
+          links={links}
+          onOpenNav={() => setMobileOpen(true)}
+        />
+        {/* `relative` makes main the containing block for absolutely positioned
+            descendants (e.g. sr-only file inputs), so they scroll with the main
+            area instead of adding phantom height to the document. */}
+        <main className="relative flex-1 overflow-y-auto bg-canvas p-4 sm:p-6 lg:p-8">
           {children}
         </main>
       </div>

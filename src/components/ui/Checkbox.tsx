@@ -2,10 +2,12 @@
 
 import { cn } from "./cn";
 
+/* Meridian §05 checkbox — teal check on 18px rounded box. */
 export function Checkbox({
   checked,
   onChange,
   label,
+  description,
   disabled = false,
   id,
   "aria-label": ariaLabel,
@@ -15,16 +17,14 @@ export function Checkbox({
   onChange: (checked: boolean) => void;
   /** Visible label; omit for compact cells and pass `aria-label` instead. */
   label?: string;
+  description?: string;
   disabled?: boolean;
   id?: string;
   "aria-label"?: string;
   className?: string;
 }) {
   const inputId =
-    id ??
-    (label
-      ? `chk-${label.replace(/\s+/g, "-").toLowerCase()}`
-      : undefined);
+    id ?? (label ? `chk-${label.replace(/\s+/g, "-").toLowerCase()}` : undefined);
   const accessibleName = ariaLabel ?? label;
   if (!accessibleName) {
     throw new Error("Checkbox requires label or aria-label");
@@ -35,7 +35,6 @@ export function Checkbox({
       id={inputId}
       type="checkbox"
       aria-label={label ? undefined : accessibleName}
-      className="h-4 w-4 rounded border-neutral-300 accent-gold-400 text-gold-400 focus:ring-gold-400/30"
       checked={checked}
       disabled={disabled}
       onChange={(e) => onChange(e.target.checked)}
@@ -43,30 +42,16 @@ export function Checkbox({
   );
 
   if (!label) {
-    return (
-      <span
-        className={cn(
-          "inline-flex items-center justify-center",
-          disabled && "opacity-50",
-          className
-        )}
-      >
-        {input}
-      </span>
-    );
+    return <span className={cn("check", className)}>{input}</span>;
   }
 
   return (
-    <label
-      htmlFor={inputId}
-      className={cn(
-        "inline-flex cursor-pointer items-center gap-2 text-sm text-ink",
-        disabled && "cursor-not-allowed opacity-50",
-        className
-      )}
-    >
+    <label htmlFor={inputId} className={cn("check", disabled && "opacity-60", className)}>
       {input}
-      {label}
+      <span>
+        <b>{label}</b>
+        {description ? <span>{description}</span> : null}
+      </span>
     </label>
   );
 }

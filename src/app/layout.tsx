@@ -1,20 +1,37 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { JetBrains_Mono, Public_Sans, Sora } from "next/font/google";
 import "./globals.css";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
+import { PermissionsProvider } from "@/hooks/usePermissions";
+import { BRANDING } from "@/lib/branding";
+
+const sora = Sora({
+  variable: "--font-display",
   subsets: ["latin"],
+  weight: ["400", "500", "600", "700", "800"],
 });
 
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
+const publicSans = Public_Sans({
+  variable: "--font-sans",
   subsets: ["latin"],
+  weight: ["400", "500", "600", "700"],
+});
+
+const jetbrainsMono = JetBrains_Mono({
+  variable: "--font-mono",
+  subsets: ["latin"],
+  weight: ["400", "500", "600", "700"],
 });
 
 export const metadata: Metadata = {
-  title: "LoanStar LMS",
-  description: "LoanStar Loan Management System",
+  title: "LoanStar — Lending, charted clearly",
+  description:
+    "Trusted lending for Filipino seafarers — apply, track, and repay in one transparent portal.",
+  icons: {
+    icon: [{ url: BRANDING.iconUrl, type: "image/png", sizes: "180x180" }],
+    apple: [{ url: BRANDING.iconUrl, type: "image/png", sizes: "180x180" }],
+    shortcut: BRANDING.iconUrl,
+  },
 };
 
 export default function RootLayout({
@@ -25,9 +42,11 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
+      className={`${sora.variable} ${publicSans.variable} ${jetbrainsMono.variable} h-full antialiased`}
     >
-      <body className="min-h-full flex flex-col">{children}</body>
+      <body className="h-full flex flex-col font-sans">
+        <PermissionsProvider>{children}</PermissionsProvider>
+      </body>
     </html>
   );
 }

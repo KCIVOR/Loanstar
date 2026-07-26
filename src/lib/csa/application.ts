@@ -1,14 +1,45 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import {
+  evaluateCoverageForEndorse,
+  getCoverageThreshold,
+} from "@/lib/computation/coverage";
+import {
   getCompletionSummary,
   getStageChecklist,
 } from "@/lib/documents/checklist";
+import {
+  mapBorrowerRow,
+  type BorrowerRow,
+} from "@/lib/borrowers/types";
 import { ForbiddenError } from "@/lib/permissions/server";
 
+import { assessApplicationFormCompleteness } from "./application-form-completeness";
+import { getActiveComputation } from "./computation";
+import { assessInitialInterview } from "./initial-interview";
+import { assessPrivacyOrientation } from "./privacy-orientation";
 import { isCsaEditableStatus } from "./status";
 
 export { isCsaEditableStatus, CSA_EDITABLE_STATUSES } from "./status";
+export {
+  assessApplicationFormCompleteness,
+  type ApplicationFormCompleteness,
+} from "./application-form-completeness";
+export {
+  assessPrivacyOrientation,
+  recordPrivacyOrientation,
+  PRIVACY_ORIENTATION_MISSING,
+} from "./privacy-orientation";
+export {
+  assessInitialInterview,
+  recordInitialInterview,
+  assertInterviewRecordedForComputation,
+  INITIAL_INTERVIEW_MISSING,
+  INITIAL_INTERVIEW_COMPUTATION_ERROR,
+} from "./initial-interview";
+
+export const ON_HOLD_ENDORSE_MISSING =
+  "Application is on hold — clear hold before endorsing";
 
 export async function getApplicationForStaff(
   supabase: SupabaseClient,
@@ -27,6 +58,11 @@ export async function getApplicationForStaff(
       parent_application_id,
       endorsed_at,
       endorsed_by,
+      privacy_orientation_at,
+      privacy_orientation_by,
+      initial_interview_at,
+      initial_interview_by,
+      initial_interview_notes,
       created_at,
       updated_at,
       borrower_id,
@@ -86,7 +122,10 @@ export type EndorseReadiness = {
   checklistComplete: boolean;
   nclRecorded: boolean;
   signedComputation: boolean;
+  coverageOk: boolean;
+  coverageThreshold: number;
   missing: string[];
+  warnings: string[];
 };
 
 export async function getEndorseReadiness(
@@ -116,17 +155,41 @@ export async function getEndorseReadiness(
       nclCheck?.result === "pass" || nclCheck?.result === "fail";
   }
 
-  const { data: signedComputation } = await supabase
-    .from("computations")
-    .select("id")
-    .eq("loan_application_id", applicationId)
-    .eq("is_active", true)
-    .not("signed_at", "is", null)
-    .maybeSingle();
+  const activeComputation = await getActiveComputation(supabase, applicationId);
 
-  const signedComputationPresent = Boolean(signedComputation);
+  const signedComputationPresent = Boolean(activeComputation?.signedAt);
+  const coverageRatio =
+    activeComputation?.coverageRatio != null
+      ? Number(activeComputation.coverageRatio)
+      : null;
+
+  const coverageThreshold = await getCoverageThreshold(supabase);
+  const coverageEval = evaluateCoverageForEndorse(
+    coverageRatio,
+    coverageThreshold,
+  );
+
+  const application = await getApplicationForStaff(supabase, applicationId);
+  const borrowerRaw = application.borrowers;
+  const borrowerRow = (
+    Array.isArray(borrowerRaw) ? borrowerRaw[0] : borrowerRaw
+  ) as BorrowerRow | null;
+  const formCompleteness = assessApplicationFormCompleteness(
+    borrowerRow ? mapBorrowerRow(borrowerRow) : null,
+  );
+  const orientation = assessPrivacyOrientation(
+    application.privacy_orientation_at as string | null | undefined,
+  );
+  const interview = assessInitialInterview({
+    at: application.initial_interview_at as string | null | undefined,
+    notes: application.initial_interview_notes as string | null | undefined,
+  });
 
   const missing: string[] = [];
+  const onHold = application.status === "on_hold";
+  if (onHold) {
+    missing.push(ON_HOLD_ENDORSE_MISSING);
+  }
   if (!checklistComplete) {
     missing.push("Intake checklist incomplete");
   }
@@ -136,12 +199,29 @@ export async function getEndorseReadiness(
   if (!signedComputationPresent) {
     missing.push("Signed computation required");
   }
+  if (coverageEval.blocker) {
+    missing.push(coverageEval.blocker);
+  }
+  missing.push(...formCompleteness.missing);
+  missing.push(...orientation.missing);
+  missing.push(...interview.missing);
 
   return {
-    ready: checklistComplete && nclRecorded && signedComputationPresent,
+    ready:
+      !onHold &&
+      checklistComplete &&
+      nclRecorded &&
+      signedComputationPresent &&
+      coverageEval.coverageOk &&
+      formCompleteness.complete &&
+      orientation.complete &&
+      interview.complete,
     checklistComplete,
     nclRecorded,
     signedComputation: signedComputationPresent,
+    coverageOk: coverageEval.coverageOk,
+    coverageThreshold,
     missing,
+    warnings: coverageEval.warnings,
   };
 }

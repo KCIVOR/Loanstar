@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { FormEvent, useEffect, useState } from "react";
 
-import { Alert, Button, Card, Input, Label, LoanStarMark } from "@/components/ui";
+import { Alert, Button, Card, Input, Label, LoanStarLogo } from "@/components/ui";
 import { createClient } from "@/lib/supabase/client";
 
 export default function ResetPasswordPage() {
@@ -54,9 +54,8 @@ export default function ResetPasswordPage() {
     <div className="flex min-h-full flex-1 items-center justify-center bg-navy-950 px-4 py-12">
       <Card className="w-full max-w-sm">
         <div className="flex flex-col items-center text-center">
-          <LoanStarMark size={40} />
-          <p className="mt-3 font-display text-lg font-semibold text-ink">LoanStar</p>
-          <h1 className="mt-4 font-display text-xl font-semibold text-ink">Set new password</h1>
+          <LoanStarLogo height={48} />
+          <h1 className="mt-4 font-display text-xl font-semibold text-navy-900">Set new password</h1>
         </div>
 
         {!ready ? (
@@ -64,8 +63,11 @@ export default function ResetPasswordPage() {
             <Alert variant="info">
               Open this page from the reset link in your email, or sign in first.
             </Alert>
-            <p className="text-center text-sm text-ink-faint">
-              <Link href="/login" className="text-ink hover:underline">
+            <p className="text-center text-sm text-ink-400">
+              <Link
+                href="/login"
+                className="font-medium text-teal-700 underline-offset-2 hover:underline"
+              >
                 Back to sign in
               </Link>
             </p>

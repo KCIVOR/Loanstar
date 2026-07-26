@@ -2,8 +2,19 @@
 
 import Link from "next/link";
 import { FormEvent, useCallback, useEffect, useState } from "react";
-import { Alert, Button, Input, Label, Modal, PageHeader, Spinner, Table, Td, Th, StatusBadge } from "@/components/ui";
-
+import {
+  Alert,
+  Button,
+  Input,
+  Label,
+  Modal,
+  PageHeader,
+  Spinner,
+  StatusBadge,
+  Table,
+  Td,
+  Th,
+} from "@/components/ui";
 
 type Role = {
   id: string;
@@ -90,10 +101,30 @@ export default function RolesPage() {
         open={showForm}
         title="Create role"
         onClose={() => setShowForm(false)}
+        footer={
+          <>
+            <Button
+              variant="ghost"
+              onClick={() => setShowForm(false)}
+              disabled={saving}
+            >
+              Cancel
+            </Button>
+            <Button type="submit" form="create-role-form" loading={saving}>
+              Create role
+            </Button>
+          </>
+        }
       >
-        <form onSubmit={(e) => void handleCreate(e)} className="space-y-4">
+        <form
+          id="create-role-form"
+          onSubmit={(e) => void handleCreate(e)}
+          className="space-y-4"
+        >
           <div>
-            <Label htmlFor="role-name">Role name</Label>
+            <Label htmlFor="role-name" required>
+              Role name
+            </Label>
             <Input
               id="role-name"
               required
@@ -108,18 +139,6 @@ export default function RolesPage() {
               value={description}
               onChange={(e) => setDescription(e.target.value)}
             />
-          </div>
-          <div className="flex justify-end gap-2">
-            <Button
-              variant="secondary"
-              onClick={() => setShowForm(false)}
-              disabled={saving}
-            >
-              Cancel
-            </Button>
-            <Button type="submit" disabled={saving}>
-              {saving ? "Creating…" : "Create role"}
-            </Button>
           </div>
         </form>
       </Modal>
@@ -137,11 +156,11 @@ export default function RolesPage() {
               <Th>Actions</Th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-neutral-200 bg-white">
+          <tbody>
             {roles.map((role) => (
               <tr key={role.id}>
-                <Td className="font-medium text-neutral-900">{role.name}</Td>
-                <Td>{role.slug}</Td>
+                <Td className="font-medium text-ink-900">{role.name}</Td>
+                <Td className="id">{role.slug}</Td>
                 <Td>{role.is_system ? "System" : "Custom"}</Td>
                 <Td>
                   <StatusBadge active={role.is_active} />
@@ -149,7 +168,7 @@ export default function RolesPage() {
                 <Td>
                   <Link
                     href={`/admin/roles/${role.id}`}
-                    className="text-sm text-neutral-900 hover:underline"
+                    className="text-sm text-ink-500 hover:text-navy-900"
                   >
                     Edit
                   </Link>

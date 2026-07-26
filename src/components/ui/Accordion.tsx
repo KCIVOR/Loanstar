@@ -4,6 +4,7 @@ import type { ReactNode } from "react";
 import { useId, useState } from "react";
 import { cn } from "./cn";
 
+/* Meridian §24 FAQ accordion pattern — bordered cards, mono +/– indicator in teal. */
 export type AccordionItem = {
   id: string;
   title: string;
@@ -37,20 +38,17 @@ export function Accordion({
   }
 
   return (
-    <div
-      className={cn(
-        "overflow-hidden rounded-xl border border-neutral-200 bg-white",
-        className
-      )}
-    >
-      {items.map((item, index) => {
+    <div className={cn("faq !max-w-none", className)}>
+      {items.map((item) => {
         const isOpen = openId === item.id;
         const panelId = `${baseId}-panel-${item.id}`;
         const headerId = `${baseId}-header-${item.id}`;
-        const isLast = index === items.length - 1;
 
         return (
-          <div key={item.id}>
+          <div
+            key={item.id}
+            className="mb-2.5 overflow-hidden rounded-[var(--r-md)] border border-line bg-surface last:mb-0"
+          >
             <button
               type="button"
               id={headerId}
@@ -58,32 +56,20 @@ export function Accordion({
               aria-controls={panelId}
               onClick={() => setOpenId(isOpen ? null : item.id)}
               className={cn(
-                "flex w-full items-center justify-between gap-3 px-[18px] py-3.5 text-left transition-colors",
-                isOpen ? "bg-[#FBF9F2]" : "bg-white hover:bg-neutral-50",
-                !isLast || isOpen ? "border-b border-neutral-100" : undefined
+                "flex w-full items-center justify-between gap-3 px-4 py-3.5 text-left text-sm font-semibold text-ink-900",
+                isOpen && "border-b border-line-soft"
               )}
             >
-              <span className="text-[13px] font-bold text-ink">
+              <span>
                 {item.title}
                 {item.meta ? (
-                  <span
-                    className={cn(
-                      "ml-1.5 text-[11px] font-semibold",
-                      isOpen ? "text-gold-600" : "text-ink-faint"
-                    )}
-                  >
+                  <span className={cn("ml-1.5 text-[11px] font-semibold", isOpen ? "text-teal-700" : "text-ink-400")}>
                     {item.meta}
                   </span>
                 ) : null}
               </span>
-              <span
-                className={cn(
-                  "text-xs",
-                  isOpen ? "text-gold-600" : "text-ink-faint"
-                )}
-                aria-hidden
-              >
-                {isOpen ? "▴" : "▾"}
+              <span className="mono text-base text-teal-600" aria-hidden>
+                {isOpen ? "–" : "+"}
               </span>
             </button>
             {isOpen ? (
@@ -91,10 +77,7 @@ export function Accordion({
                 id={panelId}
                 role="region"
                 aria-labelledby={headerId}
-                className={cn(
-                  "px-[18px] pb-3.5 text-xs leading-relaxed text-ink-muted",
-                  !isLast ? "border-b border-neutral-100" : undefined
-                )}
+                className="px-4 pb-4 pt-3 text-[13.5px] text-ink-500"
               >
                 {item.children}
               </div>

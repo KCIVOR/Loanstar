@@ -7,7 +7,7 @@ test.describe("LoanStar smoke", () => {
   });
 
   test("borrower registration page loads", async ({ page }) => {
-    await page.goto("/borrower/register");
+    await page.goto("/register");
     await expect(page.getByRole("heading")).toBeVisible();
   });
 });

@@ -5,6 +5,7 @@ import type { ReactNode } from "react";
 import { Badge } from "./Badge";
 import { cn } from "./cn";
 
+/* Meridian §17 dropzone — dashed frame, navy icon tile, teal browse hint. */
 export function FileDropzone({
   hint = "PDF, JPG, PNG, DOC up to 10MB",
   accept = ".pdf,.jpg,.jpeg,.png,.doc,.docx",
@@ -19,15 +20,16 @@ export function FileDropzone({
   className?: string;
 }) {
   return (
-    <label
-      className={cn(
-        "flex cursor-pointer flex-col items-center justify-center rounded-xl border border-dashed border-neutral-300 bg-neutral-50 px-6 py-10 text-center transition-colors hover:border-gold-400/50",
-        disabled && "pointer-events-none opacity-60",
-        className
-      )}
-    >
-      <span className="text-sm font-semibold text-ink">Drop file or click to upload</span>
-      <span className="mt-1 text-xs text-ink-faint">{hint}</span>
+    <label className={cn("dropzone block", disabled && "pointer-events-none opacity-60", className)}>
+      <span className="ic" aria-hidden>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12" />
+        </svg>
+      </span>
+      <b>
+        Drop files here or <em>browse</em>
+      </b>
+      <span>{hint}</span>
       <input
         type="file"
         className="sr-only"
@@ -55,34 +57,32 @@ const statusBadge: Record<
   incomplete: { variant: "danger", label: "Incomplete" },
 };
 
+/* Meridian §17 file row — type tile, name + meta, status/action on the right. */
 export function DocumentRow({
   title,
   status,
   subtitle,
   action,
+  fileType,
   className = "",
 }: {
   title: string;
   status: keyof typeof statusBadge;
   subtitle?: string;
   action?: ReactNode;
+  fileType?: string;
   className?: string;
 }) {
   const badge = statusBadge[status];
+  const isImage = /jpe?g|png|img/i.test(fileType ?? "");
   return (
-    <div
-      className={cn(
-        "flex flex-wrap items-center justify-between gap-3 rounded-lg border border-neutral-200 bg-white px-4 py-3",
-        className
-      )}
-    >
-      <div className="min-w-0">
-        <span className="text-sm font-medium text-ink">{title}</span>
-        {subtitle ? (
-          <p className="mt-0.5 truncate text-xs text-ink-faint">{subtitle}</p>
-        ) : null}
+    <div className={cn("file-row !max-w-none", className)}>
+      <span className={cn("fic", isImage && "img")}>{(fileType ?? "DOC").toUpperCase().slice(0, 3)}</span>
+      <div className="fm min-w-0">
+        <b className="truncate">{title}</b>
+        {subtitle ? <span>{subtitle}</span> : null}
       </div>
-      <div className="flex shrink-0 items-center gap-2">
+      <div className="sp">
         <Badge variant={badge.variant}>{badge.label}</Badge>
         {action}
       </div>

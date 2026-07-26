@@ -10,6 +10,7 @@ export type StatusHistoryEntry = {
 };
 
 const STATUS_LABELS: Record<ApplicationStatus, string> = {
+  draft: "Draft — Not Yet Submitted",
   registered: "Registered",
   documents_pending: "Documents Pending",
   submitted: "Submitted",
@@ -20,6 +21,7 @@ const STATUS_LABELS: Record<ApplicationStatus, string> = {
   negotiating_terms: "Negotiating Terms",
   awaiting_confirmation: "Awaiting Confirmation",
   on_hold: "On Hold",
+  committee_hold: "On Hold — Committee",
   for_revision: "For Revision",
   lra_pending: "LRA Pending",
   release_signing: "Release — Signing Documents",
@@ -28,6 +30,7 @@ const STATUS_LABELS: Record<ApplicationStatus, string> = {
   released: "Released",
   closed: "Closed — Transmitted",
   loan_active: "Loan Active",
+  paid_off: "Paid Off",
 };
 
 export function formatStatusLabel(status: ApplicationStatus | string): string {
@@ -38,6 +41,42 @@ export function formatStatusLabel(status: ApplicationStatus | string): string {
     .split("_")
     .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
     .join(" ");
+}
+
+const STATUS_BADGE_VARIANTS: Record<
+  ApplicationStatus,
+  "success" | "warning" | "danger" | "navy" | "teal" | "neutral"
+> = {
+  draft: "neutral",
+  registered: "neutral",
+  documents_pending: "warning",
+  submitted: "navy",
+  for_verification: "navy",
+  for_approval: "navy",
+  approved: "success",
+  denied: "danger",
+  negotiating_terms: "warning",
+  awaiting_confirmation: "warning",
+  on_hold: "danger",
+  committee_hold: "danger",
+  for_revision: "danger",
+  lra_pending: "navy",
+  release_signing: "teal",
+  release_briefing: "teal",
+  release_ready: "teal",
+  released: "success",
+  closed: "success",
+  loan_active: "success",
+  paid_off: "success",
+};
+
+export function statusBadgeVariant(
+  status: ApplicationStatus | string,
+): "success" | "warning" | "danger" | "navy" | "teal" | "neutral" {
+  if (status in STATUS_BADGE_VARIANTS) {
+    return STATUS_BADGE_VARIANTS[status as ApplicationStatus];
+  }
+  return "neutral";
 }
 
 export async function appendStatusHistory(
@@ -65,16 +104,26 @@ export async function appendStatusHistory(
   };
   const updatedHistory = [...history, entry];
 
-  const { error: updateError } = await supabase
+  const { data: updated, error: updateError } = await supabase
     .from("loan_applications")
     .update({
       status: newStatus,
       status_history: updatedHistory,
     })
-    .eq("id", applicationId);
+    .eq("id", applicationId)
+    .select("id, status")
+    .maybeSingle();
 
   if (updateError) {
     throw new Error(`Failed to update application status: ${updateError.message}`);
+  }
+
+  // RLS can silently update 0 rows; treat that as failure so callers don't
+  // report success when the application status never changed.
+  if (!updated) {
+    throw new Error(
+      `Failed to update application status to ${newStatus}: no row updated (RLS or missing application)`,
+    );
   }
 
   return updatedHistory;

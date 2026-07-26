@@ -21,6 +21,8 @@ export async function GET() {
             payment_date,
             amount,
             masterlist_id,
+            storage_path,
+            file_name,
             masterlist ( borrower_name, loan_account_no )
           )
         )

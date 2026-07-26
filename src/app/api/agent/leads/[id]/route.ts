@@ -1,9 +1,11 @@
-import { handleApiError, jsonOk } from "@/lib/api/handler";
+import { checklistProgress } from "@/lib/agent/pipeline";
+import { excludeCsaOnlyIntakeItems } from "@/lib/documents/csa-only-intake";
 import {
   ForbiddenError,
   requireModulePermission,
 } from "@/lib/permissions/server";
 import { createClient } from "@/lib/supabase/server";
+import { handleApiError, jsonOk } from "@/lib/api/handler";
 
 type RouteParams = { params: Promise<{ id: string }> };
 
@@ -56,26 +58,28 @@ export async function GET(_request: Request, { params }: RouteParams) {
         throw new Error(`Failed to load checklist flags: ${flagsError.message}`);
       }
 
-      checklistFlags = (flags ?? []).map(
-        (flag: {
-          document_type_id: string;
-          document_type_slug: string;
-          document_type_name: string;
-          stage: string;
-          is_required: boolean;
-          is_optional_flag: boolean;
-          sort_order: number;
-          completion_status: string;
-        }) => ({
-          documentTypeId: flag.document_type_id,
-          documentTypeSlug: flag.document_type_slug,
-          documentTypeName: flag.document_type_name,
-          stage: flag.stage,
-          isRequired: flag.is_required,
-          isOptionalFlag: flag.is_optional_flag,
-          sortOrder: flag.sort_order,
-          completionStatus: flag.completion_status,
-        }),
+      checklistFlags = excludeCsaOnlyIntakeItems(
+        (flags ?? []).map(
+          (flag: {
+            document_type_id: string;
+            document_type_slug: string;
+            document_type_name: string;
+            stage: string;
+            is_required: boolean;
+            is_optional_flag: boolean;
+            sort_order: number;
+            completion_status: string;
+          }) => ({
+            documentTypeId: flag.document_type_id,
+            documentTypeSlug: flag.document_type_slug,
+            documentTypeName: flag.document_type_name,
+            stage: flag.stage,
+            isRequired: flag.is_required,
+            isOptionalFlag: flag.is_optional_flag,
+            sortOrder: flag.sort_order,
+            completionStatus: flag.completion_status,
+          }),
+        ),
       );
     }
 
@@ -91,6 +95,12 @@ export async function GET(_request: Request, { params }: RouteParams) {
         updatedAt: lead.updated_at,
       },
       checklistFlags,
+      checklistSummary: checklistProgress(
+        checklistFlags.map((flag) => ({
+          isRequired: flag.isRequired,
+          completionStatus: flag.completionStatus,
+        })),
+      ),
     });
   } catch (error) {
     return handleApiError(error);

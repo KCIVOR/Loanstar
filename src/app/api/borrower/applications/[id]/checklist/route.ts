@@ -4,6 +4,7 @@ import {
   getCompletionSummary,
   getStageChecklist,
 } from "@/lib/documents/checklist";
+import { excludeCsaOnlyIntakeItems } from "@/lib/documents/csa-only-intake";
 import { STAGES } from "@/lib/constants";
 import {
   ForbiddenError,
@@ -64,10 +65,8 @@ export async function GET(request: Request, { params }: RouteParams) {
       application.borrowerId,
     );
 
-    const items = await getStageChecklist(
-      supabase,
-      stageParam,
-      application.id,
+    const items = excludeCsaOnlyIntakeItems(
+      await getStageChecklist(supabase, stageParam, application.id),
     );
     const summary = getCompletionSummary(items);
 

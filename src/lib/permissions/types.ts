@@ -30,6 +30,14 @@ export type UserPermissions = {
   fieldRules: Partial<Record<ModuleSlug, FieldRule>>;
 };
 
+/** Shape returned by /api/permissions/me — permissions plus the caller's own
+ * profile, so consumers (Header, Sidebar) don't need a separate identity fetch. */
+export type SelfPermissions = UserPermissions & {
+  fullName: string;
+  email: string | null;
+  avatarUrl?: string | null;
+};
+
 /** Maps PermissionAction to the corresponding property on ModulePermission. */
 export const PERMISSION_COLUMN: Record<
   PermissionAction,

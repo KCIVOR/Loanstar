@@ -2,7 +2,15 @@
 
 import { FormEvent, useState } from "react";
 
-import { Alert, Button, Card, ConfirmDialog, Input, Label } from "@/components/ui";
+import {
+  Alert,
+  Button,
+  Card,
+  ConfirmDialog,
+  Input,
+  Label,
+} from "@/components/ui";
+import { computationConfirmState } from "@/lib/negotiation/computation-confirm-state";
 
 type ComputationSummary = {
   id: string;
@@ -31,12 +39,6 @@ function formatMoney(value: number) {
   });
 }
 
-const COUNTER_STATUSES = [
-  "approved",
-  "awaiting_confirmation",
-  "negotiating_terms",
-];
-
 const KEY_AMOUNT_KEYS = new Set([
   "principal",
   "net_released",
@@ -56,19 +58,27 @@ export function ComputationSign({
 }: ComputationSignProps) {
   const [confirming, setConfirming] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [message, setMessage] = useState<string | null>(null);
   const [showDialog, setShowDialog] = useState(false);
   const [counterAmount, setCounterAmount] = useState("");
   const [countering, setCountering] = useState(false);
 
   if (!computation) return null;
 
-  const canCounter = COUNTER_STATUSES.includes(applicationStatus);
-  const canSign =
-    !negotiationStatus || negotiationStatus === "awaiting_signature";
+  const confirmState = computationConfirmState({
+    signedAt: computation.signedAt,
+    negotiationStatus,
+    applicationStatus,
+  });
+  const canSign = confirmState === "confirm";
+  const canCounter =
+    negotiationStatus === "awaiting_signature" ||
+    negotiationStatus === "negotiating";
 
   async function handleSign() {
     setConfirming(true);
     setError(null);
+    setMessage(null);
     try {
       const res = await fetch(
         `/api/borrower/applications/${applicationId}/computation`,
@@ -93,6 +103,7 @@ export function ComputationSign({
     e.preventDefault();
     setCountering(true);
     setError(null);
+    setMessage(null);
     try {
       const res = await fetch(
         `/api/borrower/applications/${applicationId}/counter`,
@@ -105,6 +116,9 @@ export function ComputationSign({
       const data = (await res.json()) as { error?: string };
       if (!res.ok) throw new Error(data.error ?? "Counter failed");
       setCounterAmount("");
+      setMessage(
+        "Counter-offer submitted. Committee will review the new amount.",
+      );
       onSigned();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Counter failed");
@@ -115,9 +129,12 @@ export function ComputationSign({
 
   return (
     <Card className="mb-6">
-      <h2 className="mb-2 font-display text-lg font-semibold text-ink">Loan computation</h2>
-      <p className="mb-4 text-sm text-ink-muted">
-        {computation.loanTypeName ?? "Loan"} · review and confirm your loan terms.
+      <h2 className="mb-2 font-display text-lg font-semibold text-navy-900">
+        Loan computation
+      </h2>
+      <p className="mb-4 text-sm text-ink-500">
+        {computation.loanTypeName ?? "Loan"} · review and confirm your loan
+        terms.
       </p>
 
       <div className="mb-4 grid gap-2 sm:grid-cols-2">
@@ -126,14 +143,14 @@ export function ComputationSign({
           return (
             <div
               key={item.key}
-              className="flex justify-between border-b border-neutral-100 py-1.5 text-sm"
+              className="flex justify-between border-b border-line-soft py-1.5 text-sm"
             >
-              <span className="text-ink-muted">{item.label}</span>
+              <span className="text-ink-500">{item.label}</span>
               <span
                 className={
                   isKey
-                    ? "font-mono font-bold tabular-nums text-gold-600"
-                    : "font-mono font-medium tabular-nums text-ink"
+                    ? "mono font-bold tabular-nums text-teal-600"
+                    : "mono font-medium tabular-nums text-ink-900"
                 }
               >
                 {formatMoney(item.amount)}
@@ -143,22 +160,35 @@ export function ComputationSign({
         })}
       </div>
 
-      {computation.signedAt ? (
+      {error ? (
+        <div className="mb-3">
+          <Alert>{error}</Alert>
+        </div>
+      ) : null}
+      {message ? (
+        <div className="mb-3">
+          <Alert variant="success">{message}</Alert>
+        </div>
+      ) : null}
+
+      {confirmState === "waiting_disclosure" ? (
+        <Alert variant="info">
+          Committee approved these terms. CSA will disclose them shortly — then
+          you can confirm / sign (or submit a counter-offer).
+        </Alert>
+      ) : confirmState === "confirmed" ? (
         <Alert variant="success">
           You confirmed this computation on{" "}
-          <span className="font-mono">
-            {new Date(computation.signedAt).toLocaleString()}
+          <span className="mono">
+            {new Date(computation.signedAt!).toLocaleString()}
           </span>
           .
         </Alert>
       ) : canSign ? (
         <>
-          {error ? (
-            <div className="mb-3">
-              <Alert>{error}</Alert>
-            </div>
-          ) : null}
-          <Button onClick={() => setShowDialog(true)}>Review & confirm computation</Button>
+          <Button onClick={() => setShowDialog(true)}>
+            Review & confirm computation
+          </Button>
           <ConfirmDialog
             open={showDialog}
             title="Confirm computation"
@@ -170,28 +200,35 @@ export function ComputationSign({
             onCancel={() => setShowDialog(false)}
           />
         </>
-      ) : negotiationStatus === "pending_disclosure" ? (
-        <Alert variant="info">Approved terms will be disclosed by CSA shortly.</Alert>
       ) : null}
 
-      {canCounter && applicationStatus !== "lra_pending" ? (
+      {canCounter ? (
         <form
           onSubmit={(e) => void handleCounter(e)}
-          className="mt-6 space-y-3 border-t border-neutral-100 pt-4"
+          className="mt-6 space-y-3 border-t border-line-soft pt-4"
         >
-          <h3 className="font-medium text-ink">Counter-offer</h3>
-          <p className="text-sm text-ink-muted">
-            Propose a different net release amount for Committee review.
+          <h3 className="font-medium text-ink-900">Counter-offer (optional)</h3>
+          <p className="text-sm text-ink-500">
+            Not required. Only use this if you want a different net release
+            amount sent back to Committee. To accept the terms above, use{" "}
+            <span className="font-medium text-ink-700">
+              Review & confirm computation
+            </span>
+            .
           </p>
           <div>
-            <Label htmlFor="counterAmount">Requested amount</Label>
+            <Label htmlFor="counterAmount" required>
+              Requested amount
+            </Label>
             <Input
               id="counterAmount"
               type="number"
               step="0.01"
+              min="0.01"
               value={counterAmount}
               onChange={(e) => setCounterAmount(e.target.value)}
               required
+              className="mono"
             />
           </div>
           <Button type="submit" variant="secondary" loading={countering}>

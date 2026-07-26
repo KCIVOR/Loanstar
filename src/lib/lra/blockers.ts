@@ -15,8 +15,6 @@ export async function syncApplicationBlocker(
 ) {
   const blocker = BLOCKER_BY_STATUS[releaseStatus];
 
-  const updates: Record<string, unknown> = { blocker };
-
   if (options?.applicationStatus) {
     await appendStatusHistory(
       supabase,
@@ -24,7 +22,6 @@ export async function syncApplicationBlocker(
       options.applicationStatus,
       { actorId: options.actorId, note: blocker },
     );
-    return blocker;
   }
 
   await supabase
@@ -47,6 +44,8 @@ export function mapReleaseFileRow(row: Record<string, unknown>) {
     atmBankName: (row.atm_bank_name as string) ?? null,
     atmCardLast4: (row.atm_card_last4 as string) ?? null,
     assignedTo: (row.assigned_to as string) ?? null,
+    pdcCollectedAt: (row.pdc_collected_at as string) ?? null,
+    pdcCollectedBy: (row.pdc_collected_by as string) ?? null,
     createdAt: row.created_at as string,
     updatedAt: row.updated_at as string,
   };

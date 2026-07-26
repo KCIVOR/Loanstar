@@ -27,6 +27,13 @@ export class ForbiddenError extends Error {
   }
 }
 
+export class NotFoundError extends Error {
+  constructor(message = "Not found") {
+    super(message);
+    this.name = "NotFoundError";
+  }
+}
+
 export function toJsonError(error: unknown, status: number) {
   const message =
     error instanceof Error ? error.message : "An unexpected error occurred";

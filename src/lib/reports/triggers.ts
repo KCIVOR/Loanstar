@@ -24,13 +24,37 @@ export const WORKFLOW_TRIGGERS: WorkflowTrigger[] = [
     ],
   },
   {
-    id: "auto_forward_committee",
-    name: "CIG auto-forward to Committee",
+    id: "submit_ci_report",
+    name: "CIG submit CI report to Committee",
+    module: "verification",
+    requiredPermission: "execute_trigger",
+    preconditions: [
+      "Verification form complete (incl. borrower interview)",
+      "All required CIG checks recorded",
+      "Finding (positive/negative) set",
+      "Explicit submit click",
+    ],
+  },
+  {
+    id: "cig_return_to_csa",
+    name: "CIG return file to CSA",
+    module: "verification",
+    requiredPermission: "execute_trigger",
+    preconditions: [
+      "Application status for_verification",
+      "Receipt check found the file incomplete",
+      "Note for CSA provided",
+    ],
+  },
+  {
+    id: "cig_denial_informed",
+    name: "CIG borrower denial call done",
     module: "verification",
     requiredPermission: "edit",
     preconditions: [
-      "Verification form complete",
-      "All required CIG checks recorded",
+      "Open denial notice exists",
+      "Borrower informed by phone (reason withheld)",
+      "Written denial email already sent on committee Deny",
     ],
   },
   {
@@ -55,23 +79,25 @@ export const WORKFLOW_TRIGGERS: WorkflowTrigger[] = [
     ],
   },
   {
-    id: "borrower_sign_release_doc",
-    name: "Borrower sign release document",
-    module: "borrower_portal",
+    id: "lra_witness_sign_release_doc",
+    name: "LRA witness release document signing",
+    module: "release_lra",
     requiredPermission: "edit",
     preconditions: [
       "Generated document exists and not finalized",
       "Release file in awaiting_signatures",
+      "Borrower signed the document in-branch",
     ],
   },
   {
-    id: "borrower_sign_briefing",
-    name: "Borrower sign briefing",
-    module: "borrower_portal",
-    requiredPermission: "edit",
+    id: "collector_briefing_ack",
+    name: "Collection Head briefing check-off",
+    module: "collection",
+    requiredPermission: "execute_trigger",
     preconditions: [
       "Release file status awaiting_briefing",
       "All release documents signed",
+      "Briefing conducted with the borrower",
     ],
   },
   {
@@ -105,6 +131,16 @@ export const WORKFLOW_TRIGGERS: WorkflowTrigger[] = [
     ],
   },
   {
+    id: "ar_receive_file",
+    name: "AR receive closed file",
+    module: "accounting_ar",
+    requiredPermission: "execute_trigger",
+    preconditions: [
+      "Application in AR queue (LRA closed the file)",
+      "Not yet received (no masterlist account)",
+    ],
+  },
+  {
     id: "reconcile_post",
     name: "AR reconcile and post",
     module: "accounting_ar",
@@ -112,6 +148,18 @@ export const WORKFLOW_TRIGGERS: WorkflowTrigger[] = [
     preconditions: [
       "DCR status submitted",
       "Bank deposit reference provided",
+      "Deposit amount equals DCR total",
+    ],
+  },
+  {
+    id: "mark_paid_off",
+    name: "AR mark loan paid off",
+    module: "accounting_ar",
+    requiredPermission: "execute_trigger",
+    preconditions: [
+      "Application status loan_active",
+      "Outstanding balance zero",
+      "All installments paid",
     ],
   },
   {
@@ -120,7 +168,7 @@ export const WORKFLOW_TRIGGERS: WorkflowTrigger[] = [
     module: "accounting_ar",
     requiredPermission: "execute_trigger",
     preconditions: [
-      "Masterlist aging 91+ or remedial_flag",
+      "Masterlist aging at 90-day threshold or remedial_flag",
       "Remedial user assigned",
     ],
   },

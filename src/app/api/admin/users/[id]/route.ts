@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
+import { syncAuthDisplayNameMetadata } from "@/lib/account/sync-display-name";
 import { writeAuditEvent } from "@/lib/audit/writer";
 import { handleApiError, jsonOk } from "@/lib/api/handler";
 import {
@@ -43,6 +44,10 @@ export async function PATCH(request: Request, context: RouteContext) {
         })
         .eq("id", userId);
       if (error) throw new Error(error.message);
+
+      if (body.full_name !== undefined) {
+        await syncAuthDisplayNameMetadata(userId, body.full_name);
+      }
     }
 
     if (body.roleIds !== undefined) {

@@ -45,15 +45,15 @@ CREATE POLICY masterlist_ar_select ON public.masterlist
     )
     OR EXISTS (
       SELECT 1 FROM public.assignments a
-      WHERE a.masterlist_id = id
+      WHERE a.masterlist_id = masterlist.id
         AND a.collector_user_id = auth.uid()
-        AND remedial_flag = false
+        AND masterlist.remedial_flag = false
     )
     OR EXISTS (
       SELECT 1 FROM public.assignments a
-      WHERE a.masterlist_id = id
+      WHERE a.masterlist_id = masterlist.id
         AND a.remedial_user_id = auth.uid()
-        AND remedial_flag = true
+        AND masterlist.remedial_flag = true
     )
   );
 

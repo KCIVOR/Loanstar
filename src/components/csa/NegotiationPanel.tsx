@@ -4,6 +4,13 @@ import { useState } from "react";
 
 import { Alert, Badge, Button, Card } from "@/components/ui";
 
+const NEGOTIATION_BADGE_VARIANT: Record<string, "success" | "warning" | "navy" | "neutral"> = {
+  negotiating: "warning",
+  pending_disclosure: "warning",
+  awaiting_signature: "navy",
+  signed: "success",
+};
+
 type NegotiationPanelProps = {
   applicationId: string;
   status: string;
@@ -78,7 +85,7 @@ export function NegotiationPanel({
 
   return (
     <Card>
-      <h2 className="mb-4 font-display text-lg font-semibold text-ink">
+      <h2 className="mb-4 font-display text-lg font-semibold text-navy-900">
         Negotiation &amp; disclosure
       </h2>
 
@@ -95,7 +102,7 @@ export function NegotiationPanel({
 
       {status === "for_revision" ? (
         <div>
-          <p className="mb-3 text-sm text-ink-muted">
+          <p className="mb-3 text-sm text-ink-500">
             Committee requested revisions. Complete your updates and return the
             file to Committee.
           </p>
@@ -104,44 +111,50 @@ export function NegotiationPanel({
           </Button>
         </div>
       ) : negotiation ? (
-        <div className="space-y-3 text-sm text-ink-muted">
-          <p>
-            Approved amount:{" "}
-            <span className="font-mono font-bold tabular-nums text-gold-600">
-              {negotiation.approvedAmount != null
-                ? formatMoney(negotiation.approvedAmount)
-                : "—"}
-            </span>
-          </p>
-          <p>
-            Current amount:{" "}
-            <span className="font-mono font-bold tabular-nums text-gold-600">
-              {negotiation.currentAmount != null
-                ? formatMoney(negotiation.currentAmount)
-                : "—"}
-            </span>
-          </p>
-          <p>
-            Negotiation status:{" "}
-            <Badge variant="neutral">
-              {negotiation.status.replace(/_/g, " ")}
-            </Badge>
-          </p>
+        <div className="space-y-4">
+          <div className="kv">
+            <div className="row">
+              <span className="k">Approved amount</span>
+              <span className="v mono">
+                {negotiation.approvedAmount != null
+                  ? `₱${formatMoney(negotiation.approvedAmount)}`
+                  : "—"}
+              </span>
+            </div>
+            <div className="row">
+              <span className="k">Current amount</span>
+              <span className="v mono" style={{ color: "var(--teal-700)" }}>
+                {negotiation.currentAmount != null
+                  ? `₱${formatMoney(negotiation.currentAmount)}`
+                  : "—"}
+              </span>
+            </div>
+            <div className="row">
+              <span className="k">Negotiation status</span>
+              <span className="v">
+                <Badge variant={NEGOTIATION_BADGE_VARIANT[negotiation.status] ?? "neutral"}>
+                  {negotiation.status.replace(/_/g, " ")}
+                </Badge>
+              </span>
+            </div>
+          </div>
           {negotiation.disclosedAt ? (
-            <p className="text-ink-faint">
+            <p className="text-sm text-ink-400">
               Disclosed{" "}
-              <span className="font-mono">
+              <span className="mono">
                 {new Date(negotiation.disclosedAt).toLocaleString()}
               </span>
             </p>
-          ) : status === "approved" ? (
+          ) : negotiation.status === "pending_disclosure" ||
+            status === "approved" ||
+            status === "negotiating_terms" ? (
             <Button loading={saving} onClick={() => void handleDisclose()}>
               Disclose terms to borrower
             </Button>
           ) : null}
         </div>
       ) : (
-        <p className="text-sm text-ink-muted">No negotiation record yet.</p>
+        <p className="text-sm text-ink-500">No negotiation record yet.</p>
       )}
     </Card>
   );

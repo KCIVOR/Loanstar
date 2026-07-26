@@ -45,6 +45,7 @@ const TAT_PAIRS: Array<{
   { from: "approved", to: "lra_pending", label: "Approval → LRA queue" },
   { from: "lra_pending", to: "closed", label: "LRA processing" },
   { from: "closed", to: "loan_active", label: "Close → Active loan" },
+  { from: "loan_active", to: "paid_off", label: "Active → Paid off" },
 ];
 
 function daysBetween(a: string, b: string): number {

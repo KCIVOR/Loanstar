@@ -14,7 +14,14 @@ const COLLECTOR_PREFIX = "/collector";
 const REMEDIAL_PREFIX = "/remedial";
 const REPORTS_PREFIX = "/reports";
 const DASHBOARD_PREFIX = "/dashboard";
-const AUTH_ROUTES = ["/login", "/signup", "/forgot-password", "/reset-password"];
+const ACCOUNT_PREFIX = "/account";
+const AUTH_ROUTES = [
+  "/login",
+  "/register",
+  "/signup",
+  "/forgot-password",
+  "/reset-password",
+];
 
 function isAuthRoute(pathname: string) {
   return AUTH_ROUTES.some((route) => pathname.startsWith(route));
@@ -32,17 +39,15 @@ export async function middleware(request: NextRequest) {
   const { supabaseResponse, user } = await updateSession(request);
   const { pathname } = request.nextUrl;
 
-  if (pathname === "/signup") {
+  if (pathname === "/signup" || pathname === "/borrower/register") {
     const registerUrl = request.nextUrl.clone();
-    registerUrl.pathname = "/borrower/register";
+    registerUrl.pathname = "/register";
     registerUrl.search = "";
     return NextResponse.redirect(registerUrl);
   }
 
   const isAdminRoute = pathname.startsWith(ADMIN_PREFIX);
-  const isBorrowerRoute =
-    pathname.startsWith(BORROWER_PREFIX) &&
-    !pathname.startsWith("/borrower/register");
+  const isBorrowerRoute = pathname.startsWith(BORROWER_PREFIX);
   const isAgentRoute = pathname.startsWith(AGENT_PREFIX);
   const isCsaRoute = pathname.startsWith(CSA_PREFIX);
   const isCigRoute = pathname.startsWith(CIG_PREFIX);
@@ -53,8 +58,10 @@ export async function middleware(request: NextRequest) {
   const isRemedialRoute = pathname.startsWith(REMEDIAL_PREFIX);
   const isReportsRoute = pathname.startsWith(REPORTS_PREFIX);
   const isDashboardRoute = pathname.startsWith(DASHBOARD_PREFIX);
+  const isAccountRoute = pathname.startsWith(ACCOUNT_PREFIX);
   const isProtectedPortal =
     isDashboardRoute ||
+    isAccountRoute ||
     isAdminRoute ||
     isBorrowerRoute ||
     isAgentRoute ||

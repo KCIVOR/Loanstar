@@ -1,0 +1,2432 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Meridian — LoanStar Design System v1.1</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700;800&family=Public+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+/* ============================================================
+   MERIDIAN — LoanStar Design System v1.1
+   Navy foundation · Teal accent · Mono ledger figures
+   ============================================================ */
+:root{
+  /* --- Navy (brand foundation) --- */
+  --navy-950:#071633;
+  --navy-900:#0C2247;
+  --navy-800:#123061;
+  --navy-700:#1A407D;
+  --navy-600:#23539E;
+  --navy-500:#2F68BE;
+  --navy-200:#B9CBE7;
+  --navy-100:#DCE5F3;
+  --navy-50:#EEF3FA;
+
+  /* --- Teal (accent / action) --- */
+  --teal-700:#0A7D71;
+  --teal-600:#0D9488;
+  --teal-500:#12A797;
+  --teal-400:#2DC7B6;
+  --teal-100:#C9F0EA;
+  --teal-50:#E9FAF7;
+
+  /* --- Neutrals (cool slate) --- */
+  --ink-900:#16233B;
+  --ink-700:#3E4C66;
+  --ink-500:#62708A;
+  --ink-400:#8C99B0;
+  --ink-300:#B4BECF;
+  --line:#D9E0EB;
+  --line-soft:#E7ECF3;
+  --surface:#FFFFFF;
+  --surface-2:#F3F6FA;
+  --canvas:#F7F9FC;
+
+  /* --- Semantic --- */
+  --success:#178A50;      --success-bg:#E8F6EE;   --success-line:#BCE4CD;
+  --warning:#B96A00;      --warning-bg:#FDF3E3;   --warning-line:#F2D9AC;
+  --danger:#C2362F;       --danger-bg:#FCEBEA;    --danger-line:#F2C4C1;
+  --info:#23539E;         --info-bg:#E8F0FB;      --info-line:#C4D6EF;
+
+  /* --- Type --- */
+  --font-display:'Sora',sans-serif;
+  --font-body:'Public Sans',sans-serif;
+  --font-mono:'JetBrains Mono',monospace;
+
+  /* --- Radius --- */
+  --r-sm:6px; --r-md:10px; --r-lg:14px; --r-xl:20px; --r-full:999px;
+
+  /* --- Shadows --- */
+  --sh-1:0 1px 2px rgba(12,34,71,.06);
+  --sh-2:0 2px 8px rgba(12,34,71,.08);
+  --sh-3:0 8px 24px rgba(12,34,71,.12);
+  --sh-4:0 16px 48px rgba(12,34,71,.18);
+
+  /* --- Spacing scale --- */
+  --s-1:4px; --s-2:8px; --s-3:12px; --s-4:16px; --s-5:24px; --s-6:32px; --s-7:48px; --s-8:64px;
+}
+
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{
+  font-family:var(--font-body);
+  color:var(--ink-900);
+  background:var(--canvas);
+  font-size:15px;
+  line-height:1.55;
+  -webkit-font-smoothing:antialiased;
+}
+
+/* ============ DOC CHROME (documentation page itself) ============ */
+.doc-header{
+  background:linear-gradient(135deg,var(--navy-950) 0%,var(--navy-900) 55%,var(--navy-800) 100%);
+  color:#fff;
+  padding:72px 32px 64px;
+  position:relative;
+  overflow:hidden;
+}
+.doc-header::after{
+  content:"";position:absolute;inset:0;
+  background-image:radial-gradient(circle at 85% 20%,rgba(45,199,182,.14),transparent 45%);
+  pointer-events:none;
+}
+.doc-header-inner{max-width:1080px;margin:0 auto;position:relative;z-index:1}
+.doc-kicker{
+  font-family:var(--font-mono);font-size:12px;letter-spacing:.18em;text-transform:uppercase;
+  color:var(--teal-400);display:flex;align-items:center;gap:12px;margin-bottom:20px;
+}
+.doc-kicker::after{content:"";height:1px;width:64px;background:var(--teal-400);opacity:.6}
+.doc-header h1{font-family:var(--font-display);font-size:52px;font-weight:800;letter-spacing:-.02em;line-height:1.05}
+.doc-header p{margin-top:16px;max-width:640px;color:var(--navy-100);font-size:16px}
+.doc-meta{margin-top:28px;display:flex;gap:24px;flex-wrap:wrap;font-family:var(--font-mono);font-size:12px;color:var(--navy-200)}
+.doc-meta span b{color:#fff;font-weight:600}
+
+.doc-body{max-width:1080px;margin:0 auto;padding:48px 32px 96px}
+
+/* Meridian section header — the system's signature rule */
+.sec{margin-top:72px}
+.sec:first-child{margin-top:0}
+.sec-head{display:flex;align-items:baseline;gap:16px;margin-bottom:8px}
+.sec-num{font-family:var(--font-mono);font-size:13px;font-weight:600;color:var(--teal-600)}
+.sec-head h2{font-family:var(--font-display);font-size:26px;font-weight:700;letter-spacing:-.01em;color:var(--navy-900)}
+.sec-rule{height:1px;background:var(--line);position:relative;margin:12px 0 28px}
+.sec-rule::before{content:"";position:absolute;left:0;top:-2px;width:56px;height:5px;background:var(--teal-600);border-radius:3px}
+.sec p.lede{color:var(--ink-500);max-width:720px;margin-bottom:28px}
+
+.sub{margin-top:36px;margin-bottom:16px;font-family:var(--font-display);font-size:16px;font-weight:600;color:var(--navy-800)}
+.hint{font-size:13px;color:var(--ink-400);margin-top:10px}
+
+.demo{
+  background:var(--surface);border:1px solid var(--line);border-radius:var(--r-lg);
+  padding:28px;display:flex;flex-wrap:wrap;gap:16px;align-items:center;
+}
+.demo.col{flex-direction:column;align-items:stretch}
+.demo.dark{background:var(--navy-900);border-color:var(--navy-800)}
+.demo-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:16px}
+
+/* ============ FOUNDATIONS ============ */
+.swatch-row{display:grid;grid-template-columns:repeat(auto-fill,minmax(108px,1fr));gap:10px}
+.swatch{border-radius:var(--r-md);overflow:hidden;border:1px solid var(--line-soft);background:#fff}
+.swatch .chip{height:64px}
+.swatch .lbl{padding:8px 10px}
+.swatch .lbl b{display:block;font-size:12px;font-weight:600}
+.swatch .lbl span{font-family:var(--font-mono);font-size:11px;color:var(--ink-400)}
+
+.type-row{display:flex;align-items:baseline;gap:24px;padding:14px 0;border-bottom:1px solid var(--line-soft)}
+.type-row:last-child{border-bottom:none}
+.type-spec{font-family:var(--font-mono);font-size:11px;color:var(--ink-400);width:190px;flex-shrink:0}
+
+.space-demo{display:flex;align-items:flex-end;gap:14px}
+.space-demo .bar{background:var(--teal-100);border:1px solid var(--teal-400);border-radius:4px}
+.space-demo .cell{text-align:center}
+.space-demo .cell span{display:block;font-family:var(--font-mono);font-size:11px;color:var(--ink-400);margin-top:6px}
+
+.radius-demo,.shadow-demo{display:flex;gap:20px;flex-wrap:wrap}
+.radius-demo .box{width:96px;height:72px;background:var(--navy-50);border:2px solid var(--navy-200);display:flex;align-items:center;justify-content:center;font-family:var(--font-mono);font-size:11px;color:var(--navy-700)}
+.shadow-demo .box{width:130px;height:88px;background:#fff;border-radius:var(--r-md);display:flex;align-items:center;justify-content:center;font-family:var(--font-mono);font-size:11px;color:var(--ink-500)}
+
+/* ============ BUTTONS ============ */
+.btn{
+  font-family:var(--font-body);font-weight:600;font-size:14px;
+  display:inline-flex;align-items:center;justify-content:center;gap:8px;
+  padding:0 18px;height:40px;border-radius:var(--r-md);
+  border:1px solid transparent;cursor:pointer;
+  transition:background .15s,border-color .15s,color .15s,box-shadow .15s,transform .05s;
+  white-space:nowrap;user-select:none;
+}
+.btn:focus-visible{outline:2px solid var(--teal-500);outline-offset:2px}
+.btn:active{transform:translateY(1px)}
+.btn svg{width:16px;height:16px;flex-shrink:0}
+
+.btn-primary{background:var(--navy-900);color:#fff}
+.btn-primary:hover{background:var(--navy-800)}
+.btn-accent{background:var(--teal-600);color:#fff}
+.btn-accent:hover{background:var(--teal-700)}
+.btn-secondary{background:var(--navy-50);color:var(--navy-800);border-color:var(--navy-100)}
+.btn-secondary:hover{background:var(--navy-100)}
+.btn-outline{background:transparent;color:var(--navy-800);border-color:var(--line)}
+.btn-outline:hover{border-color:var(--navy-600);color:var(--navy-600)}
+.btn-ghost{background:transparent;color:var(--ink-700)}
+.btn-ghost:hover{background:var(--surface-2)}
+.btn-danger{background:var(--danger);color:#fff}
+.btn-danger:hover{background:#A62B25}
+.btn-danger-soft{background:var(--danger-bg);color:var(--danger);border-color:var(--danger-line)}
+.btn-danger-soft:hover{background:#F8DBD9}
+.btn:disabled,.btn.is-disabled{opacity:.45;cursor:not-allowed;pointer-events:none}
+
+.btn-sm{height:32px;padding:0 12px;font-size:13px;border-radius:var(--r-sm)}
+.btn-lg{height:48px;padding:0 24px;font-size:15px;border-radius:var(--r-lg)}
+.btn-icon{width:40px;padding:0}
+.btn-icon.btn-sm{width:32px}
+.btn-block{width:100%}
+
+.btn-group{display:inline-flex}
+.btn-group .btn{border-radius:0;border:1px solid var(--line);background:#fff;color:var(--ink-700);font-weight:500}
+.btn-group .btn:first-child{border-radius:var(--r-md) 0 0 var(--r-md)}
+.btn-group .btn:last-child{border-radius:0 var(--r-md) var(--r-md) 0}
+.btn-group .btn+.btn{margin-left:-1px}
+.btn-group .btn.is-active{background:var(--navy-900);color:#fff;border-color:var(--navy-900);z-index:1}
+
+/* ============ FORMS ============ */
+.field{display:flex;flex-direction:column;gap:6px;min-width:240px;flex:1}
+.field label{font-size:13px;font-weight:600;color:var(--ink-700)}
+.field label .req{color:var(--danger)}
+.field .help{font-size:12px;color:var(--ink-400)}
+.field .err{font-size:12px;color:var(--danger);font-weight:500}
+
+.input,.select,.textarea{
+  font-family:var(--font-body);font-size:14px;color:var(--ink-900);
+  background:#fff;border:1px solid var(--line);border-radius:var(--r-md);
+  height:40px;padding:0 12px;width:100%;
+  transition:border-color .15s,box-shadow .15s;
+}
+.textarea{height:auto;min-height:96px;padding:10px 12px;resize:vertical;line-height:1.5}
+.input::placeholder,.textarea::placeholder{color:var(--ink-400)}
+.input:hover,.select:hover,.textarea:hover{border-color:var(--ink-300)}
+.input:focus,.select:focus,.textarea:focus{outline:none;border-color:var(--teal-600);box-shadow:0 0 0 3px var(--teal-100)}
+.input:disabled,.select:disabled{background:var(--surface-2);color:var(--ink-400);cursor:not-allowed}
+.field.is-error .input,.field.is-error .select,.field.is-error .textarea{border-color:var(--danger);box-shadow:0 0 0 3px var(--danger-bg)}
+.field.is-success .input{border-color:var(--success)}
+
+.select{
+  appearance:none;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%2362708A' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat:no-repeat;background-position:right 12px center;
+  padding-right:36px;cursor:pointer;
+}
+
+.input-wrap{position:relative;display:flex;align-items:center}
+.input-wrap .input{padding-left:38px}
+.input-wrap .icon{position:absolute;left:12px;color:var(--ink-400);display:flex}
+.input-wrap .icon svg{width:16px;height:16px}
+
+/* currency / affix input — mono ledger figures */
+.affix{display:flex;align-items:stretch;width:100%}
+.affix .add{
+  display:flex;align-items:center;padding:0 12px;
+  background:var(--surface-2);border:1px solid var(--line);color:var(--ink-500);
+  font-family:var(--font-mono);font-size:13px;font-weight:600;
+}
+.affix .add:first-child{border-radius:var(--r-md) 0 0 var(--r-md);border-right:none}
+.affix .add:last-child{border-radius:0 var(--r-md) var(--r-md) 0;border-left:none}
+.affix .input{border-radius:0 var(--r-md) var(--r-md) 0}
+.affix .input.mid{border-radius:0}
+.mono{font-family:var(--font-mono) !important;font-variant-numeric:tabular-nums}
+
+/* checkbox / radio / toggle */
+.check,.radio{display:flex;align-items:flex-start;gap:10px;cursor:pointer;font-size:14px;color:var(--ink-700)}
+.check input,.radio input{appearance:none;width:18px;height:18px;flex-shrink:0;margin-top:1px;border:1.5px solid var(--ink-300);background:#fff;cursor:pointer;transition:all .12s}
+.check input{border-radius:5px}
+.radio input{border-radius:50%}
+.check input:hover,.radio input:hover{border-color:var(--teal-600)}
+.check input:focus-visible,.radio input:focus-visible,.toggle input:focus-visible{outline:2px solid var(--teal-500);outline-offset:2px}
+.check input:checked{
+  background:var(--teal-600) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='3.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M20 6 9 17l-5-5'/%3E%3C/svg%3E") center/12px no-repeat;
+  border-color:var(--teal-600);
+}
+.radio input:checked{border:5.5px solid var(--teal-600)}
+.check input:disabled,.radio input:disabled{background:var(--surface-2);border-color:var(--line);cursor:not-allowed}
+.check b,.radio b{font-weight:600;color:var(--ink-900);display:block}
+.check span,.radio span{font-size:12.5px;color:var(--ink-500)}
+
+.toggle{display:inline-flex;align-items:center;gap:10px;cursor:pointer;font-size:14px;color:var(--ink-700)}
+.toggle input{appearance:none;width:40px;height:22px;border-radius:var(--r-full);background:var(--ink-300);position:relative;cursor:pointer;transition:background .15s;flex-shrink:0}
+.toggle input::after{content:"";position:absolute;top:2px;left:2px;width:18px;height:18px;border-radius:50%;background:#fff;box-shadow:var(--sh-1);transition:left .15s}
+.toggle input:checked{background:var(--teal-600)}
+.toggle input:checked::after{left:20px}
+
+/* ============ BADGES & STATUS ============ */
+.badge{
+  display:inline-flex;align-items:center;gap:6px;
+  height:24px;padding:0 10px;border-radius:var(--r-full);
+  font-size:12px;font-weight:600;letter-spacing:.01em;
+  border:1px solid transparent;
+}
+.badge .dot{width:6px;height:6px;border-radius:50%;background:currentColor}
+.badge-navy{background:var(--navy-50);color:var(--navy-700);border-color:var(--navy-100)}
+.badge-teal{background:var(--teal-50);color:var(--teal-700);border-color:var(--teal-100)}
+.badge-success{background:var(--success-bg);color:var(--success);border-color:var(--success-line)}
+.badge-warning{background:var(--warning-bg);color:var(--warning);border-color:var(--warning-line)}
+.badge-danger{background:var(--danger-bg);color:var(--danger);border-color:var(--danger-line)}
+.badge-neutral{background:var(--surface-2);color:var(--ink-500);border-color:var(--line)}
+.badge-solid{background:var(--navy-900);color:#fff}
+
+/* ============ ALERTS ============ */
+.alert{display:flex;gap:12px;padding:14px 16px;border-radius:var(--r-md);border:1px solid;font-size:14px;width:100%}
+.alert svg{width:18px;height:18px;flex-shrink:0;margin-top:1px}
+.alert b{display:block;font-weight:600;margin-bottom:2px}
+.alert p{font-size:13.5px;opacity:.9}
+.alert-info{background:var(--info-bg);border-color:var(--info-line);color:var(--info)}
+.alert-success{background:var(--success-bg);border-color:var(--success-line);color:var(--success)}
+.alert-warning{background:var(--warning-bg);border-color:var(--warning-line);color:var(--warning)}
+.alert-danger{background:var(--danger-bg);border-color:var(--danger-line);color:var(--danger)}
+.alert .alert-body{color:var(--ink-900)}
+.alert .alert-body p{color:var(--ink-700)}
+
+/* toast */
+.toast{
+  display:flex;align-items:flex-start;gap:12px;
+  background:var(--navy-950);color:#fff;border-radius:var(--r-md);
+  padding:14px 16px;box-shadow:var(--sh-3);max-width:380px;font-size:14px;
+}
+.toast svg{width:18px;height:18px;flex-shrink:0;margin-top:1px;color:var(--teal-400)}
+.toast b{display:block;font-weight:600}
+.toast span{font-size:13px;color:var(--navy-200)}
+.toast .x{margin-left:auto;color:var(--navy-200);cursor:pointer;background:none;border:none;font-size:16px;line-height:1}
+
+/* ============ CARDS & DATA ============ */
+.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r-lg);box-shadow:var(--sh-1)}
+.card-pad{padding:22px}
+.card-head{padding:16px 22px;border-bottom:1px solid var(--line-soft);display:flex;align-items:center;justify-content:space-between;gap:12px}
+.card-head h4{font-family:var(--font-display);font-size:15px;font-weight:600;color:var(--navy-900)}
+
+.stat{padding:20px 22px}
+.stat .k{font-size:12.5px;font-weight:600;color:var(--ink-500);text-transform:uppercase;letter-spacing:.06em;display:flex;align-items:center;justify-content:space-between}
+.stat .v{font-family:var(--font-mono);font-size:28px;font-weight:600;color:var(--navy-900);margin-top:8px;font-variant-numeric:tabular-nums;letter-spacing:-.01em}
+.stat .d{font-size:12.5px;margin-top:6px;display:flex;align-items:center;gap:6px}
+.stat .d.up{color:var(--success)}
+.stat .d.down{color:var(--danger)}
+.stat .d span{color:var(--ink-400)}
+
+.kv{width:100%}
+.kv .row{display:flex;justify-content:space-between;gap:16px;padding:10px 0;border-bottom:1px dashed var(--line)}
+.kv .row:last-child{border-bottom:none}
+.kv .row .k{font-size:13.5px;color:var(--ink-500)}
+.kv .row .v{font-size:13.5px;font-weight:600;color:var(--ink-900);text-align:right}
+.kv .row .v.mono{font-size:13.5px}
+
+/* table */
+.table-wrap{width:100%;overflow-x:auto;border:1px solid var(--line);border-radius:var(--r-lg);background:#fff}
+table.tbl{width:100%;border-collapse:collapse;font-size:13.5px;min-width:640px}
+.tbl thead th{
+  text-align:left;padding:11px 16px;background:var(--surface-2);
+  font-size:11.5px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--ink-500);
+  border-bottom:1px solid var(--line);white-space:nowrap;
+}
+.tbl tbody td{padding:13px 16px;border-bottom:1px solid var(--line-soft);vertical-align:middle}
+.tbl tbody tr:last-child td{border-bottom:none}
+.tbl tbody tr:hover{background:var(--navy-50)}
+.tbl td.num,.tbl th.num{text-align:right;font-family:var(--font-mono);font-variant-numeric:tabular-nums}
+.tbl th.num{font-family:var(--font-body)}
+.tbl .id{font-family:var(--font-mono);font-size:12.5px;color:var(--navy-700);font-weight:500}
+
+/* avatar */
+.avatar{width:36px;height:36px;border-radius:50%;background:var(--navy-100);color:var(--navy-800);display:inline-flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;flex-shrink:0}
+.avatar.sm{width:28px;height:28px;font-size:11px}
+.avatar.lg{width:48px;height:48px;font-size:16px}
+.avatar.teal{background:var(--teal-100);color:var(--teal-700)}
+.avatar-stack{display:inline-flex}
+.avatar-stack .avatar{border:2px solid #fff;margin-left:-8px}
+.avatar-stack .avatar:first-child{margin-left:0}
+.person{display:flex;align-items:center;gap:10px}
+.person .nm{font-weight:600;font-size:13.5px;color:var(--ink-900);line-height:1.25}
+.person .sub2{font-size:12px;color:var(--ink-400)}
+
+/* ============ NAV PARTS ============ */
+.tabs{display:flex;gap:4px;border-bottom:1px solid var(--line);width:100%}
+.tab{
+  padding:10px 16px;font-size:14px;font-weight:600;color:var(--ink-500);
+  background:none;border:none;border-bottom:2px solid transparent;cursor:pointer;
+  margin-bottom:-1px;transition:color .12s,border-color .12s;
+}
+.tab:hover{color:var(--navy-800)}
+.tab.is-active{color:var(--navy-900);border-bottom-color:var(--teal-600)}
+.tab .cnt{font-family:var(--font-mono);font-size:11px;background:var(--surface-2);border:1px solid var(--line);border-radius:var(--r-full);padding:1px 7px;margin-left:6px;color:var(--ink-500)}
+.tabs-pill{display:inline-flex;background:var(--surface-2);border:1px solid var(--line);border-radius:var(--r-full);padding:3px;gap:2px}
+.tabs-pill .tab{border:none;border-radius:var(--r-full);padding:7px 16px;margin:0;font-size:13px}
+.tabs-pill .tab.is-active{background:#fff;color:var(--navy-900);box-shadow:var(--sh-1)}
+
+.crumbs{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--ink-400);flex-wrap:wrap}
+.crumbs a{color:var(--ink-500);text-decoration:none;font-weight:500}
+.crumbs a:hover{color:var(--teal-700)}
+.crumbs .sep{color:var(--ink-300)}
+.crumbs .cur{color:var(--navy-900);font-weight:600}
+
+.pager{display:flex;align-items:center;gap:6px}
+.pg{
+  min-width:34px;height:34px;padding:0 8px;border-radius:var(--r-sm);border:1px solid var(--line);
+  background:#fff;color:var(--ink-700);font-size:13px;font-weight:500;cursor:pointer;
+  display:inline-flex;align-items:center;justify-content:center;font-family:var(--font-mono);
+}
+.pg:hover{border-color:var(--navy-600);color:var(--navy-700)}
+.pg.is-active{background:var(--navy-900);border-color:var(--navy-900);color:#fff}
+.pg.gap{border:none;background:none;cursor:default;color:var(--ink-400)}
+
+/* top nav sample */
+.appbar{
+  display:flex;align-items:center;gap:24px;width:100%;
+  background:var(--navy-950);border-radius:var(--r-lg);padding:0 20px;height:60px;color:#fff;
+}
+.logo{display:flex;align-items:center;gap:10px;font-family:var(--font-display);font-weight:700;font-size:16px;letter-spacing:-.01em}
+.logo-mark{width:28px;height:28px;border-radius:8px;background:linear-gradient(135deg,var(--teal-400),var(--teal-600));display:flex;align-items:center;justify-content:center}
+.logo-mark svg{width:16px;height:16px;color:var(--navy-950)}
+.appbar nav{display:flex;gap:4px;margin-left:8px}
+.appbar nav a{color:var(--navy-200);text-decoration:none;font-size:13.5px;font-weight:500;padding:8px 12px;border-radius:var(--r-sm)}
+.appbar nav a:hover{color:#fff;background:rgba(255,255,255,.06)}
+.appbar nav a.is-active{color:#fff;background:rgba(45,199,182,.15)}
+.appbar .right{margin-left:auto;display:flex;align-items:center;gap:12px}
+
+/* sidebar sample */
+.side{
+  width:240px;background:var(--navy-950);border-radius:var(--r-lg);padding:16px 12px;color:#fff;flex-shrink:0;
+}
+.side .grp{font-family:var(--font-mono);font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--navy-200);opacity:.7;padding:14px 12px 6px}
+.side a{
+  display:flex;align-items:center;gap:10px;padding:9px 12px;border-radius:var(--r-sm);
+  color:var(--navy-100);text-decoration:none;font-size:13.5px;font-weight:500;
+}
+.side a svg{width:16px;height:16px;opacity:.8}
+.side a:hover{background:rgba(255,255,255,.06);color:#fff}
+.side a.is-active{background:rgba(45,199,182,.16);color:#fff;position:relative}
+.side a.is-active::before{content:"";position:absolute;left:0;top:8px;bottom:8px;width:3px;border-radius:2px;background:var(--teal-400)}
+.side a .cnt{margin-left:auto;font-family:var(--font-mono);font-size:11px;background:rgba(255,255,255,.1);border-radius:var(--r-full);padding:1px 7px}
+
+/* ============ OVERLAYS ============ */
+.modal-demo{position:relative;width:100%;background:rgba(7,22,51,.45);border-radius:var(--r-lg);padding:40px 20px;display:flex;justify-content:center}
+.modal{background:#fff;border-radius:var(--r-lg);box-shadow:var(--sh-4);width:100%;max-width:440px;overflow:hidden}
+.modal-h{padding:20px 24px 0;display:flex;justify-content:space-between;align-items:flex-start}
+.modal-h h4{font-family:var(--font-display);font-size:17px;font-weight:700;color:var(--navy-900)}
+.modal-h .x{background:none;border:none;font-size:18px;color:var(--ink-400);cursor:pointer;line-height:1}
+.modal-b{padding:12px 24px 20px;font-size:14px;color:var(--ink-700)}
+.modal-f{padding:16px 24px;background:var(--surface-2);border-top:1px solid var(--line-soft);display:flex;justify-content:flex-end;gap:10px}
+
+.menu{background:#fff;border:1px solid var(--line);border-radius:var(--r-md);box-shadow:var(--sh-3);width:220px;padding:6px;font-size:13.5px}
+.menu a{display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:var(--r-sm);color:var(--ink-700);text-decoration:none;font-weight:500}
+.menu a svg{width:15px;height:15px;color:var(--ink-400)}
+.menu a:hover{background:var(--surface-2);color:var(--navy-900)}
+.menu hr{border:none;border-top:1px solid var(--line-soft);margin:6px 4px}
+.menu a.danger{color:var(--danger)}
+.menu a.danger svg{color:var(--danger)}
+
+.tip-demo{display:flex;gap:40px;align-items:center;flex-wrap:wrap}
+.tip{position:relative;display:inline-block}
+.tip .tip-box{
+  position:absolute;bottom:calc(100% + 8px);left:50%;transform:translateX(-50%);
+  background:var(--navy-950);color:#fff;font-size:12px;font-weight:500;
+  padding:6px 10px;border-radius:var(--r-sm);white-space:nowrap;box-shadow:var(--sh-2);
+}
+.tip .tip-box::after{content:"";position:absolute;top:100%;left:50%;transform:translateX(-50%);border:5px solid transparent;border-top-color:var(--navy-950)}
+
+/* ============ PROGRESS / LOADING ============ */
+.prog{width:100%;height:8px;background:var(--surface-2);border-radius:var(--r-full);overflow:hidden}
+.prog>i{display:block;height:100%;background:var(--teal-600);border-radius:var(--r-full)}
+.prog.navy>i{background:var(--navy-700)}
+.prog.warn>i{background:var(--warning)}
+.prog-lbl{display:flex;justify-content:space-between;font-size:12.5px;color:var(--ink-500);margin-bottom:6px}
+.prog-lbl b{font-family:var(--font-mono);color:var(--ink-900)}
+
+.skel{background:linear-gradient(90deg,var(--surface-2) 25%,var(--line-soft) 50%,var(--surface-2) 75%);background-size:200% 100%;animation:skel 1.4s infinite;border-radius:var(--r-sm)}
+@keyframes skel{0%{background-position:200% 0}100%{background-position:-200% 0}}
+
+.spinner{width:22px;height:22px;border:2.5px solid var(--line);border-top-color:var(--teal-600);border-radius:50%;animation:spin .7s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* empty state */
+.empty{width:100%;text-align:center;padding:48px 24px;border:1.5px dashed var(--line);border-radius:var(--r-lg);background:var(--surface)}
+.empty .ic{width:48px;height:48px;border-radius:var(--r-md);background:var(--navy-50);color:var(--navy-600);display:inline-flex;align-items:center;justify-content:center;margin-bottom:14px}
+.empty .ic svg{width:22px;height:22px}
+.empty h4{font-family:var(--font-display);font-size:16px;font-weight:600;color:var(--navy-900);margin-bottom:6px}
+.empty p{font-size:13.5px;color:var(--ink-500);max-width:340px;margin:0 auto 18px}
+
+/* ============ STEPPER & TIMELINE ============ */
+.stepper{display:flex;width:100%}
+.step{flex:1;position:relative;text-align:center;padding-top:34px}
+.step::before{content:"";position:absolute;top:12px;left:50%;width:100%;height:2px;background:var(--line)}
+.step:last-child::before{display:none}
+.step .pt{
+  position:absolute;top:0;left:50%;transform:translateX(-50%);
+  width:26px;height:26px;border-radius:50%;background:#fff;border:2px solid var(--line);
+  display:flex;align-items:center;justify-content:center;
+  font-family:var(--font-mono);font-size:11.5px;font-weight:600;color:var(--ink-400);z-index:1;
+}
+.step .t{font-size:13px;font-weight:600;color:var(--ink-400)}
+.step .s{font-size:11.5px;color:var(--ink-400)}
+.step.done::before{background:var(--teal-600)}
+.step.done .pt{background:var(--teal-600);border-color:var(--teal-600);color:#fff}
+.step.done .t{color:var(--ink-700)}
+.step.cur .pt{border-color:var(--teal-600);color:var(--teal-700);box-shadow:0 0 0 4px var(--teal-100)}
+.step.cur .t{color:var(--navy-900)}
+
+.tl{position:relative;padding-left:30px;width:100%}
+.tl::before{content:"";position:absolute;left:9px;top:6px;bottom:6px;width:2px;background:var(--line)}
+.tl-item{position:relative;padding-bottom:26px}
+.tl-item:last-child{padding-bottom:0}
+.tl-item .pt{
+  position:absolute;left:-30px;top:2px;width:20px;height:20px;border-radius:50%;
+  background:#fff;border:2px solid var(--line);z-index:1;
+  display:flex;align-items:center;justify-content:center;
+}
+.tl-item .pt svg{width:10px;height:10px}
+.tl-item.done .pt{background:var(--teal-600);border-color:var(--teal-600);color:#fff}
+.tl-item.cur .pt{border-color:var(--teal-600);box-shadow:0 0 0 4px var(--teal-100)}
+.tl-item.cur .pt::after{content:"";width:8px;height:8px;border-radius:50%;background:var(--teal-600)}
+.tl-item.warn .pt{background:var(--warning-bg);border-color:var(--warning)}
+.tl-item .tl-h{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.tl-item .tl-h b{font-size:14px;font-weight:600;color:var(--ink-900)}
+.tl-item .when{font-family:var(--font-mono);font-size:11.5px;color:var(--ink-400);margin-left:auto}
+.tl-item p{font-size:13px;color:var(--ink-500);margin-top:3px;max-width:560px}
+.tl-item .by{font-size:12px;color:var(--ink-400);margin-top:4px}
+.tl-item .by b{color:var(--ink-500);font-weight:600}
+
+
+/* ============================================================
+   MERIDIAN v1.1 EXTENSIONS — sections 12–25
+   ============================================================ */
+
+/* ---- charts ---- */
+.legend{display:flex;gap:18px;flex-wrap:wrap;font-size:12.5px;color:var(--ink-500);align-items:center}
+.legend .li{display:inline-flex;align-items:center;gap:7px}
+.legend .li i{width:10px;height:10px;border-radius:3px;display:inline-block}
+.chart-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:14px;width:100%}
+.chart-head b{font-family:var(--font-display);font-size:14.5px;font-weight:600;color:var(--navy-900)}
+.chart-svg{width:100%;height:auto;display:block}
+.axis{font-family:var(--font-mono);font-size:10px;fill:var(--ink-400)}
+.gridline{stroke:var(--line-soft);stroke-width:1}
+
+/* progress ring / gauge */
+.ring-wrap{display:flex;flex-direction:column;align-items:center;gap:8px}
+.ring-wrap .lbl{font-size:12.5px;color:var(--ink-500);font-weight:600}
+
+/* heatmap */
+.heat{display:grid;grid-template-columns:repeat(12,1fr);gap:4px;width:100%;max-width:520px}
+.heat i{aspect-ratio:1;border-radius:4px;display:block}
+
+/* funnel */
+.funnel{display:flex;flex-direction:column;gap:6px;width:100%;max-width:440px}
+.funnel .f{height:38px;border-radius:var(--r-sm);display:flex;align-items:center;justify-content:space-between;padding:0 14px;color:#fff;font-size:12.5px;font-weight:600}
+.funnel .f span{font-family:var(--font-mono);font-weight:600}
+
+/* kanban */
+.kanban{display:grid;grid-template-columns:repeat(3,minmax(220px,1fr));gap:14px;width:100%;overflow-x:auto}
+.kan-col{background:var(--surface-2);border:1px solid var(--line-soft);border-radius:var(--r-lg);padding:12px}
+.kan-col .kh{display:flex;align-items:center;justify-content:space-between;font-size:12px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-500);padding:2px 4px 10px}
+.kan-col .kh .cnt{font-family:var(--font-mono);background:#fff;border:1px solid var(--line);border-radius:var(--r-full);padding:1px 8px;font-size:11px}
+.kan-card{background:#fff;border:1px solid var(--line);border-radius:var(--r-md);padding:12px;box-shadow:var(--sh-1);margin-bottom:10px;cursor:grab}
+.kan-card:last-child{margin-bottom:0}
+.kan-card .t{font-size:13.5px;font-weight:600;color:var(--ink-900)}
+.kan-card .m{display:flex;align-items:center;justify-content:space-between;margin-top:10px}
+.kan-card .m .amt{font-family:var(--font-mono);font-size:12.5px;font-weight:600;color:var(--navy-800)}
+
+/* ---- loan components ---- */
+.loan-app-card{max-width:420px;width:100%}
+.loan-app-card .lh{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}
+.loan-app-card .amt{font-family:var(--font-mono);font-size:26px;font-weight:600;color:var(--navy-900);letter-spacing:-.01em;margin-top:12px}
+.loan-app-card .meta{display:flex;gap:18px;flex-wrap:wrap;margin-top:12px;font-size:12.5px;color:var(--ink-500)}
+.loan-app-card .meta b{display:block;color:var(--ink-900);font-weight:600;font-size:13px}
+
+/* credit score meter */
+.score{max-width:340px;width:100%;text-align:center}
+.score .bands{display:flex;height:10px;border-radius:var(--r-full);overflow:hidden;margin-top:14px}
+.score .bands i{flex:1}
+.score .needle-track{position:relative;height:0}
+.score .needle{position:absolute;top:-16px;width:2.5px;height:22px;background:var(--navy-900);border-radius:2px;transform:translateX(-50%)}
+.score .band-lbls{display:flex;justify-content:space-between;font-size:10.5px;color:var(--ink-400);margin-top:8px;font-family:var(--font-mono)}
+.score .val{font-family:var(--font-mono);font-size:34px;font-weight:600;color:var(--navy-900)}
+.score .cat{font-size:13px;font-weight:700;color:var(--success)}
+
+/* document checklist */
+.chk-list{width:100%;max-width:420px}
+.chk-list .ci{display:flex;align-items:center;gap:12px;padding:11px 0;border-bottom:1px dashed var(--line)}
+.chk-list .ci:last-child{border-bottom:none}
+.chk-list .ci .st{width:22px;height:22px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center}
+.chk-list .ci .st svg{width:12px;height:12px}
+.chk-list .ci.ok .st{background:var(--success-bg);color:var(--success)}
+.chk-list .ci.pend .st{background:var(--warning-bg);color:var(--warning)}
+.chk-list .ci.miss .st{background:var(--surface-2);border:1.5px dashed var(--ink-300);color:var(--ink-400)}
+.chk-list .ci b{font-size:13.5px;font-weight:600;color:var(--ink-900);display:block}
+.chk-list .ci span{font-size:12px;color:var(--ink-400)}
+.chk-list .ci .act{margin-left:auto}
+
+/* EMI calculator */
+.emi{display:grid;grid-template-columns:1.1fr .9fr;gap:0;width:100%;max-width:680px;overflow:hidden}
+.emi .in{padding:22px}
+.emi .out{background:var(--navy-950);color:#fff;padding:22px;display:flex;flex-direction:column;gap:14px;justify-content:center}
+.emi .out .ok{font-size:11.5px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--navy-200)}
+.emi .out .ov{font-family:var(--font-mono);font-size:26px;font-weight:600;letter-spacing:-.01em}
+.emi .out .row2{display:flex;justify-content:space-between;font-size:13px;padding-top:12px;border-top:1px dashed rgba(255,255,255,.2)}
+.emi .out .row2 span{color:var(--navy-200)}
+.emi .out .row2 b{font-family:var(--font-mono);font-weight:600}
+@media(max-width:640px){.emi{grid-template-columns:1fr}}
+
+/* ---- KPI dashboard grid ---- */
+.kpi-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:14px;width:100%}
+.kpi{background:#fff;border:1px solid var(--line);border-radius:var(--r-lg);padding:16px 18px;box-shadow:var(--sh-1)}
+.kpi .ic{width:34px;height:34px;border-radius:var(--r-md);display:flex;align-items:center;justify-content:center;margin-bottom:12px}
+.kpi .ic svg{width:16px;height:16px}
+.kpi .k{font-size:12px;font-weight:600;color:var(--ink-500)}
+.kpi .v{font-family:var(--font-mono);font-size:22px;font-weight:600;color:var(--navy-900);margin-top:4px;font-variant-numeric:tabular-nums}
+.kpi .d{font-size:11.5px;margin-top:4px}
+.kpi .d.up{color:var(--success)}.kpi .d.down{color:var(--danger)}
+
+/* activity feed */
+.feed{width:100%;max-width:480px}
+.feed .fi{display:flex;gap:12px;padding:12px 0;border-bottom:1px solid var(--line-soft)}
+.feed .fi:last-child{border-bottom:none}
+.feed .fi p{font-size:13.5px;color:var(--ink-700)}
+.feed .fi p b{color:var(--ink-900);font-weight:600}
+.feed .fi .when{font-family:var(--font-mono);font-size:11px;color:var(--ink-400);margin-top:3px}
+
+/* quick actions */
+.qa-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:12px;width:100%;max-width:640px}
+.qa{background:#fff;border:1px solid var(--line);border-radius:var(--r-lg);padding:16px 14px;text-align:center;cursor:pointer;transition:box-shadow .15s,transform .15s,border-color .15s}
+.qa:hover{box-shadow:var(--sh-2);transform:translateY(-1px);border-color:var(--teal-400)}
+.qa .ic{width:38px;height:38px;border-radius:var(--r-md);background:var(--teal-50);color:var(--teal-700);display:inline-flex;align-items:center;justify-content:center;margin-bottom:10px}
+.qa .ic svg{width:18px;height:18px}
+.qa b{display:block;font-size:12.5px;font-weight:600;color:var(--ink-900)}
+
+/* ---- search & filters ---- */
+.gsearch{position:relative;width:100%;max-width:560px}
+.gsearch .input{padding-left:40px;padding-right:64px;height:44px;border-radius:var(--r-lg)}
+.gsearch .icon{position:absolute;left:14px;top:50%;transform:translateY(-50%);color:var(--ink-400);display:flex}
+.gsearch .icon svg{width:17px;height:17px}
+.gsearch .kbd-hint{position:absolute;right:12px;top:50%;transform:translateY(-50%)}
+.kbd{font-family:var(--font-mono);font-size:11px;color:var(--ink-500);background:var(--surface-2);border:1px solid var(--line);border-bottom-width:2px;border-radius:5px;padding:2px 6px}
+.filter-bar{display:flex;gap:10px;flex-wrap:wrap;align-items:center;width:100%}
+.fchip{display:inline-flex;align-items:center;gap:7px;height:34px;padding:0 12px;border-radius:var(--r-full);border:1px solid var(--line);background:#fff;font-size:13px;font-weight:500;color:var(--ink-700);cursor:pointer}
+.fchip:hover{border-color:var(--navy-600)}
+.fchip svg{width:13px;height:13px;color:var(--ink-400)}
+.fchip.is-on{background:var(--navy-50);border-color:var(--navy-200);color:var(--navy-800)}
+.fchip.is-on b{font-weight:700}
+.fchip .x{color:var(--ink-400);font-size:14px;line-height:1;margin-left:2px}
+.saved-filters{display:flex;gap:8px;flex-wrap:wrap}
+
+/* ---- advanced table ---- */
+.tbl th.sortable{cursor:pointer;user-select:none}
+.tbl th.sortable:hover{color:var(--navy-800)}
+.tbl th.sortable .arr{font-size:9px;margin-left:4px;color:var(--teal-600)}
+.tbl .rowchk{width:36px}
+.tbl tr.is-selected td{background:var(--teal-50)}
+.tbl tr.expand td{background:var(--surface-2);padding:16px 20px}
+.tbl .chev{background:none;border:none;cursor:pointer;color:var(--ink-400);padding:4px;display:inline-flex}
+.tbl .chev svg{width:14px;height:14px}
+.bulk-bar{display:flex;align-items:center;gap:14px;width:100%;background:var(--navy-950);color:#fff;border-radius:var(--r-md);padding:10px 16px;font-size:13.5px}
+.bulk-bar b{font-weight:600}
+.bulk-bar .sp{margin-left:auto;display:flex;gap:8px}
+.tbl-toolbar{display:flex;align-items:center;gap:10px;width:100%;flex-wrap:wrap}
+.tbl-toolbar .sp{margin-left:auto;display:flex;gap:8px}
+
+/* ---- advanced forms ---- */
+.otp{display:flex;gap:10px}
+.otp input{width:46px;height:52px;text-align:center;font-family:var(--font-mono);font-size:20px;font-weight:600;color:var(--navy-900);border:1px solid var(--line);border-radius:var(--r-md);background:#fff;transition:border-color .15s,box-shadow .15s}
+.otp input:focus{outline:none;border-color:var(--teal-600);box-shadow:0 0 0 3px var(--teal-100)}
+.otp input.filled{border-color:var(--navy-200);background:var(--navy-50)}
+
+.chips-input{display:flex;flex-wrap:wrap;gap:6px;align-items:center;min-height:44px;padding:6px 8px;background:#fff;border:1px solid var(--line);border-radius:var(--r-md);width:100%;cursor:text}
+.chips-input:focus-within{border-color:var(--teal-600);box-shadow:0 0 0 3px var(--teal-100)}
+.chip{display:inline-flex;align-items:center;gap:6px;height:26px;padding:0 6px 0 10px;border-radius:var(--r-full);background:var(--navy-50);border:1px solid var(--navy-100);color:var(--navy-800);font-size:12.5px;font-weight:600}
+.chip .x{background:none;border:none;cursor:pointer;color:var(--navy-600);font-size:13px;line-height:1;padding:2px;border-radius:50%}
+.chip .x:hover{background:var(--navy-100)}
+.chips-input input{border:none;outline:none;font-family:var(--font-body);font-size:13.5px;flex:1;min-width:80px;padding:4px}
+
+.sdrop{position:relative;width:100%;max-width:320px}
+.sdrop-panel{margin-top:6px;background:#fff;border:1px solid var(--line);border-radius:var(--r-md);box-shadow:var(--sh-3);overflow:hidden}
+.sdrop-panel .srch{display:flex;align-items:center;gap:8px;padding:10px 12px;border-bottom:1px solid var(--line-soft);color:var(--ink-400)}
+.sdrop-panel .srch svg{width:14px;height:14px}
+.sdrop-panel .srch input{border:none;outline:none;font-size:13.5px;flex:1;font-family:var(--font-body)}
+.sdrop-panel .opt{display:flex;align-items:center;gap:10px;padding:9px 12px;font-size:13.5px;cursor:pointer;color:var(--ink-700)}
+.sdrop-panel .opt:hover{background:var(--surface-2)}
+.sdrop-panel .opt.is-sel{background:var(--teal-50);color:var(--teal-700);font-weight:600}
+.sdrop-panel .opt .tick{margin-left:auto;color:var(--teal-600)}
+
+.dropzone{width:100%;max-width:460px;border:1.5px dashed var(--line);border-radius:var(--r-lg);background:var(--surface);padding:32px 24px;text-align:center;transition:border-color .15s,background .15s;cursor:pointer}
+.dropzone:hover{border-color:var(--teal-500);background:var(--teal-50)}
+.dropzone .ic{width:44px;height:44px;border-radius:var(--r-md);background:var(--navy-50);color:var(--navy-600);display:inline-flex;align-items:center;justify-content:center;margin-bottom:12px}
+.dropzone .ic svg{width:20px;height:20px}
+.dropzone b{display:block;font-size:14px;color:var(--ink-900)}
+.dropzone b em{font-style:normal;color:var(--teal-700)}
+.dropzone span{font-size:12px;color:var(--ink-400);display:block;margin-top:4px}
+
+.file-row{display:flex;align-items:center;gap:12px;padding:10px 14px;background:#fff;border:1px solid var(--line);border-radius:var(--r-md);width:100%;max-width:460px}
+.file-row .fic{width:34px;height:34px;border-radius:var(--r-sm);background:var(--danger-bg);color:var(--danger);display:flex;align-items:center;justify-content:center;font-family:var(--font-mono);font-size:9.5px;font-weight:700;flex-shrink:0}
+.file-row .fic.img{background:var(--info-bg);color:var(--info)}
+.file-row .fm b{display:block;font-size:13px;font-weight:600;color:var(--ink-900)}
+.file-row .fm span{font-family:var(--font-mono);font-size:11px;color:var(--ink-400)}
+.file-row .sp{margin-left:auto;display:flex;align-items:center;gap:8px}
+.file-row .prog{width:90px}
+
+.imgup{display:flex;gap:12px;align-items:center}
+.imgup .ph{width:76px;height:76px;border-radius:var(--r-md);border:1.5px dashed var(--line);display:flex;align-items:center;justify-content:center;color:var(--ink-400);cursor:pointer;background:var(--surface)}
+.imgup .ph:hover{border-color:var(--teal-500);color:var(--teal-600)}
+.imgup .ph svg{width:20px;height:20px}
+.imgup .got{width:76px;height:76px;border-radius:var(--r-md);background:linear-gradient(135deg,var(--navy-200),var(--navy-100));display:flex;align-items:center;justify-content:center;font-weight:700;color:var(--navy-800);position:relative;border:1px solid var(--line)}
+.imgup .got .rm{position:absolute;top:-6px;right:-6px;width:20px;height:20px;border-radius:50%;background:var(--navy-950);color:#fff;border:none;font-size:11px;cursor:pointer;display:flex;align-items:center;justify-content:center}
+
+.sigpad{width:100%;max-width:420px;border:1px solid var(--line);border-radius:var(--r-md);background:#fff;overflow:hidden}
+.sigpad .cv{height:130px;background:repeating-linear-gradient(transparent,transparent 31px,var(--line-soft) 31px,var(--line-soft) 32px);position:relative}
+.sigpad .cv svg{position:absolute;inset:0;width:100%;height:100%}
+.sigpad .cv .hint2{position:absolute;bottom:8px;left:0;right:0;text-align:center;font-size:11px;color:var(--ink-300);font-family:var(--font-mono);letter-spacing:.1em}
+.sigpad .sf{display:flex;justify-content:space-between;align-items:center;padding:8px 12px;border-top:1px solid var(--line-soft);background:var(--surface-2)}
+.sigpad .sf span{font-size:12px;color:var(--ink-500)}
+
+.range-wrap{width:100%;max-width:320px}
+.range-wrap input[type=range]{width:100%;appearance:none;height:6px;border-radius:var(--r-full);background:linear-gradient(90deg,var(--teal-600) 55%,var(--line) 55%);outline:none}
+.range-wrap input[type=range]::-webkit-slider-thumb{appearance:none;width:20px;height:20px;border-radius:50%;background:#fff;border:3px solid var(--teal-600);box-shadow:var(--sh-2);cursor:pointer}
+.range-lbls{display:flex;justify-content:space-between;font-family:var(--font-mono);font-size:11px;color:var(--ink-400);margin-top:6px}
+
+/* ---- notifications ---- */
+.bell{position:relative;width:40px;height:40px;border-radius:var(--r-md);border:1px solid var(--line);background:#fff;color:var(--ink-700);display:inline-flex;align-items:center;justify-content:center;cursor:pointer}
+.bell:hover{border-color:var(--navy-600);color:var(--navy-800)}
+.bell svg{width:18px;height:18px}
+.bell .cnt{position:absolute;top:-5px;right:-5px;min-width:18px;height:18px;border-radius:var(--r-full);background:var(--danger);color:#fff;font-family:var(--font-mono);font-size:10px;font-weight:600;display:flex;align-items:center;justify-content:center;padding:0 4px;border:2px solid #fff}
+.notif-center{width:100%;max-width:380px;background:#fff;border:1px solid var(--line);border-radius:var(--r-lg);box-shadow:var(--sh-3);overflow:hidden}
+.notif-center .nh{display:flex;align-items:center;justify-content:space-between;padding:14px 16px;border-bottom:1px solid var(--line-soft)}
+.notif-center .nh b{font-family:var(--font-display);font-size:14px;font-weight:600;color:var(--navy-900)}
+.notif-center .nh a{font-size:12px;color:var(--teal-700);text-decoration:none;font-weight:600}
+.ni{display:flex;gap:12px;padding:13px 16px;border-bottom:1px solid var(--line-soft);position:relative}
+.ni:last-child{border-bottom:none}
+.ni.unread{background:var(--navy-50)}
+.ni.unread::before{content:"";position:absolute;left:6px;top:50%;transform:translateY(-50%);width:5px;height:5px;border-radius:50%;background:var(--teal-600)}
+.ni .nic{width:32px;height:32px;border-radius:var(--r-sm);flex-shrink:0;display:flex;align-items:center;justify-content:center}
+.ni .nic svg{width:15px;height:15px}
+.ni p{font-size:13px;color:var(--ink-700)}
+.ni p b{color:var(--ink-900);font-weight:600}
+.ni .when{font-family:var(--font-mono);font-size:10.5px;color:var(--ink-400);margin-top:3px}
+.banner{display:flex;align-items:center;gap:12px;width:100%;background:var(--navy-950);color:#fff;padding:11px 18px;border-radius:var(--r-md);font-size:13.5px}
+.banner .badge{flex-shrink:0}
+.banner .sp{margin-left:auto;display:flex;gap:8px;align-items:center}
+.banner a{color:var(--teal-400);font-weight:600;text-decoration:none}
+.banner .x{background:none;border:none;color:var(--navy-200);cursor:pointer;font-size:16px;line-height:1}
+.banner.warn{background:var(--warning-bg);color:var(--warning);border:1px solid var(--warning-line)}
+.banner.warn a{color:var(--warning)}
+
+.dots{display:inline-flex;gap:5px}
+.dots i{width:7px;height:7px;border-radius:50%;background:var(--teal-600);animation:dots 1.2s infinite ease-in-out}
+.dots i:nth-child(2){animation-delay:.15s}
+.dots i:nth-child(3){animation-delay:.3s}
+@keyframes dots{0%,80%,100%{opacity:.25;transform:scale(.8)}40%{opacity:1;transform:scale(1)}}
+
+/* ---- profile & customer ---- */
+.profile-card{width:100%;max-width:380px;overflow:hidden}
+.profile-card .cover{height:70px;background:linear-gradient(135deg,var(--navy-900),var(--navy-700))}
+.profile-card .pbody{padding:0 22px 20px;margin-top:-26px}
+.profile-card .avatar.lg{border:3px solid #fff;box-shadow:var(--sh-1)}
+.profile-card .nm{font-family:var(--font-display);font-size:17px;font-weight:700;color:var(--navy-900);margin-top:10px}
+.profile-card .rl{font-size:13px;color:var(--ink-500)}
+.profile-card .prow{display:flex;gap:18px;margin-top:14px;padding-top:14px;border-top:1px solid var(--line-soft)}
+.profile-card .prow .c b{font-family:var(--font-mono);font-size:16px;font-weight:600;color:var(--navy-900);display:block}
+.profile-card .prow .c span{font-size:11.5px;color:var(--ink-400)}
+.contact-kv .row .v a{color:var(--teal-700);text-decoration:none;font-weight:600}
+
+.sess-row{display:flex;align-items:center;gap:14px;padding:12px 0;border-bottom:1px solid var(--line-soft);width:100%}
+.sess-row:last-child{border-bottom:none}
+.sess-row .dic{width:36px;height:36px;border-radius:var(--r-sm);background:var(--surface-2);color:var(--ink-500);display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.sess-row .dic svg{width:17px;height:17px}
+.sess-row b{font-size:13.5px;font-weight:600;color:var(--ink-900);display:block}
+.sess-row span{font-size:12px;color:var(--ink-400);font-family:var(--font-mono)}
+.sess-row .sp{margin-left:auto}
+
+/* ---- admin ---- */
+.pm{width:100%;overflow-x:auto}
+.pm table{border-collapse:collapse;width:100%;min-width:560px;font-size:13px}
+.pm th,.pm td{padding:10px 14px;border-bottom:1px solid var(--line-soft);text-align:center}
+.pm th{font-size:11.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-500);background:var(--surface-2)}
+.pm td:first-child,.pm th:first-child{text-align:left}
+.pm td:first-child{font-weight:600;color:var(--ink-900)}
+.pm .y{color:var(--success);font-weight:700}
+.pm .n{color:var(--ink-300)}
+.audit .tbl td{font-size:13px}
+.role-pill{display:inline-flex;align-items:center;gap:8px;padding:6px 12px;border-radius:var(--r-md);border:1px solid var(--line);background:#fff;font-size:13px;font-weight:600;color:var(--ink-700)}
+.role-pill i{width:8px;height:8px;border-radius:50%}
+
+/* ---- calendar ---- */
+.cal{width:100%;max-width:460px;background:#fff;border:1px solid var(--line);border-radius:var(--r-lg);overflow:hidden}
+.cal .ch{display:flex;align-items:center;justify-content:space-between;padding:14px 16px;border-bottom:1px solid var(--line-soft)}
+.cal .ch b{font-family:var(--font-display);font-size:14.5px;font-weight:600;color:var(--navy-900)}
+.cal .grid7{display:grid;grid-template-columns:repeat(7,1fr)}
+.cal .dow{padding:8px 0;text-align:center;font-size:10.5px;font-weight:700;letter-spacing:.08em;color:var(--ink-400);text-transform:uppercase;background:var(--surface-2);border-bottom:1px solid var(--line-soft)}
+.cal .day{aspect-ratio:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;font-family:var(--font-mono);font-size:12.5px;color:var(--ink-700);border-bottom:1px solid var(--line-soft);border-right:1px solid var(--line-soft);cursor:pointer}
+.cal .day:hover{background:var(--navy-50)}
+.cal .day.mut{color:var(--ink-300)}
+.cal .day.today{background:var(--navy-900);color:#fff;font-weight:600}
+.cal .day .dt{width:5px;height:5px;border-radius:50%}
+.cal .day .dt.due{background:var(--warning)}
+.cal .day .dt.paid{background:var(--success)}
+.cal .day .dt.ovr{background:var(--danger)}
+.cal .cl{display:flex;gap:16px;padding:10px 16px;font-size:11.5px;color:var(--ink-500)}
+.cal .cl i{width:7px;height:7px;border-radius:50%;display:inline-block;margin-right:5px}
+
+/* ---- documents ---- */
+.doc-viewer{width:100%;max-width:520px;border:1px solid var(--line);border-radius:var(--r-lg);overflow:hidden;background:#fff}
+.doc-viewer .dvh{display:flex;align-items:center;gap:10px;padding:10px 14px;background:var(--navy-950);color:#fff;font-size:12.5px}
+.doc-viewer .dvh .fn{font-family:var(--font-mono);font-size:12px}
+.doc-viewer .dvh .sp{margin-left:auto;display:flex;gap:4px}
+.doc-viewer .dvh button{background:rgba(255,255,255,.08);border:none;color:#fff;width:28px;height:28px;border-radius:var(--r-sm);cursor:pointer;display:inline-flex;align-items:center;justify-content:center}
+.doc-viewer .dvh button svg{width:13px;height:13px}
+.doc-viewer .pg-area{background:var(--surface-2);padding:20px;display:flex;justify-content:center}
+.doc-viewer .sheet{background:#fff;box-shadow:var(--sh-2);width:100%;max-width:300px;aspect-ratio:8.5/11;padding:24px;display:flex;flex-direction:column;gap:8px}
+.doc-viewer .sheet .ln{height:8px;background:var(--line-soft);border-radius:3px}
+.doc-viewer .dvf{display:flex;align-items:center;justify-content:center;gap:12px;padding:9px;border-top:1px solid var(--line-soft);font-family:var(--font-mono);font-size:12px;color:var(--ink-500)}
+.ver-item{display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px dashed var(--line);font-size:13px;width:100%}
+.ver-item:last-child{border-bottom:none}
+.ver-item .vtag{font-family:var(--font-mono);font-size:11px;font-weight:600;background:var(--navy-50);color:var(--navy-700);border:1px solid var(--navy-100);border-radius:var(--r-sm);padding:2px 8px}
+.ver-item .sp{margin-left:auto;display:flex;align-items:center;gap:10px}
+.ver-item .when{font-family:var(--font-mono);font-size:11px;color:var(--ink-400)}
+
+/* ---- utilities ---- */
+.popover{background:#fff;border:1px solid var(--line);border-radius:var(--r-md);box-shadow:var(--sh-3);width:260px;padding:14px 16px;position:relative}
+.popover::before{content:"";position:absolute;top:-6px;left:28px;width:10px;height:10px;background:#fff;border-left:1px solid var(--line);border-top:1px solid var(--line);transform:rotate(45deg)}
+.popover b{font-size:13.5px;font-weight:600;color:var(--navy-900);display:block;margin-bottom:4px}
+.popover p{font-size:12.5px;color:var(--ink-500)}
+.copybtn{display:inline-flex;align-items:center;gap:8px;font-family:var(--font-mono);font-size:12.5px;color:var(--navy-800);background:var(--surface-2);border:1px solid var(--line);border-radius:var(--r-sm);padding:7px 10px;cursor:pointer}
+.copybtn:hover{border-color:var(--teal-500);color:var(--teal-700)}
+.copybtn svg{width:13px;height:13px}
+.autosave{display:inline-flex;align-items:center;gap:7px;font-size:12px;color:var(--ink-400)}
+.autosave i{width:7px;height:7px;border-radius:50%;background:var(--success)}
+.autosave.saving i{background:var(--warning);animation:dots 1.2s infinite}
+.faq{width:100%;max-width:560px}
+.faq details{border:1px solid var(--line);border-radius:var(--r-md);background:#fff;margin-bottom:10px;overflow:hidden}
+.faq summary{padding:14px 16px;font-size:14px;font-weight:600;color:var(--ink-900);cursor:pointer;list-style:none;display:flex;justify-content:space-between;align-items:center}
+.faq summary::after{content:"+";font-family:var(--font-mono);color:var(--teal-600);font-size:16px}
+.faq details[open] summary::after{content:"–"}
+.faq details[open] summary{border-bottom:1px solid var(--line-soft)}
+.faq .fa{padding:12px 16px 16px;font-size:13.5px;color:var(--ink-500)}
+.lang{display:inline-flex;align-items:center;gap:8px;height:36px;padding:0 12px;border:1px solid var(--line);border-radius:var(--r-md);background:#fff;font-size:13px;font-weight:500;color:var(--ink-700);cursor:pointer}
+.lang svg{width:14px;height:14px;color:var(--ink-400)}
+.dark-toggle{display:inline-flex;align-items:center;gap:10px;font-size:13.5px;color:var(--ink-700)}
+
+.fab{width:56px;height:56px;border-radius:50%;background:var(--teal-600);color:#fff;border:none;box-shadow:var(--sh-3);cursor:pointer;display:inline-flex;align-items:center;justify-content:center;transition:background .15s,transform .1s}
+.fab:hover{background:var(--teal-700);transform:translateY(-1px)}
+.fab svg{width:22px;height:22px}
+.fab.ext{width:auto;border-radius:var(--r-full);padding:0 22px;gap:10px;font-size:14px;font-weight:600;font-family:var(--font-body)}
+
+/* ---- mobile ---- */
+.phone{width:280px;border:1px solid var(--line);border-radius:26px;background:var(--canvas);overflow:hidden;box-shadow:var(--sh-2);flex-shrink:0}
+.phone .scr{height:330px;padding:16px;position:relative;overflow:hidden}
+.bottom-nav{display:flex;background:#fff;border-top:1px solid var(--line)}
+.bottom-nav a{flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;padding:9px 0 10px;font-size:10px;font-weight:600;color:var(--ink-400);text-decoration:none}
+.bottom-nav a svg{width:19px;height:19px}
+.bottom-nav a.is-active{color:var(--teal-700)}
+.drawer{position:absolute;top:0;left:0;bottom:0;width:76%;background:var(--navy-950);color:#fff;border-radius:0 18px 18px 0;padding:18px 14px;box-shadow:var(--sh-4)}
+.sticky-act{position:absolute;bottom:0;left:0;right:0;background:#fff;border-top:1px solid var(--line);padding:12px 14px;display:flex;gap:10px}
+.swipe-card{position:relative;border-radius:var(--r-md);overflow:hidden;width:100%}
+.swipe-card .under{position:absolute;inset:0;background:var(--success);display:flex;align-items:center;padding-left:16px;color:#fff}
+.swipe-card .under svg{width:18px;height:18px}
+.swipe-card .over{position:relative;background:#fff;border:1px solid var(--line);border-radius:var(--r-md);padding:12px 14px;transform:translateX(52px);box-shadow:var(--sh-1)}
+
+/* ---- reports ---- */
+.report-head{width:100%;display:flex;align-items:flex-end;gap:14px;flex-wrap:wrap;padding-bottom:16px;border-bottom:2px solid var(--navy-900)}
+.report-head .rt b{font-family:var(--font-display);font-size:19px;font-weight:700;color:var(--navy-900);display:block}
+.report-head .rt span{font-family:var(--font-mono);font-size:11.5px;color:var(--ink-400)}
+.report-head .sp{margin-left:auto;display:flex;gap:8px}
+.tfoot-row td{background:var(--surface-2);font-weight:700 !important;border-top:2px solid var(--line)}
+
+/* footer */
+.doc-foot{border-top:1px solid var(--line);margin-top:80px;padding:28px 32px;text-align:center;font-family:var(--font-mono);font-size:12px;color:var(--ink-400)}
+
+@media (max-width:640px){
+  .doc-header h1{font-size:36px}
+  .doc-body{padding:32px 18px 72px}
+  .demo{padding:18px}
+  .stepper{flex-direction:column;gap:0}
+  .step{text-align:left;padding:0 0 24px 40px}
+  .step::before{left:12px;top:26px;width:2px;height:100%}
+  .step .pt{left:0;transform:none}
+}
+@media (prefers-reduced-motion:reduce){
+  *,*::before,*::after{animation-duration:.01ms !important;transition-duration:.01ms !important}
+}
+</style>
+</head>
+<body>
+
+<header class="doc-header">
+  <div class="doc-header-inner">
+    <div class="doc-kicker">LoanStar · Design System · v1.1</div>
+    <h1>Meridian</h1>
+    <p>A navigation-grade interface system for the LoanStar lending platform. Deep navy carries authority, teal signals action and approval, and every figure — amounts, IDs, dates — is set in a tabular mono ledger face.</p>
+    <div class="doc-meta">
+      <span>PRIMARY <b>Navy #0C2247</b></span>
+      <span>ACCENT <b>Teal #0D9488</b></span>
+      <span>DISPLAY <b>Sora</b></span>
+      <span>BODY <b>Public Sans</b></span>
+      <span>LEDGER <b>JetBrains Mono</b></span>
+    </div>
+  </div>
+</header>
+
+<main class="doc-body">
+
+<!-- ================= 01 COLOR ================= -->
+<section class="sec" id="color">
+  <div class="sec-head"><span class="sec-num">01</span><h2>Color</h2></div>
+  <div class="sec-rule"></div>
+  <p class="lede">Navy is the brand and structure. Teal is the single action color — buttons, focus rings, active states, progress. Semantic colors are reserved strictly for loan status and feedback, never decoration.</p>
+
+  <div class="sub">Navy · Brand foundation</div>
+  <div class="swatch-row">
+    <div class="swatch"><div class="chip" style="background:#071633"></div><div class="lbl"><b>navy-950</b><span>#071633</span></div></div>
+    <div class="swatch"><div class="chip" style="background:#0C2247"></div><div class="lbl"><b>navy-900</b><span>#0C2247</span></div></div>
+    <div class="swatch"><div class="chip" style="background:#123061"></div><div class="lbl"><b>navy-800</b><span>#123061</span></div></div>
+    <div class="swatch"><div class="chip" style="background:#1A407D"></div><div class="lbl"><b>navy-700</b><span>#1A407D</span></div></div>
+    <div class="swatch"><div class="chip" style="background:#23539E"></div><div class="lbl"><b>navy-600</b><span>#23539E</span></div></div>
+    <div class="swatch"><div class="chip" style="background:#2F68BE"></div><div class="lbl"><b>navy-500</b><span>#2F68BE</span></div></div>
+    <div class="swatch"><div class="chip" style="background:#B9CBE7"></div><div class="lbl"><b>navy-200</b><span>#B9CBE7</span></div></div>
+    <div class="swatch"><div class="chip" style="background:#DCE5F3"></div><div class="lbl"><b>navy-100</b><span>#DCE5F3</span></div></div>
+    <div class="swatch"><div class="chip" style="background:#EEF3FA"></div><div class="lbl"><b>navy-50</b><span>#EEF3FA</span></div></div>
+  </div>
+
+  <div class="sub">Teal · Action &amp; accent</div>
+  <div class="swatch-row">
+    <div class="swatch"><div class="chip" style="background:#0A7D71"></div><div class="lbl"><b>teal-700</b><span>#0A7D71</span></div></div>
+    <div class="swatch"><div class="chip" style="background:#0D9488"></div><div class="lbl"><b>teal-600</b><span>#0D9488</span></div></div>
+    <div class="swatch"><div class="chip" style="background:#12A797"></div><div class="lbl"><b>teal-500</b><span>#12A797</span></div></div>
+    <div class="swatch"><div class="chip" style="background:#2DC7B6"></div><div class="lbl"><b>teal-400</b><span>#2DC7B6</span></div></div>
+    <div class="swatch"><div class="chip" style="background:#C9F0EA"></div><div class="lbl"><b>teal-100</b><span>#C9F0EA</span></div></div>
+    <div class="swatch"><div class="chip" style="background:#E9FAF7"></div><div class="lbl"><b>teal-50</b><span>#E9FAF7</span></div></div>
+  </div>
+
+  <div class="sub">Neutrals · Cool slate</div>
+  <div class="swatch-row">
+    <div class="swatch"><div class="chip" style="background:#16233B"></div><div class="lbl"><b>ink-900</b><span>#16233B</span></div></div>
+    <div class="swatch"><div class="chip" style="background:#3E4C66"></div><div class="lbl"><b>ink-700</b><span>#3E4C66</span></div></div>
+    <div class="swatch"><div class="chip" style="background:#62708A"></div><div class="lbl"><b>ink-500</b><span>#62708A</span></div></div>
+    <div class="swatch"><div class="chip" style="background:#8C99B0"></div><div class="lbl"><b>ink-400</b><span>#8C99B0</span></div></div>
+    <div class="swatch"><div class="chip" style="background:#D9E0EB"></div><div class="lbl"><b>line</b><span>#D9E0EB</span></div></div>
+    <div class="swatch"><div class="chip" style="background:#F3F6FA;border-bottom:1px solid #E7ECF3"></div><div class="lbl"><b>surface-2</b><span>#F3F6FA</span></div></div>
+    <div class="swatch"><div class="chip" style="background:#F7F9FC;border-bottom:1px solid #E7ECF3"></div><div class="lbl"><b>canvas</b><span>#F7F9FC</span></div></div>
+  </div>
+
+  <div class="sub">Semantic · Status &amp; feedback</div>
+  <div class="swatch-row">
+    <div class="swatch"><div class="chip" style="background:#178A50"></div><div class="lbl"><b>success</b><span>#178A50</span></div></div>
+    <div class="swatch"><div class="chip" style="background:#B96A00"></div><div class="lbl"><b>warning</b><span>#B96A00</span></div></div>
+    <div class="swatch"><div class="chip" style="background:#C2362F"></div><div class="lbl"><b>danger</b><span>#C2362F</span></div></div>
+    <div class="swatch"><div class="chip" style="background:#23539E"></div><div class="lbl"><b>info</b><span>#23539E</span></div></div>
+  </div>
+</section>
+
+<!-- ================= 02 TYPOGRAPHY ================= -->
+<section class="sec" id="type">
+  <div class="sec-head"><span class="sec-num">02</span><h2>Typography</h2></div>
+  <div class="sec-rule"></div>
+  <p class="lede">Three faces, three jobs. <b>Sora</b> for headings and product identity. <b>Public Sans</b> for interface text and paragraphs. <b>JetBrains Mono</b> for every number that matters — loan amounts, reference IDs, rates, and dates in tables. Tabular figures keep ledgers aligned.</p>
+
+  <div class="demo col">
+    <div class="type-row"><span class="type-spec">display-xl · Sora 800 · 44/1.1</span><span style="font-family:var(--font-display);font-size:44px;font-weight:800;letter-spacing:-.02em;color:var(--navy-900)">Lending, charted clearly.</span></div>
+    <div class="type-row"><span class="type-spec">display-lg · Sora 700 · 32/1.15</span><span style="font-family:var(--font-display);font-size:32px;font-weight:700;letter-spacing:-.015em;color:var(--navy-900)">Loan portfolio overview</span></div>
+    <div class="type-row"><span class="type-spec">heading · Sora 700 · 22/1.3</span><span style="font-family:var(--font-display);font-size:22px;font-weight:700;color:var(--navy-900)">Application details</span></div>
+    <div class="type-row"><span class="type-spec">subheading · Sora 600 · 16/1.4</span><span style="font-family:var(--font-display);font-size:16px;font-weight:600;color:var(--navy-800)">Borrower information</span></div>
+    <div class="type-row"><span class="type-spec">body · Public Sans 400 · 15/1.55</span><span style="max-width:520px">The monthly amortization is computed from the approved principal, applicable interest, and the chosen repayment term.</span></div>
+    <div class="type-row"><span class="type-spec">body-sm · Public Sans 400 · 13.5</span><span style="font-size:13.5px;color:var(--ink-500);max-width:520px">Supporting text for helper copy, table cells, and secondary descriptions.</span></div>
+    <div class="type-row"><span class="type-spec">label · Public Sans 700 · 11.5 caps</span><span style="font-size:11.5px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--ink-500)">Outstanding balance</span></div>
+    <div class="type-row"><span class="type-spec">ledger · JetBrains Mono 600 · tabular</span><span class="mono" style="font-size:24px;font-weight:600;color:var(--navy-900)">₱182,450.00</span></div>
+    <div class="type-row"><span class="type-spec">code / ref · JetBrains Mono 500 · 13</span><span class="mono" style="font-size:13px;color:var(--navy-700)">LN-2026-004518</span></div>
+  </div>
+  <p class="hint">Rule of thumb: if a value could appear on a statement of account, it is set in the ledger face.</p>
+</section>
+
+<!-- ================= 03 SPACING / RADIUS / ELEVATION ================= -->
+<section class="sec" id="space">
+  <div class="sec-head"><span class="sec-num">03</span><h2>Spacing, Radius &amp; Elevation</h2></div>
+  <div class="sec-rule"></div>
+
+  <div class="sub">Spacing · 4px base grid</div>
+  <div class="demo">
+    <div class="space-demo">
+      <div class="cell"><div class="bar" style="width:4px;height:4px"></div><span>s-1·4</span></div>
+      <div class="cell"><div class="bar" style="width:8px;height:8px"></div><span>s-2·8</span></div>
+      <div class="cell"><div class="bar" style="width:12px;height:12px"></div><span>s-3·12</span></div>
+      <div class="cell"><div class="bar" style="width:16px;height:16px"></div><span>s-4·16</span></div>
+      <div class="cell"><div class="bar" style="width:24px;height:24px"></div><span>s-5·24</span></div>
+      <div class="cell"><div class="bar" style="width:32px;height:32px"></div><span>s-6·32</span></div>
+      <div class="cell"><div class="bar" style="width:48px;height:48px"></div><span>s-7·48</span></div>
+      <div class="cell"><div class="bar" style="width:64px;height:64px"></div><span>s-8·64</span></div>
+    </div>
+  </div>
+
+  <div class="sub">Radius</div>
+  <div class="demo radius-demo">
+    <div class="box" style="border-radius:6px">sm · 6</div>
+    <div class="box" style="border-radius:10px">md · 10</div>
+    <div class="box" style="border-radius:14px">lg · 14</div>
+    <div class="box" style="border-radius:20px">xl · 20</div>
+    <div class="box" style="border-radius:999px">full</div>
+  </div>
+
+  <div class="sub">Elevation</div>
+  <div class="demo shadow-demo" style="background:var(--surface-2)">
+    <div class="box" style="box-shadow:var(--sh-1)">sh-1 · rest</div>
+    <div class="box" style="box-shadow:var(--sh-2)">sh-2 · raised</div>
+    <div class="box" style="box-shadow:var(--sh-3)">sh-3 · overlay</div>
+    <div class="box" style="box-shadow:var(--sh-4)">sh-4 · modal</div>
+  </div>
+</section>
+
+<!-- ================= 04 BUTTONS ================= -->
+<section class="sec" id="buttons">
+  <div class="sec-head"><span class="sec-num">04</span><h2>Buttons</h2></div>
+  <div class="sec-rule"></div>
+  <p class="lede">Navy for the primary path, teal for the money moment — submit, approve, release. One accent button per view.</p>
+
+  <div class="sub">Variants</div>
+  <div class="demo">
+    <button class="btn btn-primary">Primary</button>
+    <button class="btn btn-accent">Accent · Approve</button>
+    <button class="btn btn-secondary">Secondary</button>
+    <button class="btn btn-outline">Outline</button>
+    <button class="btn btn-ghost">Ghost</button>
+    <button class="btn btn-danger">Danger</button>
+    <button class="btn btn-danger-soft">Danger · Soft</button>
+    <button class="btn btn-primary" disabled>Disabled</button>
+  </div>
+
+  <div class="sub">Sizes &amp; icons</div>
+  <div class="demo">
+    <button class="btn btn-primary btn-sm">Small</button>
+    <button class="btn btn-primary">Default</button>
+    <button class="btn btn-primary btn-lg">Large</button>
+    <button class="btn btn-accent">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>
+      New loan application
+    </button>
+    <button class="btn btn-outline">
+      Export
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
+    </button>
+    <button class="btn btn-outline btn-icon" aria-label="Settings">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z"/></svg>
+    </button>
+  </div>
+
+  <div class="sub">Button group · Segmented filter</div>
+  <div class="demo">
+    <div class="btn-group">
+      <button class="btn btn-sm is-active">All loans</button>
+      <button class="btn btn-sm">Active</button>
+      <button class="btn btn-sm">Delinquent</button>
+      <button class="btn btn-sm">Closed</button>
+    </div>
+  </div>
+</section>
+
+<!-- ================= 05 FORMS ================= -->
+<section class="sec" id="forms">
+  <div class="sec-head"><span class="sec-num">05</span><h2>Form Inputs</h2></div>
+  <div class="sec-rule"></div>
+  <p class="lede">Teal focus rings, generous 40px hit targets, and mono affixes for currency and rate fields.</p>
+
+  <div class="sub">Text fields · States</div>
+  <div class="demo">
+    <div class="field">
+      <label>Borrower name <span class="req">*</span></label>
+      <input class="input" placeholder="e.g. Juan R. Dela Cruz">
+      <span class="help">As it appears on the seafarer's book.</span>
+    </div>
+    <div class="field">
+      <label>Email address</label>
+      <input class="input" value="j.delacruz@email.com">
+    </div>
+    <div class="field is-error">
+      <label>Contact number <span class="req">*</span></label>
+      <input class="input" value="0917-123">
+      <span class="err">Enter a valid 11-digit mobile number.</span>
+    </div>
+    <div class="field">
+      <label>Employer / manning agency</label>
+      <input class="input" placeholder="Disabled while verifying" disabled>
+    </div>
+  </div>
+
+  <div class="sub">With icon, prefix &amp; suffix</div>
+  <div class="demo">
+    <div class="field">
+      <label>Search borrowers</label>
+      <div class="input-wrap">
+        <span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg></span>
+        <input class="input" placeholder="Name, ID, or vessel">
+      </div>
+    </div>
+    <div class="field">
+      <label>Loan amount</label>
+      <div class="affix">
+        <span class="add">₱</span>
+        <input class="input mono" value="150,000.00">
+      </div>
+    </div>
+    <div class="field">
+      <label>Interest rate</label>
+      <div class="affix">
+        <input class="input mono mid" value="4.50" style="border-radius:var(--r-md) 0 0 var(--r-md)">
+        <span class="add">% / mo</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="sub">Select, date &amp; textarea</div>
+  <div class="demo">
+    <div class="field">
+      <label>Loan product</label>
+      <select class="select">
+        <option>SF Loan — Standard</option>
+        <option>Allotment Advance</option>
+        <option>Reloan</option>
+      </select>
+    </div>
+    <div class="field">
+      <label>Term</label>
+      <select class="select">
+        <option>6 months</option>
+        <option selected>10 months</option>
+        <option>12 months</option>
+      </select>
+    </div>
+    <div class="field">
+      <label>Target release date</label>
+      <input class="input mono" type="date" value="2026-07-15">
+    </div>
+    <div class="field" style="flex-basis:100%">
+      <label>Remarks</label>
+      <textarea class="textarea" placeholder="Notes for the credit committee…"></textarea>
+    </div>
+  </div>
+
+  <div class="sub">Checkbox, radio &amp; toggle</div>
+  <div class="demo" style="gap:32px;align-items:flex-start">
+    <div style="display:flex;flex-direction:column;gap:12px">
+      <label class="check"><input type="checkbox" checked><span><b>Complete requirements</b><span>All documents verified by CIG</span></span></label>
+      <label class="check"><input type="checkbox"><span><b>Co-maker attached</b></span></label>
+      <label class="check"><input type="checkbox" disabled><span><b>Disabled option</b></span></label>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:12px">
+      <label class="radio"><input type="radio" name="r1" checked><span><b>Semi-monthly</b><span>Deducted every 15th &amp; 30th</span></span></label>
+      <label class="radio"><input type="radio" name="r1"><span><b>Monthly</b><span>Deducted every end of month</span></span></label>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <label class="toggle"><input type="checkbox" checked>Email notifications</label>
+      <label class="toggle"><input type="checkbox">SMS reminders</label>
+    </div>
+  </div>
+</section>
+
+<!-- ================= 06 STATUS ================= -->
+<section class="sec" id="status">
+  <div class="sec-head"><span class="sec-num">06</span><h2>Badges &amp; Loan Status</h2></div>
+  <div class="sec-rule"></div>
+  <p class="lede">One badge per meaning, applied consistently across tables, cards, and detail pages.</p>
+
+  <div class="sub">Loan lifecycle</div>
+  <div class="demo">
+    <span class="badge badge-neutral"><i class="dot"></i>Draft</span>
+    <span class="badge badge-navy"><i class="dot"></i>Pending review</span>
+    <span class="badge badge-warning"><i class="dot"></i>For committee</span>
+    <span class="badge badge-teal"><i class="dot"></i>Approved</span>
+    <span class="badge badge-success"><i class="dot"></i>Released</span>
+    <span class="badge badge-success"><i class="dot"></i>Active · Current</span>
+    <span class="badge badge-danger"><i class="dot"></i>Delinquent</span>
+    <span class="badge badge-neutral"><i class="dot"></i>Closed</span>
+    <span class="badge badge-danger"><i class="dot"></i>Rejected</span>
+  </div>
+
+  <div class="sub">Utility badges</div>
+  <div class="demo">
+    <span class="badge badge-solid">New</span>
+    <span class="badge badge-navy">Reloan</span>
+    <span class="badge badge-teal">Verified</span>
+    <span class="badge badge-warning">Docs incomplete</span>
+    <span class="badge badge-neutral mono" style="font-size:11px">LN-2026-004518</span>
+  </div>
+</section>
+
+<!-- ================= 07 ALERTS & FEEDBACK ================= -->
+<section class="sec" id="alerts">
+  <div class="sec-head"><span class="sec-num">07</span><h2>Alerts, Toasts &amp; Tooltips</h2></div>
+  <div class="sec-rule"></div>
+
+  <div class="sub">Alerts</div>
+  <div class="demo col">
+    <div class="alert alert-info">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>
+      <div class="alert-body"><b>Verification in progress</b><p>The CIG is confirming this borrower's contract with the manning agency. Expect results within 1 business day.</p></div>
+    </div>
+    <div class="alert alert-success">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><path d="m9 11 3 3L22 4"/></svg>
+      <div class="alert-body"><b>Loan released</b><p>₱150,000.00 was credited to the borrower's nominated account on Jul 8, 2026.</p></div>
+    </div>
+    <div class="alert alert-warning">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><path d="M12 9v4M12 17h.01"/></svg>
+      <div class="alert-body"><b>Payment due soon</b><p>Amortization of ₱16,875.00 is due on Jul 15, 2026. A reminder was sent to the borrower.</p></div>
+    </div>
+    <div class="alert alert-danger">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><path d="m15 9-6 6M9 9l6 6"/></svg>
+      <div class="alert-body"><b>Account delinquent</b><p>2 missed amortizations. This account is now endorsed to Collections for follow-up.</p></div>
+    </div>
+  </div>
+
+  <div class="sub">Toast</div>
+  <div class="demo" style="background:var(--surface-2)">
+    <div class="toast">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><path d="m9 11 3 3L22 4"/></svg>
+      <div><b>Application submitted</b><span>LN-2026-004518 is now pending review.</span></div>
+      <button class="x" aria-label="Dismiss">×</button>
+    </div>
+  </div>
+
+  <div class="sub">Tooltip</div>
+  <div class="demo tip-demo" style="padding-top:48px">
+    <span class="tip"><span class="tip-box">Effective rate incl. service fee</span><button class="btn btn-outline btn-sm">Hover target</button></span>
+    <span class="tip"><span class="tip-box">Verified Jul 2, 2026</span><span class="badge badge-teal">Verified</span></span>
+  </div>
+</section>
+
+<!-- ================= 08 CARDS & DATA ================= -->
+<section class="sec" id="data">
+  <div class="sec-head"><span class="sec-num">08</span><h2>Cards &amp; Data Display</h2></div>
+  <div class="sec-rule"></div>
+
+  <div class="sub">Stat cards</div>
+  <div class="demo-grid">
+    <div class="card stat">
+      <div class="k">Total portfolio <span class="badge badge-teal" style="height:20px;font-size:11px">Live</span></div>
+      <div class="v">₱48.2M</div>
+      <div class="d up">▲ 6.4% <span>vs last month</span></div>
+    </div>
+    <div class="card stat">
+      <div class="k">Active loans</div>
+      <div class="v">1,284</div>
+      <div class="d up">▲ 32 <span>new this month</span></div>
+    </div>
+    <div class="card stat">
+      <div class="k">Delinquency rate</div>
+      <div class="v">2.1%</div>
+      <div class="d down">▼ 0.3 pts <span>vs last month</span></div>
+    </div>
+  </div>
+
+  <div class="sub">Key–value summary</div>
+  <div class="demo">
+    <div class="card card-pad" style="max-width:420px;width:100%">
+      <div style="font-family:var(--font-display);font-weight:600;color:var(--navy-900);margin-bottom:10px">Loan summary</div>
+      <div class="kv">
+        <div class="row"><span class="k">Reference</span><span class="v mono">LN-2026-004518</span></div>
+        <div class="row"><span class="k">Principal</span><span class="v mono">₱150,000.00</span></div>
+        <div class="row"><span class="k">Interest rate</span><span class="v mono">4.50% / mo</span></div>
+        <div class="row"><span class="k">Term</span><span class="v mono">10 months</span></div>
+        <div class="row"><span class="k">Monthly amortization</span><span class="v mono">₱21,750.00</span></div>
+        <div class="row"><span class="k">Status</span><span class="v"><span class="badge badge-success"><i class="dot"></i>Active</span></span></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="sub">Table · Loan ledger</div>
+  <div class="table-wrap">
+    <table class="tbl">
+      <thead><tr>
+        <th>Reference</th><th>Borrower</th><th>Product</th><th class="num">Principal</th><th class="num">Balance</th><th>Next due</th><th>Status</th>
+      </tr></thead>
+      <tbody>
+        <tr>
+          <td class="id">LN-2026-004518</td>
+          <td><div class="person"><span class="avatar sm">JD</span><div><div class="nm">Juan Dela Cruz</div><div class="sub2">MV Pacific Star</div></div></div></td>
+          <td>SF Loan</td>
+          <td class="num">150,000.00</td>
+          <td class="num">108,750.00</td>
+          <td class="mono" style="font-size:12.5px">Jul 15, 2026</td>
+          <td><span class="badge badge-success"><i class="dot"></i>Active</span></td>
+        </tr>
+        <tr>
+          <td class="id">LN-2026-004495</td>
+          <td><div class="person"><span class="avatar sm teal">MR</span><div><div class="nm">Maria Reyes</div><div class="sub2">MV Ocean Grace</div></div></div></td>
+          <td>Reloan</td>
+          <td class="num">200,000.00</td>
+          <td class="num">200,000.00</td>
+          <td class="mono" style="font-size:12.5px">Jul 30, 2026</td>
+          <td><span class="badge badge-teal"><i class="dot"></i>Approved</span></td>
+        </tr>
+        <tr>
+          <td class="id">LN-2026-004471</td>
+          <td><div class="person"><span class="avatar sm">RS</span><div><div class="nm">Ramon Santos</div><div class="sub2">MV Coral Queen</div></div></div></td>
+          <td>SF Loan</td>
+          <td class="num">80,000.00</td>
+          <td class="num">52,300.00</td>
+          <td class="mono" style="font-size:12.5px;color:var(--danger)">Jun 30, 2026</td>
+          <td><span class="badge badge-danger"><i class="dot"></i>Delinquent</span></td>
+        </tr>
+        <tr>
+          <td class="id">LN-2026-004432</td>
+          <td><div class="person"><span class="avatar sm">AL</span><div><div class="nm">Ana Lim</div><div class="sub2">MV Horizon Bay</div></div></div></td>
+          <td>Allotment Advance</td>
+          <td class="num">60,000.00</td>
+          <td class="num">0.00</td>
+          <td class="mono" style="font-size:12.5px">—</td>
+          <td><span class="badge badge-neutral"><i class="dot"></i>Closed</span></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="sub">Avatars</div>
+  <div class="demo">
+    <span class="avatar sm">KC</span>
+    <span class="avatar">JD</span>
+    <span class="avatar lg teal">MR</span>
+    <div class="avatar-stack"><span class="avatar sm">JD</span><span class="avatar sm teal">MR</span><span class="avatar sm">RS</span><span class="avatar sm" style="background:var(--surface-2);color:var(--ink-500)">+4</span></div>
+    <div class="person"><span class="avatar">JD</span><div><div class="nm">Juan Dela Cruz</div><div class="sub2">Borrower · Verified</div></div></div>
+  </div>
+
+  <div class="sub">Progress</div>
+  <div class="demo col" style="gap:20px;max-width:520px">
+    <div>
+      <div class="prog-lbl"><span>Repayment progress</span><b>4 / 10 payments</b></div>
+      <div class="prog"><i style="width:40%"></i></div>
+    </div>
+    <div>
+      <div class="prog-lbl"><span>Requirements complete</span><b>85%</b></div>
+      <div class="prog navy"><i style="width:85%"></i></div>
+    </div>
+    <div>
+      <div class="prog-lbl"><span>Credit limit used</span><b>92%</b></div>
+      <div class="prog warn"><i style="width:92%"></i></div>
+    </div>
+  </div>
+
+  <div class="sub">Skeleton &amp; spinner</div>
+  <div class="demo" style="align-items:flex-start;gap:32px">
+    <div style="width:280px;display:flex;flex-direction:column;gap:10px">
+      <div class="skel" style="height:14px;width:60%"></div>
+      <div class="skel" style="height:28px;width:85%"></div>
+      <div class="skel" style="height:10px;width:100%"></div>
+      <div class="skel" style="height:10px;width:70%"></div>
+    </div>
+    <div style="display:flex;align-items:center;gap:12px;color:var(--ink-500);font-size:13.5px"><span class="spinner"></span>Computing amortization…</div>
+  </div>
+
+  <div class="sub">Empty state</div>
+  <div class="demo" style="background:var(--surface-2)">
+    <div class="empty">
+      <span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z"/><path d="M14 2v6h6M16 13H8M16 17H8M10 9H8"/></svg></span>
+      <h4>No applications yet</h4>
+      <p>New loan applications from the borrower portal will appear here once submitted.</p>
+      <button class="btn btn-accent btn-sm">Create application</button>
+    </div>
+  </div>
+</section>
+
+<!-- ================= 09 NAVIGATION ================= -->
+<section class="sec" id="nav">
+  <div class="sec-head"><span class="sec-num">09</span><h2>Navigation</h2></div>
+  <div class="sec-rule"></div>
+
+  <div class="sub">Top app bar</div>
+  <div class="demo" style="padding:16px">
+    <div class="appbar">
+      <span class="logo"><span class="logo-mark"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l2.4 6.9L21 11l-6.6 2.1L12 20l-2.4-6.9L3 11l6.6-2.1z"/></svg></span>LoanStar</span>
+      <nav>
+        <a class="is-active" href="#nav">Dashboard</a>
+        <a href="#nav">Loans</a>
+        <a href="#nav">Borrowers</a>
+        <a href="#nav">Collections</a>
+        <a href="#nav">Reports</a>
+      </nav>
+      <div class="right">
+        <button class="btn btn-accent btn-sm">New loan</button>
+        <span class="avatar sm" style="background:var(--navy-700);color:#fff">KC</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="sub">Sidebar</div>
+  <div class="demo" style="padding:16px">
+    <div class="side">
+      <div class="grp">Operations</div>
+      <a class="is-active" href="#nav"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="9" rx="1"/><rect x="14" y="3" width="7" height="5" rx="1"/><rect x="14" y="12" width="7" height="9" rx="1"/><rect x="3" y="16" width="7" height="5" rx="1"/></svg>Dashboard</a>
+      <a href="#nav"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z"/><path d="M14 2v6h6"/></svg>Applications<span class="cnt">12</span></a>
+      <a href="#nav"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg>Borrowers</a>
+      <a href="#nav"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1v22M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>Payments</a>
+      <div class="grp">Management</div>
+      <a href="#nav"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="m19 9-5 5-4-4-3 3"/></svg>Reports</a>
+      <a href="#nav"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z"/></svg>Settings</a>
+    </div>
+  </div>
+
+  <div class="sub">Tabs</div>
+  <div class="demo col" style="gap:28px">
+    <div class="tabs">
+      <button class="tab is-active">Details</button>
+      <button class="tab">Documents<span class="cnt">6</span></button>
+      <button class="tab">Payment schedule</button>
+      <button class="tab">Activity</button>
+    </div>
+    <div class="tabs-pill">
+      <button class="tab is-active">This month</button>
+      <button class="tab">Quarter</button>
+      <button class="tab">Year</button>
+    </div>
+  </div>
+
+  <div class="sub">Breadcrumbs &amp; pagination</div>
+  <div class="demo col" style="gap:22px">
+    <div class="crumbs">
+      <a href="#nav">Loans</a><span class="sep">/</span>
+      <a href="#nav">Applications</a><span class="sep">/</span>
+      <span class="cur mono" style="font-size:12.5px">LN-2026-004518</span>
+    </div>
+    <div class="pager">
+      <button class="pg">‹</button>
+      <button class="pg is-active">1</button>
+      <button class="pg">2</button>
+      <button class="pg">3</button>
+      <span class="pg gap">…</span>
+      <button class="pg">18</button>
+      <button class="pg">›</button>
+    </div>
+  </div>
+</section>
+
+<!-- ================= 10 OVERLAYS ================= -->
+<section class="sec" id="overlay">
+  <div class="sec-head"><span class="sec-num">10</span><h2>Overlays</h2></div>
+  <div class="sec-rule"></div>
+
+  <div class="sub">Modal · Confirm release</div>
+  <div class="modal-demo">
+    <div class="modal">
+      <div class="modal-h"><h4>Release loan proceeds?</h4><button class="x" aria-label="Close">×</button></div>
+      <div class="modal-b">
+        <p style="margin-bottom:14px">You are about to release funds for <b class="mono" style="font-size:13px">LN-2026-004518</b>. This action posts to the ledger and cannot be undone.</p>
+        <div class="kv">
+          <div class="row"><span class="k">Net proceeds</span><span class="v mono">₱142,750.00</span></div>
+          <div class="row"><span class="k">Release channel</span><span class="v">Bank transfer · BDO</span></div>
+        </div>
+      </div>
+      <div class="modal-f">
+        <button class="btn btn-ghost">Cancel</button>
+        <button class="btn btn-accent">Release funds</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="sub">Dropdown menu</div>
+  <div class="demo" style="background:var(--surface-2)">
+    <div class="menu">
+      <a href="#overlay"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8Z"/><circle cx="12" cy="12" r="3"/></svg>View details</a>
+      <a href="#overlay"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>Edit application</a>
+      <a href="#overlay"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>Download SOA</a>
+      <hr>
+      <a class="danger" href="#overlay"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/></svg>Cancel application</a>
+    </div>
+  </div>
+</section>
+
+<!-- ================= 11 STEPPER & TIMELINE ================= -->
+<section class="sec" id="timeline">
+  <div class="sec-head"><span class="sec-num">11</span><h2>Stepper &amp; Timeline</h2></div>
+  <div class="sec-rule"></div>
+  <p class="lede">The stepper shows where an application sits in the pipeline. The timeline is the audit trail — every handoff, stamped and attributed.</p>
+
+  <div class="sub">Horizontal stepper · Application pipeline</div>
+  <div class="demo" style="padding:32px 24px 24px">
+    <div class="stepper">
+      <div class="step done"><span class="pt">✓</span><div class="t">Application</div><div class="s">Submitted</div></div>
+      <div class="step done"><span class="pt">✓</span><div class="t">Verification</div><div class="s">CIG cleared</div></div>
+      <div class="step cur"><span class="pt">3</span><div class="t">Committee</div><div class="s">2 of 3 votes</div></div>
+      <div class="step"><span class="pt">4</span><div class="t">Approval</div><div class="s">Pending</div></div>
+      <div class="step"><span class="pt">5</span><div class="t">Release</div><div class="s">Pending</div></div>
+    </div>
+  </div>
+
+  <div class="sub">Vertical timeline · Loan activity</div>
+  <div class="demo" style="padding:28px">
+    <div class="tl">
+      <div class="tl-item done">
+        <span class="pt"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span>
+        <div class="tl-h"><b>Application submitted</b><span class="badge badge-navy" style="height:20px;font-size:11px">Portal</span><span class="when">Jul 02, 2026 · 09:14</span></div>
+        <p>Borrower completed the SF Loan application with all required documents attached.</p>
+        <div class="by">by <b>Juan Dela Cruz</b> · Borrower portal</div>
+      </div>
+      <div class="tl-item done">
+        <span class="pt"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span>
+        <div class="tl-h"><b>Documents verified</b><span class="when">Jul 03, 2026 · 14:02</span></div>
+        <p>Contract, seafarer's book, and allotment slip validated against agency records.</p>
+        <div class="by">by <b>A. Navarro</b> · CIG</div>
+      </div>
+      <div class="tl-item warn">
+        <span class="pt"><svg viewBox="0 0 24 24" fill="none" stroke="#B96A00" stroke-width="3" stroke-linecap="round"><path d="M12 7v6M12 17h.01"/></svg></span>
+        <div class="tl-h"><b>Additional document requested</b><span class="when">Jul 04, 2026 · 10:40</span></div>
+        <p>Latest allotment slip was older than 60 days. Borrower notified via SMS and email.</p>
+        <div class="by">by <b>R. Villanueva</b> · LRA</div>
+      </div>
+      <div class="tl-item cur">
+        <span class="pt"></span>
+        <div class="tl-h"><b>Committee review in progress</b><span class="badge badge-warning" style="height:20px;font-size:11px">2 / 3 votes</span><span class="when">Jul 08, 2026 · 16:25</span></div>
+        <p>Two approvals recorded. Awaiting final committee member's vote.</p>
+      </div>
+      <div class="tl-item">
+        <span class="pt"></span>
+        <div class="tl-h"><b style="color:var(--ink-400)">Release of proceeds</b><span class="when">Pending</span></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+
+<!-- ================= 12 CHARTS & DATA VIZ ================= -->
+<section class="sec" id="charts">
+  <div class="sec-head"><span class="sec-num">12</span><h2>Charts &amp; Data Viz</h2></div>
+  <div class="sec-rule"></div>
+  <p class="lede">Navy carries the primary series, teal the comparison. Axes and figures are always set in the mono ledger face. Semantic colors appear only when the data itself is a status.</p>
+
+  <div class="sub">Bar chart · Releases by month</div>
+  <div class="demo col">
+    <div class="chart-head"><b>Loan releases (₱M)</b><div class="legend"><span class="li"><i style="background:var(--navy-700)"></i>2026</span><span class="li"><i style="background:var(--teal-400)"></i>2025</span></div></div>
+    <svg class="chart-svg" viewBox="0 0 640 220" role="img" aria-label="Bar chart of loan releases by month">
+      <line class="gridline" x1="40" y1="20" x2="620" y2="20"/><line class="gridline" x1="40" y1="65" x2="620" y2="65"/><line class="gridline" x1="40" y1="110" x2="620" y2="110"/><line class="gridline" x1="40" y1="155" x2="620" y2="155"/><line x1="40" y1="190" x2="620" y2="190" stroke="var(--line)"/>
+      <text class="axis" x="34" y="24" text-anchor="end">8</text><text class="axis" x="34" y="69" text-anchor="end">6</text><text class="axis" x="34" y="114" text-anchor="end">4</text><text class="axis" x="34" y="159" text-anchor="end">2</text><text class="axis" x="34" y="193" text-anchor="end">0</text>
+      <g>
+        <rect x="62" y="105" width="26" height="85" rx="4" fill="var(--navy-700)"/><rect x="92" y="130" width="26" height="60" rx="4" fill="var(--teal-400)"/>
+        <rect x="158" y="88" width="26" height="102" rx="4" fill="var(--navy-700)"/><rect x="188" y="120" width="26" height="70" rx="4" fill="var(--teal-400)"/>
+        <rect x="254" y="60" width="26" height="130" rx="4" fill="var(--navy-700)"/><rect x="284" y="100" width="26" height="90" rx="4" fill="var(--teal-400)"/>
+        <rect x="350" y="72" width="26" height="118" rx="4" fill="var(--navy-700)"/><rect x="380" y="92" width="26" height="98" rx="4" fill="var(--teal-400)"/>
+        <rect x="446" y="42" width="26" height="148" rx="4" fill="var(--navy-700)"/><rect x="476" y="84" width="26" height="106" rx="4" fill="var(--teal-400)"/>
+        <rect x="542" y="30" width="26" height="160" rx="4" fill="var(--navy-700)"/><rect x="572" y="70" width="26" height="120" rx="4" fill="var(--teal-400)"/>
+      </g>
+      <text class="axis" x="90" y="208" text-anchor="middle">Feb</text><text class="axis" x="186" y="208" text-anchor="middle">Mar</text><text class="axis" x="282" y="208" text-anchor="middle">Apr</text><text class="axis" x="378" y="208" text-anchor="middle">May</text><text class="axis" x="474" y="208" text-anchor="middle">Jun</text><text class="axis" x="570" y="208" text-anchor="middle">Jul</text>
+    </svg>
+  </div>
+
+  <div class="sub">Line &amp; area chart · Collection efficiency</div>
+  <div class="demo col">
+    <div class="chart-head"><b>Collection efficiency (%)</b><span class="badge badge-success"><i class="dot"></i>96.2% current</span></div>
+    <svg class="chart-svg" viewBox="0 0 640 190" role="img" aria-label="Line chart of collection efficiency">
+      <defs><linearGradient id="areaFill" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="var(--teal-400)" stop-opacity=".28"/><stop offset="100%" stop-color="var(--teal-400)" stop-opacity="0"/></linearGradient></defs>
+      <line class="gridline" x1="40" y1="20" x2="620" y2="20"/><line class="gridline" x1="40" y1="65" x2="620" y2="65"/><line class="gridline" x1="40" y1="110" x2="620" y2="110"/><line x1="40" y1="155" x2="620" y2="155" stroke="var(--line)"/>
+      <text class="axis" x="34" y="24" text-anchor="end">100</text><text class="axis" x="34" y="69" text-anchor="end">90</text><text class="axis" x="34" y="114" text-anchor="end">80</text><text class="axis" x="34" y="159" text-anchor="end">70</text>
+      <path d="M60 92 L155 78 L250 96 L345 62 L440 55 L535 40 L610 34 L610 155 L60 155 Z" fill="url(#areaFill)"/>
+      <path d="M60 92 L155 78 L250 96 L345 62 L440 55 L535 40 L610 34" fill="none" stroke="var(--teal-600)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+      <path d="M60 105 L155 100 L250 108 L345 90 L440 88 L535 74 L610 70" fill="none" stroke="var(--navy-300,#B9CBE7)" stroke-width="2" stroke-dasharray="5 5"/>
+      <circle cx="610" cy="34" r="4.5" fill="#fff" stroke="var(--teal-600)" stroke-width="2.5"/>
+      <text class="axis" x="60" y="172" text-anchor="middle">Jan</text><text class="axis" x="250" y="172" text-anchor="middle">Mar</text><text class="axis" x="440" y="172" text-anchor="middle">May</text><text class="axis" x="610" y="172" text-anchor="middle">Jul</text>
+    </svg>
+    <div class="legend"><span class="li"><i style="background:var(--teal-600)"></i>This year</span><span class="li"><i style="background:var(--navy-200)"></i>Last year</span></div>
+  </div>
+
+  <div class="sub">Pie &amp; donut · Portfolio mix and interest breakdown</div>
+  <div class="demo" style="gap:48px;justify-content:flex-start">
+    <div class="ring-wrap">
+      <svg width="150" height="150" viewBox="0 0 42 42" role="img" aria-label="Donut chart of portfolio by product">
+        <circle cx="21" cy="21" r="15.9" fill="none" stroke="var(--line-soft)" stroke-width="7"/>
+        <circle cx="21" cy="21" r="15.9" fill="none" stroke="var(--navy-800)" stroke-width="7" stroke-dasharray="52 48" stroke-dashoffset="25"/>
+        <circle cx="21" cy="21" r="15.9" fill="none" stroke="var(--teal-500)" stroke-width="7" stroke-dasharray="30 70" stroke-dashoffset="-27"/>
+        <circle cx="21" cy="21" r="15.9" fill="none" stroke="var(--navy-200)" stroke-width="7" stroke-dasharray="18 82" stroke-dashoffset="-57"/>
+        <text x="21" y="20.4" text-anchor="middle" style="font-family:var(--font-mono);font-size:6.5px;font-weight:600;fill:var(--navy-900)">₱48.2M</text>
+        <text x="21" y="26.4" text-anchor="middle" style="font-family:var(--font-body);font-size:2.9px;fill:var(--ink-400)">TOTAL PORTFOLIO</text>
+      </svg>
+      <div class="legend" style="flex-direction:column;gap:6px;align-items:flex-start"><span class="li"><i style="background:var(--navy-800)"></i>SF Loan · 52%</span><span class="li"><i style="background:var(--teal-500)"></i>Reloan · 30%</span><span class="li"><i style="background:var(--navy-200)"></i>Allotment Adv. · 18%</span></div>
+    </div>
+    <div class="ring-wrap">
+      <svg width="150" height="150" viewBox="0 0 42 42" role="img" aria-label="Pie chart of payment composition">
+        <circle cx="21" cy="21" r="10.5" fill="none" stroke="var(--navy-900)" stroke-width="21" stroke-dasharray="46.2 19.8" stroke-dashoffset="16.5"/>
+        <circle cx="21" cy="21" r="10.5" fill="none" stroke="var(--teal-500)" stroke-width="21" stroke-dasharray="14.5 51.5" stroke-dashoffset="-29.7"/>
+        <circle cx="21" cy="21" r="10.5" fill="none" stroke="var(--warning)" stroke-width="21" stroke-dasharray="5.3 60.7" stroke-dashoffset="-44.2"/>
+      </svg>
+      <div class="legend" style="flex-direction:column;gap:6px;align-items:flex-start"><span class="li"><i style="background:var(--navy-900)"></i>Principal · 70%</span><span class="li"><i style="background:var(--teal-500)"></i>Interest · 22%</span><span class="li"><i style="background:var(--warning)"></i>Fees · 8%</span></div>
+    </div>
+  </div>
+
+  <div class="sub">Gauge &amp; progress ring</div>
+  <div class="demo" style="gap:48px">
+    <div class="ring-wrap">
+      <svg width="160" height="100" viewBox="0 0 200 120" role="img" aria-label="Gauge of portfolio at risk">
+        <path d="M20 110 A 80 80 0 0 1 180 110" fill="none" stroke="var(--line-soft)" stroke-width="16" stroke-linecap="round"/>
+        <path d="M20 110 A 80 80 0 0 1 180 110" fill="none" stroke="var(--teal-600)" stroke-width="16" stroke-linecap="round" stroke-dasharray="251" stroke-dashoffset="188"/>
+        <text x="100" y="92" text-anchor="middle" style="font-family:var(--font-mono);font-size:26px;font-weight:600;fill:var(--navy-900)">2.1%</text>
+        <text x="100" y="110" text-anchor="middle" style="font-family:var(--font-body);font-size:10px;fill:var(--ink-400)">PORTFOLIO AT RISK</text>
+      </svg>
+      <span class="lbl">Speedometer gauge</span>
+    </div>
+    <div class="ring-wrap">
+      <svg width="110" height="110" viewBox="0 0 42 42" role="img" aria-label="Circular progress 65 percent paid">
+        <circle cx="21" cy="21" r="15.9" fill="none" stroke="var(--line-soft)" stroke-width="4.5"/>
+        <circle cx="21" cy="21" r="15.9" fill="none" stroke="var(--teal-600)" stroke-width="4.5" stroke-linecap="round" stroke-dasharray="65 35" stroke-dashoffset="25"/>
+        <text x="21" y="20.8" text-anchor="middle" style="font-family:var(--font-mono);font-size:8px;font-weight:600;fill:var(--navy-900)">65%</text>
+        <text x="21" y="27" text-anchor="middle" style="font-family:var(--font-body);font-size:3.2px;fill:var(--ink-400)">PAID</text>
+      </svg>
+      <span class="lbl">Progress ring</span>
+    </div>
+    <div class="ring-wrap" style="align-items:flex-start">
+      <div class="heat" role="img" aria-label="Heatmap of collections by day">
+        <i style="background:var(--teal-50)"></i><i style="background:var(--teal-100)"></i><i style="background:var(--teal-400)"></i><i style="background:var(--teal-600)"></i><i style="background:var(--teal-100)"></i><i style="background:var(--teal-50)"></i><i style="background:var(--teal-400)"></i><i style="background:var(--teal-600)"></i><i style="background:var(--teal-700)"></i><i style="background:var(--teal-400)"></i><i style="background:var(--teal-100)"></i><i style="background:var(--teal-50)"></i>
+        <i style="background:var(--teal-100)"></i><i style="background:var(--teal-400)"></i><i style="background:var(--teal-600)"></i><i style="background:var(--teal-700)"></i><i style="background:var(--teal-400)"></i><i style="background:var(--teal-100)"></i><i style="background:var(--teal-600)"></i><i style="background:var(--teal-700)"></i><i style="background:var(--teal-600)"></i><i style="background:var(--teal-100)"></i><i style="background:var(--teal-50)"></i><i style="background:var(--teal-100)"></i>
+        <i style="background:var(--teal-50)"></i><i style="background:var(--teal-100)"></i><i style="background:var(--teal-100)"></i><i style="background:var(--teal-400)"></i><i style="background:var(--teal-600)"></i><i style="background:var(--teal-400)"></i><i style="background:var(--teal-100)"></i><i style="background:var(--teal-400)"></i><i style="background:var(--teal-100)"></i><i style="background:var(--teal-50)"></i><i style="background:var(--teal-100)"></i><i style="background:var(--teal-50)"></i>
+      </div>
+      <span class="lbl">Heatmap · Collections intensity</span>
+    </div>
+  </div>
+
+  <div class="sub">Funnel · Application conversion</div>
+  <div class="demo">
+    <div class="funnel">
+      <div class="f" style="width:100%;background:var(--navy-900)">Applications started<span>1,240</span></div>
+      <div class="f" style="width:84%;background:var(--navy-700)">Documents complete<span>1,042</span></div>
+      <div class="f" style="width:66%;background:var(--navy-600)">Verified by CIG<span>818</span></div>
+      <div class="f" style="width:52%;background:var(--teal-600)">Committee approved<span>645</span></div>
+      <div class="f" style="width:47%;background:var(--teal-700)">Released<span>583</span></div>
+    </div>
+  </div>
+
+  <div class="sub">Kanban board · Application pipeline</div>
+  <div class="demo" style="padding:18px;background:var(--canvas)">
+    <div class="kanban">
+      <div class="kan-col">
+        <div class="kh">Pending review<span class="cnt">3</span></div>
+        <div class="kan-card"><div class="t">Juan Dela Cruz — SF Loan</div><div class="m"><span class="amt">₱150,000</span><span class="avatar sm">JD</span></div></div>
+        <div class="kan-card"><div class="t">Ana Lim — Allotment Adv.</div><div class="m"><span class="amt">₱60,000</span><span class="avatar sm teal">AL</span></div></div>
+      </div>
+      <div class="kan-col">
+        <div class="kh">For committee<span class="cnt">2</span></div>
+        <div class="kan-card"><div class="t">Maria Reyes — Reloan</div><div class="m"><span class="amt">₱200,000</span><span class="avatar sm teal">MR</span></div></div>
+      </div>
+      <div class="kan-col">
+        <div class="kh">For release<span class="cnt">1</span></div>
+        <div class="kan-card"><div class="t">Ramon Santos — SF Loan</div><div class="m"><span class="amt">₱80,000</span><span class="avatar sm">RS</span></div></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= 13 LOAN COMPONENTS ================= -->
+<section class="sec" id="loan">
+  <div class="sec-head"><span class="sec-num">13</span><h2>Loan Components</h2></div>
+  <div class="sec-rule"></div>
+  <p class="lede">Domain pieces assembled from the primitives above: application cards, payment schedules, the amortization ledger, the EMI calculator, and the credit meter.</p>
+
+  <div class="sub">Loan application card</div>
+  <div class="demo" style="background:var(--surface-2)">
+    <div class="card card-pad loan-app-card">
+      <div class="lh">
+        <div class="person"><span class="avatar">JD</span><div><div class="nm">Juan Dela Cruz</div><div class="sub2 mono" style="font-size:11.5px">LN-2026-004518 · Applied Jul 02, 2026</div></div></div>
+        <span class="badge badge-warning"><i class="dot"></i>For committee</span>
+      </div>
+      <div class="amt">₱150,000<small style="font-size:14px;color:var(--ink-400)">.00</small></div>
+      <div class="meta">
+        <div><b>SF Loan</b>Loan type</div>
+        <div><b>10 months</b>Term</div>
+        <div><b>4.50% / mo</b>Rate</div>
+        <div><b>MV Pacific Star</b>Vessel</div>
+      </div>
+      <div style="display:flex;gap:10px;margin-top:18px">
+        <button class="btn btn-accent btn-sm">Review</button>
+        <button class="btn btn-outline btn-sm">View documents</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="sub">Payment schedule</div>
+  <div class="table-wrap">
+    <table class="tbl">
+      <thead><tr><th>#</th><th>Due date</th><th class="num">Amortization</th><th class="num">Principal</th><th class="num">Interest</th><th class="num">Balance</th><th>Status</th></tr></thead>
+      <tbody>
+        <tr><td class="mono">01</td><td class="mono" style="font-size:12.5px">Apr 15, 2026</td><td class="num">21,750.00</td><td class="num">15,000.00</td><td class="num">6,750.00</td><td class="num">135,000.00</td><td><span class="badge badge-success"><i class="dot"></i>Paid</span></td></tr>
+        <tr><td class="mono">02</td><td class="mono" style="font-size:12.5px">May 15, 2026</td><td class="num">21,750.00</td><td class="num">15,000.00</td><td class="num">6,750.00</td><td class="num">120,000.00</td><td><span class="badge badge-success"><i class="dot"></i>Paid</span></td></tr>
+        <tr><td class="mono">03</td><td class="mono" style="font-size:12.5px;color:var(--danger)">Jun 15, 2026</td><td class="num">21,750.00</td><td class="num">15,000.00</td><td class="num">6,750.00</td><td class="num">105,000.00</td><td><span class="badge badge-danger"><i class="dot"></i>Overdue</span></td></tr>
+        <tr><td class="mono">04</td><td class="mono" style="font-size:12.5px">Jul 15, 2026</td><td class="num">21,750.00</td><td class="num">15,000.00</td><td class="num">6,750.00</td><td class="num">90,000.00</td><td><span class="badge badge-navy"><i class="dot"></i>Upcoming</span></td></tr>
+        <tr class="tfoot-row"><td></td><td>Total remaining</td><td class="num">174,000.00</td><td class="num">120,000.00</td><td class="num">54,000.00</td><td class="num">—</td><td></td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p class="hint">The same table pattern serves the full amortization ledger — add a running-balance column and a totals row.</p>
+
+  <div class="sub">EMI / amortization calculator</div>
+  <div class="demo" style="background:var(--surface-2)">
+    <div class="card emi">
+      <div class="in">
+        <div style="font-family:var(--font-display);font-weight:600;color:var(--navy-900);margin-bottom:16px">Compute amortization</div>
+        <div class="field" style="min-width:0;margin-bottom:14px">
+          <label>Loan amount</label>
+          <div class="affix"><span class="add">₱</span><input class="input mono" value="150,000.00"></div>
+        </div>
+        <div style="display:flex;gap:12px">
+          <div class="field" style="min-width:0">
+            <label>Rate</label>
+            <div class="affix"><input class="input mono" value="4.50" style="border-radius:var(--r-md) 0 0 var(--r-md)"><span class="add">%</span></div>
+          </div>
+          <div class="field" style="min-width:0">
+            <label>Term</label>
+            <select class="select"><option>10 months</option><option>6 months</option></select>
+          </div>
+        </div>
+        <button class="btn btn-primary btn-block" style="margin-top:16px">Compute</button>
+      </div>
+      <div class="out">
+        <div><div class="ok">Monthly amortization</div><div class="ov" style="color:var(--teal-400)">₱21,750.00</div></div>
+        <div class="row2"><span>Total interest</span><b>₱67,500.00</b></div>
+        <div class="row2"><span>Total repayment</span><b>₱217,500.00</b></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="sub">Credit standing meter</div>
+  <div class="demo" style="gap:56px">
+    <div class="card card-pad score">
+      <div class="val">712</div>
+      <div class="cat">GOOD STANDING</div>
+      <div class="bands">
+        <i style="background:var(--danger)"></i><i style="background:var(--warning)"></i><i style="background:var(--teal-500)"></i><i style="background:var(--success)"></i>
+      </div>
+      <div class="needle-track"><span class="needle" style="left:68%"></span></div>
+      <div class="band-lbls"><span>POOR</span><span>FAIR</span><span>GOOD</span><span>EXCELLENT</span></div>
+    </div>
+    <div class="chk-list">
+      <div style="font-family:var(--font-display);font-weight:600;color:var(--navy-900);margin-bottom:6px">Document checklist</div>
+      <div class="ci ok"><span class="st"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span><div><b>Valid government ID</b><span>Passport · verified Jul 02</span></div></div>
+      <div class="ci ok"><span class="st"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span><div><b>Employment contract</b><span>POEA-approved · verified Jul 02</span></div></div>
+      <div class="ci pend"><span class="st"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><path d="M12 7v6M12 17h.01"/></svg></span><div><b>Latest allotment slip</b><span>Re-upload requested · older than 60 days</span></div><span class="act"><button class="btn btn-outline btn-sm">Upload</button></span></div>
+      <div class="ci miss"><span class="st">·</span><div><b>Co-maker valid ID</b><span>Not yet submitted</span></div><span class="act"><button class="btn btn-ghost btn-sm">Request</button></span></div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= 14 DASHBOARD WIDGETS ================= -->
+<section class="sec" id="dash">
+  <div class="sec-head"><span class="sec-num">14</span><h2>Dashboard Widgets</h2></div>
+  <div class="sec-rule"></div>
+  <p class="lede">The KPI grid, activity feed, and quick actions that make up the operations home screen. Icons stay muted; the mono figure is the loudest thing on the card.</p>
+
+  <div class="sub">KPI grid</div>
+  <div class="kpi-grid">
+    <div class="kpi"><span class="ic" style="background:var(--navy-50);color:var(--navy-700)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z"/><path d="M14 2v6h6"/></svg></span><div class="k">Total loans</div><div class="v">4,812</div><div class="d up">▲ 3.1% MoM</div></div>
+    <div class="kpi"><span class="ic" style="background:var(--teal-50);color:var(--teal-700)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg></span><div class="k">Active loans</div><div class="v">1,284</div><div class="d up">▲ 32 new</div></div>
+    <div class="kpi"><span class="ic" style="background:var(--success-bg);color:var(--success)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><path d="m9 11 3 3L22 4"/></svg></span><div class="k">Completed loans</div><div class="v">3,391</div><div class="d up">▲ 41 this month</div></div>
+    <div class="kpi"><span class="ic" style="background:var(--warning-bg);color:var(--warning)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg></span><div class="k">Pending applications</div><div class="v">37</div><div class="d down">▼ 5 vs last week</div></div>
+    <div class="kpi"><span class="ic" style="background:var(--navy-50);color:var(--navy-700)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1v22M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg></span><div class="k">Total revenue</div><div class="v">₱9.4M</div><div class="d up">▲ 6.8% YoY</div></div>
+    <div class="kpi"><span class="ic" style="background:var(--teal-50);color:var(--teal-700)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="m19 9-5 5-4-4-3 3"/></svg></span><div class="k">Interest earned</div><div class="v">₱2.1M</div><div class="d up">▲ 4.2% MoM</div></div>
+    <div class="kpi"><span class="ic" style="background:var(--danger-bg);color:var(--danger)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><path d="M12 9v4M12 17h.01"/></svg></span><div class="k">Late payments</div><div class="v">27</div><div class="d down" style="color:var(--success)">▼ 6 vs last month</div></div>
+    <div class="kpi"><span class="ic" style="background:var(--navy-50);color:var(--navy-700)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg></span><div class="k">Upcoming payments</div><div class="v">312</div><div class="d">next 7 days</div></div>
+    <div class="kpi"><span class="ic" style="background:var(--teal-50);color:var(--teal-700)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M19 8v6M22 11h-6"/></svg></span><div class="k">New borrowers</div><div class="v">58</div><div class="d up">▲ this month</div></div>
+    <div class="kpi"><span class="ic" style="background:var(--navy-50);color:var(--navy-700)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg></span><div class="k">Total borrowers</div><div class="v">3,209</div><div class="d">all time</div></div>
+  </div>
+
+  <div class="sub">Activity feed &amp; quick actions</div>
+  <div class="demo" style="align-items:flex-start;gap:40px">
+    <div class="feed">
+      <div class="fi"><span class="avatar sm teal">MR</span><div><p><b>Maria Reyes</b> submitted a reloan application for <b class="mono" style="font-size:12.5px">₱200,000</b></p><div class="when">12 minutes ago</div></div></div>
+      <div class="fi"><span class="avatar sm">AN</span><div><p><b>A. Navarro</b> verified documents for <span class="mono" style="font-size:12px;color:var(--navy-700)">LN-2026-004518</span></p><div class="when">1 hour ago</div></div></div>
+      <div class="fi"><span class="avatar sm">RV</span><div><p><b>R. Villanueva</b> requested an updated allotment slip from <b>Juan Dela Cruz</b></p><div class="when">3 hours ago</div></div></div>
+      <div class="fi"><span class="avatar sm" style="background:var(--success-bg);color:var(--success)">₱</span><div><p>Payment of <b class="mono" style="font-size:12.5px">₱21,750.00</b> posted to <span class="mono" style="font-size:12px;color:var(--navy-700)">LN-2026-004495</span></p><div class="when">Yesterday · 16:40</div></div></div>
+    </div>
+    <div class="qa-grid">
+      <div class="qa"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></span><b>New loan</b></div>
+      <div class="qa"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M19 8v6M22 11h-6"/></svg></span><b>Add borrower</b></div>
+      <div class="qa"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1v22M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg></span><b>Post payment</b></div>
+      <div class="qa"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg></span><b>Export report</b></div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= 15 SEARCH & FILTERS ================= -->
+<section class="sec" id="filters">
+  <div class="sec-head"><span class="sec-num">15</span><h2>Search &amp; Filters</h2></div>
+  <div class="sec-rule"></div>
+  <p class="lede">Global search opens with <span class="kbd">⌘K</span>. Filter chips read as a sentence: status, product, branch, officer, amount, date — active chips turn navy.</p>
+
+  <div class="sub">Global search</div>
+  <div class="demo">
+    <div class="gsearch">
+      <span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg></span>
+      <input class="input" placeholder="Search loans, borrowers, payments, vessels…">
+      <span class="kbd-hint"><span class="kbd">⌘K</span></span>
+    </div>
+  </div>
+
+  <div class="sub">Filter bar · date, amount, status, product, branch, officer</div>
+  <div class="demo col" style="gap:16px">
+    <div class="filter-bar">
+      <button class="fchip is-on">Status: <b>Active + Delinquent</b><span class="x">×</span></button>
+      <button class="fchip is-on">Product: <b>SF Loan</b><span class="x">×</span></button>
+      <button class="fchip">Branch<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg></button>
+      <button class="fchip">Officer<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg></button>
+      <button class="fchip is-on mono" style="font-size:12px">₱50k – ₱250k<span class="x">×</span></button>
+      <button class="fchip mono" style="font-size:12px">Jan 01 – Jul 09, 2026<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg></button>
+      <button class="btn btn-ghost btn-sm" style="color:var(--teal-700)">Clear all</button>
+    </div>
+    <div style="display:flex;gap:14px;align-items:center;flex-wrap:wrap">
+      <span style="font-size:12px;font-weight:700;letter-spacing:.06em;color:var(--ink-400);text-transform:uppercase">Saved filters</span>
+      <div class="saved-filters">
+        <button class="fchip"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m19 21-7-4-7 4V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2Z"/></svg>Delinquent · Manila</button>
+        <button class="fchip"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m19 21-7-4-7 4V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2Z"/></svg>Releases this week</button>
+        <button class="fchip"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m19 21-7-4-7 4V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2Z"/></svg>My committee queue</button>
+      </div>
+    </div>
+    <div style="display:flex;gap:12px;align-items:center">
+      <span style="font-size:13px;color:var(--ink-500)">Sort by</span>
+      <select class="select" style="width:200px"><option>Next due date · soonest</option><option>Amount · high to low</option><option>Date applied · newest</option><option>Borrower · A–Z</option></select>
+    </div>
+  </div>
+</section>
+
+<!-- ================= 16 ADVANCED TABLES ================= -->
+<section class="sec" id="tables2">
+  <div class="sec-head"><span class="sec-num">16</span><h2>Advanced Table Features</h2></div>
+  <div class="sec-rule"></div>
+  <p class="lede">Row selection, bulk actions, sortable headers, and expandable detail rows — the workhorse patterns for the loan ledger and collections queue.</p>
+
+  <div class="sub">Toolbar &amp; bulk actions</div>
+  <div class="demo col" style="gap:14px">
+    <div class="tbl-toolbar">
+      <div class="gsearch" style="max-width:280px">
+        <span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg></span>
+        <input class="input" placeholder="Search this table" style="height:36px;padding-right:12px;border-radius:var(--r-md)">
+      </div>
+      <button class="fchip">Filter<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 3H2l8 9.46V19l4 2v-8.54Z"/></svg></button>
+      <div class="sp">
+        <button class="btn btn-outline btn-sm"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>CSV</button>
+        <button class="btn btn-outline btn-sm">Excel</button>
+        <button class="btn btn-outline btn-sm"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9V2h12v7"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><path d="M6 14h12v8H6z"/></svg>Print</button>
+      </div>
+    </div>
+    <div class="bulk-bar">
+      <label class="check" style="color:#fff"><input type="checkbox" checked></label>
+      <b>2 selected</b>
+      <div class="sp">
+        <button class="btn btn-ghost-inv btn-sm" style="border:1px solid rgba(255,255,255,.28);color:#fff;background:transparent">Send reminder</button>
+        <button class="btn btn-accent btn-sm">Endorse to collections</button>
+      </div>
+    </div>
+    <div class="table-wrap">
+      <table class="tbl">
+        <thead><tr>
+          <th class="rowchk"><label class="check"><input type="checkbox" checked></label></th>
+          <th></th>
+          <th class="sortable">Reference<span class="arr">▲</span></th>
+          <th class="sortable">Borrower</th>
+          <th class="num sortable">Balance<span class="arr" style="color:var(--ink-300)">▼</span></th>
+          <th class="sortable">Next due</th>
+          <th>Status</th>
+        </tr></thead>
+        <tbody>
+          <tr class="is-selected">
+            <td><label class="check"><input type="checkbox" checked></label></td>
+            <td><button class="chev" aria-label="Expand"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg></button></td>
+            <td class="id">LN-2026-004471</td>
+            <td><div class="person"><span class="avatar sm">RS</span><div class="nm">Ramon Santos</div></div></td>
+            <td class="num">52,300.00</td>
+            <td class="mono" style="font-size:12.5px;color:var(--danger)">Jun 30, 2026</td>
+            <td><span class="badge badge-danger"><i class="dot"></i>Delinquent</span></td>
+          </tr>
+          <tr class="expand">
+            <td colspan="7">
+              <div class="kv" style="max-width:520px">
+                <div class="row"><span class="k">Missed amortizations</span><span class="v mono">2 × ₱11,600.00</span></div>
+                <div class="row"><span class="k">Penalty accrued</span><span class="v mono" style="color:var(--danger)">₱1,160.00</span></div>
+                <div class="row"><span class="k">Last contact</span><span class="v">Jul 01 · SMS reminder sent</span></div>
+              </div>
+            </td>
+          </tr>
+          <tr class="is-selected">
+            <td><label class="check"><input type="checkbox" checked></label></td>
+            <td><button class="chev" aria-label="Expand"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg></button></td>
+            <td class="id">LN-2026-004380</td>
+            <td><div class="person"><span class="avatar sm teal">CB</span><div class="nm">Carlos Bautista</div></div></td>
+            <td class="num">36,200.00</td>
+            <td class="mono" style="font-size:12.5px;color:var(--danger)">Jun 15, 2026</td>
+            <td><span class="badge badge-danger"><i class="dot"></i>Delinquent</span></td>
+          </tr>
+          <tr>
+            <td><label class="check"><input type="checkbox"></label></td>
+            <td><button class="chev" aria-label="Expand"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg></button></td>
+            <td class="id">LN-2026-004518</td>
+            <td><div class="person"><span class="avatar sm">JD</span><div class="nm">Juan Dela Cruz</div></div></td>
+            <td class="num">108,750.00</td>
+            <td class="mono" style="font-size:12.5px">Jul 15, 2026</td>
+            <td><span class="badge badge-success"><i class="dot"></i>Active</span></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+  <p class="hint">Sticky header: add <span class="mono" style="font-size:12px">position:sticky;top:0</span> to <span class="mono" style="font-size:12px">thead th</span> inside a fixed-height <span class="mono" style="font-size:12px">.table-wrap</span>. Fixed first column: <span class="mono" style="font-size:12px">position:sticky;left:0</span>.</p>
+</section>
+
+<!-- ================= 17 ADVANCED FORMS ================= -->
+<section class="sec" id="forms2">
+  <div class="sec-head"><span class="sec-num">17</span><h2>Advanced Form Inputs</h2></div>
+  <div class="sec-rule"></div>
+  <p class="lede">Date ranges, multi-select chips, searchable dropdowns, OTP entry, uploads, and the signature pad for release documents.</p>
+
+  <div class="sub">Date range, time &amp; amount slider</div>
+  <div class="demo">
+    <div class="field">
+      <label>Coverage period</label>
+      <div style="display:flex;gap:8px;align-items:center">
+        <input class="input mono" type="date" value="2026-01-01">
+        <span style="color:var(--ink-400)">–</span>
+        <input class="input mono" type="date" value="2026-07-09">
+      </div>
+    </div>
+    <div class="field" style="max-width:180px">
+      <label>Cut-off time</label>
+      <input class="input mono" type="time" value="17:00">
+    </div>
+    <div class="field">
+      <label>Loan amount · <span class="mono" style="font-weight:600;color:var(--teal-700)">₱165,000</span></label>
+      <div class="range-wrap">
+        <input type="range" min="20000" max="300000" value="165000">
+        <div class="range-lbls"><span>₱20,000</span><span>₱300,000</span></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="sub">Multi-select chips &amp; searchable dropdown</div>
+  <div class="demo" style="align-items:flex-start">
+    <div class="field">
+      <label>Assigned collectors</label>
+      <div class="chips-input">
+        <span class="chip">A. Navarro<button class="x" aria-label="Remove">×</button></span>
+        <span class="chip">R. Villanueva<button class="x" aria-label="Remove">×</button></span>
+        <input placeholder="Add collector…">
+      </div>
+      <span class="help">Type a name and press Enter.</span>
+    </div>
+    <div class="field">
+      <label>Manning agency</label>
+      <div class="sdrop">
+        <input class="input" value="Pacific Crew Management" readonly>
+        <div class="sdrop-panel">
+          <div class="srch"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg><input placeholder="Search agencies…"></div>
+          <div class="opt is-sel">Pacific Crew Management<span class="tick">✓</span></div>
+          <div class="opt">Horizon Maritime Services</div>
+          <div class="opt">Coral Seas Manning Inc.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="sub">OTP input</div>
+  <div class="demo">
+    <div class="otp" role="group" aria-label="One-time code">
+      <input class="filled" maxlength="1" value="4"><input class="filled" maxlength="1" value="7"><input class="filled" maxlength="1" value="2"><input maxlength="1"><input maxlength="1"><input maxlength="1">
+    </div>
+    <span style="font-size:12.5px;color:var(--ink-400)">Code sent to +63 917 ••• 4821 · <a href="#forms2" style="color:var(--teal-700);font-weight:600;text-decoration:none">Resend in 0:42</a></span>
+  </div>
+
+  <div class="sub">File upload · dropzone, progress &amp; image upload</div>
+  <div class="demo col" style="gap:14px;max-width:520px">
+    <div class="dropzone">
+      <span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12"/></svg></span>
+      <b>Drop files here or <em>browse</em></b>
+      <span>PDF, JPG, or PNG up to 10 MB · Contract, allotment slip, valid IDs</span>
+    </div>
+    <div class="file-row">
+      <span class="fic">PDF</span>
+      <div class="fm"><b>employment_contract.pdf</b><span>2.4 MB · uploading</span></div>
+      <div class="sp"><div class="prog"><i style="width:64%"></i></div><span class="mono" style="font-size:11px;color:var(--ink-400)">64%</span></div>
+    </div>
+    <div class="file-row">
+      <span class="fic img">JPG</span>
+      <div class="fm"><b>allotment_slip_jun2026.jpg</b><span>1.1 MB · uploaded</span></div>
+      <div class="sp"><span class="badge badge-success" style="height:20px;font-size:11px">Done</span><button class="btn btn-ghost btn-sm btn-icon" aria-label="Remove">×</button></div>
+    </div>
+    <div class="imgup">
+      <div class="got">ID<button class="rm" aria-label="Remove">×</button></div>
+      <div class="ph" role="button" aria-label="Add photo"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.1-3.1a2 2 0 0 0-2.8 0L6 21"/></svg></div>
+      <div class="ph" role="button" aria-label="Add photo"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></div>
+      <span style="font-size:12px;color:var(--ink-400)">Photo of valid ID · front &amp; back</span>
+    </div>
+  </div>
+
+  <div class="sub">Signature pad</div>
+  <div class="demo">
+    <div class="sigpad">
+      <div class="cv">
+        <svg viewBox="0 0 420 130" preserveAspectRatio="none"><path d="M60 88 C 90 40, 120 44, 138 74 C 150 94, 168 92, 182 66 C 196 42, 214 46, 224 70 C 236 96, 262 60, 300 64 C 330 68, 344 80, 372 62" fill="none" stroke="var(--navy-800)" stroke-width="2.2" stroke-linecap="round"/></svg>
+        <span class="hint2">SIGN ABOVE THE LINE</span>
+      </div>
+      <div class="sf"><span>Borrower's signature · required on Promissory Note</span><button class="btn btn-ghost btn-sm">Clear</button></div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= 18 NOTIFICATIONS ================= -->
+<section class="sec" id="notif">
+  <div class="sec-head"><span class="sec-num">18</span><h2>Notifications</h2></div>
+  <div class="sec-rule"></div>
+  <p class="lede">The bell, the notification center, and page-level banners — alongside the alerts and toasts from section 07.</p>
+
+  <div class="sub">Notification bell &amp; center</div>
+  <div class="demo" style="align-items:flex-start;gap:32px">
+    <button class="bell" aria-label="Notifications, 3 unread"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg><span class="cnt">3</span></button>
+    <div class="notif-center">
+      <div class="nh"><b>Notifications</b><a href="#notif">Mark all as read</a></div>
+      <div class="ni unread">
+        <span class="nic" style="background:var(--warning-bg);color:var(--warning)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg></span>
+        <div><p><b>Committee vote pending</b> — LN-2026-004518 needs 1 more approval before Friday's release run.</p><div class="when">25 min ago</div></div>
+      </div>
+      <div class="ni unread">
+        <span class="nic" style="background:var(--danger-bg);color:var(--danger)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><path d="M12 9v4M12 17h.01"/></svg></span>
+        <div><p><b>2 accounts turned delinquent</b> overnight and were auto-endorsed to Collections.</p><div class="when">2 hours ago</div></div>
+      </div>
+      <div class="ni">
+        <span class="nic" style="background:var(--success-bg);color:var(--success)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><path d="m9 11 3 3L22 4"/></svg></span>
+        <div><p><b>Release batch completed</b> — 14 loans, ₱2.36M total, all posted to the ledger.</p><div class="when">Yesterday · 17:05</div></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="sub">Banners</div>
+  <div class="demo col" style="gap:12px">
+    <div class="banner">
+      <span class="badge badge-teal" style="height:20px;font-size:11px">New</span>
+      Semi-monthly deduction schedules are now supported. <a href="#notif">See what changed</a>
+      <span class="sp"><button class="x" aria-label="Dismiss">×</button></span>
+    </div>
+    <div class="banner warn">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><path d="M12 9v4M12 17h.01"/></svg>
+      Scheduled maintenance on Jul 12, 10:00 PM – 12:00 MN PHT. Posting will be paused. <a href="#notif">Details</a>
+    </div>
+  </div>
+
+  <div class="sub">Loading dots</div>
+  <div class="demo">
+    <span class="dots"><i></i><i></i><i></i></span>
+    <span style="font-size:13px;color:var(--ink-500)">Syncing with ledger…</span>
+    <span class="autosave"><i></i>All changes saved</span>
+    <span class="autosave saving"><i></i>Saving draft…</span>
+  </div>
+</section>
+
+<!-- ================= 19 MODAL VARIANTS & AUTH ================= -->
+<section class="sec" id="modals2">
+  <div class="sec-head"><span class="sec-num">19</span><h2>Modal Variants &amp; Auth</h2></div>
+  <div class="sec-rule"></div>
+  <p class="lede">Destructive confirmation, approve/reject, and the session timeout warning. The base modal anatomy is in section 10; the login form lives on the portal's login page.</p>
+
+  <div class="sub">Delete confirmation · destructive pattern</div>
+  <div class="modal-demo">
+    <div class="modal" style="max-width:400px">
+      <div class="modal-h">
+        <div style="display:flex;gap:12px;align-items:flex-start">
+          <span style="width:38px;height:38px;border-radius:50%;background:var(--danger-bg);color:var(--danger);display:flex;align-items:center;justify-content:center;flex-shrink:0"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/></svg></span>
+          <h4>Delete this draft application?</h4>
+        </div>
+        <button class="x" aria-label="Close">×</button>
+      </div>
+      <div class="modal-b" style="padding-left:74px">
+        <p>Draft <b class="mono" style="font-size:12.5px">DR-2026-000231</b> and its 3 attached files will be permanently removed. This can't be undone.</p>
+      </div>
+      <div class="modal-f">
+        <button class="btn btn-ghost">Keep draft</button>
+        <button class="btn btn-danger">Delete draft</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="sub">Approve / Reject · committee decision</div>
+  <div class="modal-demo" style="background:rgba(7,22,51,.35)">
+    <div class="modal" style="max-width:460px">
+      <div class="modal-h"><h4>Committee decision — LN-2026-004518</h4><button class="x" aria-label="Close">×</button></div>
+      <div class="modal-b">
+        <div class="kv" style="margin-bottom:14px">
+          <div class="row"><span class="k">Borrower</span><span class="v">Juan Dela Cruz</span></div>
+          <div class="row"><span class="k">Principal requested</span><span class="v mono">₱150,000.00</span></div>
+          <div class="row"><span class="k">Recommendation</span><span class="v"><span class="badge badge-teal">CIG · Favorable</span></span></div>
+        </div>
+        <div class="field" style="min-width:0">
+          <label>Remarks <span class="req">*</span> <span style="font-weight:400;color:var(--ink-400)">(required when rejecting)</span></label>
+          <textarea class="textarea" placeholder="Basis for your vote…" style="min-height:72px"></textarea>
+        </div>
+      </div>
+      <div class="modal-f" style="justify-content:space-between">
+        <button class="btn btn-danger-soft">Reject</button>
+        <div style="display:flex;gap:10px">
+          <button class="btn btn-ghost">Defer</button>
+          <button class="btn btn-accent">Approve</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="sub">Session timeout warning</div>
+  <div class="modal-demo">
+    <div class="modal" style="max-width:380px">
+      <div class="modal-h"><h4>Still there?</h4></div>
+      <div class="modal-b">
+        <p>For your security, you'll be signed out in <b class="mono" style="color:var(--warning)">01:54</b> due to inactivity. Unsaved changes will be kept as a draft.</p>
+      </div>
+      <div class="modal-f">
+        <button class="btn btn-ghost">Sign out</button>
+        <button class="btn btn-primary">Stay signed in</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="sub">Two-factor verification</div>
+  <div class="demo" style="background:var(--surface-2);justify-content:center;padding:36px">
+    <div class="card card-pad" style="max-width:380px;width:100%;text-align:center">
+      <div style="font-family:var(--font-display);font-size:17px;font-weight:700;color:var(--navy-900)">Verify it's you</div>
+      <p style="font-size:13.5px;color:var(--ink-500);margin:8px 0 18px">Enter the 6-digit code from your authenticator app.</p>
+      <div class="otp" style="justify-content:center">
+        <input maxlength="1"><input maxlength="1"><input maxlength="1"><input maxlength="1"><input maxlength="1"><input maxlength="1">
+      </div>
+      <button class="btn btn-accent btn-block" style="margin-top:18px">Verify</button>
+      <p style="font-size:12px;color:var(--ink-400);margin-top:12px">Lost your device? <a href="#modals2" style="color:var(--teal-700);font-weight:600;text-decoration:none">Use a backup code</a></p>
+    </div>
+  </div>
+</section>
+
+<!-- ================= 20 PROFILE & BORROWER ================= -->
+<section class="sec" id="profile">
+  <div class="sec-head"><span class="sec-num">20</span><h2>Profile &amp; Borrower Components</h2></div>
+  <div class="sec-rule"></div>
+  <p class="lede">The borrower profile card, contact and guarantor info, plus account security surfaces: login history and trusted devices.</p>
+
+  <div class="sub">Borrower profile card &amp; contact info</div>
+  <div class="demo" style="align-items:flex-start;gap:24px;background:var(--surface-2)">
+    <div class="card profile-card">
+      <div class="cover"></div>
+      <div class="pbody">
+        <span class="avatar lg">JD</span>
+        <div class="nm">Juan Dela Cruz <span class="badge badge-teal" style="height:20px;font-size:11px;vertical-align:2px">Verified</span></div>
+        <div class="rl">Able Seaman · MV Pacific Star · <span class="mono" style="font-size:12px">BR-004291</span></div>
+        <div class="prow">
+          <div class="c"><b>3</b><span>Loans taken</span></div>
+          <div class="c"><b>₱108,750</b><span>Outstanding</span></div>
+          <div class="c"><b>0</b><span>Missed (12 mo)</span></div>
+        </div>
+        <div style="display:flex;gap:10px;margin-top:16px">
+          <button class="btn btn-primary btn-sm btn-block">View full profile</button>
+          <button class="btn btn-outline btn-sm btn-icon" aria-label="More"><svg viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="19" cy="12" r="1.8"/></svg></button>
+        </div>
+      </div>
+    </div>
+    <div class="card card-pad" style="max-width:360px;width:100%">
+      <div style="font-family:var(--font-display);font-weight:600;color:var(--navy-900);margin-bottom:10px">Contact information</div>
+      <div class="kv contact-kv">
+        <div class="row"><span class="k">Mobile</span><span class="v mono">+63 917 555 4821</span></div>
+        <div class="row"><span class="k">Email</span><span class="v"><a href="#profile">j.delacruz@email.com</a></span></div>
+        <div class="row"><span class="k">Address</span><span class="v" style="font-weight:500">Brgy. San Roque, Bulacan</span></div>
+        <div class="row"><span class="k">Allottee</span><span class="v">Maria Dela Cruz · Spouse</span></div>
+      </div>
+      <div style="font-family:var(--font-display);font-weight:600;color:var(--navy-900);margin:18px 0 10px">Co-maker / Guarantor</div>
+      <div class="person"><span class="avatar sm teal">PD</span><div><div class="nm">Pedro Dela Cruz</div><div class="sub2">Brother · 1 active guarantee</div></div></div>
+    </div>
+  </div>
+
+  <div class="sub">Login history &amp; trusted devices</div>
+  <div class="demo col" style="max-width:560px">
+    <div class="sess-row">
+      <span class="dic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg></span>
+      <div><b>Chrome on Windows <span class="badge badge-success" style="height:18px;font-size:10.5px;margin-left:6px">This device</span></b><span>Manila, PH · 2026-07-09 · 09:12</span></div>
+      <span class="sp badge badge-teal" style="height:20px;font-size:11px">Active now</span>
+    </div>
+    <div class="sess-row">
+      <span class="dic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="7" y="2" width="10" height="20" rx="2"/><path d="M12 18h.01"/></svg></span>
+      <div><b>Safari on iPhone</b><span>Singapore · 2026-07-06 · 22:47</span></div>
+      <span class="sp"><button class="btn btn-ghost btn-sm" style="color:var(--danger)">Revoke</button></span>
+    </div>
+    <div class="sess-row">
+      <span class="dic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg></span>
+      <div><b>Edge on Windows</b><span>Rotterdam, NL · 2026-06-28 · 14:03 · <span style="color:var(--warning)">New location</span></span></div>
+      <span class="sp"><button class="btn btn-ghost btn-sm" style="color:var(--danger)">Revoke</button></span>
+    </div>
+  </div>
+</section>
+
+<!-- ================= 21 ADMIN ================= -->
+<section class="sec" id="admin">
+  <div class="sec-head"><span class="sec-num">21</span><h2>Admin Components</h2></div>
+  <div class="sec-rule"></div>
+  <p class="lede">Role management, the permission matrix, and the audit log. Every privileged action is attributable — same rule as the loan timeline.</p>
+
+  <div class="sub">Roles</div>
+  <div class="demo">
+    <span class="role-pill"><i style="background:var(--navy-700)"></i>Admin</span>
+    <span class="role-pill"><i style="background:var(--teal-600)"></i>CSA</span>
+    <span class="role-pill"><i style="background:var(--teal-600)"></i>CIG</span>
+    <span class="role-pill"><i style="background:var(--warning)"></i>LRA</span>
+    <span class="role-pill"><i style="background:var(--navy-500)"></i>Committee</span>
+    <span class="role-pill"><i style="background:var(--danger)"></i>Collections</span>
+    <button class="btn btn-outline btn-sm"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>New role</button>
+  </div>
+
+  <div class="sub">Permission matrix</div>
+  <div class="demo col" style="padding:0;overflow:hidden">
+    <div class="pm">
+      <table>
+        <thead><tr><th>Permission</th><th>Admin</th><th>CSA</th><th>CIG</th><th>Committee</th><th>Collections</th></tr></thead>
+        <tbody>
+          <tr><td>Create application</td><td class="y">✓</td><td class="y">✓</td><td class="n">—</td><td class="n">—</td><td class="n">—</td></tr>
+          <tr><td>Verify documents</td><td class="y">✓</td><td class="n">—</td><td class="y">✓</td><td class="n">—</td><td class="n">—</td></tr>
+          <tr><td>Vote on approval</td><td class="n">—</td><td class="n">—</td><td class="n">—</td><td class="y">✓</td><td class="n">—</td></tr>
+          <tr><td>Release funds</td><td class="y">✓</td><td class="n">—</td><td class="n">—</td><td class="n">—</td><td class="n">—</td></tr>
+          <tr><td>Endorse to collections</td><td class="y">✓</td><td class="n">—</td><td class="n">—</td><td class="n">—</td><td class="y">✓</td></tr>
+          <tr><td>Manage users &amp; roles</td><td class="y">✓</td><td class="n">—</td><td class="n">—</td><td class="n">—</td><td class="n">—</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="sub">Audit log</div>
+  <div class="table-wrap audit">
+    <table class="tbl">
+      <thead><tr><th>Timestamp</th><th>Actor</th><th>Action</th><th>Target</th><th>IP</th></tr></thead>
+      <tbody>
+        <tr><td class="mono" style="font-size:12px">2026-07-09 09:14:22</td><td><div class="person"><span class="avatar sm">KC</span><div class="nm">K. Cruz</div></div></td><td><span class="badge badge-teal">RELEASE</span></td><td class="id">LN-2026-004495</td><td class="mono" style="font-size:12px">203.87.14.2</td></tr>
+        <tr><td class="mono" style="font-size:12px">2026-07-09 08:52:01</td><td><div class="person"><span class="avatar sm">AN</span><div class="nm">A. Navarro</div></div></td><td><span class="badge badge-navy">VERIFY</span></td><td class="id">LN-2026-004518</td><td class="mono" style="font-size:12px">203.87.14.9</td></tr>
+        <tr><td class="mono" style="font-size:12px">2026-07-08 17:30:45</td><td><div class="person"><span class="avatar sm" style="background:var(--navy-700);color:#fff">SY</span><div class="nm">System</div></div></td><td><span class="badge badge-danger">FLAG</span></td><td class="id">LN-2026-004380</td><td class="mono" style="font-size:12px">—</td></tr>
+        <tr><td class="mono" style="font-size:12px">2026-07-08 16:02:10</td><td><div class="person"><span class="avatar sm">KC</span><div class="nm">K. Cruz</div></div></td><td><span class="badge badge-warning">ROLE EDIT</span></td><td>User · R. Villanueva → LRA</td><td class="mono" style="font-size:12px">203.87.14.2</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- ================= 22 CALENDAR ================= -->
+<section class="sec" id="calendar">
+  <div class="sec-head"><span class="sec-num">22</span><h2>Calendar</h2></div>
+  <div class="sec-rule"></div>
+  <p class="lede">One calendar pattern serves payment due dates, collection schedules, and holidays — dots use semantic colors only.</p>
+
+  <div class="sub">Payment calendar · July 2026</div>
+  <div class="demo" style="background:var(--surface-2)">
+    <div class="cal">
+      <div class="ch">
+        <button class="btn btn-ghost btn-sm btn-icon" aria-label="Previous month">‹</button>
+        <b>July 2026</b>
+        <button class="btn btn-ghost btn-sm btn-icon" aria-label="Next month">›</button>
+      </div>
+      <div class="grid7">
+        <span class="dow">Su</span><span class="dow">Mo</span><span class="dow">Tu</span><span class="dow">We</span><span class="dow">Th</span><span class="dow">Fr</span><span class="dow">Sa</span>
+        <span class="day mut">28</span><span class="day mut">29</span><span class="day mut">30</span><span class="day">1<i class="dt paid"></i></span><span class="day">2</span><span class="day">3</span><span class="day">4</span>
+        <span class="day">5</span><span class="day">6<i class="dt paid"></i></span><span class="day">7</span><span class="day">8<i class="dt paid"></i></span><span class="day today">9</span><span class="day">10</span><span class="day">11</span>
+        <span class="day">12</span><span class="day">13</span><span class="day">14</span><span class="day">15<i class="dt due"></i></span><span class="day">16</span><span class="day">17</span><span class="day">18</span>
+        <span class="day">19</span><span class="day">20<i class="dt ovr"></i></span><span class="day">21</span><span class="day">22</span><span class="day">23</span><span class="day">24</span><span class="day">25</span>
+        <span class="day">26</span><span class="day">27</span><span class="day">28</span><span class="day">29</span><span class="day">30<i class="dt due"></i></span><span class="day">31<i class="dt due"></i></span><span class="day mut">1</span>
+      </div>
+      <div class="cl"><span><i style="background:var(--success)"></i>Paid</span><span><i style="background:var(--warning)"></i>Due</span><span><i style="background:var(--danger)"></i>Overdue</span></div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= 23 FILES & DOCUMENTS ================= -->
+<section class="sec" id="files">
+  <div class="sec-head"><span class="sec-num">23</span><h2>Files &amp; Documents</h2></div>
+  <div class="sec-rule"></div>
+  <p class="lede">The embedded document viewer for contracts and SOAs, plus version history for regenerated documents.</p>
+
+  <div class="sub">Document viewer · PDF preview</div>
+  <div class="demo" style="background:var(--surface-2)">
+    <div class="doc-viewer">
+      <div class="dvh">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z"/><path d="M14 2v6h6"/></svg>
+        <span class="fn">promissory_note_LN-2026-004518.pdf</span>
+        <div class="sp">
+          <button aria-label="Zoom out">−</button>
+          <button aria-label="Zoom in">+</button>
+          <button aria-label="Download"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg></button>
+          <button aria-label="Print"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9V2h12v7"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><path d="M6 14h12v8H6z"/></svg></button>
+        </div>
+      </div>
+      <div class="pg-area">
+        <div class="sheet">
+          <div class="ln" style="width:46%;height:11px;background:var(--navy-200)"></div>
+          <div class="ln" style="width:30%;margin-bottom:10px"></div>
+          <div class="ln"></div><div class="ln" style="width:92%"></div><div class="ln" style="width:96%"></div><div class="ln" style="width:70%;margin-bottom:10px"></div>
+          <div class="ln" style="width:55%;background:var(--teal-100)"></div>
+          <div class="ln"></div><div class="ln" style="width:88%"></div><div class="ln" style="width:40%"></div>
+          <div style="margin-top:auto;display:flex;justify-content:space-between;gap:12px"><div class="ln" style="width:34%"></div><div class="ln" style="width:34%"></div></div>
+        </div>
+      </div>
+      <div class="dvf"><span>‹</span><span>Page 1 / 3</span><span>›</span></div>
+    </div>
+  </div>
+
+  <div class="sub">Version history</div>
+  <div class="demo col" style="max-width:520px">
+    <div class="ver-item"><span class="vtag">v3 · current</span><b style="font-size:13px">Statement of account regenerated</b><div class="sp"><span class="when">Jul 08, 2026</span><button class="btn btn-ghost btn-sm">View</button></div></div>
+    <div class="ver-item"><span class="vtag">v2</span><b style="font-size:13px;font-weight:500;color:var(--ink-700)">Penalty line item added</b><div class="sp"><span class="when">Jul 01, 2026</span><button class="btn btn-ghost btn-sm">View</button></div></div>
+    <div class="ver-item"><span class="vtag">v1</span><b style="font-size:13px;font-weight:500;color:var(--ink-700)">Initial document generated</b><div class="sp"><span class="when">Apr 12, 2026</span><button class="btn btn-ghost btn-sm">View</button></div></div>
+  </div>
+</section>
+
+<!-- ================= 24 UTILITIES ================= -->
+<section class="sec" id="utils">
+  <div class="sec-head"><span class="sec-num">24</span><h2>Utilities</h2></div>
+  <div class="sec-rule"></div>
+  <p class="lede">Popovers, copy buttons, codes, the FAB, and preference controls — the small parts that finish a screen.</p>
+
+  <div class="sub">Popover &amp; copy button</div>
+  <div class="demo" style="align-items:flex-start;gap:32px">
+    <div class="popover">
+      <b>Effective interest rate</b>
+      <p>Includes the 4.5% monthly add-on plus the one-time 2% service fee, expressed as an annualized rate per BSP disclosure rules.</p>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:10px">
+      <button class="copybtn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>LN-2026-004518</button>
+      <button class="copybtn" style="color:var(--teal-700);border-color:var(--teal-100);background:var(--teal-50)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>Copied!</button>
+    </div>
+  </div>
+
+  <div class="sub">QR code &amp; barcode</div>
+  <div class="demo" style="gap:40px">
+    <div style="text-align:center">
+      <svg width="110" height="110" viewBox="0 0 29 29" style="border:1px solid var(--line);border-radius:var(--r-md);padding:8px;background:#fff" role="img" aria-label="QR code sample">
+        <rect width="29" height="29" fill="#fff"/>
+        <g fill="var(--navy-950)">
+          <path d="M2 2h7v7H2zM4 4h3v3H4z" fill-rule="evenodd"/><path d="M20 2h7v7h-7zM22 4h3v3h-3z" fill-rule="evenodd"/><path d="M2 20h7v7H2zM4 22h3v3H4z" fill-rule="evenodd"/>
+          <rect x="11" y="2" width="2" height="2"/><rect x="15" y="2" width="2" height="2"/><rect x="12" y="5" width="2" height="2"/><rect x="16" y="5" width="2" height="2"/><rect x="11" y="8" width="2" height="2"/><rect x="14" y="8" width="3" height="2"/>
+          <rect x="2" y="11" width="2" height="2"/><rect x="6" y="12" width="2" height="2"/><rect x="9" y="11" width="2" height="3"/><rect x="13" y="12" width="3" height="2"/><rect x="18" y="11" width="2" height="2"/><rect x="21" y="12" width="2" height="2"/><rect x="25" y="11" width="2" height="2"/>
+          <rect x="3" y="15" width="2" height="2"/><rect x="7" y="16" width="2" height="2"/><rect x="11" y="15" width="2" height="2"/><rect x="15" y="16" width="2" height="2"/><rect x="19" y="15" width="3" height="2"/><rect x="24" y="16" width="2" height="2"/>
+          <rect x="11" y="20" width="2" height="2"/><rect x="14" y="21" width="2" height="2"/><rect x="18" y="20" width="2" height="3"/><rect x="22" y="21" width="2" height="2"/><rect x="25" y="24" width="2" height="2"/><rect x="12" y="24" width="3" height="2"/><rect x="20" y="25" width="2" height="2"/>
+        </g>
+      </svg>
+      <div class="mono" style="font-size:11px;color:var(--ink-400);margin-top:6px">Pay via QR PH</div>
+    </div>
+    <div style="text-align:center">
+      <svg width="180" height="56" viewBox="0 0 180 56" style="background:#fff;border:1px solid var(--line);border-radius:var(--r-md);padding:6px" role="img" aria-label="Barcode sample">
+        <g fill="var(--navy-950)">
+          <rect x="10" y="6" width="2" height="36"/><rect x="14" y="6" width="1" height="36"/><rect x="18" y="6" width="3" height="36"/><rect x="24" y="6" width="1" height="36"/><rect x="28" y="6" width="2" height="36"/><rect x="33" y="6" width="4" height="36"/><rect x="40" y="6" width="1" height="36"/><rect x="44" y="6" width="2" height="36"/><rect x="50" y="6" width="1" height="36"/><rect x="54" y="6" width="3" height="36"/><rect x="60" y="6" width="2" height="36"/><rect x="66" y="6" width="1" height="36"/><rect x="70" y="6" width="4" height="36"/><rect x="77" y="6" width="1" height="36"/><rect x="81" y="6" width="2" height="36"/><rect x="86" y="6" width="3" height="36"/><rect x="92" y="6" width="1" height="36"/><rect x="96" y="6" width="2" height="36"/><rect x="102" y="6" width="1" height="36"/><rect x="106" y="6" width="4" height="36"/><rect x="113" y="6" width="2" height="36"/><rect x="118" y="6" width="1" height="36"/><rect x="122" y="6" width="3" height="36"/><rect x="128" y="6" width="1" height="36"/><rect x="132" y="6" width="2" height="36"/><rect x="137" y="6" width="1" height="36"/><rect x="141" y="6" width="4" height="36"/><rect x="148" y="6" width="2" height="36"/><rect x="153" y="6" width="1" height="36"/><rect x="157" y="6" width="2" height="36"/><rect x="162" y="6" width="3" height="36"/><rect x="168" y="6" width="2" height="36"/>
+        </g>
+        <text x="90" y="52" text-anchor="middle" style="font-family:var(--font-mono);font-size:9px;fill:var(--ink-500)">BR-004291</text>
+      </svg>
+      <div class="mono" style="font-size:11px;color:var(--ink-400);margin-top:6px">Borrower card</div>
+    </div>
+  </div>
+
+  <div class="sub">FAB, preferences &amp; FAQ accordion</div>
+  <div class="demo" style="align-items:flex-start;gap:36px">
+    <div style="display:flex;flex-direction:column;gap:16px;align-items:flex-start">
+      <button class="fab" aria-label="New application"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></button>
+      <button class="fab ext"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>New application</button>
+      <label class="dark-toggle"><label class="toggle"><input type="checkbox"></label>Dark mode</label>
+      <button class="lang"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>English · PH<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg></button>
+    </div>
+    <div class="faq">
+      <details open>
+        <summary>How is my monthly amortization computed?</summary>
+        <div class="fa">Principal plus flat add-on interest for the full term, divided by the number of months. The exact breakdown appears on your disclosure statement before you sign.</div>
+      </details>
+      <details>
+        <summary>Can I pay off my loan early?</summary>
+        <div class="fa">Yes — request an early settlement quote from your account officer to see the adjusted payoff amount.</div>
+      </details>
+      <details>
+        <summary>What happens if my vessel deployment is delayed?</summary>
+        <div class="fa">Contact us before your first due date. Deferment options are available for documented deployment changes.</div>
+      </details>
+    </div>
+  </div>
+</section>
+
+<!-- ================= 25 MOBILE ================= -->
+<section class="sec" id="mobile">
+  <div class="sec-head"><span class="sec-num">25</span><h2>Mobile Patterns</h2></div>
+  <div class="sec-rule"></div>
+  <p class="lede">Borrowers check the portal from vessels and ports — the mobile patterns keep everything one thumb away: bottom navigation, the drawer, swipe actions, and sticky action bars.</p>
+
+  <div class="sub">Bottom navigation, drawer &amp; sticky actions</div>
+  <div class="demo" style="background:var(--surface-2);gap:28px">
+    <div class="phone">
+      <div class="scr">
+        <div style="font-family:var(--font-display);font-weight:700;color:var(--navy-900);font-size:16px;margin-bottom:12px">My loan</div>
+        <div class="card card-pad" style="padding:16px">
+          <div class="prog-lbl"><span>Repayment</span><b>4 / 10</b></div>
+          <div class="prog"><i style="width:40%"></i></div>
+          <div class="kv" style="margin-top:12px">
+            <div class="row"><span class="k">Next due</span><span class="v mono" style="font-size:12.5px">Jul 15</span></div>
+            <div class="row"><span class="k">Amount</span><span class="v mono" style="font-size:12.5px">₱21,750.00</span></div>
+          </div>
+        </div>
+        <div class="swipe-card" style="margin-top:12px">
+          <div class="under"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></div>
+          <div class="over"><b style="font-size:13px">Payment #3 · ₱21,750</b><div style="font-size:11px;color:var(--ink-400)" class="mono">Swipe to mark reviewed →</div></div>
+        </div>
+      </div>
+      <div class="bottom-nav">
+        <a class="is-active" href="#mobile"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>Home</a>
+        <a href="#mobile"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z"/><path d="M14 2v6h6"/></svg>Loans</a>
+        <a href="#mobile"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1v22M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>Pay</a>
+        <a href="#mobile"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>Profile</a>
+      </div>
+    </div>
+    <div class="phone">
+      <div class="scr" style="background:rgba(7,22,51,.4)">
+        <div class="drawer">
+          <span class="logo" style="font-size:14px"><span class="logo-mark" style="width:24px;height:24px"><svg viewBox="0 0 24 24" fill="currentColor" style="width:14px;height:14px"><path d="M12 2l2.4 6.9L21 11l-6.6 2.1L12 20l-2.4-6.9L3 11l6.6-2.1z"/></svg></span>LoanStar</span>
+          <div style="margin-top:20px;display:flex;flex-direction:column;gap:2px">
+            <a href="#mobile" style="display:block;padding:10px 12px;border-radius:6px;background:rgba(45,199,182,.16);color:#fff;text-decoration:none;font-size:13px;font-weight:600">My loan</a>
+            <a href="#mobile" style="display:block;padding:10px 12px;color:var(--navy-100);text-decoration:none;font-size:13px">Payment schedule</a>
+            <a href="#mobile" style="display:block;padding:10px 12px;color:var(--navy-100);text-decoration:none;font-size:13px">Documents</a>
+            <a href="#mobile" style="display:block;padding:10px 12px;color:var(--navy-100);text-decoration:none;font-size:13px">Apply for reloan</a>
+          </div>
+        </div>
+      </div>
+      <div style="padding:8px 12px;font-family:var(--font-mono);font-size:10px;color:var(--ink-400);text-align:center;border-top:1px solid var(--line)">MOBILE DRAWER</div>
+    </div>
+    <div class="phone">
+      <div class="scr">
+        <div style="font-family:var(--font-display);font-weight:700;color:var(--navy-900);font-size:16px">Review application</div>
+        <div class="kv" style="margin-top:12px">
+          <div class="row"><span class="k">Borrower</span><span class="v" style="font-size:12.5px">Juan Dela Cruz</span></div>
+          <div class="row"><span class="k">Principal</span><span class="v mono" style="font-size:12.5px">₱150,000.00</span></div>
+          <div class="row"><span class="k">Term</span><span class="v mono" style="font-size:12.5px">10 mo</span></div>
+          <div class="row"><span class="k">CIG</span><span class="v"><span class="badge badge-teal" style="height:19px;font-size:10.5px">Favorable</span></span></div>
+        </div>
+        <div class="sticky-act">
+          <button class="btn btn-outline btn-sm" style="flex:1">Reject</button>
+          <button class="btn btn-accent btn-sm" style="flex:1.6">Approve</button>
+        </div>
+      </div>
+      <div style="padding:8px 12px;font-family:var(--font-mono);font-size:10px;color:var(--ink-400);text-align:center;border-top:1px solid var(--line)">STICKY ACTION BAR</div>
+    </div>
+  </div>
+  <p class="hint">Pull-to-refresh uses the platform default; the spinner from section 08 appears during the refresh.</p>
+</section>
+
+<!-- ================= 26 REPORTS ================= -->
+<section class="sec" id="reports">
+  <div class="sec-head"><span class="sec-num">26</span><h2>Reports</h2></div>
+  <div class="sec-rule"></div>
+  <p class="lede">Report screens compose the pieces above: the report header with period filter and exports, a summary KPI row, and a printable totals table.</p>
+
+  <div class="sub">Report header · print-ready</div>
+  <div class="demo col" style="gap:20px">
+    <div class="report-head">
+      <div class="rt"><b>Collection report</b><span>PERIOD: JUN 01 – JUN 30, 2026 · GENERATED JUL 09, 2026 · BY K. CRUZ</span></div>
+      <div class="sp">
+        <select class="select" style="width:150px;height:34px;font-size:13px"><option>June 2026</option><option>May 2026</option></select>
+        <button class="btn btn-outline btn-sm">CSV</button>
+        <button class="btn btn-outline btn-sm">Excel</button>
+        <button class="btn btn-primary btn-sm"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9V2h12v7"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><path d="M6 14h12v8H6z"/></svg>Print</button>
+      </div>
+    </div>
+    <div class="table-wrap">
+      <table class="tbl">
+        <thead><tr><th>Branch</th><th class="num">Due</th><th class="num">Collected</th><th class="num">Variance</th><th class="num">Efficiency</th></tr></thead>
+        <tbody>
+          <tr><td>Manila Main</td><td class="num">4,820,500.00</td><td class="num">4,691,300.00</td><td class="num" style="color:var(--danger)">(129,200.00)</td><td class="num">97.3%</td></tr>
+          <tr><td>Cebu</td><td class="num">2,140,000.00</td><td class="num">2,061,900.00</td><td class="num" style="color:var(--danger)">(78,100.00)</td><td class="num">96.4%</td></tr>
+          <tr><td>Davao</td><td class="num">1,065,250.00</td><td class="num">1,012,400.00</td><td class="num" style="color:var(--danger)">(52,850.00)</td><td class="num">95.0%</td></tr>
+          <tr class="tfoot-row"><td>Total</td><td class="num">8,025,750.00</td><td class="num">7,765,600.00</td><td class="num" style="color:var(--danger)">(260,150.00)</td><td class="num">96.8%</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+  <p class="hint">Delinquency, borrower, revenue, and loan-performance reports reuse this exact frame — swap the columns and the summary KPIs.</p>
+</section>
+
+</main>
+
+<footer class="doc-foot">MERIDIAN · LOANSTAR DESIGN SYSTEM · V1.1 · 2026</footer>
+
+</body>
+</html>

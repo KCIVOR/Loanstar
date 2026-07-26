@@ -17,7 +17,6 @@ import {
   Th,
 } from "@/components/ui";
 
-
 type UserRow = {
   id: string;
   email: string;
@@ -159,10 +158,34 @@ export default function UsersPage() {
         open={showForm}
         title="Create user"
         onClose={() => setShowForm(false)}
+        footer={
+          <>
+            <Button
+              variant="ghost"
+              onClick={() => setShowForm(false)}
+              disabled={saving}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="submit"
+              form="create-user-form"
+              loading={saving}
+            >
+              Create user
+            </Button>
+          </>
+        }
       >
-        <form onSubmit={(e) => void handleCreate(e)} className="space-y-4">
+        <form
+          id="create-user-form"
+          onSubmit={(e) => void handleCreate(e)}
+          className="space-y-4"
+        >
           <div>
-            <Label htmlFor="user-email">Email</Label>
+            <Label htmlFor="user-email" required>
+              Email
+            </Label>
             <Input
               id="user-email"
               type="email"
@@ -172,7 +195,9 @@ export default function UsersPage() {
             />
           </div>
           <div>
-            <Label htmlFor="user-password">Password</Label>
+            <Label htmlFor="user-password" required>
+              Password
+            </Label>
             <Input
               id="user-password"
               type="password"
@@ -210,18 +235,6 @@ export default function UsersPage() {
               ))}
             </div>
           </div>
-          <div className="flex justify-end gap-2">
-            <Button
-              variant="secondary"
-              onClick={() => setShowForm(false)}
-              disabled={saving}
-            >
-              Cancel
-            </Button>
-            <Button type="submit" disabled={saving}>
-              {saving ? "Creating…" : "Create user"}
-            </Button>
-          </div>
         </form>
       </Modal>
 
@@ -238,16 +251,16 @@ export default function UsersPage() {
               <Th>Actions</Th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-neutral-200 bg-white">
+          <tbody>
             {users.map((user) => (
               <tr key={user.id}>
-                <Td className="font-medium">{user.email}</Td>
+                <Td className="font-medium text-ink-900">{user.email}</Td>
                 <Td>{user.full_name ?? "—"}</Td>
                 <Td>
                   <StatusBadge active={user.is_active} />
                 </Td>
                 <Td>
-                  <div className="flex flex-wrap gap-2 text-xs">
+                  <div className="flex flex-wrap gap-2">
                     {roles.map((role) => (
                       <Checkbox
                         key={role.id}
@@ -268,7 +281,8 @@ export default function UsersPage() {
                 <Td>
                   {user.is_active ? (
                     <Button
-                      variant="secondary"
+                      variant="danger-soft"
+                      size="sm"
                       onClick={() => setConfirmDeactivate(user)}
                     >
                       Deactivate
@@ -276,6 +290,7 @@ export default function UsersPage() {
                   ) : (
                     <Button
                       variant="secondary"
+                      size="sm"
                       onClick={() => void toggleActive(user)}
                     >
                       Activate

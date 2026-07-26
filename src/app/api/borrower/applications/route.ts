@@ -40,18 +40,40 @@ export async function GET() {
 
     if (error) throw new Error(error.message);
 
-    const applications = (data ?? []).map((app) => ({
-      id: app.id,
-      applicationNo: app.application_no,
-      status: app.status,
-      statusLabel: formatStatusLabel(app.status),
-      statusHistory: (app.status_history ?? []) as StatusHistoryEntry[],
-      blocker: app.blocker,
-      isReloan: app.is_reloan,
-      parentApplicationId: app.parent_application_id,
-      createdAt: app.created_at,
-      updatedAt: app.updated_at,
-    }));
+    const applicationIds = (data ?? []).map((app) => app.id as string);
+    const { data: computations } = applicationIds.length
+      ? await supabase
+          .from("computations")
+          .select(
+            "loan_application_id, principal, terms, interest_rate, loan_type_name",
+          )
+          .in("loan_application_id", applicationIds)
+          .eq("is_active", true)
+      : { data: [] };
+
+    const computationByApp = new Map(
+      (computations ?? []).map((c) => [c.loan_application_id as string, c]),
+    );
+
+    const applications = (data ?? []).map((app) => {
+      const computation = computationByApp.get(app.id as string);
+      return {
+        id: app.id,
+        applicationNo: app.application_no,
+        status: app.status,
+        statusLabel: formatStatusLabel(app.status),
+        statusHistory: (app.status_history ?? []) as StatusHistoryEntry[],
+        blocker: app.blocker,
+        isReloan: app.is_reloan,
+        parentApplicationId: app.parent_application_id,
+        createdAt: app.created_at,
+        updatedAt: app.updated_at,
+        loanAmount: computation ? Number(computation.principal) : null,
+        loanTypeName: computation?.loan_type_name ?? null,
+        termMonths: computation?.terms ?? null,
+        interestRate: computation ? Number(computation.interest_rate) : null,
+      };
+    });
 
     return jsonOk({ applications });
   } catch (error) {

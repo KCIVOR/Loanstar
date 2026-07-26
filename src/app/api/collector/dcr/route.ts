@@ -24,17 +24,23 @@ const submitSchema = z.object({
   dcrId: z.string().uuid(),
 });
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
     const user = await requireModulePermission("collection", "view");
     const supabase = await createClient();
+    const limitRaw = Number(
+      new URL(request.url).searchParams.get("limit") ?? "50",
+    );
+    const limit = Number.isFinite(limitRaw)
+      ? Math.min(Math.max(limitRaw, 1), 200)
+      : 50;
 
     const { data, error } = await supabase
       .from("dcr")
       .select("*, dcr_items (*)")
       .eq("collector_user_id", user.id)
       .order("created_at", { ascending: false })
-      .limit(20);
+      .limit(limit);
 
     if (error) throw new Error(error.message);
 

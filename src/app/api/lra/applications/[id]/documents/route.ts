@@ -5,6 +5,7 @@ import { writeAuditEvent } from "@/lib/audit/writer";
 import { handleApiError, jsonOk } from "@/lib/api/handler";
 import { STAGES } from "@/lib/constants";
 import { buildStoragePath } from "@/lib/documents/storage";
+import { assertLraIntakeUploadAllowed } from "@/lib/lra/employment-contract";
 import { requireModulePermission } from "@/lib/permissions/server";
 import { createClient } from "@/lib/supabase/server";
 
@@ -35,6 +36,18 @@ export async function POST(request: Request, { params }: RouteParams) {
     if (appError || !app?.borrower_id) {
       throw new Error("Application not found");
     }
+
+    const { data: docType, error: typeError } = await supabase
+      .from("document_types")
+      .select("id, slug")
+      .eq("id", body.documentTypeId)
+      .single();
+
+    if (typeError || !docType) {
+      return NextResponse.json({ error: "Invalid document type" }, { status: 400 });
+    }
+
+    assertLraIntakeUploadAllowed(body.stage, docType.slug as string);
 
     const { data: existingDoc, error: fetchError } = await supabase
       .from("documents")
@@ -102,6 +115,7 @@ export async function POST(request: Request, { params }: RouteParams) {
       afterData: {
         applicationId: app.id,
         documentTypeId: body.documentTypeId,
+        documentTypeSlug: docType.slug,
         stage: body.stage,
         fileName: body.fileName,
         status: "uploaded",
@@ -111,6 +125,12 @@ export async function POST(request: Request, { params }: RouteParams) {
     return jsonOk({ document: updated });
   } catch (error) {
     if (error instanceof z.ZodError) {
+      return NextResponse.json({ error: error.message }, { status: 400 });
+    }
+    if (
+      error instanceof Error &&
+      error.message.includes("LRA may only upload the employment contract")
+    ) {
       return NextResponse.json({ error: error.message }, { status: 400 });
     }
     return handleApiError(error);

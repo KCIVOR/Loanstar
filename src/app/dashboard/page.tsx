@@ -43,21 +43,16 @@ export default function DashboardPage() {
     };
   }, [reloadKey]);
 
-  // Nothing to draw an accurate skeleton from until permissions resolve —
-  // the real per-module SectionSkeleton below is the only skeleton shown.
   if (loading) return null;
   if (error) {
     return (
-      <div className="text-sm text-danger-ink">
-        Failed to load permissions: {error}
-      </div>
+      <div className="text-sm text-danger">Failed to load permissions: {error}</div>
     );
   }
 
   const visibleModules = MODULES.filter((mod) =>
     permissions?.modules.some((m) => m.moduleSlug === mod.slug && m.canView),
   );
-  // Reports is the cross-cutting overview — render it first.
   const orderedModules = [
     ...visibleModules.filter((m) => m.slug === "reports"),
     ...visibleModules.filter((m) => m.slug !== "reports"),
@@ -75,7 +70,7 @@ export default function DashboardPage() {
             : "Live overview of your modules"
         }
         actions={
-          <p className="text-xs text-ink-faint">
+          <p className="text-xs text-ink-400">
             {new Date().toLocaleDateString(undefined, {
               weekday: "long",
               month: "long",
@@ -137,12 +132,12 @@ export default function DashboardPage() {
                 <Link
                   key={slug}
                   href={href}
-                  className="group min-w-[220px] flex-1 rounded-[12px] border border-neutral-200 bg-white p-4 shadow-xs transition-shadow hover:shadow-md"
+                  className="card group min-w-[220px] flex-1 p-4 transition-shadow hover:shadow-[var(--sh-2)]"
                 >
-                  <h2 className="text-[13.5px] font-bold text-ink group-hover:text-gold-600">
+                  <h2 className="text-[13.5px] font-bold text-ink-900 group-hover:text-teal-700">
                     {mod.name} <span aria-hidden>→</span>
                   </h2>
-                  <p className="mt-1 text-xs text-ink-faint">{mod.description}</p>
+                  <p className="mt-1 text-xs text-ink-400">{mod.description}</p>
                 </Link>
               );
             })}
@@ -152,7 +147,7 @@ export default function DashboardPage() {
 
       {visibleModules.length === 0 ? (
         <div className="mt-4 flex flex-col items-start gap-3">
-          <p className="text-sm text-ink-muted">
+          <p className="text-sm text-ink-500">
             No modules visible. Contact an administrator to assign roles.
           </p>
           <Button variant="outline" size="sm" onClick={loadWidgets}>

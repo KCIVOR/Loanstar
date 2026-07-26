@@ -1,9 +1,10 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
-import { checkCoverageRatio } from "@/lib/computation/coverage";
+import { checkCoverageRatio, getCoverageThreshold } from "@/lib/computation/coverage";
 import { computeFirstPaymentDate } from "@/lib/computation/release-date";
 import { computeSfLoan } from "@/lib/computation/sf";
 import type { InputMode, OtherDeductions, SfComputeResult } from "@/lib/computation/types";
+import { createServiceClient } from "@/lib/supabase/server";
 
 export type PersistComputationInput = {
   loanApplicationId: string;
@@ -95,9 +96,11 @@ export async function persistComputation(
     otherDeductions: input.otherDeductions,
   });
 
+  const coverageThreshold = await getCoverageThreshold(supabase);
   const coverage = checkCoverageRatio(
     result.monthlyAmortization,
     input.monthlyIncome,
+    coverageThreshold,
   );
 
   const releaseDate = input.releaseDate ? new Date(input.releaseDate) : new Date();
@@ -108,11 +111,21 @@ export async function persistComputation(
     dueDay,
   );
 
-  await supabase
+  // Deactivate prior actives with service role: CSA RLS cannot update rows
+  // that already have signed_at set, which left multiple is_active=true rows
+  // and broke detail GET (.maybeSingle()).
+  const admin = createServiceClient();
+  const { error: deactivateError } = await admin
     .from("computations")
     .update({ is_active: false })
     .eq("loan_application_id", input.loanApplicationId)
     .eq("is_active", true);
+
+  if (deactivateError) {
+    throw new Error(
+      `Failed to deactivate prior computations: ${deactivateError.message}`,
+    );
+  }
 
   const { count } = await supabase
     .from("computations")
@@ -173,11 +186,15 @@ export async function getActiveComputation(
   supabase: SupabaseClient,
   applicationId: string,
 ) {
+  // Prefer latest version if duplicates ever exist (e.g. signed row that
+  // could not be deactivated under CSA RLS).
   const { data, error } = await supabase
     .from("computations")
     .select("*")
     .eq("loan_application_id", applicationId)
     .eq("is_active", true)
+    .order("version", { ascending: false })
+    .limit(1)
     .maybeSingle();
 
   if (error) {

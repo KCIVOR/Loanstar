@@ -1,5 +1,6 @@
 import { cn } from "./cn";
 
+/* Meridian §08 spinner — teal arc on line track. */
 export function Spinner({
   size = "md",
   label = "Loading…",
@@ -9,15 +10,15 @@ export function Spinner({
   label?: string;
   className?: string;
 }) {
-  const dim = size === "sm" ? "h-3.5 w-3.5" : size === "lg" ? "h-7 w-7" : "h-5 w-5";
+  const dim = size === "sm" ? 14 : size === "lg" ? 28 : 22;
   return (
-    <div className={cn("flex items-center justify-center gap-2.5 py-12 text-sm text-ink-muted", className)}>
-      <span
-        className={cn(
-          "animate-spin rounded-full border-2 border-gold-400/20 border-t-gold-400",
-          dim
-        )}
-      />
+    <div
+      className={cn(
+        "flex items-center justify-center gap-3 py-12 text-[13.5px] text-ink-500",
+        className
+      )}
+    >
+      <span className="spinner" style={{ width: dim, height: dim }} />
       {label}
     </div>
   );

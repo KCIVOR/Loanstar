@@ -72,8 +72,8 @@ export function AuthAdminWidget({ data }: { data: AuthAdminWidgetData }) {
           emptyText="No role assignments."
           renderRow={(r) => (
             <tr key={r.role}>
-              <td className="py-1.5 pr-3 font-semibold text-ink">{r.role}</td>
-              <td className="py-1.5 text-ink-muted">{r.count}</td>
+              <td className="py-1.5 pr-3 font-semibold text-ink-900">{r.role}</td>
+              <td className="py-1.5 text-ink-500">{r.count}</td>
             </tr>
           )}
         />
@@ -110,10 +110,10 @@ export function AuditWidget({ data }: { data: AuditWidgetData }) {
         emptyText="No recent events."
         renderRow={(e, i) => (
           <tr key={`${e.createdAt}-${i}`}>
-            <td className="py-1.5 pr-3 font-semibold text-ink">{e.moduleSlug}</td>
+            <td className="py-1.5 pr-3 font-semibold text-ink-900">{e.moduleSlug}</td>
             <td className="py-1.5 pr-3 text-ink-muted">{e.action}</td>
             <td className="py-1.5 pr-3 text-ink-muted">{e.entityType ?? "—"}</td>
-            <td className="py-1.5 text-ink-faint">{TIME_LABEL.format(new Date(e.createdAt))}</td>
+            <td className="py-1.5 text-ink-400">{TIME_LABEL.format(new Date(e.createdAt))}</td>
           </tr>
         )}
       />

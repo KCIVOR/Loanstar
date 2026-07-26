@@ -1,4 +1,5 @@
 import { handleApiError, jsonOk } from "@/lib/api/handler";
+import { createSignedDownloadUrl } from "@/lib/documents/storage";
 import {
   ForbiddenError,
   requireModulePermission,
@@ -41,9 +42,24 @@ export async function GET(_request: Request, { params }: RouteParams) {
 
     const { data: docs } = await supabase
       .from("generated_documents")
-      .select("id, document_slug, signed_at, is_finalized")
+      .select("id, document_slug, signed_at, is_finalized, storage_path")
       .eq("release_file_id", releaseFile.id)
       .order("document_slug");
+
+    const documents = await Promise.all(
+      (docs ?? []).map(async (doc) => ({
+        id: doc.id,
+        document_slug: doc.document_slug,
+        signed_at: doc.signed_at,
+        is_finalized: doc.is_finalized,
+        downloadUrl: doc.storage_path
+          ? await createSignedDownloadUrl(
+              supabase,
+              doc.storage_path as string,
+            ).catch(() => null)
+          : null,
+      })),
+    );
 
     return jsonOk({
       releaseFile: {
@@ -52,7 +68,7 @@ export async function GET(_request: Request, { params }: RouteParams) {
         releasePath: releaseFile.release_path,
       },
       blocker: app.blocker,
-      documents: docs ?? [],
+      documents,
     });
   } catch (error) {
     return handleApiError(error);

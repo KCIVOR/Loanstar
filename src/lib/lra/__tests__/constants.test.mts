@@ -27,6 +27,32 @@ test("With-PDC path generates check voucher, not cash voucher", () => {
   assert.ok(!AUTO_GENERATED_SLUGS.with_pdc.includes("ar_cash_voucher"));
 });
 
+test("both paths generate 7 docs including Letter of Intent and Loan Agreement (Phase 11)", () => {
+  assert.equal(AUTO_GENERATED_SLUGS.with_pdc.length, 7);
+  assert.equal(AUTO_GENERATED_SLUGS.without_pdc.length, 7);
+  for (const path of ["with_pdc", "without_pdc"] as const) {
+    assert.ok(AUTO_GENERATED_SLUGS[path].includes("letter_of_intent"));
+    assert.ok(AUTO_GENERATED_SLUGS[path].includes("loan_agreement"));
+  }
+});
+
+test("all-signed gate treats a full 7-doc set as complete (Phase 11)", () => {
+  const withPdc = AUTO_GENERATED_SLUGS.with_pdc.map((slug) => ({
+    slug,
+    signed_at: "2026-07-17T00:00:00Z",
+  }));
+  assert.equal(withPdc.length, 7);
+  assert.ok(withPdc.every((d) => Boolean(d.signed_at)));
+
+  const incomplete = withPdc.map((d, i) =>
+    i === 0 ? { ...d, signed_at: null } : d,
+  );
+  assert.equal(
+    incomplete.every((d) => Boolean(d.signed_at)),
+    false,
+  );
+});
+
 test("canRecordRelease requires borrower briefing sign-off", () => {
   assert.equal(canRecordRelease("ready_release", "2026-07-07T00:00:00Z"), true);
   assert.equal(canRecordRelease("ready_release", null), false);

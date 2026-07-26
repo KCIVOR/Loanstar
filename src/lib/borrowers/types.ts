@@ -5,6 +5,9 @@ export type Address = {
   province?: string;
   zipCode?: string;
   country?: string;
+  lengthOfStay?: string;
+  ownership?: string;
+  mortgage?: string;
 };
 
 export type ManningAgency = {
@@ -13,6 +16,13 @@ export type ManningAgency = {
   contactPerson?: string;
   phone?: string;
   email?: string;
+  crewingManager?: string;
+  crewingManagerContact?: string;
+  yearsOfStay?: string;
+  departureDate?: string;
+  previousAgency?: string;
+  previousSignOffDate?: string;
+  reasonForTransfer?: string;
 };
 
 export type FinancialInfo = {
@@ -21,6 +31,10 @@ export type FinancialInfo = {
   bankName?: string;
   accountNumber?: string;
   accountType?: string;
+  monthlyIncomeUsd?: number;
+  monthlyIncomePhp?: number;
+  householdExpensesPhp?: number;
+  otherLoansPhp?: number;
 };
 
 export type AllotteeInfo = {
@@ -28,6 +42,13 @@ export type AllotteeInfo = {
   relationship?: string;
   address?: Address;
   phone?: string;
+  email?: string;
+  facebook?: string;
+  allotmentPercent?: string;
+  companyName?: string;
+  companyAddress?: string;
+  yearsStayed?: string;
+  companyPhone?: string;
 };
 
 export type PicWorkInfo = {
@@ -42,6 +63,9 @@ export type Dependent = {
   name?: string;
   relationship?: string;
   dateOfBirth?: string;
+  age?: string;
+  contactNo?: string;
+  occupation?: string;
 };
 
 export type Reference = {
@@ -49,6 +73,18 @@ export type Reference = {
   relationship?: string;
   address?: string;
   phone?: string;
+  occupation?: string;
+};
+
+/** Loosely-typed keys stored inside `profileData` — no dedicated column, since
+ * they're single scalars not covered by the existing structured JSONB objects. */
+export type ContactChannels = {
+  viber?: string;
+  skype?: string;
+  othersContact?: string;
+  roaming?: string;
+  facebook?: string;
+  education?: string;
 };
 
 export type BorrowerProfile = {

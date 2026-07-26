@@ -27,6 +27,9 @@ const addressSchema = z.object({
   province: z.string().optional(),
   zipCode: z.string().optional(),
   country: z.string().optional(),
+  lengthOfStay: z.string().optional(),
+  ownership: z.string().optional(),
+  mortgage: z.string().optional(),
 });
 
 const manningAgencySchema = z.object({
@@ -35,6 +38,13 @@ const manningAgencySchema = z.object({
   contactPerson: z.string().optional(),
   phone: z.string().optional(),
   email: z.string().email().optional(),
+  crewingManager: z.string().optional(),
+  crewingManagerContact: z.string().optional(),
+  yearsOfStay: z.string().optional(),
+  departureDate: z.string().optional(),
+  previousAgency: z.string().optional(),
+  previousSignOffDate: z.string().optional(),
+  reasonForTransfer: z.string().optional(),
 });
 
 const financialSchema = z.object({
@@ -43,6 +53,10 @@ const financialSchema = z.object({
   bankName: z.string().optional(),
   accountNumber: z.string().optional(),
   accountType: z.string().optional(),
+  monthlyIncomeUsd: z.number().optional(),
+  monthlyIncomePhp: z.number().optional(),
+  householdExpensesPhp: z.number().optional(),
+  otherLoansPhp: z.number().optional(),
 });
 
 const allotteeSchema = z.object({
@@ -50,6 +64,13 @@ const allotteeSchema = z.object({
   relationship: z.string().optional(),
   address: addressSchema.optional(),
   phone: z.string().optional(),
+  email: z.string().email().optional(),
+  facebook: z.string().optional(),
+  allotmentPercent: z.string().optional(),
+  companyName: z.string().optional(),
+  companyAddress: z.string().optional(),
+  yearsStayed: z.string().optional(),
+  companyPhone: z.string().optional(),
 });
 
 const picWorkSchema = z.object({
@@ -64,6 +85,9 @@ const dependentSchema = z.object({
   name: z.string().optional(),
   relationship: z.string().optional(),
   dateOfBirth: z.string().optional(),
+  age: z.string().optional(),
+  contactNo: z.string().optional(),
+  occupation: z.string().optional(),
 });
 
 const referenceSchema = z.object({
@@ -71,6 +95,7 @@ const referenceSchema = z.object({
   relationship: z.string().optional(),
   address: z.string().optional(),
   phone: z.string().optional(),
+  occupation: z.string().optional(),
 });
 
 const patchProfileSchema = z.object({

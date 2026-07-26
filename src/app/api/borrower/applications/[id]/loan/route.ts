@@ -5,6 +5,10 @@ import { writeAuditEvent } from "@/lib/audit/writer";
 import { handleApiError, jsonOk } from "@/lib/api/handler";
 import { DOCUMENT_BUCKET } from "@/lib/constants";
 import {
+  assertPaymentProofPathOwnedByBorrower,
+  isAllowedPaymentProofMime,
+} from "@/lib/payments/proof-storage";
+import {
   ForbiddenError,
   requireModulePermission,
 } from "@/lib/permissions/server";
@@ -17,13 +21,14 @@ const schema = z.object({
   channel: z.enum(["bank_deposit", "check", "pos_cash"]),
   storagePath: z.string().optional(),
   fileName: z.string().optional(),
+  mimeType: z.string().optional(),
 });
 
 async function getBorrowerMasterlist(userId: string, applicationId: string) {
   const supabase = await createClient();
   const { data: app } = await supabase
     .from("loan_applications")
-    .select("id, borrower_id, borrowers!inner ( user_id )")
+    .select("id, status, borrower_id, borrowers!inner ( user_id )")
     .eq("id", applicationId)
     .single();
 
@@ -49,6 +54,7 @@ async function getBorrowerMasterlist(userId: string, applicationId: string) {
     masterlistId: masterlist.id as string,
     borrowerId: app.borrower_id as string,
     applicationId: app.id as string,
+    applicationStatus: String(app.status),
   };
 }
 
@@ -89,6 +95,44 @@ export async function POST(request: Request, ctx: { params: Promise<{ id: string
     const body = schema.parse(await request.json());
     const supabase = await createClient();
     const ctxData = await getBorrowerMasterlist(user.id, id);
+
+    if (ctxData.applicationStatus === "paid_off") {
+      return NextResponse.json(
+        { error: "This loan is paid off — payment proofs are closed" },
+        { status: 400 },
+      );
+    }
+
+    if (body.storagePath || body.fileName) {
+      if (!body.storagePath || !body.fileName) {
+        return NextResponse.json(
+          { error: "storagePath and fileName are required together" },
+          { status: 400 },
+        );
+      }
+      try {
+        assertPaymentProofPathOwnedByBorrower(
+          body.storagePath,
+          ctxData.borrowerId,
+        );
+      } catch (pathError) {
+        return NextResponse.json(
+          {
+            error:
+              pathError instanceof Error
+                ? pathError.message
+                : "Invalid payment proof storage path",
+          },
+          { status: 400 },
+        );
+      }
+      if (body.mimeType && !isAllowedPaymentProofMime(body.mimeType)) {
+        return NextResponse.json(
+          { error: "Unsupported file type for payment proof" },
+          { status: 400 },
+        );
+      }
+    }
 
     const { data, error } = await supabase
       .from("payments")

@@ -16,5 +16,6 @@ test("critical workflow statuses use End-to-End labels", () => {
   assert.equal(formatStatusLabel("for_verification"), "For Verification");
   assert.equal(formatStatusLabel("for_approval"), "For Approval");
   assert.equal(formatStatusLabel("loan_active"), "Loan Active");
+  assert.equal(formatStatusLabel("paid_off"), "Paid Off");
   assert.equal(formatStatusLabel("documents_pending"), "Documents Pending");
 });

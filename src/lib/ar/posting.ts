@@ -4,7 +4,10 @@ import {
   calculatePenaltyAmount,
   computeAgingBucket,
   daysPastDue,
+  DEFAULT_AGING_THRESHOLDS,
+  type AgingThresholds,
 } from "@/lib/ar/schedule";
+import { isActiveDcrStatus } from "@/lib/collector/desk";
 import { halfUp } from "@/lib/computation/money";
 
 async function getPenaltyRate(supabase: SupabaseClient): Promise<number> {
@@ -20,6 +23,25 @@ async function getPenaltyRate(supabase: SupabaseClient): Promise<number> {
   return 0.05;
 }
 
+async function getAgingThresholds(
+  supabase: SupabaseClient,
+): Promise<AgingThresholds> {
+  const { data } = await supabase
+    .from("config_settings")
+    .select("value")
+    .eq("key", "aging_thresholds")
+    .maybeSingle();
+
+  const raw = data?.value as Record<string, unknown> | undefined;
+  if (!raw) return DEFAULT_AGING_THRESHOLDS;
+
+  return {
+    t30: Number(raw["30"] ?? DEFAULT_AGING_THRESHOLDS.t30),
+    t60: Number(raw["60"] ?? DEFAULT_AGING_THRESHOLDS.t60),
+    t90: Number(raw["90"] ?? DEFAULT_AGING_THRESHOLDS.t90),
+  };
+}
+
 export async function refreshMasterlistAging(
   supabase: SupabaseClient,
   masterlistId: string,
@@ -27,24 +49,34 @@ export async function refreshMasterlistAging(
 ) {
   const { data: schedules } = await supabase
     .from("amortization_schedules")
-    .select("id, due_date, status, amount_due, amount_paid, penalty_amount")
+    .select(
+      "id, installment_no, due_date, status, amount_due, amount_paid, penalty_amount, rolled_at",
+    )
     .eq("masterlist_id", masterlistId)
     .neq("status", "paid")
-    .order("due_date");
+    .order("installment_no");
 
-  const overdue = (schedules ?? []).find((row) => {
-    const due = row.due_date as string;
-    return daysPastDue(due, asOf) > 0;
-  });
+  const thresholds = await getAgingThresholds(supabase);
+
+  // 'rolled' installments are frozen — their own balance was absorbed into
+  // the next installment, so they're excluded from being "the overdue one".
+  const overdue = (schedules ?? [])
+    .filter((row) => row.status !== "rolled")
+    .filter((row) => daysPastDue(row.due_date as string, asOf) > 0)
+    .sort((a, b) =>
+      (a.due_date as string).localeCompare(b.due_date as string),
+    )[0];
 
   let agingBucket = "current" as ReturnType<typeof computeAgingBucket>;
   if (overdue) {
     agingBucket = computeAgingBucket(
       daysPastDue(overdue.due_date as string, asOf),
+      thresholds,
     );
   }
 
   const penaltyRate = await getPenaltyRate(supabase);
+  let finalPenalty = Number(overdue?.penalty_amount ?? 0);
 
   if (overdue && daysPastDue(overdue.due_date as string, asOf) >= 1) {
     const outstanding =
@@ -69,6 +101,51 @@ export async function refreshMasterlistAging(
         rate_applied: penaltyRate,
         notes: "Missed payment penalty",
       });
+
+      finalPenalty = penalty;
+    }
+
+    // One-time 30-day rollover: fold the whole overdue balance (principal +
+    // accrued penalty) into the next unpaid installment, then freeze this
+    // one. Guarded by rolled_at so it only ever fires once per installment.
+    const dpd = daysPastDue(overdue.due_date as string, asOf);
+    if (dpd >= thresholds.t30 && !overdue.rolled_at) {
+      const next = (schedules ?? [])
+        .filter((row) => row.id !== overdue.id && row.status !== "rolled")
+        .sort(
+          (a, b) => (a.installment_no as number) - (b.installment_no as number),
+        )[0];
+
+      if (next) {
+        const rollAmount = halfUp(
+          Number(overdue.amount_due) -
+            Number(overdue.amount_paid) +
+            finalPenalty,
+        );
+        const now = new Date().toISOString();
+
+        await supabase
+          .from("amortization_schedules")
+          .update({ amount_due: Number(next.amount_due) + rollAmount })
+          .eq("id", next.id);
+
+        await supabase
+          .from("amortization_schedules")
+          .update({
+            status: "rolled",
+            rolled_at: now,
+            rolled_into_installment_no: next.installment_no,
+          })
+          .eq("id", overdue.id);
+
+        await supabase.from("penalties").insert({
+          masterlist_id: masterlistId,
+          amortization_schedule_id: overdue.id,
+          amount: rollAmount,
+          rate_applied: penaltyRate,
+          notes: `30-day rollover: ${rollAmount.toFixed(2)} rolled into installment #${next.installment_no}`,
+        });
+      }
     }
   }
 
@@ -93,6 +170,7 @@ export async function reconcileAndPostDcr(
   actorId: string,
   input: {
     depositReference: string;
+    depositAmount: number;
     depositProofPath?: string | null;
   },
 ) {
@@ -113,6 +191,17 @@ export async function reconcileAndPostDcr(
 
   if (!items?.length) {
     throw new Error("DCR has no payment items");
+  }
+
+  // The confirmed bank deposit must match the DCR total — a mismatched
+  // deposit means the report and the bank disagree, so nothing posts.
+  const dcrTotal = halfUp(
+    items.reduce((sum, item) => sum + Number(item.amount), 0),
+  );
+  if (halfUp(input.depositAmount) !== dcrTotal) {
+    throw new Error(
+      `Deposit amount ${input.depositAmount.toFixed(2)} does not match the DCR total ${dcrTotal.toFixed(2)} — verify the bank deposit before posting`,
+    );
   }
 
   const now = new Date().toISOString();
@@ -200,6 +289,7 @@ export async function reconcileAndPostDcr(
       reconciled_by: actorId,
       reconciled_at: now,
       deposit_reference: input.depositReference,
+      deposit_amount: halfUp(input.depositAmount),
       deposit_proof_path: input.depositProofPath ?? null,
     })
     .eq("id", dcrId);
@@ -302,6 +392,23 @@ export async function addPaymentToDcr(
 
   if (!payment || !["pending_verification", "confirmed"].includes(payment.status as string)) {
     throw new Error("Payment not available for DCR");
+  }
+
+  const { data: existingItems, error: existingError } = await supabase
+    .from("dcr_items")
+    .select("id, dcr!inner ( id, status )")
+    .eq("payment_id", paymentId);
+
+  if (existingError) throw new Error(existingError.message);
+
+  const alreadyBatched = (existingItems ?? []).some((row) => {
+    const dcr = row.dcr as { status?: string } | { status?: string }[] | null;
+    const status = Array.isArray(dcr) ? dcr[0]?.status : dcr?.status;
+    return isActiveDcrStatus(status ?? "");
+  });
+
+  if (alreadyBatched) {
+    throw new Error("Payment is already on a DCR");
   }
 
   const { error } = await supabase.from("dcr_items").insert({

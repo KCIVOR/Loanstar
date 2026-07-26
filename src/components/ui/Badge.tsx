@@ -1,31 +1,37 @@
 import type { ReactNode } from "react";
 import { cn } from "./cn";
 
+/* Meridian §06 badges. Legacy keys map onto Meridian classes:
+   info → badge-navy, gold → badge-teal, pending → badge-warning,
+   inactive → badge-neutral. `dot` adds the status dot. */
 const variants = {
-  success: "bg-success-100 text-success-ink",
-  warning: "bg-warning-100 text-warning-ink",
-  danger: "bg-danger-100 text-danger-ink",
-  info: "bg-info-100 text-info-ink",
-  neutral: "bg-neutral-100 text-neutral-700",
-  gold: "bg-gold-400/16 text-gold-600",
-  pending: "bg-warning-100 text-warning-ink",
-  inactive: "bg-neutral-100 text-ink-muted",
+  success: "badge-success",
+  warning: "badge-warning",
+  danger: "badge-danger",
+  info: "badge-navy",
+  navy: "badge-navy",
+  teal: "badge-teal",
+  neutral: "badge-neutral",
+  solid: "badge-solid",
+  gold: "badge-teal",
+  pending: "badge-warning",
+  inactive: "badge-neutral",
 } as const;
 
 export function Badge({
   children,
   variant = "neutral",
+  dot = false,
+  className = "",
 }: {
   children: ReactNode;
   variant?: keyof typeof variants;
+  dot?: boolean;
+  className?: string;
 }) {
   return (
-    <span
-      className={cn(
-        "inline-flex items-center rounded-full px-3 py-[3px] text-[11px] font-bold",
-        variants[variant]
-      )}
-    >
+    <span className={cn("badge", variants[variant], className)}>
+      {dot ? <i className="dot" /> : null}
       {children}
     </span>
   );
@@ -33,7 +39,7 @@ export function Badge({
 
 export function StatusBadge({ active }: { active: boolean }) {
   return (
-    <Badge variant={active ? "success" : "inactive"}>
+    <Badge variant={active ? "success" : "inactive"} dot>
       {active ? "Active" : "Inactive"}
     </Badge>
   );

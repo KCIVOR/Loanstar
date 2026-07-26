@@ -23,16 +23,17 @@ Use separate Supabase projects and Vercel environments for **dev**, **staging**,
 | `NEXT_PUBLIC_SUPABASE_URL` | Project URL |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Anon key |
 | `SUPABASE_SERVICE_ROLE_KEY` | Server only; never expose to client |
-| `RESEND_API_KEY` | Transactional email |
-| `EMAIL_FROM` | Verified sender domain |
 
 - [ ] Deploy staging first; run smoke + E2E against staging URL
 - [ ] Production deploy after staging sign-off
 
-## 3. Email (Resend)
+## 3. Email (SMTP via Superadmin)
 
-- [ ] Add and verify sending domain (DKIM/SPF)
-- [ ] Test denial + key transition templates via `/admin/email-test`
+- [ ] Configure Google SMTP (or other provider) under **Superadmin → System Config**
+- [ ] Enable transactional email; set **From** to match the mailbox username
+- [ ] Test via `/admin/email-test` (generic `test` template, or committee `application_approved` / `application_denied`)
+- [ ] Edit Approve/Deny email copy at **Superadmin → Decision Emails** (`/admin/email-templates`); committee Approve sends SMTP + in-app notice
+- [ ] Separately configure **Supabase Auth SMTP** in the Supabase dashboard for signup/confirm and password-reset emails
 
 ## 4. Pre-production verification
 

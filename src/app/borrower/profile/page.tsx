@@ -2,59 +2,9 @@
 
 import { FormEvent, useCallback, useEffect, useState } from "react";
 
-import {
-  Alert,
-  Button,
-  Card,
-  Input,
-  Label,
-  PageHeader,
-  Spinner,
-} from "@/components/ui";
-import type {
-  Address,
-  AllotteeInfo,
-  BorrowerProfile,
-  Dependent,
-  FinancialInfo,
-  ManningAgency,
-  PicWorkInfo,
-  Reference,
-} from "@/lib/borrowers/types";
-
-function AddressFields({
-  prefix,
-  value,
-  onChange,
-}: {
-  prefix: string;
-  value: Address;
-  onChange: (v: Address) => void;
-}) {
-  return (
-    <div className="grid gap-3 sm:grid-cols-2">
-      {(
-        [
-          ["street", "Street"],
-          ["barangay", "Barangay"],
-          ["city", "City"],
-          ["province", "Province"],
-          ["zipCode", "Zip code"],
-          ["country", "Country"],
-        ] as const
-      ).map(([field, label]) => (
-        <div key={field}>
-          <Label htmlFor={`${prefix}_${field}`}>{label}</Label>
-          <Input
-            id={`${prefix}_${field}`}
-            value={value[field] ?? ""}
-            onChange={(e) => onChange({ ...value, [field]: e.target.value })}
-          />
-        </div>
-      ))}
-    </div>
-  );
-}
+import { Alert, Breadcrumbs, Button, PageHeader, Spinner } from "@/components/ui";
+import { ApplicantProfileFields } from "@/components/borrowers/ApplicantProfileFields";
+import type { BorrowerProfile } from "@/lib/borrowers/types";
 
 export default function BorrowerProfilePage() {
   const [profile, setProfile] = useState<BorrowerProfile | null>(null);
@@ -112,6 +62,7 @@ export default function BorrowerProfilePage() {
           picWork: profile.picWork,
           dependents: profile.dependents,
           references: profile.references,
+          profileData: profile.profileData,
         }),
       });
       if (!res.ok) {
@@ -132,9 +83,16 @@ export default function BorrowerProfilePage() {
 
   return (
     <div>
+      <Breadcrumbs
+        className="mb-3"
+        items={[
+          { label: "Dashboard", href: "/borrower" },
+          { label: "Application profile" },
+        ]}
+      />
       <PageHeader
-        title="Profile"
-        description="Complete your SF Application Form details"
+        title="Application profile"
+        description="SF Application Form details for your loan file. Login settings (name, avatar, notification prefs) are under Account in the header."
       />
 
       {error ? (
@@ -149,293 +107,9 @@ export default function BorrowerProfilePage() {
       ) : null}
 
       <form onSubmit={(e) => void handleSubmit(e)} className="space-y-6">
-        <Card>
-          <h2 className="mb-4 font-medium text-ink">Personal information</h2>
-          <div className="grid gap-3 sm:grid-cols-2">
-            {(
-              [
-                ["firstName", "First name", true],
-                ["middleName", "Middle name", false],
-                ["lastName", "Last name", true],
-                ["suffix", "Suffix", false],
-              ] as const
-            ).map(([field, label, required]) => (
-              <div key={field}>
-                <Label htmlFor={field}>{label}</Label>
-                <Input
-                  id={field}
-                  required={required}
-                  value={profile[field] ?? ""}
-                  onChange={(e) =>
-                    setProfile({ ...profile, [field]: e.target.value })
-                  }
-                />
-              </div>
-            ))}
-            <div>
-              <Label htmlFor="email">Email</Label>
-              <Input id="email" type="email" value={profile.email} disabled />
-            </div>
-            {(
-              [
-                ["dateOfBirth", "date", "Date of birth"],
-                ["placeOfBirth", "text", "Place of birth"],
-                ["citizenship", "text", "Citizenship"],
-                ["civilStatus", "text", "Civil status"],
-                ["gender", "text", "Gender"],
-                ["mobilePhone", "tel", "Mobile phone"],
-                ["landline", "tel", "Landline"],
-              ] as const
-            ).map(([field, type, label]) => (
-              <div key={field}>
-                <Label htmlFor={field}>{label}</Label>
-                <Input
-                  id={field}
-                  type={type}
-                  value={profile[field] ?? ""}
-                  onChange={(e) =>
-                    setProfile({ ...profile, [field]: e.target.value })
-                  }
-                />
-              </div>
-            ))}
-          </div>
-        </Card>
-
-        <Card>
-          <h2 className="mb-4 font-medium text-ink">Present address</h2>
-          <AddressFields
-            prefix="present"
-            value={profile.presentAddress}
-            onChange={(v) => setProfile({ ...profile, presentAddress: v })}
-          />
-        </Card>
-
-        <Card>
-          <h2 className="mb-4 font-medium text-ink">Permanent address</h2>
-          <AddressFields
-            prefix="permanent"
-            value={profile.permanentAddress}
-            onChange={(v) => setProfile({ ...profile, permanentAddress: v })}
-          />
-        </Card>
-
-        <Card>
-          <h2 className="mb-4 font-medium text-ink">Manning agency</h2>
-          <div className="grid gap-3 sm:grid-cols-2">
-            {(
-              [
-                ["name", "Agency name"],
-                ["contactPerson", "Contact person"],
-                ["phone", "Phone"],
-                ["email", "Email"],
-                ["address", "Address"],
-              ] as const
-            ).map(([field, label]) => (
-              <div key={field}>
-                <Label htmlFor={`ma_${field}`}>{label}</Label>
-                <Input
-                  id={`ma_${field}`}
-                  value={profile.manningAgency[field] ?? ""}
-                  onChange={(e) =>
-                    setProfile({
-                      ...profile,
-                      manningAgency: {
-                        ...profile.manningAgency,
-                        [field]: e.target.value,
-                      } as ManningAgency,
-                    })
-                  }
-                />
-              </div>
-            ))}
-          </div>
-        </Card>
-
-        <Card>
-          <h2 className="mb-4 font-medium text-ink">Financial</h2>
-          <div className="grid gap-3 sm:grid-cols-2">
-            {(
-              [
-                ["monthlyIncome", "Monthly income"],
-                ["otherIncome", "Other income"],
-                ["bankName", "Bank name"],
-                ["accountNumber", "Account number"],
-                ["accountType", "Account type"],
-              ] as const
-            ).map(([field, label]) => (
-              <div key={field}>
-                <Label htmlFor={`fin_${field}`}>{label}</Label>
-                <Input
-                  id={`fin_${field}`}
-                  className={field === "accountNumber" ? "font-mono" : undefined}
-                  value={String(profile.financial[field] ?? "")}
-                  onChange={(e) =>
-                    setProfile({
-                      ...profile,
-                      financial: {
-                        ...profile.financial,
-                        [field]:
-                          field.includes("Income")
-                            ? Number(e.target.value) || undefined
-                            : e.target.value,
-                      } as FinancialInfo,
-                    })
-                  }
-                />
-              </div>
-            ))}
-          </div>
-        </Card>
-
-        <Card>
-          <h2 className="mb-4 font-medium text-ink">Allottee</h2>
-          <div className="grid gap-3 sm:grid-cols-2">
-            {(
-              [
-                ["name", "Name"],
-                ["relationship", "Relationship"],
-                ["phone", "Phone"],
-              ] as const
-            ).map(([field, label]) => (
-              <div key={field}>
-                <Label htmlFor={`all_${field}`}>{label}</Label>
-                <Input
-                  id={`all_${field}`}
-                  value={profile.allottee[field] ?? ""}
-                  onChange={(e) =>
-                    setProfile({
-                      ...profile,
-                      allottee: {
-                        ...profile.allottee,
-                        [field]: e.target.value,
-                      } as AllotteeInfo,
-                    })
-                  }
-                />
-              </div>
-            ))}
-          </div>
-        </Card>
-
-        <Card>
-          <h2 className="mb-4 font-medium text-ink">PIC work info</h2>
-          <div className="grid gap-3 sm:grid-cols-2">
-            {(
-              [
-                ["rank", "Rank"],
-                ["vessel", "Vessel"],
-                ["contractDuration", "Contract duration"],
-                ["embarkationDate", "Embarkation date"],
-                ["disembarkationDate", "Disembarkation date"],
-              ] as const
-            ).map(([field, label]) => (
-              <div key={field}>
-                <Label htmlFor={`pic_${field}`}>{label}</Label>
-                <Input
-                  id={`pic_${field}`}
-                  value={profile.picWork[field] ?? ""}
-                  onChange={(e) =>
-                    setProfile({
-                      ...profile,
-                      picWork: {
-                        ...profile.picWork,
-                        [field]: e.target.value,
-                      } as PicWorkInfo,
-                    })
-                  }
-                />
-              </div>
-            ))}
-          </div>
-        </Card>
-
-        <Card>
-          <div className="mb-4 flex items-center justify-between">
-            <h2 className="font-medium text-ink">Dependents</h2>
-            <Button
-              type="button"
-              variant="secondary"
-              onClick={() =>
-                setProfile({
-                  ...profile,
-                  dependents: [
-                    ...profile.dependents,
-                    { name: "", relationship: "", dateOfBirth: "" },
-                  ],
-                })
-              }
-            >
-              Add dependent
-            </Button>
-          </div>
-          {profile.dependents.map((dep, i) => (
-            <div
-              key={i}
-              className="mb-3 grid gap-3 border-b border-neutral-200 pb-3 sm:grid-cols-3"
-            >
-              {(["name", "relationship", "dateOfBirth"] as const).map(
-                (field) => (
-                  <Input
-                    key={field}
-                    placeholder={field === "dateOfBirth" ? "Date of birth" : field}
-                    value={dep[field] ?? ""}
-                    onChange={(e) => {
-                      const deps = [...profile.dependents];
-                      deps[i] = { ...dep, [field]: e.target.value };
-                      setProfile({ ...profile, dependents: deps as Dependent[] });
-                    }}
-                  />
-                ),
-              )}
-            </div>
-          ))}
-        </Card>
-
-        <Card>
-          <div className="mb-4 flex items-center justify-between">
-            <h2 className="font-medium text-ink">References</h2>
-            <Button
-              type="button"
-              variant="secondary"
-              onClick={() =>
-                setProfile({
-                  ...profile,
-                  references: [
-                    ...profile.references,
-                    { name: "", relationship: "", phone: "", address: "" },
-                  ],
-                })
-              }
-            >
-              Add reference
-            </Button>
-          </div>
-          {profile.references.map((ref, i) => (
-            <div
-              key={i}
-              className="mb-3 grid gap-3 border-b border-neutral-200 pb-3 sm:grid-cols-2"
-            >
-              {(["name", "relationship", "phone", "address"] as const).map(
-                (field) => (
-                  <Input
-                    key={field}
-                    placeholder={field.charAt(0).toUpperCase() + field.slice(1)}
-                    value={ref[field] ?? ""}
-                    onChange={(e) => {
-                      const refs = [...profile.references];
-                      refs[i] = { ...ref, [field]: e.target.value };
-                      setProfile({ ...profile, references: refs as Reference[] });
-                    }}
-                  />
-                ),
-              )}
-            </div>
-          ))}
-        </Card>
-
-        <Button type="submit" disabled={saving}>
-          {saving ? "Saving…" : "Save profile"}
+        <ApplicantProfileFields profile={profile} onChange={setProfile} />
+        <Button type="submit" loading={saving}>
+          Save profile
         </Button>
       </form>
     </div>

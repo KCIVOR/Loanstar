@@ -2,12 +2,62 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { appendStatusHistory } from "@/lib/applications/status";
 import { writeAuditEvent } from "@/lib/audit/writer";
-import { sendEmail } from "@/lib/email/send";
-import { getApplicationForStaff } from "@/lib/csa/application";
+import { notifyBorrowerForApplication } from "@/lib/notifications/write";
 
-import { computeVoteTally, type VoteRecord } from "./votes";
+import {
+  assertAllVotesCast,
+  computeVoteTally,
+  type VoteRecord,
+} from "./votes";
 
 export type FinalAction = "approve" | "deny" | "revisit" | "hold";
+
+const COMMITTEE_DECISION_STATUSES = ["for_approval", "committee_hold"] as const;
+
+export function assertFinalActionPreconditions(
+  status: string,
+  action: FinalAction,
+  options?: { comment?: string; revisitRoute?: "csa" | "cig" },
+): void {
+  if (
+    !(COMMITTEE_DECISION_STATUSES as readonly string[]).includes(status)
+  ) {
+    throw new Error("Application is not pending committee decision");
+  }
+
+  if (action === "hold" && status === "committee_hold") {
+    throw new Error("Application is already on committee hold");
+  }
+
+  if (action === "revisit" && !options?.comment?.trim()) {
+    throw new Error("Comment is required for Notice to Revisit");
+  }
+
+  if (action === "deny" && !options?.comment?.trim()) {
+    throw new Error("Remarks are required when denying a loan");
+  }
+
+  if (action === "hold" && !options?.comment?.trim()) {
+    throw new Error("Comment is required when placing a committee hold");
+  }
+}
+
+export function resolveFinalActionStatus(action: FinalAction): string {
+  switch (action) {
+    case "approve":
+      return "approved";
+    case "deny":
+      return "denied";
+    case "revisit":
+      return "for_revision";
+    case "hold":
+      return "committee_hold";
+    default: {
+      const _exhaustive: never = action;
+      throw new Error(`Invalid action: ${_exhaustive}`);
+    }
+  }
+}
 
 export async function getCommitteeVotes(
   supabase: SupabaseClient,
@@ -15,7 +65,7 @@ export async function getCommitteeVotes(
 ): Promise<VoteRecord[]> {
   const { data, error } = await supabase
     .from("committee_votes")
-    .select("id, voter_id, vote, voted_at")
+    .select("id, voter_id, vote, voted_at, comment")
     .eq("loan_application_id", applicationId)
     .order("voted_at");
 
@@ -28,6 +78,7 @@ export async function getCommitteeVotes(
     voterId: row.voter_id as string,
     vote: row.vote as VoteRecord["vote"],
     votedAt: row.voted_at as string,
+    comment: (row.comment as string) ?? null,
   }));
 }
 
@@ -36,6 +87,7 @@ export async function castCommitteeVote(
   applicationId: string,
   voterId: string,
   vote: VoteRecord["vote"],
+  comment?: string | null,
 ): Promise<VoteRecord[]> {
   const { error } = await supabase.from("committee_votes").upsert(
     {
@@ -43,6 +95,7 @@ export async function castCommitteeVote(
       voter_id: voterId,
       vote,
       voted_at: new Date().toISOString(),
+      comment: comment ?? null,
     },
     { onConflict: "loan_application_id,voter_id" },
   );
@@ -95,15 +148,10 @@ export async function executeFinalAction(
     throw new Error("Application not found");
   }
 
-  if (application.status !== "for_approval") {
-    throw new Error("Application is not pending committee decision");
-  }
-
-  if (action === "revisit" && !options?.comment?.trim()) {
-    throw new Error("Comment is required for Notice to Revisit");
-  }
+  assertFinalActionPreconditions(application.status, action, options);
 
   const votes = await getCommitteeVotes(supabase, applicationId);
+  assertAllVotesCast(votes);
   const tally = computeVoteTally(votes);
 
   const { data: actionRow, error: actionError } = await supabase
@@ -122,24 +170,7 @@ export async function executeFinalAction(
     throw new Error(actionError.message);
   }
 
-  let newStatus: string;
-
-  switch (action) {
-    case "approve":
-      newStatus = "approved";
-      break;
-    case "deny":
-      newStatus = "denied";
-      break;
-    case "revisit":
-      newStatus = "for_revision";
-      break;
-    case "hold":
-      newStatus = "on_hold";
-      break;
-    default:
-      throw new Error("Invalid action");
-  }
+  const newStatus = resolveFinalActionStatus(action);
 
   await appendStatusHistory(supabase, applicationId, newStatus, {
     actorId,
@@ -149,7 +180,7 @@ export async function executeFinalAction(
   await supabase
     .from("loan_applications")
     .update({
-      blocker: action === "hold" ? options?.comment ?? "On hold" : null,
+      blocker: null,
     })
     .eq("id", applicationId);
 
@@ -179,22 +210,24 @@ export async function executeFinalAction(
   }
 
   if (action === "deny") {
-    const staffApp = await getApplicationForStaff(supabase, applicationId);
-    const borrowerRaw = staffApp.borrowers;
-    const borrower = Array.isArray(borrowerRaw) ? borrowerRaw[0] : borrowerRaw;
+    // Queues CIG's courtesy call. Denial email is sent on this Deny click
+    // (see action route + attemptApplicationDeniedEmail) — not when CIG
+    // marks the call done.
+    const { error: noticeError } = await supabase
+      .from("denial_notices")
+      .upsert(
+        {
+          loan_application_id: applicationId,
+          committee_action_id: actionRow.id,
+          created_at: new Date().toISOString(),
+          informed_at: null,
+          informed_by: null,
+        },
+        { onConflict: "loan_application_id" },
+      );
 
-    if (borrower?.email) {
-      try {
-        await sendEmail({
-          to: borrower.email as string,
-          templateSlug: "application_denied",
-          variables: {
-            borrower_name: `${borrower.first_name} ${borrower.last_name}`,
-          },
-        });
-      } catch {
-        // Email failure should not block denial; audit still records action
-      }
+    if (noticeError) {
+      throw new Error(noticeError.message);
     }
   }
 
@@ -221,6 +254,26 @@ export async function executeFinalAction(
       votes,
     },
   });
+
+  if (action === "approve") {
+    void notifyBorrowerForApplication(applicationId, {
+      title: "Application approved",
+      body: "The committee approved your loan application. Next steps will follow for disclosure and release.",
+      link: "/borrower",
+      kind: "application_approved",
+      entityType: "loan_application",
+      entityId: applicationId,
+    });
+  } else if (action === "deny") {
+    void notifyBorrowerForApplication(applicationId, {
+      title: "Application decision",
+      body: "A decision was recorded on your loan application. Please check your email for the written notice.",
+      link: "/borrower",
+      kind: "application_denied",
+      entityType: "loan_application",
+      entityId: applicationId,
+    });
+  }
 
   return { status: newStatus };
 }

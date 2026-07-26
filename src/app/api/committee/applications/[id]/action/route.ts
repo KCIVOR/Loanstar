@@ -2,7 +2,10 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 
 import { handleApiError, jsonOk } from "@/lib/api/handler";
+import { attemptApplicationApprovedEmail } from "@/lib/committee/approval-email";
 import { executeFinalAction } from "@/lib/committee/actions";
+import { attemptApplicationDeniedEmail } from "@/lib/committee/denial-email";
+import { getApplicationForStaff } from "@/lib/csa/application";
 import { requireModulePermission } from "@/lib/permissions/server";
 import { createClient } from "@/lib/supabase/server";
 
@@ -32,6 +35,51 @@ export async function POST(request: Request, { params }: RouteParams) {
       comment: body.comment,
       revisitRoute: body.revisitRoute,
     });
+
+    // Phase 4: denial email fires on Deny (not on CIG's courtesy-call confirm).
+    // Failure must not roll back the decision — attemptApplicationDeniedEmail
+    // swallows errors and audits emailSent.
+    if (body.action === "deny") {
+      const application = await getApplicationForStaff(supabase, id);
+      const borrowerRaw = application.borrowers;
+      const borrower = Array.isArray(borrowerRaw)
+        ? borrowerRaw[0]
+        : borrowerRaw;
+      await attemptApplicationDeniedEmail({
+        actorId: user.id,
+        applicationId: id,
+        supabase,
+        borrower: borrower
+          ? {
+              email: borrower.email as string | null,
+              first_name: borrower.first_name as string | null,
+              last_name: borrower.last_name as string | null,
+              user_id: borrower.user_id as string | null,
+            }
+          : null,
+      });
+    }
+
+    if (body.action === "approve") {
+      const application = await getApplicationForStaff(supabase, id);
+      const borrowerRaw = application.borrowers;
+      const borrower = Array.isArray(borrowerRaw)
+        ? borrowerRaw[0]
+        : borrowerRaw;
+      await attemptApplicationApprovedEmail({
+        actorId: user.id,
+        applicationId: id,
+        supabase,
+        borrower: borrower
+          ? {
+              email: borrower.email as string | null,
+              first_name: borrower.first_name as string | null,
+              last_name: borrower.last_name as string | null,
+              user_id: borrower.user_id as string | null,
+            }
+          : null,
+      });
+    }
 
     return jsonOk(result);
   } catch (error) {

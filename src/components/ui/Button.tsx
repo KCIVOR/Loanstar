@@ -1,28 +1,30 @@
 import type { ButtonHTMLAttributes, ReactNode } from "react";
 import { cn } from "./cn";
 
+/* Meridian §04 — navy for the primary path, teal for the money moment.
+   Legacy keys kept for compatibility: success → accent (approve/release). */
 const variants = {
-  primary:
-    "bg-gradient-to-br from-gold-300 to-gold-400 text-navy-900 shadow-[0_4px_14px_rgba(217,168,85,0.3)] hover:from-gold-300 hover:to-gold-300",
-  secondary:
-    "border border-gold-400/40 bg-gold-400/10 text-gold-600 hover:bg-gold-400/16",
-  outline:
-    "border border-neutral-300 bg-transparent text-ink hover:bg-neutral-50",
-  ghost: "text-ink-muted hover:bg-neutral-100",
-  danger: "bg-danger text-white hover:opacity-90",
-  success: "bg-success text-white hover:opacity-90",
+  primary: "btn-primary",
+  accent: "btn-accent",
+  secondary: "btn-secondary",
+  outline: "btn-outline",
+  ghost: "btn-ghost",
+  danger: "btn-danger",
+  "danger-soft": "btn-danger-soft",
+  success: "btn-accent",
 } as const;
 
 const sizes = {
-  sm: "h-8 rounded-sm px-3.5 text-xs",
-  md: "h-10 rounded-lg px-5 text-sm",
-  lg: "h-12 rounded-[10px] px-7 text-[15px]",
+  sm: "btn-sm",
+  md: "",
+  lg: "btn-lg",
 } as const;
 
 export type ButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & {
   variant?: keyof typeof variants;
   size?: keyof typeof sizes;
   loading?: boolean;
+  block?: boolean;
   children?: ReactNode;
 };
 
@@ -31,6 +33,7 @@ export function Button({
   variant = "primary",
   size = "md",
   loading = false,
+  block = false,
   className = "",
   disabled,
   type = "button",
@@ -41,17 +44,14 @@ export function Button({
     <button
       type={type}
       disabled={isDisabled}
-      className={cn(
-        "inline-flex items-center justify-center gap-2 font-bold tracking-[0.01em] transition-all duration-150",
-        "disabled:cursor-not-allowed disabled:bg-neutral-100 disabled:text-neutral-400 disabled:shadow-none disabled:hover:bg-neutral-100",
-        sizes[size],
-        variants[variant],
-        className
-      )}
+      className={cn("btn", variants[variant], sizes[size], block && "btn-block", className)}
       {...props}
     >
       {loading ? (
-        <span className="h-3.5 w-3.5 shrink-0 animate-spin rounded-full border-2 border-navy-900/35 border-t-navy-900" />
+        <span
+          className="spinner"
+          style={{ width: 14, height: 14, borderWidth: 2, borderColor: "currentColor", borderTopColor: "transparent", opacity: 0.7 }}
+        />
       ) : null}
       {children}
     </button>

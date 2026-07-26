@@ -2,12 +2,13 @@
 
 import { useCallback, useEffect, useState } from "react";
 
-import { Alert, Button, Card, DocumentRow } from "@/components/ui";
+import { Alert, Card } from "@/components/ui";
 
 type ReleaseDoc = {
   id: string;
   document_slug: string;
   signed_at: string | null;
+  downloadUrl?: string | null;
 };
 
 type ReleaseDocSignProps = {
@@ -15,15 +16,43 @@ type ReleaseDocSignProps = {
   onSigned: () => void;
 };
 
-export function ReleaseDocSign({ applicationId, onSigned }: ReleaseDocSignProps) {
+const CheckIcon = (
+  <svg
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth={3.4}
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
+    <path d="M20 6 9 17l-5-5" />
+  </svg>
+);
+const ClockIcon = (
+  <svg
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth={3}
+    strokeLinecap="round"
+  >
+    <path d="M12 7v6M12 17h.01" />
+  </svg>
+);
+
+/**
+ * Read-only progress view: release documents are signed in-branch during the
+ * LRA-facilitated signing session, not from the portal.
+ */
+export function ReleaseDocSign({ applicationId }: ReleaseDocSignProps) {
   const [documents, setDocuments] = useState<ReleaseDoc[]>([]);
   const [blocker, setBlocker] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
-  const [signingId, setSigningId] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [collapsed, setCollapsed] = useState(false);
+  const [collapseInitialized, setCollapseInitialized] = useState(false);
 
-  const load = useCallback(async () => {
-    setLoading(true);
+  const load = useCallback(async (opts?: { silent?: boolean }) => {
+    if (!opts?.silent) setLoading(true);
     try {
       const res = await fetch(
         `/api/borrower/applications/${applicationId}/release-documents`,
@@ -37,7 +66,7 @@ export function ReleaseDocSign({ applicationId, onSigned }: ReleaseDocSignProps)
       setDocuments(data.documents);
       setBlocker(data.blocker);
     } finally {
-      setLoading(false);
+      if (!opts?.silent) setLoading(false);
     }
   }, [applicationId]);
 
@@ -45,71 +74,100 @@ export function ReleaseDocSign({ applicationId, onSigned }: ReleaseDocSignProps)
     void load();
   }, [load]);
 
+  const pending = documents.filter((d) => !d.signed_at);
+  const allDone = documents.length > 0 && pending.length === 0;
+
+  useEffect(() => {
+    if (collapseInitialized || loading || documents.length === 0) return;
+    setCollapsed(allDone);
+    setCollapseInitialized(true);
+  }, [collapseInitialized, loading, documents.length, allDone]);
+
   if (loading || documents.length === 0) return null;
 
-  async function sign(docId: string) {
-    setSigningId(docId);
-    setError(null);
-    try {
-      const res = await fetch(
-        `/api/borrower/applications/${applicationId}/release-documents/${docId}/sign`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ confirm: true }),
-        },
-      );
-      const body = (await res.json()) as { error?: string };
-      if (!res.ok) throw new Error(body.error ?? "Sign failed");
-      onSigned();
-      await load();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Sign failed");
-    } finally {
-      setSigningId(null);
-    }
-  }
-
-  const pending = documents.filter((d) => !d.signed_at);
+  const progressLabel = `${documents.length - pending.length}/${documents.length}`;
+  const isOpen = !collapsed;
 
   return (
     <Card className="mb-6">
-      <h2 className="mb-2 font-display text-lg font-semibold text-ink">Release documents</h2>
-      {blocker ? (
-        <div className="mb-3">
-          <Alert variant="warning">{blocker}</Alert>
-        </div>
-      ) : null}
-      {error ? (
-        <div className="mb-3">
-          <Alert>{error}</Alert>
-        </div>
-      ) : null}
-      <ul className="space-y-2">
-        {documents.map((doc) => (
-          <li key={doc.id}>
-            <DocumentRow
-              title={doc.document_slug.replace(/_/g, " ")}
-              status={doc.signed_at ? "confirmed" : "required"}
-              action={
-                doc.signed_at ? undefined : (
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    loading={signingId === doc.id}
-                    onClick={() => void sign(doc.id)}
-                  >
-                    Confirm / sign
-                  </Button>
-                )
-              }
-            />
-          </li>
-        ))}
-      </ul>
-      {pending.length === 0 ? (
+      <button
+        type="button"
+        className="flex w-full items-start justify-between gap-3 text-left"
+        aria-expanded={isOpen}
+        onClick={() => setCollapsed((c) => !c)}
+      >
+        <span className="min-w-0">
+          <span className="flex flex-wrap items-center gap-2">
+            <span className="font-display text-lg font-semibold leading-tight text-navy-900">
+              Release documents
+            </span>
+            <span
+              className={`mono text-[11.5px] font-semibold ${
+                allDone ? "text-success" : "text-ink-400"
+              }`}
+            >
+              {progressLabel}
+            </span>
+          </span>
+          <span className="mt-0.5 block text-sm leading-snug text-ink-500">
+            You will sign these at the branch with your loan release officer.
+          </span>
+        </span>
+        <span
+          className="mono mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-[var(--r-sm)] text-base text-teal-600 hover:bg-surface-2"
+          aria-hidden
+        >
+          {isOpen ? "–" : "+"}
+        </span>
+      </button>
+
+      {isOpen ? (
         <div className="mt-3">
-          <Alert variant="success">All release documents signed.</Alert>
+          {blocker ? (
+            <div className="mb-3">
+              <Alert variant="warning">{blocker}</Alert>
+            </div>
+          ) : null}
+
+          <div className="chk-list chk-list--page !max-w-none">
+            {documents.map((doc) => {
+              const signed = Boolean(doc.signed_at);
+              return (
+                <div key={doc.id} className={`ci ${signed ? "ok" : "pend"}`}>
+                  <span className="st">{signed ? CheckIcon : ClockIcon}</span>
+                  <div>
+                    <b className="capitalize">
+                      {doc.document_slug.replace(/_/g, " ")}
+                    </b>
+                    <span>
+                      {signed
+                        ? `Signed ${new Date(doc.signed_at!).toLocaleString()}`
+                        : "To be signed at your branch signing session"}
+                    </span>
+                  </div>
+                  <span className="act flex items-center gap-2">
+                    {doc.downloadUrl ? (
+                      <a
+                        href={doc.downloadUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-sm font-semibold text-teal-700 hover:underline"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        PDF
+                      </a>
+                    ) : null}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+
+          {allDone ? (
+            <div className="mt-3">
+              <Alert variant="success">All release documents signed.</Alert>
+            </div>
+          ) : null}
         </div>
       ) : null}
     </Card>

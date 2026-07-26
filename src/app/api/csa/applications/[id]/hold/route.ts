@@ -1,10 +1,10 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
-import { appendStatusHistory } from "@/lib/applications/status";
 import { writeAuditEvent } from "@/lib/audit/writer";
 import { handleApiError, jsonOk } from "@/lib/api/handler";
 import { assertCsaCanEdit } from "@/lib/csa/application";
+import { recordApplicationHold } from "@/lib/csa/record-hold";
 import { requireModulePermission } from "@/lib/permissions/server";
 import { createClient } from "@/lib/supabase/server";
 
@@ -22,40 +22,24 @@ export async function POST(request: Request, { params }: RouteParams) {
     const supabase = await createClient();
     await assertCsaCanEdit(supabase, id);
 
-    const { data: hold, error: holdError } = await supabase
-      .from("file_holds")
-      .insert({
-        loan_application_id: id,
-        reason: body.reason,
-        recorded_by: user.id,
-      })
-      .select("id, reason, created_at")
-      .single();
-
-    if (holdError) {
-      throw new Error(holdError.message);
-    }
-
-    await appendStatusHistory(supabase, id, "on_hold", {
+    const { holdId } = await recordApplicationHold(supabase, {
+      applicationId: id,
+      reason: body.reason,
       actorId: user.id,
-      note: body.reason,
     });
-
-    await supabase
-      .from("loan_applications")
-      .update({ blocker: body.reason })
-      .eq("id", id);
 
     await writeAuditEvent({
       actorId: user.id,
       moduleSlug: "intake",
       action: "execute_trigger",
       entityType: "file_hold",
-      entityId: hold.id,
+      entityId: holdId,
       afterData: { applicationId: id, reason: body.reason },
     });
 
-    return jsonOk({ hold });
+    return jsonOk({
+      hold: { id: holdId, reason: body.reason },
+    });
   } catch (error) {
     if (error instanceof z.ZodError) {
       return NextResponse.json({ error: error.message }, { status: 400 });

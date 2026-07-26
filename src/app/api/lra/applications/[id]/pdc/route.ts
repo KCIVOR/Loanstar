@@ -3,6 +3,7 @@ import { z } from "zod";
 
 import { writeAuditEvent } from "@/lib/audit/writer";
 import { handleApiError, jsonOk } from "@/lib/api/handler";
+import { isPdcShortfallError } from "@/lib/lra/pdc-shortfall";
 import { savePdcChecks } from "@/lib/lra/release-service";
 import { requireModulePermission } from "@/lib/permissions/server";
 import { createClient } from "@/lib/supabase/server";
@@ -21,6 +22,7 @@ const schema = z.object({
   ),
   blankCheckFrom: z.string().optional(),
   blankCheckTo: z.string().optional(),
+  acknowledgeShortfall: z.boolean().optional(),
 });
 
 export async function POST(request: Request, { params }: RouteParams) {
@@ -46,6 +48,7 @@ export async function POST(request: Request, { params }: RouteParams) {
       body.checks,
       { from: body.blankCheckFrom, to: body.blankCheckTo },
       user.id,
+      { acknowledgeShortfall: body.acknowledgeShortfall },
     );
 
     await writeAuditEvent({
@@ -54,13 +57,21 @@ export async function POST(request: Request, { params }: RouteParams) {
       action: "update",
       entityType: "pdc_checks",
       entityId: releaseFile.id,
-      afterData: { count: body.checks.length },
+      afterData: {
+        count: body.checks.length,
+        terms: result.terms,
+        acknowledgeShortfall: body.acknowledgeShortfall === true,
+        shortfallAcknowledged: result.shortfallAcknowledged,
+      },
     });
 
     return jsonOk(result);
   } catch (error) {
     if (error instanceof z.ZodError) {
       return NextResponse.json({ error: error.message }, { status: 400 });
+    }
+    if (error instanceof Error && isPdcShortfallError(error.message)) {
+      return NextResponse.json({ error: error.message }, { status: 409 });
     }
     return handleApiError(error);
   }

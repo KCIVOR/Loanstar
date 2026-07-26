@@ -19,6 +19,13 @@ Default roles are seeded in Phase 1. Super Admin manages custom roles at **Admin
 
 Users may hold **multiple roles** (e.g. same person as CSA + LRA).
 
+## Account vs application profile
+
+- **Account** (`/account`, header → Account / Settings) — login identity for every role: display name, account phone, avatar, notification preferences, in-app inbox. Stored on `profiles` (+ Auth metadata for display name).
+- **Application profile** (`/borrower/profile`) — borrower SF / KYC form on the `borrowers` table (loan file data). CSA may also edit this during intake. Do **not** treat these as the same screen.
+
+Self-service account edits write audit events under module slug `account_settings`. Avatar uploads are rate-limited (5 per 10 minutes).
+
 ## System configuration
 
 **Admin → Config**

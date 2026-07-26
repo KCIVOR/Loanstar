@@ -8,6 +8,7 @@ import {
   getActiveComputation,
   persistComputation,
 } from "@/lib/csa/computation";
+import { assertInterviewRecordedForComputation } from "@/lib/csa/initial-interview";
 import { requireModulePermission } from "@/lib/permissions/server";
 import { createClient } from "@/lib/supabase/server";
 
@@ -52,6 +53,22 @@ export async function POST(request: Request, { params }: RouteParams) {
     const body = computeSchema.parse(await request.json());
     const supabase = await createClient();
     const application = await assertCsaCanEdit(supabase, id);
+
+    try {
+      assertInterviewRecordedForComputation(
+        (application.initial_interview_at as string | null) ?? null,
+      );
+    } catch (err) {
+      return NextResponse.json(
+        {
+          error:
+            err instanceof Error
+              ? err.message
+              : "Initial interview must be recorded before preparing the loan computation",
+        },
+        { status: 400 },
+      );
+    }
 
     let loanType: {
       id: string;
@@ -100,7 +117,13 @@ export async function POST(request: Request, { params }: RouteParams) {
     const borrower = Array.isArray(borrowerRaw)
       ? borrowerRaw[0]
       : borrowerRaw;
-    const financial = (borrower?.financial ?? {}) as { monthlyIncome?: number };
+    const financial = (borrower?.financial ?? {}) as {
+      monthlyIncome?: number;
+      monthlyIncomePhp?: number;
+    };
+    // Profile form stores PHP as monthlyIncomePhp; legacy rows may use monthlyIncome.
+    const monthlyIncome =
+      financial.monthlyIncomePhp ?? financial.monthlyIncome ?? null;
     const securityFeeRate =
       body.securityFeeRate ?? Number(loanType.interest_rate);
 
@@ -118,7 +141,7 @@ export async function POST(request: Request, { params }: RouteParams) {
       otherDeductions: body.otherDeductions,
       releaseDate: body.releaseDate,
       dueDay: body.dueDay,
-      monthlyIncome: financial.monthlyIncome,
+      monthlyIncome,
       computedBy: user.id,
     });
 

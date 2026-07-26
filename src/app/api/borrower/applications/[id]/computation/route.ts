@@ -10,7 +10,7 @@ import {
   ForbiddenError,
   requireModulePermission,
 } from "@/lib/permissions/server";
-import { createClient } from "@/lib/supabase/server";
+import { createClient, createServiceClient } from "@/lib/supabase/server";
 
 type RouteParams = { params: Promise<{ id: string }> };
 
@@ -103,10 +103,27 @@ export async function POST(request: Request, { params }: RouteParams) {
     }
 
     if (computation.signedAt) {
-      return NextResponse.json(
-        { error: "Computation already signed" },
-        { status: 400 },
-      );
+      // Stale intake signature after disclose: RLS can leave signed_at set
+      // while negotiation is still awaiting_signature. Clear and continue.
+      if (negotiation?.status === "awaiting_signature") {
+        const admin = createServiceClient();
+        const { error: clearError } = await admin
+          .from("computations")
+          .update({
+            signed_at: null,
+            signed_by: null,
+            signature_hash: null,
+          })
+          .eq("id", computation.id);
+        if (clearError) {
+          throw new Error(clearError.message);
+        }
+      } else {
+        return NextResponse.json(
+          { error: "Computation already signed" },
+          { status: 400 },
+        );
+      }
     }
 
     const signatureHash = createHash("sha256")

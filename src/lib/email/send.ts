@@ -1,6 +1,7 @@
-import { Resend } from "resend";
+import nodemailer from "nodemailer";
 
 import { createServiceClient } from "@/lib/supabase/server";
+import { loadSmtpConfig } from "@/lib/email/smtp-config";
 
 export type SendEmailInput = {
   to: string | string[];
@@ -15,8 +16,6 @@ export type SendEmailResult = {
   subject: string;
 };
 
-const DEFAULT_FROM = "LoanStar <noreply@loanstar.local>";
-
 function renderTemplate(
   template: string,
   variables: Record<string, string>,
@@ -27,17 +26,24 @@ function renderTemplate(
 }
 
 /**
- * Sends a transactional email using a row from `email_templates` and Resend.
+ * Sends a transactional email using `email_templates` + SMTP from
+ * Superadmin `config_settings` (Google SMTP / nodemailer).
  */
 export async function sendEmail(
   input: SendEmailInput,
 ): Promise<SendEmailResult> {
-  const apiKey = process.env.RESEND_API_KEY;
-  if (!apiKey) {
-    throw new Error("RESEND_API_KEY is not configured");
+  const supabase = createServiceClient();
+  const smtp = await loadSmtpConfig(supabase);
+
+  if (!smtp.enabled) {
+    throw new Error("Transactional email is disabled (email_enabled=false)");
+  }
+  if (smtp.incomplete.length > 0) {
+    throw new Error(
+      `SMTP credentials incomplete: ${smtp.incomplete.join(", ")}`,
+    );
   }
 
-  const supabase = createServiceClient();
   const { data: template, error } = await supabase
     .from("email_templates")
     .select("subject, body_html")
@@ -54,23 +60,30 @@ export async function sendEmail(
   const subject = renderTemplate(template.subject, variables);
   const html = renderTemplate(template.body_html, variables);
   const recipients = Array.isArray(input.to) ? input.to : [input.to];
+  const from = (input.from?.trim() || smtp.from).trim();
+  if (!from) {
+    throw new Error("SMTP from address is empty");
+  }
 
-  const resend = new Resend(apiKey);
-  const { data, error: sendError } = await resend.emails.send({
-    from: input.from ?? DEFAULT_FROM,
-    to: recipients,
+  const transporter = nodemailer.createTransport({
+    host: smtp.host,
+    port: smtp.port,
+    secure: smtp.secure,
+    auth: {
+      user: smtp.user,
+      pass: smtp.password,
+    },
+  });
+
+  const info = await transporter.sendMail({
+    from,
+    to: recipients.join(", "),
     subject,
     html,
   });
 
-  if (sendError || !data?.id) {
-    throw new Error(
-      `Failed to send email: ${sendError?.message ?? "unknown error"}`,
-    );
-  }
-
   return {
-    id: data.id,
+    id: info.messageId || `smtp-${Date.now()}`,
     to: recipients,
     subject,
   };

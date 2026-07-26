@@ -48,11 +48,22 @@ export function generateAmortizationSchedule(input: {
 
 export type AgingBucket = "current" | "1-30" | "31-60" | "61-90" | "91+";
 
-export function computeAgingBucket(daysPastDue: number): AgingBucket {
+export type AgingThresholds = { t30: number; t60: number; t90: number };
+
+export const DEFAULT_AGING_THRESHOLDS: AgingThresholds = {
+  t30: 30,
+  t60: 60,
+  t90: 90,
+};
+
+export function computeAgingBucket(
+  daysPastDue: number,
+  thresholds: AgingThresholds = DEFAULT_AGING_THRESHOLDS,
+): AgingBucket {
   if (daysPastDue <= 0) return "current";
-  if (daysPastDue <= 30) return "1-30";
-  if (daysPastDue <= 60) return "31-60";
-  if (daysPastDue <= 90) return "61-90";
+  if (daysPastDue <= thresholds.t30) return "1-30";
+  if (daysPastDue <= thresholds.t60) return "31-60";
+  if (daysPastDue < thresholds.t90) return "61-90";
   return "91+";
 }
 

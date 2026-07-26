@@ -1,0 +1,124 @@
+import type { SupabaseClient } from "@supabase/supabase-js";
+
+import { writeAuditEvent } from "@/lib/audit/writer";
+import { sendEmail } from "@/lib/email/send";
+import { shouldSendChannel } from "@/lib/notifications/should-send-channel";
+
+export type DenialBorrower = {
+  email?: string | null;
+  first_name?: string | null;
+  last_name?: string | null;
+  user_id?: string | null;
+};
+
+export type ApplicationDeniedEmailPayload = {
+  to: string;
+  templateSlug: "application_denied";
+  variables: { borrower_name: string };
+};
+
+/** Build the denial notice email — borrower name only (no reason disclosed). */
+export function buildApplicationDeniedEmail(
+  borrower: DenialBorrower | null | undefined,
+): ApplicationDeniedEmailPayload | null {
+  const email = borrower?.email?.trim();
+  if (!email) return null;
+
+  const borrower_name = [borrower?.first_name, borrower?.last_name]
+    .filter((part): part is string => Boolean(part?.trim()))
+    .join(" ")
+    .trim();
+
+  return {
+    to: email,
+    templateSlug: "application_denied",
+    variables: { borrower_name: borrower_name || "Borrower" },
+  };
+}
+
+/**
+ * Sends the denial email after a successful committee Deny.
+ * Failures are audited and never thrown — the decision must stand.
+ */
+export async function attemptApplicationDeniedEmail(opts: {
+  actorId: string;
+  applicationId: string;
+  borrower: DenialBorrower | null | undefined;
+  supabase: SupabaseClient;
+  isResend?: boolean;
+}): Promise<{ emailSent: boolean }> {
+  const payload = buildApplicationDeniedEmail(opts.borrower);
+  if (!payload) {
+    await writeAuditEvent({
+      actorId: opts.actorId,
+      moduleSlug: "committee",
+      action: "execute_trigger",
+      entityType: "loan_application",
+      entityId: opts.applicationId,
+      afterData: {
+        trigger: "committee_deny_email",
+        applicationId: opts.applicationId,
+        emailSent: false,
+        reason: "borrower_email_missing",
+        ...(opts.isResend ? { isResend: true } : {}),
+      },
+    });
+    return { emailSent: false };
+  }
+
+  const channel = await shouldSendChannel(
+    opts.supabase,
+    opts.borrower?.user_id,
+    "email",
+  );
+  if (!channel.allowed) {
+    await writeAuditEvent({
+      actorId: opts.actorId,
+      moduleSlug: "committee",
+      action: "execute_trigger",
+      entityType: "loan_application",
+      entityId: opts.applicationId,
+      afterData: {
+        trigger: "committee_deny_email",
+        applicationId: opts.applicationId,
+        emailSent: false,
+        reason: channel.reason ?? "channel_pref_blocked",
+        ...(opts.isResend ? { isResend: true } : {}),
+      },
+    });
+    return { emailSent: false };
+  }
+
+  try {
+    await sendEmail(payload);
+    await writeAuditEvent({
+      actorId: opts.actorId,
+      moduleSlug: "committee",
+      action: "execute_trigger",
+      entityType: "loan_application",
+      entityId: opts.applicationId,
+      afterData: {
+        trigger: "committee_deny_email",
+        applicationId: opts.applicationId,
+        emailSent: true,
+        ...(opts.isResend ? { isResend: true } : {}),
+      },
+    });
+    return { emailSent: true };
+  } catch {
+    await writeAuditEvent({
+      actorId: opts.actorId,
+      moduleSlug: "committee",
+      action: "execute_trigger",
+      entityType: "loan_application",
+      entityId: opts.applicationId,
+      afterData: {
+        trigger: "committee_deny_email",
+        applicationId: opts.applicationId,
+        emailSent: false,
+        ...(opts.isResend ? { isResend: true } : {}),
+      },
+    });
+    return { emailSent: false };
+  }
+}

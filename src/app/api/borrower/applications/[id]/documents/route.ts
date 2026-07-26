@@ -4,6 +4,7 @@ import { z } from "zod";
 import { writeAuditEvent } from "@/lib/audit/writer";
 import { handleApiError, jsonOk } from "@/lib/api/handler";
 import { STAGES } from "@/lib/constants";
+import { isCsaOnlyIntakeSlug } from "@/lib/documents/csa-only-intake";
 import { buildStoragePath } from "@/lib/documents/storage";
 import {
   ForbiddenError,
@@ -60,6 +61,23 @@ export async function POST(request: Request, { params }: RouteParams) {
     const body = uploadMetadataSchema.parse(await request.json());
     const supabase = await createClient();
     const application = await assertOwnApplication(user.id, id);
+
+    const { data: docType, error: docTypeError } = await supabase
+      .from("document_types")
+      .select("slug")
+      .eq("id", body.documentTypeId)
+      .maybeSingle();
+
+    if (docTypeError) throw new Error(docTypeError.message);
+    if (docType && isCsaOnlyIntakeSlug(docType.slug as string)) {
+      return NextResponse.json(
+        {
+          error:
+            "Clearance Form is managed by CSA and cannot be uploaded from the borrower portal.",
+        },
+        { status: 403 },
+      );
+    }
 
     const { data: existingDoc, error: fetchError } = await supabase
       .from("documents")

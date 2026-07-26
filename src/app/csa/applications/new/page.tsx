@@ -1,23 +1,33 @@
 "use client";
 
-import Link from "next/link";
-import { FormEvent, useState } from "react";
-import { useRouter } from "next/navigation";
+import { FormEvent, useMemo, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 
 import {
   Alert,
+  Breadcrumbs,
   Button,
   Card,
   Input,
   Label,
   PageHeader,
 } from "@/components/ui";
+import { parseBorrowerNameParts } from "@/lib/csa/leads";
 
 export default function CsaNewApplicationPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const leadId = searchParams.get("leadId");
+  const leadName = searchParams.get("name") ?? "";
+
+  const prefill = useMemo(
+    () => parseBorrowerNameParts(leadName),
+    [leadName],
+  );
+
   const [email, setEmail] = useState("");
-  const [firstName, setFirstName] = useState("");
-  const [lastName, setLastName] = useState("");
+  const [firstName, setFirstName] = useState(prefill.firstName);
+  const [lastName, setLastName] = useState(prefill.lastName);
   const [middleName, setMiddleName] = useState("");
   const [mobilePhone, setMobilePhone] = useState("");
   const [saving, setSaving] = useState(false);
@@ -28,17 +38,24 @@ export default function CsaNewApplicationPage() {
     setSaving(true);
     setError(null);
     try {
-      const res = await fetch("/api/csa/applications", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          email,
-          firstName,
-          lastName,
-          middleName: middleName || undefined,
-          mobilePhone: mobilePhone || undefined,
-        }),
-      });
+      const payload = {
+        email,
+        firstName,
+        lastName,
+        middleName: middleName || undefined,
+        mobilePhone: mobilePhone || undefined,
+      };
+
+      const res = await fetch(
+        leadId
+          ? `/api/csa/leads/${leadId}/convert`
+          : "/api/csa/applications",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        },
+      );
       const data = (await res.json()) as {
         applicationId?: string;
         error?: string;
@@ -54,13 +71,19 @@ export default function CsaNewApplicationPage() {
 
   return (
     <div>
+      <Breadcrumbs
+        className="mb-3"
+        items={[
+          { label: "CSA queue", href: "/csa" },
+          { label: leadId ? "Convert lead" : "New application" },
+        ]}
+      />
       <PageHeader
-        title="Create application"
-        description="Create on behalf of a borrower. Account linking can happen later when the borrower registers."
-        actions={
-          <Link href="/csa">
-            <Button variant="secondary">Back to queue</Button>
-          </Link>
+        title={leadId ? "Start application from lead" : "Create application"}
+        description={
+          leadId
+            ? "Convert this agent lead into a loan application. The lead will link to the new file."
+            : "Create on behalf of a borrower. Account linking can happen later when the borrower registers."
         }
       />
 
@@ -71,9 +94,14 @@ export default function CsaNewApplicationPage() {
       ) : null}
 
       <Card>
+        <h2 className="mb-4 font-display text-lg font-semibold text-navy-900">
+          Borrower details
+        </h2>
         <form onSubmit={(e) => void handleSubmit(e)} className="grid gap-4 sm:grid-cols-2">
           <div className="sm:col-span-2">
-            <Label htmlFor="email">Email</Label>
+            <Label htmlFor="email" required>
+              Email
+            </Label>
             <Input
               id="email"
               type="email"
@@ -83,7 +111,9 @@ export default function CsaNewApplicationPage() {
             />
           </div>
           <div>
-            <Label htmlFor="firstName">First name</Label>
+            <Label htmlFor="firstName" required>
+              First name
+            </Label>
             <Input
               id="firstName"
               required
@@ -92,7 +122,9 @@ export default function CsaNewApplicationPage() {
             />
           </div>
           <div>
-            <Label htmlFor="lastName">Last name</Label>
+            <Label htmlFor="lastName" required>
+              Last name
+            </Label>
             <Input
               id="lastName"
               required
@@ -117,8 +149,8 @@ export default function CsaNewApplicationPage() {
             />
           </div>
           <div className="sm:col-span-2">
-            <Button type="submit" disabled={saving}>
-              {saving ? "Creating…" : "Create application"}
+            <Button type="submit" loading={saving}>
+              {leadId ? "Convert lead & create application" : "Create application"}
             </Button>
           </div>
         </form>
