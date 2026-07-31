@@ -3753,19 +3753,22 @@ table.tbl {
   background: rgba(255, 255, 255, 0.08);
 }
 
-/* Full-viewport section panels — each major block fills one screen. */
+/* Full-viewport section panels — each major block fills at least one screen,
+   but never clips: min-height lets the section grow instead of cutting off
+   content when the effective viewport shrinks (e.g. browser zoom-in, short
+   windows, larger text). */
 .landing-panel {
-  height: 100vh;
-  height: 100dvh;
+  min-height: 100vh;
+  min-height: 100dvh;
   display: flex;
   flex-direction: column;
   justify-content: center;
   box-sizing: border-box;
-  overflow: hidden;
+  padding-block: 28px;
 }
-@supports (height: 100svh) {
+@supports (min-height: 100svh) {
   .landing-panel {
-    height: 100svh;
+    min-height: 100svh;
   }
 }
 
@@ -3827,7 +3830,6 @@ table.tbl {
   background: linear-gradient(160deg, var(--navy-950) 0%, var(--navy-900) 60%, var(--navy-800) 100%);
   color: #fff;
   position: relative;
-  overflow: hidden;
   /* Fixed nav overlays this panel; keep content clear of the 66px bar */
   padding-top: 66px;
   justify-content: center;
@@ -4092,7 +4094,6 @@ table.tbl {
   background: var(--navy-950);
   color: #fff;
   position: relative;
-  overflow: hidden;
 }
 .landing-band::before {
   content: "";
@@ -4271,7 +4272,7 @@ table.tbl {
   display: flex;
   flex-direction: column;
   position: relative;
-  overflow: hidden;
+  overflow-y: auto;
 }
 .login-brand::before {
   content: "";
@@ -4459,18 +4460,6 @@ table.tbl {
   }
   .landing-band .landing-wrap {
     grid-template-columns: 1fr;
-  }
-  /* Allow tall content to scroll inside a panel on small screens */
-  .landing-panel {
-    height: auto;
-    min-height: 100vh;
-    min-height: 100dvh;
-    overflow-y: auto;
-  }
-  @supports (min-height: 100svh) {
-    .landing-panel {
-      min-height: 100svh;
-    }
   }
   .login-shell {
     grid-template-columns: 1fr;
