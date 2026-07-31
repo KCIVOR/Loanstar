@@ -3,7 +3,7 @@ import {
   buildApplicationApprovedEmailHtml,
   buildApplicationDeniedEmailHtml,
   buildTestEmailHtml,
-} from "../src/lib/email/meridian-default-bodies.ts";
+} from "../src/lib/email/meridian-default-bodies";
 
 const triples: Array<[string, string]> = [
   ["application_denied", buildApplicationDeniedEmailHtml()],

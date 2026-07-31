@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useMemo, useState } from "react";
+import { FormEvent, Suspense, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 
 import {
@@ -14,7 +14,7 @@ import {
 } from "@/components/ui";
 import { parseBorrowerNameParts } from "@/lib/csa/leads";
 
-export default function CsaNewApplicationPage() {
+function CsaNewApplicationForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const leadId = searchParams.get("leadId");
@@ -156,5 +156,13 @@ export default function CsaNewApplicationPage() {
         </form>
       </Card>
     </div>
+  );
+}
+
+export default function CsaNewApplicationPage() {
+  return (
+    <Suspense fallback={null}>
+      <CsaNewApplicationForm />
+    </Suspense>
   );
 }

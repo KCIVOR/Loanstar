@@ -17,10 +17,12 @@ export function Card({
   children,
   variant = "base",
   className = "",
+  id,
 }: {
   children: ReactNode;
   variant?: keyof typeof variants;
   className?: string;
+  id?: string;
 }) {
-  return <div className={cn(variants[variant], className)}>{children}</div>;
+  return <div id={id} className={cn(variants[variant], className)}>{children}</div>;
 }

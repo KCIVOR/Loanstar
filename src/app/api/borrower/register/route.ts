@@ -243,6 +243,10 @@ export async function POST(request: Request) {
       throw profileError;
     }
 
+    if (!borrower) {
+      throw new Error("Borrower profile was not created");
+    }
+
     await writeServiceAudit({
       actorId: userId,
       moduleSlug: "borrower_portal",
