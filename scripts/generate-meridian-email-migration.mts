@@ -3,7 +3,7 @@ import {
   buildApplicationApprovedEmailHtml,
   buildApplicationDeniedEmailHtml,
   buildTestEmailHtml,
-} from "../src/lib/email/meridian-default-bodies.ts";
+} from "../src/lib/email/meridian-default-bodies";
 
 function updateSql(slug: string, html: string): string {
   // Dollar-quote avoids escaping single quotes inside HTML.
