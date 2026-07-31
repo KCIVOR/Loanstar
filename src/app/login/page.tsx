@@ -236,7 +236,8 @@ function LoginForm() {
             </Link>
           </div>
 
-          {process.env.NODE_ENV !== "production" ? (
+          {process.env.NODE_ENV !== "production" ||
+          process.env.NEXT_PUBLIC_ENABLE_SEED_LOGIN === "true" ? (
             <div className="mt-6 border-t border-line-soft pt-4">
               <p className="side-grp mb-2 text-center" style={{ padding: 0, opacity: 0.6 }}>
                 Quick login (seed accounts)
