@@ -45,7 +45,7 @@ export async function generateAcknowledgementReceipt(
 
   const { data: app } = await supabase
     .from("loan_applications")
-    .select("borrower_id, borrowers (*)")
+    .select("borrower_id, segment, borrowers (*)")
     .eq("id", file.loanApplicationId)
     .single();
   if (!app?.borrower_id) {
@@ -74,6 +74,7 @@ export async function generateAcknowledgementReceipt(
     },
     borrowerProfile,
     releasePath,
+    { segment: app.segment === "sme" ? "sme" : "seafarer" },
   );
 
   // Template-specific alias for the released amount.

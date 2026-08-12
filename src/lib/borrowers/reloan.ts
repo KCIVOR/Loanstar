@@ -55,3 +55,93 @@ export function findResumableDraft<T extends { id: string; status: string }>(
 ): T | null {
   return applications.find((app) => app.status === "draft") ?? null;
 }
+
+export type ReloanSegmentScope = {
+  segment: "seafarer" | "sme";
+  entityType: "individual" | "corporate" | null;
+};
+
+/**
+ * Segment a borrower-initiated application should carry.
+ *
+ * A reloan inherits from the application it continues — otherwise an existing SME
+ * borrower clicking "apply again" silently gets a Seafarer file: wrong document
+ * checklist, and mislabelled when it reaches CSA. Borrowers cannot self-declare
+ * SME, so a first application is always Seafarer.
+ *
+ * segment/entityType are inherited as a PAIR — the DB constraint
+ * `loan_applications_entity_type_sme_only` requires entity_type when segment='sme',
+ * so an 'sme' parent missing a valid entity_type falls back to Seafarer rather
+ * than producing an insert the database would reject.
+ */
+export function resolveReloanSegment(input: {
+  isReloan: boolean;
+  parentSegment?: string | null;
+  parentEntityType?: string | null;
+}): ReloanSegmentScope {
+  if (!input.isReloan) {
+    return { segment: "seafarer", entityType: null };
+  }
+
+  const entityType = input.parentEntityType;
+  const inheritSme =
+    input.parentSegment === "sme" &&
+    (entityType === "individual" || entityType === "corporate");
+
+  return inheritSme
+    ? { segment: "sme", entityType: entityType as "individual" | "corporate" }
+    : { segment: "seafarer", entityType: null };
+}
+
+export type BorrowerCreateSegmentResult =
+  | { ok: true; scope: ReloanSegmentScope }
+  | { ok: false; error: string };
+
+/**
+ * Segment to write when a borrower starts their NEXT application (first or
+ * reloan). A reloan always inherits from its parent (`resolveReloanSegment`,
+ * unchanged, body ignored) — see that function's doc comment for why. A first
+ * application may now self-declare a segment: omitted/seafarer body keeps the
+ * pre-existing default (Seafarer, no entity type) so old clients that POST an
+ * empty body behave exactly as before; declaring 'sme' requires a valid
+ * entityType so the insert never hits the DB's
+ * `loan_applications_entity_type_sme_only` constraint.
+ */
+export function resolveBorrowerCreateSegment(input: {
+  kind: "first" | "reloan";
+  bodySegment?: string | null;
+  bodyEntityType?: string | null;
+  parentSegment?: string | null;
+  parentEntityType?: string | null;
+}): BorrowerCreateSegmentResult {
+  if (input.kind === "reloan") {
+    return {
+      ok: true,
+      scope: resolveReloanSegment({
+        isReloan: true,
+        parentSegment: input.parentSegment,
+        parentEntityType: input.parentEntityType,
+      }),
+    };
+  }
+
+  const bodySegment = input.bodySegment ?? "seafarer";
+
+  if (bodySegment === "seafarer") {
+    return { ok: true, scope: { segment: "seafarer", entityType: null } };
+  }
+
+  if (bodySegment !== "sme") {
+    return { ok: false, error: `Invalid segment: ${bodySegment}` };
+  }
+
+  const entityType = input.bodyEntityType;
+  if (entityType !== "individual" && entityType !== "corporate") {
+    return {
+      ok: false,
+      error: "entityType (individual or corporate) is required for SME",
+    };
+  }
+
+  return { ok: true, scope: { segment: "sme", entityType } };
+}

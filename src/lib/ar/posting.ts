@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
+import { resolvePenaltyRate } from "@/lib/ar/penalty-rate";
 import {
   calculatePenaltyAmount,
   computeAgingBucket,
@@ -10,17 +11,36 @@ import {
 import { isActiveDcrStatus } from "@/lib/collector/desk";
 import { halfUp } from "@/lib/computation/money";
 
-async function getPenaltyRate(supabase: SupabaseClient): Promise<number> {
+function parseRate(raw: unknown, fallback: number): number {
+  if (typeof raw === "number" && Number.isFinite(raw)) return raw;
+  if (typeof raw === "string") {
+    const n = Number(raw);
+    if (Number.isFinite(n)) return n;
+  }
+  return fallback;
+}
+
+/**
+ * Reads Seafarer vs SME penalty rates and selects by masterlist.segment.
+ * Throws if segment is NULL/unknown — never silently uses the Seafarer rate.
+ */
+export async function getPenaltyRate(
+  supabase: SupabaseClient,
+  segment: string | null | undefined,
+): Promise<number> {
   const { data } = await supabase
     .from("config_settings")
-    .select("value")
-    .eq("key", "penalty_rate")
-    .maybeSingle();
+    .select("key, value")
+    .in("key", ["penalty_rate", "penalty_rate_sme"]);
 
-  const raw = data?.value;
-  if (typeof raw === "number") return raw;
-  if (typeof raw === "string") return Number(raw);
-  return 0.05;
+  let seafarer = 0.05;
+  let sme = 0.05;
+  for (const row of data ?? []) {
+    if (row.key === "penalty_rate") seafarer = parseRate(row.value, 0.05);
+    if (row.key === "penalty_rate_sme") sme = parseRate(row.value, 0.05);
+  }
+
+  return resolvePenaltyRate(segment, { seafarer, sme });
 }
 
 async function getAgingThresholds(
@@ -47,6 +67,18 @@ export async function refreshMasterlistAging(
   masterlistId: string,
   asOf = new Date(),
 ) {
+  const { data: masterlistRow, error: mlReadError } = await supabase
+    .from("masterlist")
+    .select("segment")
+    .eq("id", masterlistId)
+    .single();
+
+  if (mlReadError || !masterlistRow) {
+    throw new Error(
+      mlReadError?.message ?? `Masterlist ${masterlistId} not found`,
+    );
+  }
+
   const { data: schedules } = await supabase
     .from("amortization_schedules")
     .select(
@@ -75,7 +107,10 @@ export async function refreshMasterlistAging(
     );
   }
 
-  const penaltyRate = await getPenaltyRate(supabase);
+  const penaltyRate = await getPenaltyRate(
+    supabase,
+    masterlistRow.segment as string | null,
+  );
   let finalPenalty = Number(overdue?.penalty_amount ?? 0);
 
   if (overdue && daysPastDue(overdue.due_date as string, asOf) >= 1) {

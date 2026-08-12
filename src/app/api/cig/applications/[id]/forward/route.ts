@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 import { writeAuditEvent } from "@/lib/audit/writer";
 import { handleApiError, jsonOk } from "@/lib/api/handler";
 import { forwardToCommittee } from "@/lib/cig/forward";
-import { assertCigVerificationStage } from "@/lib/cig/queue";
+import { assertCigVerificationStage } from "@/lib/cig/queue-guards";
 import { requireModulePermission } from "@/lib/permissions/server";
 import { createClient } from "@/lib/supabase/server";
 

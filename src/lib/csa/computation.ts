@@ -1,13 +1,24 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
-import { checkCoverageRatio, getCoverageThreshold } from "@/lib/computation/coverage";
+import {
+  checkCoverageRatio,
+  getCoverageThreshold,
+  skipCoverageForSegment,
+} from "@/lib/computation/coverage";
 import { computeFirstPaymentDate } from "@/lib/computation/release-date";
 import { computeSfLoan } from "@/lib/computation/sf";
-import type { InputMode, OtherDeductions, SfComputeResult } from "@/lib/computation/types";
+import { computeSmeLoan } from "@/lib/computation/sme";
+import type {
+  InputMode,
+  OtherDeductions,
+  SfComputeResult,
+} from "@/lib/computation/types";
 import { createServiceClient } from "@/lib/supabase/server";
 
 export type PersistComputationInput = {
   loanApplicationId: string;
+  /** Application segment — selects SF vs SME engine. Defaults to seafarer. */
+  segment?: "seafarer" | "sme" | null;
   loanTypeId?: string | null;
   loanTypeName?: string | null;
   inputMode: InputMode;
@@ -17,6 +28,10 @@ export type PersistComputationInput = {
   pfRate: number;
   interestRate: number;
   securityFeeRate: number;
+  /** SME only — loan_desired × admin_rate (outside PF bundle). Default 0. */
+  adminRate?: number;
+  /** SME only — per-account DS & Notary flag. Default true. */
+  withDsAndNotary?: boolean;
   otherDeductions?: OtherDeductions;
   releaseDate?: string | null;
   dueDay?: number;
@@ -38,6 +53,36 @@ export function buildLineItems(result: SfComputeResult) {
     { key: "total_loan", label: "Total Loan", amount: result.totalLoan },
     { key: "monthly_amortization", label: "Monthly Amortization", amount: result.monthlyAmortization },
   ];
+}
+
+function smeToSfResult(
+  input: PersistComputationInput,
+  sme: ReturnType<typeof computeSmeLoan>,
+): SfComputeResult {
+  return {
+    inputMode: input.inputMode,
+    inputAmount: input.amount,
+    terms: sme.terms,
+    addonMonths: sme.addonMonths,
+    pfRate: sme.pfRate,
+    interestRate: sme.interestRate,
+    securityFeeRate: 0,
+    otherDeductions: sme.otherDeductions,
+    otherDeductionsTotal: sme.otherDeductionsTotal,
+    principal: sme.principal,
+    pfTotal: sme.pfBundle,
+    processingFee: sme.processingFee,
+    docStamp: sme.docStamp,
+    notaryFee: sme.notaryFee,
+    adminCost: sme.adminCost,
+    pfBundle: sme.pfBundle,
+    securityFee: sme.securityFee,
+    totalDeductions: sme.totalDeductions,
+    netReleased: sme.netReleased,
+    totalInterest: sme.totalInterest,
+    totalLoan: sme.totalLoan,
+    monthlyAmortization: sme.monthlyAmortization,
+  };
 }
 
 export function mapComputationRow(row: Record<string, unknown>) {
@@ -85,23 +130,45 @@ export async function persistComputation(
   supabase: SupabaseClient,
   input: PersistComputationInput,
 ) {
-  const result = computeSfLoan({
-    inputMode: input.inputMode,
-    amount: input.amount,
-    terms: input.terms,
-    addonMonths: input.addonMonths,
-    pfRate: input.pfRate,
-    interestRate: input.interestRate,
-    securityFeeRate: input.securityFeeRate,
-    otherDeductions: input.otherDeductions,
-  });
+  const segment = input.segment === "sme" ? "sme" : "seafarer";
 
-  const coverageThreshold = await getCoverageThreshold(supabase);
-  const coverage = checkCoverageRatio(
-    result.monthlyAmortization,
-    input.monthlyIncome,
-    coverageThreshold,
-  );
+  let result: SfComputeResult;
+  if (segment === "sme") {
+    // Loan Desired mode: CSA `amount` is treated as loan_desired (extraction §4).
+    // SF inputMode is still stored for DB CHECK compatibility; it does not drive SME math.
+    const sme = computeSmeLoan({
+      loanDesired: input.amount,
+      terms: input.terms,
+      addonMonths: input.addonMonths ?? 0,
+      pfRate: input.pfRate,
+      interestRate: input.interestRate,
+      adminRate: input.adminRate ?? 0,
+      withDsAndNotary: input.withDsAndNotary ?? true,
+      otherDeductions: input.otherDeductions,
+    });
+    result = smeToSfResult(input, sme);
+  } else {
+    result = computeSfLoan({
+      inputMode: input.inputMode,
+      amount: input.amount,
+      terms: input.terms,
+      addonMonths: input.addonMonths,
+      pfRate: input.pfRate,
+      interestRate: input.interestRate,
+      securityFeeRate: input.securityFeeRate,
+      otherDeductions: input.otherDeductions,
+    });
+  }
+
+  // SME: skip Seafarer 35% personal-income coverage — see coverage.ts.
+  // Store null ratio so endorse does not inherit a meaningless figure.
+  const coverage = skipCoverageForSegment(segment)
+    ? { ratio: null as number | null, warning: false, message: null as string | null }
+    : checkCoverageRatio(
+        result.monthlyAmortization,
+        input.monthlyIncome,
+        await getCoverageThreshold(supabase),
+      );
 
   const releaseDate = input.releaseDate ? new Date(input.releaseDate) : new Date();
   const dueDay = input.dueDay ?? 10;
@@ -143,7 +210,7 @@ export async function persistComputation(
       addon_months: result.addonMonths,
       pf_rate: input.pfRate,
       interest_rate: input.interestRate,
-      security_fee_rate: input.securityFeeRate,
+      security_fee_rate: segment === "sme" ? 0 : input.securityFeeRate,
       loan_type_id: input.loanTypeId ?? null,
       loan_type_name: input.loanTypeName ?? null,
       other_deductions: result.otherDeductions,

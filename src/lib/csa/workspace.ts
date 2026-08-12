@@ -27,6 +27,10 @@ export const CSA_WORKSPACE_STAGES: Array<{
   { id: "endorse", label: "Endorse" },
 ];
 
+function screeningStageLabel(segment?: string | null): string {
+  return segment === "sme" ? "Duplication screen" : "NCL screen";
+}
+
 export type CsaNextStep = {
   title: string;
   body: string;
@@ -98,10 +102,12 @@ export function buildCsaWorkspaceSteps(input: {
   nclDone: boolean;
   hasComputation: boolean;
   endorseReady: boolean;
+  segment?: string | null;
 }): CsaWorkspaceStep[] {
   const current = csaWorkspaceStageIndex(input);
   return CSA_WORKSPACE_STAGES.map((stage, index) => ({
-    label: stage.label,
+    label:
+      stage.id === "ncl" ? screeningStageLabel(input.segment) : stage.label,
     description:
       index === current ? formatStatusLabel(input.status) : undefined,
     state:
@@ -117,6 +123,7 @@ export function csaNextStep(input: {
   nclResult: string;
   hasComputation: boolean;
   endorseReady: boolean;
+  segment?: string | null;
 }): CsaNextStep {
   const blocker = formatBlockerLabel(input.blocker);
   const missingDocs = Math.max(input.docsRequired - input.docsUploaded, 0);
@@ -166,12 +173,24 @@ export function csaNextStep(input: {
   }
 
   if (input.nclResult === "pending") {
+    if (input.segment === "sme") {
+      return {
+        title: "Record duplication screening",
+        body: "Review company/owner matches, then record the SME duplication check before endorsement to CIG.",
+      };
+    }
     return {
       title: "Record NCL screening",
       body: "Run the negative credit list check before endorsement to CIG.",
     };
   }
   if (input.nclResult === "fail") {
+    if (input.segment === "sme") {
+      return {
+        title: "Duplication flagged",
+        body: "Possible duplicate company or owner match. Review remarks before deciding next steps.",
+      };
+    }
     return {
       title: "NCL flagged",
       body: "Borrower matched the negative credit list. Review remarks before deciding next steps.",

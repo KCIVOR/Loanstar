@@ -15,6 +15,7 @@ import {
   Label,
   Modal,
   PageHeader,
+  PhoneInput,
   Spinner,
   Stepper,
   Textarea,
@@ -57,6 +58,8 @@ type ApplicationWorkspace = {
     status: string;
     statusLabel: string;
     blocker: string | null;
+    segment: "seafarer" | "sme";
+    entityType: "individual" | "corporate" | null;
     isReloan: boolean;
     createdAt: string;
     updatedAt: string;
@@ -106,19 +109,32 @@ type ApplicationWorkspace = {
   } | null;
 };
 
-type NclCheck = {
+type ScreeningCheck = {
+  slug: string;
   result: string;
   notes: string | null;
   checkedAt: string | null;
 };
 
-const NCL_BADGE_VARIANT: Record<string, "success" | "danger" | "neutral"> = {
+type DuplicationMatch = {
+  source: "borrower" | "lead";
+  id: string;
+  companyName: string | null;
+  ownerName: string | null;
+  applicationId?: string | null;
+  applicationNo?: string | null;
+};
+
+const SCREENING_BADGE_VARIANT: Record<
+  string,
+  "success" | "danger" | "neutral"
+> = {
   pass: "success",
   fail: "danger",
   pending: "neutral",
 };
 
-const NCL_TONE: Record<string, { background: string; color: string }> = {
+const SCREENING_TONE: Record<string, { background: string; color: string }> = {
   pass: { background: "var(--success-bg)", color: "var(--success)" },
   fail: { background: "var(--danger-bg)", color: "var(--danger)" },
   pending: { background: "var(--surface-2)", color: "var(--ink-400)" },
@@ -128,6 +144,12 @@ const NCL_COPY: Record<string, string> = {
   pass: "Cleared — no negative credit list match found.",
   fail: "Flagged — borrower matched the negative credit list.",
   pending: "Not yet checked against the negative credit list.",
+};
+
+const SME_DUPLICATION_COPY: Record<string, string> = {
+  pass: "Cleared — no company/owner duplication concern after review.",
+  fail: "Flagged — possible duplicate company or owner match found.",
+  pending: "Review possible matches, then record pass or fail.",
 };
 
 const CheckIcon = (
@@ -167,11 +189,21 @@ const ClockIcon = (
     <path d="M12 7v5l3 3" />
   </svg>
 );
-const NCL_ICON: Record<string, ReactNode> = {
+const SCREENING_ICON: Record<string, ReactNode> = {
   pass: CheckIcon,
   fail: XIcon,
   pending: ClockIcon,
 };
+
+function screeningLabel(slug: string): string {
+  return slug === "sme_duplication" ? "Duplication" : "NCL";
+}
+
+function screeningCopy(
+  slug: string,
+): Record<string, string> {
+  return slug === "sme_duplication" ? SME_DUPLICATION_COPY : NCL_COPY;
+}
 
 function formatDate(value: string) {
   return new Date(value).toLocaleDateString("en-PH", {
@@ -193,11 +225,15 @@ export default function CsaApplicationPage() {
   const applicationId = params.id as string;
 
   const [data, setData] = useState<ApplicationWorkspace | null>(null);
-  const [ncl, setNcl] = useState<NclCheck>({
+  const [screening, setScreening] = useState<ScreeningCheck>({
+    slug: "ncl",
     result: "pending",
     notes: null,
     checkedAt: null,
   });
+  const [duplicationMatches, setDuplicationMatches] = useState<
+    DuplicationMatch[]
+  >([]);
   const [holdReason, setHoldReason] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -231,15 +267,35 @@ export default function CsaApplicationPage() {
               notes: string | null;
               checkedAt: string | null;
             }>;
+            screeningSlug?: string;
+            duplication?: {
+              matches: DuplicationMatch[];
+            } | null;
           };
-          const nclCheck = checksData.checks.find((c) => c.slug === "ncl");
-          if (nclCheck) {
-            setNcl({
-              result: nclCheck.result,
-              notes: nclCheck.notes,
-              checkedAt: nclCheck.checkedAt,
+          const slug =
+            checksData.screeningSlug ??
+            (appData.application.segment === "sme"
+              ? "sme_duplication"
+              : "ncl");
+          const check =
+            checksData.checks.find((c) => c.slug === slug) ??
+            checksData.checks[0];
+          if (check) {
+            setScreening({
+              slug: check.slug ?? slug,
+              result: check.result,
+              notes: check.notes,
+              checkedAt: check.checkedAt,
+            });
+          } else {
+            setScreening({
+              slug,
+              result: "pending",
+              notes: null,
+              checkedAt: null,
             });
           }
+          setDuplicationMatches(checksData.duplication?.matches ?? []);
         }
       } catch (err) {
         setError(err instanceof Error ? err.message : "Failed to load");
@@ -282,6 +338,7 @@ export default function CsaApplicationPage() {
             financial: data.borrower.financial,
             allottee: data.borrower.allottee,
             picWork: data.borrower.picWork,
+            businessInfo: data.borrower.businessInfo,
             dependents: data.borrower.dependents,
             references: data.borrower.references,
             profileData: data.borrower.profileData,
@@ -300,23 +357,29 @@ export default function CsaApplicationPage() {
     }
   }
 
-  async function handleRecordNcl(result: "pass" | "fail") {
+  async function handleRecordScreening(result: "pass" | "fail") {
     setSaving(true);
     setActionError(null);
     try {
       const res = await fetch(`/api/csa/applications/${applicationId}/checks`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ result, notes: ncl.notes ?? undefined }),
+        body: JSON.stringify({
+          checkSlug: screening.slug,
+          result,
+          notes: screening.notes ?? undefined,
+        }),
       });
       if (!res.ok) {
         const body = (await res.json()) as { error?: string };
-        throw new Error(body.error ?? "Failed to record NCL");
+        throw new Error(body.error ?? "Failed to record screening check");
       }
       await load({ silent: true });
     } catch (err) {
       setActionError(
-        err instanceof Error ? err.message : "Failed to record NCL",
+        err instanceof Error
+          ? err.message
+          : "Failed to record screening check",
       );
     } finally {
       setSaving(false);
@@ -449,12 +512,18 @@ export default function CsaApplicationPage() {
   }
 
   const editable = isCsaEditableStatus(data.application.status);
-  const formCompleteness = assessApplicationFormCompleteness(data.borrower);
-  const nclDone = ncl.result === "pass" || ncl.result === "fail";
+  const formCompleteness = assessApplicationFormCompleteness(data.borrower, {
+    segment: data.application.segment ?? "seafarer",
+    entityType: data.application.entityType ?? null,
+  });
+  const isSme = data.application.segment === "sme";
+  const screeningDone =
+    screening.result === "pass" || screening.result === "fail";
   const interviewPrereqs = listInterviewRecordPrerequisites({
     privacyOrientationAt: data.application.privacyOrientationAt,
     formCompleteness,
-    nclRecorded: nclDone,
+    nclRecorded: screeningDone,
+    segment: data.application.segment ?? "seafarer",
   });
   const borrowerTitle = data.borrower
     ? `${data.borrower.firstName} ${data.borrower.lastName}`
@@ -472,16 +541,18 @@ export default function CsaApplicationPage() {
     blocker: data.application.blocker,
     docsRequired: docs.required,
     docsUploaded: docs.uploaded,
-    nclResult: ncl.result,
+    nclResult: screening.result,
     hasComputation,
     endorseReady: data.endorseReadiness.ready,
+    segment: data.application.segment ?? "seafarer",
   });
   const workspaceSteps = buildCsaWorkspaceSteps({
     status: data.application.status,
     docsComplete,
-    nclDone,
+    nclDone: screeningDone,
     hasComputation,
     endorseReady: data.endorseReadiness.ready,
+    segment: data.application.segment ?? "seafarer",
   });
 
   return (
@@ -607,11 +678,15 @@ export default function CsaApplicationPage() {
           </div>
           <div>
             <div className="text-[10.5px] font-medium uppercase tracking-[0.14em] text-navy-200 opacity-80">
-              NCL / Principal
+              {screeningLabel(screening.slug)} / Principal
             </div>
             <div className="mt-1 flex flex-wrap items-center gap-2">
-              <Badge variant={NCL_BADGE_VARIANT[ncl.result] ?? "neutral"}>
-                NCL {ncl.result}
+              <Badge
+                variant={
+                  SCREENING_BADGE_VARIANT[screening.result] ?? "neutral"
+                }
+              >
+                {screeningLabel(screening.slug)} {screening.result}
               </Badge>
             </div>
             <div className="mono mt-2 text-sm text-navy-100">
@@ -743,15 +818,15 @@ export default function CsaApplicationPage() {
                     </div>
                     <div>
                       <Label htmlFor="mobilePhone">Mobile</Label>
-                      <Input
+                      <PhoneInput
                         id="mobilePhone"
                         value={data.borrower.mobilePhone ?? ""}
-                        onChange={(e) =>
+                        onChange={(next) =>
                           setData({
                             ...data,
                             borrower: {
                               ...data.borrower!,
-                              mobilePhone: e.target.value,
+                              mobilePhone: next,
                             },
                           })
                         }
@@ -824,6 +899,8 @@ export default function CsaApplicationPage() {
             <div className="max-h-[65vh] overflow-y-auto pr-1">
               <ApplicantProfileFields
                 profile={data.borrower}
+                segment={data.application.segment ?? "seafarer"}
+                entityType={data.application.entityType ?? null}
                 onChange={(borrower) => setData({ ...data, borrower })}
               />
             </div>
@@ -882,37 +959,80 @@ export default function CsaApplicationPage() {
 
         <Card className="!bg-surface-2/30">
           <h2 className="mb-1 font-display text-lg font-semibold text-navy-900">
-            NCL check
+            {isSme ? "SME duplication check" : "NCL check"}
           </h2>
           <p className="mb-4 text-sm text-ink-500">
-            Negative credit list screening, recorded before endorsement to CIG.
+            {isSme
+              ? "Company name and owner duplication screening, recorded before endorsement to CIG."
+              : "Negative credit list screening, recorded before endorsement to CIG."}
           </p>
+
+          {isSme && duplicationMatches.length > 0 ? (
+            <div className="mb-4 rounded-[var(--r-md)] border border-warning/40 bg-warning/10 px-3 py-2.5">
+              <p className="text-sm font-medium text-ink-800">
+                {duplicationMatches.length} possible match
+                {duplicationMatches.length === 1 ? "" : "es"} found
+              </p>
+              <ul className="mt-2 space-y-1.5 text-sm text-ink-700">
+                {duplicationMatches.slice(0, 8).map((match) => (
+                  <li key={`${match.source}:${match.id}:${match.applicationId ?? ""}`}>
+                    <span className="font-medium">
+                      {match.source === "lead" ? "Lead" : "Borrower"}
+                    </span>
+                    {match.companyName ? ` — ${match.companyName}` : null}
+                    {match.ownerName ? ` (${match.ownerName})` : null}
+                    {match.applicationNo ? (
+                      <span className="mono text-ink-500">
+                        {" "}
+                        · {match.applicationNo}
+                      </span>
+                    ) : null}
+                  </li>
+                ))}
+              </ul>
+              {duplicationMatches.length > 8 ? (
+                <p className="mt-1 text-xs text-ink-500">
+                  +{duplicationMatches.length - 8} more
+                </p>
+              ) : null}
+            </div>
+          ) : isSme ? (
+            <p className="mb-4 text-sm text-ink-500">
+              No company/owner matches found in borrowers or leads. Record pass
+              when confirmed.
+            </p>
+          ) : null}
 
           <div className="mb-4 flex items-start gap-3">
             <span
               className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[var(--r-md)]"
-              style={NCL_TONE[ncl.result] ?? NCL_TONE.pending}
+              style={SCREENING_TONE[screening.result] ?? SCREENING_TONE.pending}
             >
               <span className="block h-[18px] w-[18px]">
-                {NCL_ICON[ncl.result] ?? ClockIcon}
+                {SCREENING_ICON[screening.result] ?? ClockIcon}
               </span>
             </span>
             <div>
               <div className="flex flex-wrap items-center gap-2">
-                <Badge variant={NCL_BADGE_VARIANT[ncl.result] ?? "neutral"}>
-                  {ncl.result}
+                <Badge
+                  variant={
+                    SCREENING_BADGE_VARIANT[screening.result] ?? "neutral"
+                  }
+                >
+                  {screening.result}
                 </Badge>
-                {ncl.checkedAt ? (
+                {screening.checkedAt ? (
                   <span className="text-xs text-ink-400">
                     Checked{" "}
                     <span className="mono">
-                      {new Date(ncl.checkedAt).toLocaleString()}
+                      {new Date(screening.checkedAt).toLocaleString()}
                     </span>
                   </span>
                 ) : null}
               </div>
               <p className="mt-1.5 text-sm text-ink-700">
-                {NCL_COPY[ncl.result] ?? NCL_COPY.pending}
+                {screeningCopy(screening.slug)[screening.result] ??
+                  screeningCopy(screening.slug).pending}
               </p>
             </div>
           </div>
@@ -920,34 +1040,36 @@ export default function CsaApplicationPage() {
           {editable ? (
             <div className="space-y-3 border-t border-line-soft pt-4">
               <div>
-                <Label htmlFor="nclNotes">Remarks</Label>
+                <Label htmlFor="screeningNotes">Remarks</Label>
                 <Textarea
-                  id="nclNotes"
+                  id="screeningNotes"
                   placeholder="Notes for this check (optional)"
-                  value={ncl.notes ?? ""}
-                  onChange={(e) => setNcl({ ...ncl, notes: e.target.value })}
+                  value={screening.notes ?? ""}
+                  onChange={(e) =>
+                    setScreening({ ...screening, notes: e.target.value })
+                  }
                 />
               </div>
               <div className="flex flex-wrap gap-2">
                 <Button
                   variant="accent"
                   loading={saving}
-                  onClick={() => void handleRecordNcl("pass")}
+                  onClick={() => void handleRecordScreening("pass")}
                 >
                   Record pass
                 </Button>
                 <Button
                   variant="danger-soft"
                   loading={saving}
-                  onClick={() => void handleRecordNcl("fail")}
+                  onClick={() => void handleRecordScreening("fail")}
                 >
                   Record fail
                 </Button>
               </div>
             </div>
-          ) : ncl.notes ? (
+          ) : screening.notes ? (
             <p className="border-t border-line-soft pt-3 text-sm text-ink-500">
-              {ncl.notes}
+              {screening.notes}
             </p>
           ) : null}
         </Card>

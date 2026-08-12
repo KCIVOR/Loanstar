@@ -17,7 +17,6 @@ import {
   type ReleasePath,
   type ReleaseFileStatus,
 } from "./constants";
-import { assertPdcShortfallAcknowledged } from "./pdc-shortfall";
 import {
   assertPdcCollectedForClose,
   maybePdcCollectBlocker,
@@ -101,13 +100,21 @@ export async function setReleasePath(
 
   const { data: app, error: appError } = await supabase
     .from("loan_applications")
-    .select("borrower_id")
+    .select("borrower_id, segment, entity_type")
     .eq("id", file.loanApplicationId)
     .single();
 
   if (appError || !app?.borrower_id) {
     throw new Error("Application borrower not found");
   }
+
+  const checklistScope = {
+    segment: (app.segment === "sme" ? "sme" : "seafarer") as "seafarer" | "sme",
+    entityType:
+      app.entity_type === "individual" || app.entity_type === "corporate"
+        ? (app.entity_type as "individual" | "corporate")
+        : null,
+  };
 
   const { error } = await supabase
     .from("release_files")
@@ -132,12 +139,14 @@ export async function setReleasePath(
     signingStage,
     file.loanApplicationId,
     app.borrower_id as string,
+    checklistScope,
   );
   await ensureDocumentSlots(
     supabase,
     "release",
     file.loanApplicationId,
     app.borrower_id as string,
+    checklistScope,
   );
 
   await syncApplicationBlocker(supabase, file.loanApplicationId, nextStatus, {
@@ -176,7 +185,6 @@ export async function savePdcChecks(
   }>,
   blankRange?: { from?: string; to?: string },
   actorId?: string,
-  options?: { acknowledgeShortfall?: boolean },
 ) {
   const file = await getReleaseFile(supabase, releaseFileId);
 
@@ -192,11 +200,19 @@ export async function savePdcChecks(
     throw new Error("No active computation found for this application");
   }
 
-  assertPdcShortfallAcknowledged(
-    checks.length,
-    computation.terms,
-    options?.acknowledgeShortfall,
-  );
+  if (checks.length !== computation.terms) {
+    throw new Error(
+      `Number of checks must equal the loan term (${computation.terms})`,
+    );
+  }
+
+  for (const row of checks) {
+    if (row.amount !== computation.monthlyAmortization) {
+      throw new Error(
+        `Check amount must equal the monthly amortization (₱${computation.monthlyAmortization})`,
+      );
+    }
+  }
 
   await supabase.from("pdc_checks").delete().eq("release_file_id", releaseFileId);
 
@@ -243,9 +259,6 @@ export async function savePdcChecks(
     status: "ready_generate" as const,
     checkCount: checks.length,
     terms: computation.terms,
-    shortfallAcknowledged:
-      checks.length < computation.terms &&
-      options?.acknowledgeShortfall === true,
   };
 }
 
@@ -279,7 +292,7 @@ export async function generateReleaseDocuments(
   const slugs = AUTO_GENERATED_SLUGS[releasePath];
   const { data: app } = await supabase
     .from("loan_applications")
-    .select("borrower_id, borrowers (*)")
+    .select("borrower_id, segment, borrowers (*)")
     .eq("id", file.loanApplicationId)
     .single();
 
@@ -309,6 +322,7 @@ export async function generateReleaseDocuments(
     },
     borrowerProfile,
     releasePath,
+    { segment: app.segment === "sme" ? "sme" : "seafarer" },
   );
 
   for (const slug of slugs) {
@@ -459,6 +473,93 @@ export async function witnessSignGeneratedDocument(
   }
 
   return { signedAt, allSigned };
+}
+
+export async function unwitnessSignGeneratedDocument(
+  supabase: SupabaseClient,
+  documentId: string,
+  actorId: string,
+) {
+  const { data: doc, error } = await supabase
+    .from("generated_documents")
+    .select("*, release_files ( loan_application_id, status )")
+    .eq("id", documentId)
+    .single();
+
+  if (error || !doc) {
+    throw new Error("Document not found");
+  }
+
+  if (!doc.signed_at) {
+    throw new Error("Document is not signed");
+  }
+
+  if (doc.is_finalized) {
+    throw new Error("Document not available for unsigning");
+  }
+
+  const releaseFileRaw = doc.release_files;
+  const releaseFile = Array.isArray(releaseFileRaw)
+    ? releaseFileRaw[0]
+    : releaseFileRaw;
+
+  let rolledBackToSigning = false;
+
+  if (releaseFile?.status === "awaiting_signatures") {
+    // No rollback needed.
+  } else if (releaseFile?.status === "awaiting_briefing") {
+    const { data: briefing } = await supabase
+      .from("briefings")
+      .select("acknowledged_at")
+      .eq("release_file_id", doc.release_file_id)
+      .maybeSingle();
+
+    if (briefing?.acknowledged_at) {
+      throw new Error(
+        "Briefing has already been acknowledged — signature can no longer be undone",
+      );
+    }
+
+    rolledBackToSigning = true;
+  } else {
+    throw new Error(
+      "Release file has moved past the signing stage — signature can no longer be undone",
+    );
+  }
+
+  const { error: updateError } = await supabase
+    .from("generated_documents")
+    .update({
+      signed_at: null,
+      signed_by: null,
+      witnessed_by: null,
+      signature_hash: null,
+    })
+    .eq("id", documentId);
+
+  if (updateError) {
+    throw new Error(updateError.message);
+  }
+
+  if (rolledBackToSigning) {
+    const admin = createServiceClient();
+    await admin
+      .from("release_files")
+      .update({
+        status: "awaiting_signatures",
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", doc.release_file_id);
+
+    await syncApplicationBlocker(
+      admin,
+      releaseFile.loan_application_id as string,
+      "awaiting_signatures",
+      { actorId, applicationStatus: "release_signing" },
+    );
+  }
+
+  return { unsigned: true, rolledBackToSigning };
 }
 
 export async function acknowledgeBriefing(

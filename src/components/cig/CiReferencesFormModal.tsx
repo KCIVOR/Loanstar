@@ -10,6 +10,7 @@ import {
   Input,
   Label,
   Modal,
+  PhoneInput,
   Radio,
   Textarea,
 } from "@/components/ui";
@@ -167,6 +168,7 @@ function Field({
   optTag,
   type = "text",
   required = false,
+  disabled = false,
 }: {
   label: string;
   value: string;
@@ -174,6 +176,7 @@ function Field({
   optTag?: string;
   type?: string;
   required?: boolean;
+  disabled?: boolean;
 }) {
   return (
     <div>
@@ -181,7 +184,33 @@ function Field({
         {label}
         {optTag ? <span className="ml-1 font-normal text-ink-400">{optTag}</span> : null}
       </Label>
-      <Input type={type} value={value} onChange={(e) => onChange(e.target.value)} />
+      <Input
+        type={type}
+        value={value}
+        disabled={disabled}
+        onChange={(e) => onChange(e.target.value)}
+      />
+    </div>
+  );
+}
+
+/** Same shape as Field, but for a single person's own mobile number —
+ * country picker matches the register/account/CSA mobile fields. */
+function PhoneField({
+  label,
+  value,
+  onChange,
+  required = false,
+}: {
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+  required?: boolean;
+}) {
+  return (
+    <div>
+      <Label required={required}>{label}</Label>
+      <PhoneInput value={value} onChange={onChange} />
     </div>
   );
 }
@@ -336,7 +365,7 @@ function ReferenceBlock({
         <Field label="How long do you know the client :" value={value.howLongKnowClient ?? ""} onChange={(v) => set({ howLongKnowClient: v })} />
       </div>
       <div className="mt-3 grid gap-3 sm:grid-cols-2">
-        <Field required label="Contact Number :" value={value.contactNumber ?? ""} onChange={(v) => set({ contactNumber: v })} />
+        <PhoneField required label="Contact Number :" value={value.contactNumber ?? ""} onChange={(v) => set({ contactNumber: v })} />
         <Field label="Other Contact Number :" value={value.otherContactNumber ?? ""} onChange={(v) => set({ otherContactNumber: v })} />
       </div>
       <div className="mt-3">
@@ -433,6 +462,7 @@ export function CiReferencesFormModal({
   onSave,
   saving,
   readOnly = false,
+  verifierName,
 }: {
   open: boolean;
   onClose: () => void;
@@ -452,6 +482,8 @@ export function CiReferencesFormModal({
   saving: boolean;
   /** View-only after CI report is submitted. */
   readOnly?: boolean;
+  /** Logged-in staff display name — shown/persisted as "Verified by" while editing. */
+  verifierName: string;
 }) {
   // Lazy-initialized from whatever was last saved (or, first time, prefilled
   // from CSA's declared intake data). The parent only mounts this component
@@ -500,7 +532,7 @@ export function CiReferencesFormModal({
 
   async function handleSaveDraft() {
     setSubmitErrors([]);
-    await onSave(draft);
+    await onSave({ ...draft, verifiedBy: verifierName });
   }
 
   async function handleSubmitForm() {
@@ -515,7 +547,7 @@ export function CiReferencesFormModal({
       return;
     }
     setSubmitErrors([]);
-    await onSave(draft);
+    await onSave({ ...draft, verifiedBy: verifierName });
     onClose();
   }
 
@@ -594,7 +626,7 @@ export function CiReferencesFormModal({
           </div>
 
           <div className="mt-4 grid gap-3 sm:grid-cols-2">
-            <Field required label="Contact Number" value={pic.contactNumber ?? ""} onChange={(v) => setPic({ contactNumber: v })} />
+            <PhoneField required label="Contact Number" value={pic.contactNumber ?? ""} onChange={(v) => setPic({ contactNumber: v })} />
             <Field required label="Relation to the Client" value={pic.relationToClient ?? ""} onChange={(v) => setPic({ relationToClient: v })} />
           </div>
           <div className="mt-3 grid gap-3 sm:grid-cols-2">
@@ -875,7 +907,12 @@ export function CiReferencesFormModal({
           </div>
 
           <div className="grid gap-3 sm:grid-cols-2">
-            <Field label="Verified by:" value={draft.verifiedBy ?? ""} onChange={(v) => setDraft((d) => ({ ...d, verifiedBy: v }))} />
+            <Field
+              label="Verified by:"
+              value={readOnly ? (draft.verifiedBy ?? "") : verifierName}
+              onChange={() => {}}
+              disabled
+            />
             <Field label="Date :" type="date" value={draft.verifiedDate ?? ""} onChange={(v) => setDraft((d) => ({ ...d, verifiedDate: v }))} />
           </div>
         </section>

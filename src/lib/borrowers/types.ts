@@ -1,3 +1,8 @@
+import type { BusinessInfo } from "./business-info";
+import { parseBusinessInfo } from "./business-info";
+
+export type { BusinessInfo } from "./business-info";
+
 export type Address = {
   street?: string;
   barangay?: string;
@@ -80,7 +85,7 @@ export type Reference = {
  * they're single scalars not covered by the existing structured JSONB objects. */
 export type ContactChannels = {
   viber?: string;
-  skype?: string;
+  teams?: string;
   othersContact?: string;
   roaming?: string;
   facebook?: string;
@@ -109,6 +114,7 @@ export type BorrowerProfile = {
   financial: FinancialInfo;
   allottee: AllotteeInfo;
   picWork: PicWorkInfo;
+  businessInfo: BusinessInfo;
   dependents: Dependent[];
   references: Reference[];
   profileData: Record<string, unknown>;
@@ -138,6 +144,7 @@ export type BorrowerRow = {
   financial: FinancialInfo;
   allottee: AllotteeInfo;
   pic_work: PicWorkInfo;
+  business_info?: BusinessInfo | null;
   dependents: Dependent[];
   references_data: Reference[];
   profile_data: Record<string, unknown>;
@@ -168,6 +175,7 @@ export function mapBorrowerRow(row: BorrowerRow): BorrowerProfile {
     financial: row.financial ?? {},
     allottee: row.allottee ?? {},
     picWork: row.pic_work ?? {},
+    businessInfo: parseBusinessInfo(row.business_info),
     dependents: row.dependents ?? [],
     references: row.references_data ?? [],
     profileData: row.profile_data ?? {},
@@ -198,6 +206,7 @@ export function borrowerProfileToRow(
   if (profile.financial !== undefined) row.financial = profile.financial;
   if (profile.allottee !== undefined) row.allottee = profile.allottee;
   if (profile.picWork !== undefined) row.pic_work = profile.picWork;
+  if (profile.businessInfo !== undefined) row.business_info = profile.businessInfo;
   if (profile.dependents !== undefined) row.dependents = profile.dependents;
   if (profile.references !== undefined) row.references_data = profile.references;
   if (profile.profileData !== undefined) row.profile_data = profile.profileData;

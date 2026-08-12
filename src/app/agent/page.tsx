@@ -5,41 +5,78 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { NewLeadModal } from "@/components/agent/NewLeadModal";
 import {
+  DateRangeFilter,
+  ViewModeToggle,
+  type DateRangeValue,
+  type HistoryViewMode,
+} from "@/components/history";
+import {
   Alert,
   Badge,
   Button,
   EmptyState,
   PageHeader,
   Pagination,
-  Spinner,
+  Select,
+  Skeleton,
   Table,
   Td,
   Th,
   cn,
 } from "@/components/ui";
+import { formatDate } from "@/lib/agent/format";
 import {
   leadPipelineStage,
   leadStatusVariant,
   pipelineStageLabel,
   pipelineStageVariant,
+  type LeadPipelineStage,
 } from "@/lib/agent/pipeline";
+import type {
+  AgentLeadQueueRow,
+  AgentLeadsQueueKpiCounts,
+  AgentLeadsSortKey,
+  AgentLeadStageFilter,
+  AgentLeadStatusFilter,
+} from "@/lib/agent/queue";
+import { AGENT_LEADS_QUEUE_PAGE_SIZES } from "@/lib/agent/queue";
 
-type Lead = {
-  id: string;
-  borrowerName: string;
-  businessName: string | null;
-  status: string;
-  applicationId: string | null;
-  createdAt: string;
-  checklistRequired: number;
-  checklistComplete: number;
-  checklistPercent: number | null;
+type SortKey = AgentLeadsSortKey;
+type StageFilter = AgentLeadStageFilter;
+type StatusFilter = AgentLeadStatusFilter;
+
+const PAGE_SIZE_OPTIONS = AGENT_LEADS_QUEUE_PAGE_SIZES;
+
+const DEFAULT_DATE_RANGE: DateRangeValue = {
+  preset: "all",
+  from: "",
+  to: "",
 };
 
-const PAGE_SIZE = 10;
+const EMPTY_KPI: AgentLeadsQueueKpiCounts = {
+  awaitingLink: 0,
+  gathering: 0,
+  ready: 0,
+};
 
-type StageFilter = "all" | "awaiting_link" | "gathering_docs" | "docs_ready";
-type SortKey = "priority" | "borrower" | "created" | "progress";
+const STAGE_CHIPS: Array<{ id: StageFilter; label: string }> = [
+  { id: "all", label: "All stages" },
+  { id: "awaiting_link", label: "Awaiting link" },
+  { id: "gathering_docs", label: "Gathering docs" },
+  { id: "docs_ready", label: "Docs ready" },
+];
+
+const STATUS_CHIPS: Array<{ id: StatusFilter; label: string }> = [
+  { id: "all", label: "All" },
+  { id: "open", label: "Open" },
+  { id: "converted", label: "Converted" },
+];
+
+const STAGE_RANK: Record<LeadPipelineStage, number> = {
+  awaiting_link: 0,
+  gathering_docs: 1,
+  docs_ready: 2,
+};
 
 const iconProps = {
   viewBox: "0 0 24 24",
@@ -106,7 +143,7 @@ function Kpi({
   );
 }
 
-function stageOf(lead: Lead) {
+function stageOf(lead: AgentLeadQueueRow): LeadPipelineStage {
   return leadPipelineStage({
     applicationId: lead.applicationId,
     checklistPercent: lead.checklistPercent,
@@ -138,88 +175,135 @@ function ProgressCell({ percent }: { percent: number | null }) {
   );
 }
 
+function dateRangePillLabel(value: DateRangeValue): string {
+  if (value.preset === "30d") return "Last 30 days";
+  if (value.preset === "90d") return "Last 90 days";
+  if (value.preset === "all") return "All time";
+  const from = value.from ? formatDate(value.from) : "…";
+  const to = value.to ? formatDate(value.to) : "…";
+  return `${from} → ${to}`;
+}
+
+function stageChipLabel(filter: StageFilter): string {
+  return STAGE_CHIPS.find((chip) => chip.id === filter)?.label ?? filter;
+}
+
+function statusChipLabel(filter: StatusFilter): string {
+  return STATUS_CHIPS.find((chip) => chip.id === filter)?.label ?? filter;
+}
+
+function buildQueueQuery(params: {
+  search: string;
+  stageFilter: StageFilter;
+  statusFilter: StatusFilter;
+  dateRange: DateRangeValue;
+  sortKey: SortKey;
+  sortDir: "asc" | "desc";
+  page: number;
+  pageSize: number;
+}): string {
+  const qs = new URLSearchParams();
+  if (params.search.trim()) qs.set("search", params.search.trim());
+  qs.set("stage", params.stageFilter);
+  qs.set("status", params.statusFilter);
+  qs.set("range", params.dateRange.preset);
+  if (params.dateRange.preset === "custom") {
+    if (params.dateRange.from) qs.set("from", params.dateRange.from);
+    if (params.dateRange.to) qs.set("to", params.dateRange.to);
+  }
+  // `priority` is client-only (current page); omit sortKey so server uses its default.
+  if (params.sortKey !== "priority") {
+    qs.set("sortKey", params.sortKey);
+    qs.set("sortDir", params.sortDir);
+  } else {
+    qs.set("sortDir", "desc");
+  }
+  qs.set("page", String(params.page));
+  qs.set("pageSize", String(params.pageSize));
+  return qs.toString();
+}
+
 export default function AgentPipelinePage() {
-  const [leads, setLeads] = useState<Lead[]>([]);
+  const [rows, setRows] = useState<AgentLeadQueueRow[]>([]);
+  const [totalCount, setTotalCount] = useState(0);
+  const [kpi, setKpi] = useState<AgentLeadsQueueKpiCounts>(EMPTY_KPI);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
   const [search, setSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
   const [stageFilter, setStageFilter] = useState<StageFilter>("all");
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
+  const [dateRange, setDateRange] = useState<DateRangeValue>(DEFAULT_DATE_RANGE);
+  const [viewMode, setViewMode] = useState<HistoryViewMode>("list");
+  const [pageSize, setPageSize] =
+    useState<(typeof PAGE_SIZE_OPTIONS)[number]>(10);
+  const [filterPanelOpen, setFilterPanelOpen] = useState(false);
   const [sortKey, setSortKey] = useState<SortKey>("priority");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
   const [page, setPage] = useState(1);
   const [newLeadOpen, setNewLeadOpen] = useState(false);
 
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearch(search), 300);
+    return () => clearTimeout(timer);
+  }, [search]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [
+    debouncedSearch,
+    stageFilter,
+    statusFilter,
+    dateRange,
+    pageSize,
+    sortKey,
+    sortDir,
+  ]);
+
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch("/api/agent/leads");
+      const query = buildQueueQuery({
+        search: debouncedSearch,
+        stageFilter,
+        statusFilter,
+        dateRange,
+        sortKey,
+        sortDir,
+        page,
+        pageSize,
+      });
+      const res = await fetch(`/api/agent/leads?${query}`);
       if (!res.ok) throw new Error("Failed to load leads");
-      const data = (await res.json()) as { leads: Lead[] };
-      setLeads(data.leads ?? []);
+      const data = (await res.json()) as {
+        rows: AgentLeadQueueRow[];
+        totalCount: number;
+        kpi: AgentLeadsQueueKpiCounts;
+      };
+      setRows(data.rows ?? []);
+      setTotalCount(data.totalCount ?? 0);
+      setKpi(data.kpi ?? EMPTY_KPI);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load");
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [
+    debouncedSearch,
+    stageFilter,
+    statusFilter,
+    dateRange,
+    sortKey,
+    sortDir,
+    page,
+    pageSize,
+  ]);
 
   useEffect(() => {
     void load();
   }, [load]);
-
-  const awaitingLink = leads.filter((l) => !l.applicationId).length;
-  const gathering = leads.filter((l) => stageOf(l) === "gathering_docs").length;
-  const ready = leads.filter((l) => stageOf(l) === "docs_ready").length;
-
-  const filtered = useMemo(() => {
-    const term = search.trim().toLowerCase();
-    return leads.filter((lead) => {
-      const stage = stageOf(lead);
-      if (stageFilter !== "all" && stage !== stageFilter) return false;
-      if (!term) return true;
-      return (
-        lead.borrowerName.toLowerCase().includes(term) ||
-        (lead.businessName?.toLowerCase().includes(term) ?? false) ||
-        lead.status.toLowerCase().includes(term)
-      );
-    });
-  }, [leads, search, stageFilter]);
-
-  const sorted = useMemo(() => {
-    const dir = sortDir === "asc" ? 1 : -1;
-    const stageRank = {
-      awaiting_link: 0,
-      gathering_docs: 1,
-      docs_ready: 2,
-    } as const;
-
-    return [...filtered].sort((a, b) => {
-      if (sortKey === "borrower") {
-        return dir * a.borrowerName.localeCompare(b.borrowerName);
-      }
-      if (sortKey === "created") {
-        return dir * a.createdAt.localeCompare(b.createdAt);
-      }
-      if (sortKey === "progress") {
-        const ap = a.checklistPercent ?? -1;
-        const bp = b.checklistPercent ?? -1;
-        return dir * (ap - bp);
-      }
-      // priority: awaiting link first, then lowest progress, then newest
-      const ar = stageRank[stageOf(a)];
-      const br = stageRank[stageOf(b)];
-      if (ar !== br) return ar - br;
-      const ap = a.checklistPercent ?? -1;
-      const bp = b.checklistPercent ?? -1;
-      if (ap !== bp) return ap - bp;
-      return b.createdAt.localeCompare(a.createdAt);
-    });
-  }, [filtered, sortKey, sortDir]);
-
-  const pageCount = Math.max(1, Math.ceil(sorted.length / PAGE_SIZE));
-  const safePage = Math.min(page, pageCount);
-  const paged = sorted.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
 
   function toggleSort(key: SortKey) {
     if (sortKey === key) {
@@ -228,7 +312,6 @@ export default function AgentPipelinePage() {
       setSortKey(key);
       setSortDir(key === "borrower" ? "asc" : "desc");
     }
-    setPage(1);
   }
 
   function sortArrow(key: SortKey) {
@@ -236,7 +319,51 @@ export default function AgentPipelinePage() {
     return <span className="arr">{sortDir === "asc" ? "▲" : "▼"}</span>;
   }
 
-  if (loading) return <Spinner />;
+  // priority: awaiting link first, then lowest progress, then newest — current page only
+  const displayRows = useMemo(() => {
+    if (sortKey !== "priority") return rows;
+    return [...rows].sort((a, b) => {
+      const ar = STAGE_RANK[stageOf(a)];
+      const br = STAGE_RANK[stageOf(b)];
+      if (ar !== br) return ar - br;
+      const ap = a.checklistPercent ?? -1;
+      const bp = b.checklistPercent ?? -1;
+      if (ap !== bp) return ap - bp;
+      return b.createdAt.localeCompare(a.createdAt);
+    });
+  }, [rows, sortKey]);
+
+  const pageCount = Math.max(1, Math.ceil(totalCount / pageSize));
+  const safePage = Math.min(page, pageCount);
+
+  const leadsTotal = kpi.awaitingLink + kpi.gathering + kpi.ready;
+  const dateIsDefault = dateRange.preset === "all";
+  const activeFilterCount =
+    (stageFilter !== "all" ? 1 : 0) +
+    (statusFilter !== "all" ? 1 : 0) +
+    (dateIsDefault ? 0 : 1);
+
+  const pipelineIsClear =
+    leadsTotal === 0 &&
+    stageFilter === "all" &&
+    statusFilter === "all" &&
+    dateIsDefault &&
+    !debouncedSearch.trim();
+
+  const summaryStart = displayRows.length
+    ? (safePage - 1) * pageSize + 1
+    : 0;
+  const summaryEnd = (safePage - 1) * pageSize + displayRows.length;
+
+  function renderOpenButton(lead: AgentLeadQueueRow) {
+    return (
+      <Link href={`/agent/leads/${lead.id}`}>
+        <Button variant="secondary" size="sm">
+          Open
+        </Button>
+      </Link>
+    );
+  }
 
   return (
     <div>
@@ -254,7 +381,7 @@ export default function AgentPipelinePage() {
         </div>
       ) : null}
 
-      {awaitingLink > 0 ? (
+      {!loading && kpi.awaitingLink > 0 ? (
         <div className="banner warn mb-6">
           <svg
             width="16"
@@ -271,31 +398,238 @@ export default function AgentPipelinePage() {
             <path d="M12 9v4M12 17h.01" />
           </svg>
           <span>
-            <span className="mono font-semibold">{awaitingLink}</span> lead
-            {awaitingLink === 1 ? "" : "s"} waiting for borrower registration /
-            application link
+            <span className="mono font-semibold">{kpi.awaitingLink}</span> lead
+            {kpi.awaitingLink === 1 ? "" : "s"} waiting for borrower registration
+            / application link
           </span>
         </div>
       ) : null}
 
       <div className="kpi-grid mb-6">
-        <Kpi tone="navy" icon={IconUsers} label="Leads" value={leads.length} />
-        <Kpi
-          tone="warning"
-          icon={IconLink}
-          label="Awaiting link"
-          value={awaitingLink}
-        />
-        <Kpi
-          tone="teal"
-          icon={IconDocs}
-          label="Gathering docs"
-          value={gathering}
-        />
-        <Kpi tone="success" icon={IconCheck} label="Docs ready" value={ready} />
+        {loading ? (
+          <>
+            <Skeleton variant="kpi" />
+            <Skeleton variant="kpi" />
+            <Skeleton variant="kpi" />
+            <Skeleton variant="kpi" />
+          </>
+        ) : (
+          <>
+            <Kpi tone="navy" icon={IconUsers} label="Leads" value={leadsTotal} />
+            <Kpi
+              tone="warning"
+              icon={IconLink}
+              label="Awaiting link"
+              value={kpi.awaitingLink}
+            />
+            <Kpi
+              tone="teal"
+              icon={IconDocs}
+              label="Gathering docs"
+              value={kpi.gathering}
+            />
+            <Kpi
+              tone="success"
+              icon={IconCheck}
+              label="Docs ready"
+              value={kpi.ready}
+            />
+          </>
+        )}
       </div>
 
-      {leads.length === 0 ? (
+      <div className="card mb-4" style={{ overflow: "visible" }}>
+        <div className="tbl-toolbar" style={{ padding: "13px 14px" }}>
+          <div
+            className="gsearch"
+            style={{ maxWidth: 300, flex: 1, minWidth: 190 }}
+          >
+            <span className="icon">
+              <svg
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth={2.2}
+                strokeLinecap="round"
+              >
+                <circle cx="11" cy="11" r="7" />
+                <path d="m21 21-4.3-4.3" />
+              </svg>
+            </span>
+            <input
+              className="input"
+              style={{
+                height: 37,
+                paddingRight: 12,
+                borderRadius: "var(--r-md)",
+              }}
+              placeholder="Search borrower or business"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
+          </div>
+
+          <div className="active-pill-row">
+            {stageFilter !== "all" ? (
+              <span className="active-pill">
+                Stage: {stageChipLabel(stageFilter)}
+                <button
+                  type="button"
+                  aria-label="Clear stage filter"
+                  onClick={() => setStageFilter("all")}
+                >
+                  ×
+                </button>
+              </span>
+            ) : null}
+            {statusFilter !== "all" ? (
+              <span className="active-pill">
+                {statusChipLabel(statusFilter)}
+                <button
+                  type="button"
+                  aria-label="Clear status filter"
+                  onClick={() => setStatusFilter("all")}
+                >
+                  ×
+                </button>
+              </span>
+            ) : null}
+            {!dateIsDefault ? (
+              <span className="active-pill">
+                {dateRangePillLabel(dateRange)}
+                <button
+                  type="button"
+                  aria-label="Clear date filter"
+                  onClick={() => setDateRange(DEFAULT_DATE_RANGE)}
+                >
+                  ×
+                </button>
+              </span>
+            ) : null}
+            {activeFilterCount > 0 ? (
+              <button
+                type="button"
+                className="clear-link"
+                onClick={() => {
+                  setStageFilter("all");
+                  setStatusFilter("all");
+                  setDateRange(DEFAULT_DATE_RANGE);
+                }}
+              >
+                Clear all
+              </button>
+            ) : null}
+          </div>
+
+          <div className="sp">
+            <ViewModeToggle value={viewMode} onChange={setViewMode} />
+            <button
+              type="button"
+              className={cn("btn btn-outline", filterPanelOpen && "is-on")}
+              onClick={() => setFilterPanelOpen((open) => !open)}
+            >
+              <svg
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth={2}
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                width={16}
+                height={16}
+                aria-hidden
+              >
+                <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3" />
+              </svg>
+              Filters
+              {activeFilterCount > 0 ? (
+                <span
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    minWidth: 16,
+                    height: 16,
+                    padding: "0 4px",
+                    borderRadius: "var(--r-full)",
+                    background: "var(--teal-600)",
+                    color: "#fff",
+                    fontSize: 10,
+                    fontWeight: 700,
+                    fontFamily: "var(--font-mono)",
+                  }}
+                >
+                  {activeFilterCount}
+                </span>
+              ) : null}
+            </button>
+          </div>
+        </div>
+
+        <div className={cn("filter-panel", filterPanelOpen && "is-open")}>
+          <div className="filter-group">
+            <span className="filter-group-label">Stage</span>
+            <div className="filter-bar">
+              {STAGE_CHIPS.map((chip) => (
+                <button
+                  key={chip.id}
+                  type="button"
+                  className={cn("fchip", stageFilter === chip.id && "is-on")}
+                  onClick={() => setStageFilter(chip.id)}
+                >
+                  {chip.label}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className="filter-group">
+            <span className="filter-group-label">Status</span>
+            <div className="filter-bar">
+              {STATUS_CHIPS.map((chip) => (
+                <button
+                  key={chip.id}
+                  type="button"
+                  className={cn("fchip", statusFilter === chip.id && "is-on")}
+                  onClick={() => setStatusFilter(chip.id)}
+                >
+                  {chip.label}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className="filter-group">
+            <span className="filter-group-label">Created date</span>
+            <DateRangeFilter value={dateRange} onChange={setDateRange} />
+          </div>
+        </div>
+      </div>
+
+      {loading ? (
+        <div className="mb-4">
+          <Table>
+            <thead>
+              <tr>
+                <Th>Borrower</Th>
+                <Th>Business</Th>
+                <Th>Pipeline</Th>
+                <Th>Checklist</Th>
+                <Th>Status</Th>
+                <Th>Created</Th>
+                <Th className="w-1">{""}</Th>
+              </tr>
+            </thead>
+            <tbody>
+              {Array.from({ length: 6 }, (_, i) => (
+                <tr key={i}>
+                  <Td colSpan={7}>
+                    <Skeleton variant="line" />
+                  </Td>
+                </tr>
+              ))}
+            </tbody>
+          </Table>
+        </div>
+      ) : pipelineIsClear ? (
         <EmptyState
           title="No leads yet"
           description="Create a lead to start tracking a borrower through registration and documents."
@@ -303,155 +637,158 @@ export default function AgentPipelinePage() {
             <Button onClick={() => setNewLeadOpen(true)}>New lead</Button>
           }
         />
+      ) : totalCount === 0 ? (
+        <EmptyState
+          title="No matching leads"
+          description="Try a different search, stage, or status filter."
+          showMark={false}
+        />
+      ) : viewMode === "grid" ? (
+        <div className="grid-view mb-4">
+          {displayRows.map((lead) => {
+            const stage = stageOf(lead);
+            return (
+              <div key={lead.id} className="gcard">
+                <div className="gcard-top">
+                  <span className="gcard-id">{lead.id.slice(0, 8)}</span>
+                  <Badge variant={pipelineStageVariant(stage)}>
+                    {pipelineStageLabel(stage)}
+                  </Badge>
+                </div>
+                <div className="gcard-name">{lead.borrowerName}</div>
+                <div className="gcard-meta">
+                  <div className="row">
+                    <span className="k">Business</span>
+                    <span className="v">{lead.businessName ?? "—"}</span>
+                  </div>
+                  <div className="row">
+                    <span className="k">Checklist</span>
+                    <span className="v mono">
+                      {lead.checklistPercent === null
+                        ? "—"
+                        : `${lead.checklistPercent}%`}
+                    </span>
+                  </div>
+                  <div className="row">
+                    <span className="k">Status</span>
+                    <span className="v">{lead.status}</span>
+                  </div>
+                  <div className="row">
+                    <span className="k">Created</span>
+                    <span className="v mono">{formatDate(lead.createdAt)}</span>
+                  </div>
+                </div>
+                {renderOpenButton(lead)}
+              </div>
+            );
+          })}
+        </div>
       ) : (
-        <div className="flex flex-col gap-3.5">
-          <div className="tbl-toolbar">
-            <div className="gsearch" style={{ maxWidth: 280 }}>
-              <span className="icon">
-                <svg
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth={2.2}
-                  strokeLinecap="round"
+        <div className="mb-4">
+          <Table
+            className={viewMode === "compact" ? "is-compact" : undefined}
+          >
+            <thead>
+              <tr>
+                <Th
+                  className="sortable"
+                  onClick={() => toggleSort("borrower")}
                 >
-                  <circle cx="11" cy="11" r="7" />
-                  <path d="m21 21-4.3-4.3" />
-                </svg>
-              </span>
-              <input
-                className="input"
-                style={{
-                  height: 36,
-                  paddingRight: 12,
-                  borderRadius: "var(--r-md)",
-                }}
-                placeholder="Search borrower or business"
-                value={search}
-                onChange={(e) => {
-                  setSearch(e.target.value);
-                  setPage(1);
-                }}
-              />
-            </div>
-            <div className="flex flex-wrap gap-1.5">
-              {(
-                [
-                  ["all", "All stages"],
-                  ["awaiting_link", "Awaiting link"],
-                  ["gathering_docs", "Gathering docs"],
-                  ["docs_ready", "Docs ready"],
-                ] as const
-              ).map(([value, label]) => (
-                <button
-                  key={value}
-                  type="button"
-                  className={cn("fchip", stageFilter === value && "on")}
-                  onClick={() => {
-                    setStageFilter(value);
-                    setPage(1);
-                  }}
+                  Borrower
+                  {sortArrow("borrower")}
+                </Th>
+                <Th>Business</Th>
+                <Th
+                  className="sortable"
+                  onClick={() => toggleSort("priority")}
                 >
-                  {label}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <div className="tbl-wrap">
-            <Table>
-              <thead>
-                <tr>
-                  <Th>
-                    <button
-                      type="button"
-                      className="inline-flex items-center gap-1"
-                      onClick={() => toggleSort("borrower")}
-                    >
-                      Borrower {sortArrow("borrower")}
-                    </button>
-                  </Th>
-                  <Th>Business</Th>
-                  <Th>
-                    <button
-                      type="button"
-                      className="inline-flex items-center gap-1"
-                      onClick={() => toggleSort("priority")}
-                    >
-                      Pipeline {sortArrow("priority")}
-                    </button>
-                  </Th>
-                  <Th>
-                    <button
-                      type="button"
-                      className="inline-flex items-center gap-1"
-                      onClick={() => toggleSort("progress")}
-                    >
-                      Checklist {sortArrow("progress")}
-                    </button>
-                  </Th>
-                  <Th>Status</Th>
-                  <Th>
-                    <button
-                      type="button"
-                      className="inline-flex items-center gap-1"
-                      onClick={() => toggleSort("created")}
-                    >
-                      Created {sortArrow("created")}
-                    </button>
-                  </Th>
-                </tr>
-              </thead>
-              <tbody>
-                {paged.map((lead) => {
-                  const stage = stageOf(lead);
-                  return (
-                    <tr key={lead.id}>
-                      <Td>
-                        <Link
-                          href={`/agent/leads/${lead.id}`}
-                          className="font-medium text-ink-900 hover:text-teal-700"
-                        >
-                          {lead.borrowerName}
-                        </Link>
-                      </Td>
-                      <Td>{lead.businessName ?? "—"}</Td>
-                      <Td>
-                        <Badge variant={pipelineStageVariant(stage)}>
-                          {pipelineStageLabel(stage)}
-                        </Badge>
-                      </Td>
-                      <Td>
-                        <ProgressCell percent={lead.checklistPercent} />
-                      </Td>
-                      <Td>
-                        <Badge variant={leadStatusVariant(lead.status)}>
-                          {lead.status}
-                        </Badge>
-                      </Td>
-                      <Td className="mono text-xs text-ink-400">
-                        {new Date(lead.createdAt).toLocaleDateString("en-PH", {
-                          year: "numeric",
-                          month: "short",
-                          day: "numeric",
-                        })}
-                      </Td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </Table>
-          </div>
-
-          {sorted.length > PAGE_SIZE ? (
-            <Pagination
-              page={safePage}
-              pageCount={pageCount}
-              onPageChange={setPage}
-            />
-          ) : null}
+                  Pipeline
+                  {sortArrow("priority")}
+                </Th>
+                <Th
+                  className="sortable"
+                  onClick={() => toggleSort("progress")}
+                >
+                  Checklist
+                  {sortArrow("progress")}
+                </Th>
+                <Th>Status</Th>
+                <Th
+                  className="sortable"
+                  onClick={() => toggleSort("created")}
+                >
+                  Created
+                  {sortArrow("created")}
+                </Th>
+                <Th className="w-1">{""}</Th>
+              </tr>
+            </thead>
+            <tbody>
+              {displayRows.map((lead) => {
+                const stage = stageOf(lead);
+                return (
+                  <tr key={lead.id}>
+                    <Td>
+                      <Link
+                        href={`/agent/leads/${lead.id}`}
+                        className="font-medium text-ink-900 hover:text-teal-700"
+                      >
+                        {lead.borrowerName}
+                      </Link>
+                    </Td>
+                    <Td>{lead.businessName ?? "—"}</Td>
+                    <Td>
+                      <Badge variant={pipelineStageVariant(stage)}>
+                        {pipelineStageLabel(stage)}
+                      </Badge>
+                    </Td>
+                    <Td>
+                      <ProgressCell percent={lead.checklistPercent} />
+                    </Td>
+                    <Td>
+                      <Badge variant={leadStatusVariant(lead.status)}>
+                        {lead.status}
+                      </Badge>
+                    </Td>
+                    <Td className="mono text-xs text-ink-400">
+                      {formatDate(lead.createdAt)}
+                    </Td>
+                    <Td>{renderOpenButton(lead)}</Td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </Table>
         </div>
       )}
+
+      <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
+        <div className="flex flex-wrap items-center gap-2 text-xs text-ink-400">
+          <span>Show</span>
+          <Select
+            value={String(pageSize)}
+            onChange={(e) => {
+              setPageSize(
+                Number(e.target.value) as (typeof PAGE_SIZE_OPTIONS)[number],
+              );
+            }}
+            style={{ width: 72, height: 34 }}
+          >
+            {PAGE_SIZE_OPTIONS.map((size) => (
+              <option key={size} value={size}>
+                {size}
+              </option>
+            ))}
+          </Select>
+          <span>per page</span>
+        </div>
+        <Pagination
+          page={safePage}
+          pageCount={pageCount}
+          onPageChange={setPage}
+          summary={`Showing ${summaryStart}–${summaryEnd} of ${totalCount}`}
+        />
+      </div>
 
       <NewLeadModal
         open={newLeadOpen}

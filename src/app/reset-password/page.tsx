@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { FormEvent, useEffect, useState } from "react";
 
-import { Alert, Button, Card, Input, Label, LoanStarLogo } from "@/components/ui";
+import { Alert, Button, Input, Label, LoanStarLogo } from "@/components/ui";
 import { createClient } from "@/lib/supabase/client";
 
 export default function ResetPasswordPage() {
@@ -51,58 +51,116 @@ export default function ResetPasswordPage() {
   }
 
   return (
-    <div className="flex min-h-full flex-1 items-center justify-center bg-navy-950 px-4 py-12">
-      <Card className="w-full max-w-sm">
-        <div className="flex flex-col items-center text-center">
-          <LoanStarLogo height={48} />
-          <h1 className="mt-4 font-display text-xl font-semibold text-navy-900">Set new password</h1>
-        </div>
-
-        {!ready ? (
-          <div className="mt-6 space-y-3">
-            <Alert variant="info">
-              Open this page from the reset link in your email, or sign in first.
-            </Alert>
-            <p className="text-center text-sm text-ink-400">
-              <Link
-                href="/login"
-                className="font-medium text-teal-700 underline-offset-2 hover:underline"
-              >
-                Back to sign in
-              </Link>
-            </p>
+    <div className="login-shell">
+      <div className="login-brand">
+        <Link href="/" className="inline-flex items-center no-underline">
+          <LoanStarLogo height={36} />
+        </Link>
+        <div className="mid">
+          <h2>
+            Your loan, <em>charted clearly</em> — wherever you sail.
+          </h2>
+          <p>
+            Track your application, view your payment schedule, and download
+            your statement of account from any port in the world.
+          </p>
+          <div className="login-quote">
+            <div className="q">
+              &ldquo;Na-approve yung loan ko bago pa ako sumakay. Kitang-kita
+              ko rin lahat ng bawas at schedule — walang gulat.&rdquo;
+            </div>
+            <div className="who">
+              <span className="av">JD</span>
+              <div>
+                <b>Juan D.</b>
+                <span>Able Seaman · MV Pacific Star</span>
+              </div>
+            </div>
           </div>
-        ) : (
-          <form onSubmit={(e) => void handleSubmit(e)} className="mt-6 space-y-4">
-            {error ? <Alert>{error}</Alert> : null}
-            <div>
-              <Label htmlFor="password">New password</Label>
-              <Input
-                id="password"
-                type="password"
-                required
-                minLength={8}
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-              />
+        </div>
+        <div className="foot-note">MERIDIAN · SECURE PORTAL · LOANSTAR 2026</div>
+      </div>
+
+      <div className="login-panel">
+        <div className="login-card">
+          <Link href="/login" className="login-back">
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2.4"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden
+            >
+              <path d="M19 12H5M12 19l-7-7 7-7" />
+            </svg>
+            Back to sign in
+          </Link>
+          <h3>Set new password</h3>
+
+          {!ready ? (
+            <div className="mt-6">
+              <Alert variant="info">
+                Open this page from the reset link in your email, or sign in first.
+              </Alert>
             </div>
-            <div>
-              <Label htmlFor="confirm">Confirm password</Label>
-              <Input
-                id="confirm"
-                type="password"
-                required
-                minLength={8}
-                value={confirm}
-                onChange={(e) => setConfirm(e.target.value)}
-              />
-            </div>
-            <Button type="submit" disabled={loading} className="w-full">
-              {loading ? "Updating…" : "Update password"}
-            </Button>
-          </form>
-        )}
-      </Card>
+          ) : (
+            <>
+              <p className="s">Choose a new password for your account.</p>
+              <form onSubmit={(e) => void handleSubmit(e)}>
+                {error ? (
+                  <div className="mb-4">
+                    <Alert>{error}</Alert>
+                  </div>
+                ) : null}
+
+                <div className="mb-[18px]">
+                  <Label htmlFor="password" required>
+                    New password
+                  </Label>
+                  <Input
+                    id="password"
+                    type="password"
+                    required
+                    minLength={8}
+                    autoComplete="new-password"
+                    placeholder="At least 8 characters"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                  />
+                </div>
+
+                <div className="mb-[22px]">
+                  <Label htmlFor="confirm" required>
+                    Confirm password
+                  </Label>
+                  <Input
+                    id="confirm"
+                    type="password"
+                    required
+                    minLength={8}
+                    autoComplete="new-password"
+                    placeholder="Re-enter your new password"
+                    value={confirm}
+                    onChange={(e) => setConfirm(e.target.value)}
+                  />
+                </div>
+
+                <Button
+                  type="submit"
+                  variant="accent"
+                  size="lg"
+                  block
+                  loading={loading}
+                >
+                  Update password
+                </Button>
+              </form>
+            </>
+          )}
+        </div>
+      </div>
     </div>
   );
 }

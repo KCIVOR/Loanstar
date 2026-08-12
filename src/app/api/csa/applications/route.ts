@@ -1,80 +1,95 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
+import { resolveDateBounds, type DateRangeValue } from "@/components/history";
 import { handleApiError, jsonOk } from "@/lib/api/handler";
 import {
   createApplicationSchema,
   createCsaApplication,
 } from "@/lib/csa/create-application";
+import {
+  CSA_QUEUE_PAGE_SIZES,
+  getCsaQueue,
+  getCsaQueueKpiCounts,
+  type CsaQueueSortKey,
+  type CsaWorkFilter,
+} from "@/lib/csa/queue";
 import { requireModulePermission } from "@/lib/permissions/server";
 import { createClient } from "@/lib/supabase/server";
 
-export async function GET() {
+const WORK_FILTERS = new Set([
+  "all",
+  "attention",
+  "documents",
+  "negotiation",
+]);
+const RANGE_PRESETS = new Set(["30d", "90d", "all", "custom"]);
+const SORT_KEYS = new Set([
+  "borrower",
+  "type",
+  "status",
+  "filed",
+  "waiting",
+]);
+
+export async function GET(request: Request) {
   try {
     await requireModulePermission("intake", "view");
+    const { searchParams } = new URL(request.url);
+
+    const search = searchParams.get("search") ?? "";
+    const workRaw = searchParams.get("work") ?? "all";
+    const workFilter = (
+      WORK_FILTERS.has(workRaw) ? workRaw : "all"
+    ) as CsaWorkFilter;
+
+    // Active queue defaults to All time (must not hide old-but-still-open items).
+    const rangeRaw = searchParams.get("range") ?? "all";
+    const preset = (
+      RANGE_PRESETS.has(rangeRaw) ? rangeRaw : "all"
+    ) as DateRangeValue["preset"];
+    const dateRange: DateRangeValue = {
+      preset,
+      from: searchParams.get("from") ?? "",
+      to: searchParams.get("to") ?? "",
+    };
+    const { from, to } = resolveDateBounds(dateRange, new Date());
+
+    const sortKeyRaw = searchParams.get("sortKey");
+    const sortKey = (
+      sortKeyRaw && SORT_KEYS.has(sortKeyRaw) ? sortKeyRaw : undefined
+    ) as CsaQueueSortKey | undefined;
+    const sortDirRaw = searchParams.get("sortDir") ?? "desc";
+    const sortDir = sortDirRaw === "asc" ? "asc" : "desc";
+
+    const page = Math.max(1, Number(searchParams.get("page") ?? 1) || 1);
+    const pageSizeRaw = Number(searchParams.get("pageSize") ?? 10);
+    const pageSize = (CSA_QUEUE_PAGE_SIZES as readonly number[]).includes(
+      pageSizeRaw,
+    )
+      ? pageSizeRaw
+      : 10;
+
     const supabase = await createClient();
+    const [queue, kpi] = await Promise.all([
+      getCsaQueue(supabase, {
+        search,
+        workFilter,
+        from,
+        to,
+        sortKey,
+        sortDir,
+        page,
+        pageSize,
+      }),
+      getCsaQueueKpiCounts(supabase),
+    ]);
 
-    const { data, error } = await supabase
-      .from("loan_applications")
-      .select(
-        `
-        id,
-        application_no,
-        status,
-        blocker,
-        is_reloan,
-        created_at,
-        updated_at,
-        borrowers (
-          id,
-          borrower_no,
-          first_name,
-          last_name,
-          email
-        )
-      `,
-      )
-      .in("status", [
-        "registered",
-        "documents_pending",
-        "submitted",
-        "on_hold",
-        "for_revision",
-        "approved",
-        "awaiting_confirmation",
-        "negotiating_terms",
-      ])
-      .order("created_at", { ascending: false });
-
-    if (error) {
-      throw new Error(error.message);
-    }
-
-    const applications = (data ?? []).map((row) => {
-      const borrower = Array.isArray(row.borrowers)
-        ? row.borrowers[0]
-        : row.borrowers;
-      return {
-        id: row.id,
-        applicationNo: row.application_no,
-        status: row.status,
-        blocker: row.blocker,
-        isReloan: row.is_reloan,
-        createdAt: row.created_at,
-        updatedAt: row.updated_at,
-        borrower: borrower
-          ? {
-              id: borrower.id,
-              borrowerNo: borrower.borrower_no,
-              firstName: borrower.first_name,
-              lastName: borrower.last_name,
-              email: borrower.email,
-            }
-          : null,
-      };
+    return jsonOk({
+      rows: queue.rows,
+      totalCount: queue.totalCount,
+      kpi,
     });
-
-    return jsonOk({ applications });
   } catch (error) {
     return handleApiError(error);
   }

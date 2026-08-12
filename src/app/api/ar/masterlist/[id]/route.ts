@@ -17,10 +17,6 @@ type RouteParams = { params: Promise<{ id: string }> };
 const assignSchema = z.object({
   portfolioId: z.string().uuid().optional().nullable(),
   collectorUserId: z.string().uuid().optional().nullable(),
-  checkTransmittalStatus: z
-    .enum(["pending", "transmitted", "received"])
-    .optional(),
-  checkClearingStatus: z.enum(["pending", "clearing", "cleared"]).optional(),
 });
 
 const remedialSchema = z.object({
@@ -90,45 +86,6 @@ export async function PATCH(request: Request, { params }: RouteParams) {
         collectorUserId: body.collectorUserId,
         assignedBy: user.id,
       });
-    }
-
-    if (body.checkTransmittalStatus || body.checkClearingStatus) {
-      // Stamp the start of the 3-day clearing window on the transition into
-      // 'clearing'; reset it when the status goes back to 'pending'.
-      let clearingStartedAt: string | null | undefined;
-      if (body.checkClearingStatus) {
-        const { data: current } = await supabase
-          .from("masterlist")
-          .select("check_clearing_status, clearing_started_at")
-          .eq("id", id)
-          .single();
-
-        if (
-          body.checkClearingStatus === "clearing" &&
-          current?.check_clearing_status !== "clearing"
-        ) {
-          clearingStartedAt = new Date().toISOString();
-        } else if (body.checkClearingStatus === "pending") {
-          clearingStartedAt = null;
-        }
-      }
-
-      const { error: statusError } = await supabase
-        .from("masterlist")
-        .update({
-          ...(body.checkTransmittalStatus
-            ? { check_transmittal_status: body.checkTransmittalStatus }
-            : {}),
-          ...(body.checkClearingStatus
-            ? { check_clearing_status: body.checkClearingStatus }
-            : {}),
-          ...(clearingStartedAt !== undefined
-            ? { clearing_started_at: clearingStartedAt }
-            : {}),
-        })
-        .eq("id", id);
-
-      if (statusError) throw new Error(statusError.message);
     }
 
     await writeAuditEvent({

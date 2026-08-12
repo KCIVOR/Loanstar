@@ -50,6 +50,14 @@ function sequenceAt(current: CigSequenceState["current"]): CigSequenceState {
 }
 
 describe("cigChecksSummary", () => {
+  it("treats empty check list as complete", () => {
+    const summary = cigChecksSummary([]);
+    assert.equal(summary.total, 0);
+    assert.equal(summary.recorded, 0);
+    assert.equal(summary.complete, true);
+    assert.equal(summary.percent, 100);
+  });
+
   it("counts recorded checks", () => {
     const summary = cigChecksSummary([
       { result: "pass" },

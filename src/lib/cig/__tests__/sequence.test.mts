@@ -54,6 +54,8 @@ function emptyVerification(
     picRatingReason: null,
     cifVerifiedBy: null,
     cifVerifiedDate: null,
+    fieldVisit: null,
+    smeReloanVerification: null,
     finding: null,
     findingNotes: null,
     isComplete: false,

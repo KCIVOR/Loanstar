@@ -4,13 +4,20 @@ import { z } from "zod";
 import { writeAuditEvent } from "@/lib/audit/writer";
 import { ensureDocumentSlots } from "@/lib/documents/checklist";
 
-export const createApplicationSchema = z.object({
-  email: z.string().email(),
-  firstName: z.string().min(1),
-  lastName: z.string().min(1),
-  middleName: z.string().optional(),
-  mobilePhone: z.string().optional(),
-});
+export const createApplicationSchema = z
+  .object({
+    email: z.string().email(),
+    firstName: z.string().min(1),
+    lastName: z.string().min(1),
+    middleName: z.string().optional(),
+    mobilePhone: z.string().optional(),
+    segment: z.enum(["seafarer", "sme"]).default("seafarer"),
+    entityType: z.enum(["individual", "corporate"]).optional(),
+  })
+  .refine((data) => data.segment !== "sme" || data.entityType != null, {
+    message: "entityType is required when segment is sme",
+    path: ["entityType"],
+  });
 
 export type CreateApplicationInput = z.infer<typeof createApplicationSchema>;
 
@@ -51,6 +58,8 @@ export async function createCsaApplication(
     .insert({
       borrower_id: borrowerId,
       status: "submitted",
+      segment: body.segment,
+      entity_type: body.entityType ?? null,
       status_history: [
         {
           status: "submitted",
@@ -72,7 +81,10 @@ export async function createCsaApplication(
     internal_flags: {},
   });
 
-  await ensureDocumentSlots(supabase, "intake", application.id, borrowerId);
+  await ensureDocumentSlots(supabase, "intake", application.id, borrowerId, {
+    segment: body.segment,
+    entityType: body.entityType ?? null,
+  });
 
   await writeAuditEvent({
     actorId,
@@ -80,7 +92,12 @@ export async function createCsaApplication(
     action: "create",
     entityType: "loan_application",
     entityId: application.id,
-    afterData: { borrowerId, email: body.email },
+    afterData: {
+      borrowerId,
+      email: body.email,
+      segment: body.segment,
+      entityType: body.entityType ?? null,
+    },
   });
 
   return { applicationId: application.id as string, borrowerId };

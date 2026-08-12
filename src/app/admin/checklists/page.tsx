@@ -25,9 +25,14 @@ type DocumentType = {
   name: string;
 };
 
+type LoanSegment = "seafarer" | "sme";
+type EntityTypeFilter = "" | "individual" | "corporate";
+
 type ChecklistItem = {
   id: string;
   stage: string;
+  segment: LoanSegment;
+  entityType: "individual" | "corporate" | null;
   isRequired: boolean;
   isOptionalFlag: boolean;
   sortOrder: number;
@@ -36,6 +41,8 @@ type ChecklistItem = {
 
 export default function ChecklistsAdminPage() {
   const [stage, setStage] = useState<string>("intake");
+  const [segment, setSegment] = useState<LoanSegment>("seafarer");
+  const [entityType, setEntityType] = useState<EntityTypeFilter>("");
   const [items, setItems] = useState<ChecklistItem[]>([]);
   const [allItems, setAllItems] = useState<ChecklistItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -49,8 +56,15 @@ export default function ChecklistsAdminPage() {
     setLoading(true);
     setError(null);
     try {
+      const stageParams = new URLSearchParams({ stage, segment });
+      if (entityType) {
+        stageParams.set("entityType", entityType);
+      } else {
+        stageParams.set("entityType", "none");
+      }
+
       const [stageRes, allRes] = await Promise.all([
-        fetch(`/api/admin/stage-checklists?stage=${stage}`),
+        fetch(`/api/admin/stage-checklists?${stageParams.toString()}`),
         fetch("/api/admin/stage-checklists"),
       ]);
       if (!stageRes.ok || !allRes.ok) throw new Error("Failed to load checklists");
@@ -63,7 +77,7 @@ export default function ChecklistsAdminPage() {
     } finally {
       setLoading(false);
     }
-  }, [stage]);
+  }, [stage, segment, entityType]);
 
   useEffect(() => {
     void load();
@@ -96,6 +110,8 @@ export default function ChecklistsAdminPage() {
           documentTypeId: newDocTypeId,
           isRequired: true,
           sortOrder: items.length + 1,
+          segment,
+          entityType: segment === "sme" ? entityType || null : null,
         }),
       });
       if (!res.ok) {
@@ -130,6 +146,8 @@ export default function ChecklistsAdminPage() {
           isRequired: !item.isRequired,
           isOptionalFlag: item.isRequired,
           sortOrder: item.sortOrder,
+          segment: item.segment,
+          entityType: item.entityType,
         }),
       });
       if (!res.ok) throw new Error("Failed to update item");
@@ -156,7 +174,7 @@ export default function ChecklistsAdminPage() {
     <div>
       <PageHeader
         title="Checklists"
-        description="Configure required documents per workflow stage"
+        description="Configure required documents per workflow stage and loan segment"
       />
 
       {error ? (
@@ -170,20 +188,52 @@ export default function ChecklistsAdminPage() {
         </div>
       ) : null}
 
-      <Card className="mb-6">
-        <Label htmlFor="stage">Stage</Label>
-        <Select
-          id="stage"
-          value={stage}
-          onChange={(e) => setStage(e.target.value)}
-          className="mt-1 max-w-xs"
-        >
-          {STAGES.map((s) => (
-            <option key={s} value={s}>
-              {s.replace(/_/g, " ")}
-            </option>
-          ))}
-        </Select>
+      <Card className="mb-6 grid gap-4 sm:grid-cols-3">
+        <div>
+          <Label htmlFor="stage">Stage</Label>
+          <Select
+            id="stage"
+            value={stage}
+            onChange={(e) => setStage(e.target.value)}
+            className="mt-1"
+          >
+            {STAGES.map((s) => (
+              <option key={s} value={s}>
+                {s.replace(/_/g, " ")}
+              </option>
+            ))}
+          </Select>
+        </div>
+        <div>
+          <Label htmlFor="segment">Segment</Label>
+          <Select
+            id="segment"
+            value={segment}
+            onChange={(e) => {
+              const next = e.target.value as LoanSegment;
+              setSegment(next);
+              if (next === "seafarer") setEntityType("");
+            }}
+            className="mt-1"
+          >
+            <option value="seafarer">Seafarer</option>
+            <option value="sme">SME</option>
+          </Select>
+        </div>
+        <div>
+          <Label htmlFor="entityType">Entity type</Label>
+          <Select
+            id="entityType"
+            value={entityType}
+            onChange={(e) => setEntityType(e.target.value as EntityTypeFilter)}
+            className="mt-1"
+            disabled={segment !== "sme"}
+          >
+            <option value="">Common (both)</option>
+            <option value="individual">Individual</option>
+            <option value="corporate">Corporate</option>
+          </Select>
+        </div>
       </Card>
 
       {loading ? (
@@ -192,11 +242,14 @@ export default function ChecklistsAdminPage() {
         <>
           <Card className="mb-6">
             <h2 className="mb-3 font-display text-lg font-semibold text-navy-900">
-              Checklist items — {stage.replace(/_/g, " ")}
+              Checklist items — {stage.replace(/_/g, " ")} / {segment}
+              {segment === "sme"
+                ? ` / ${entityType || "common"}`
+                : ""}
             </h2>
             {items.length === 0 ? (
               <EmptyState
-                title="No items for this stage"
+                title="No items for this filter"
                 description="Add a document type below."
                 showMark={false}
               />
@@ -205,6 +258,7 @@ export default function ChecklistsAdminPage() {
                 <thead>
                   <tr>
                     <Th>Document</Th>
+                    <Th>Entity</Th>
                     <Th>Required</Th>
                     <Th num>Order</Th>
                     <Th>Actions</Th>
@@ -216,6 +270,7 @@ export default function ChecklistsAdminPage() {
                       <Td className="font-medium text-ink-900">
                         {item.documentType?.name ?? "—"}
                       </Td>
+                      <Td>{item.entityType ?? "common"}</Td>
                       <Td>
                         {item.isRequired ? (
                           <Badge variant="warning">Required</Badge>
@@ -256,7 +311,7 @@ export default function ChecklistsAdminPage() {
             {availableTypes.length === 0 ? (
               <EmptyState
                 title="All document types assigned"
-                description="Every known document type is already in this stage checklist."
+                description="Every known document type is already in this filtered checklist."
                 showMark={false}
               />
             ) : (

@@ -1,0 +1,513 @@
+[
+  {
+    "text": "Rest Form",
+    "x": 291.6,
+    "y": 47.6,
+    "size": 10.0,
+    "font": "Helvetica"
+  },
+  {
+    "text": "CORPORATE LOAN APPLICATION",
+    "x": 364.7,
+    "y": 49.4,
+    "size": 12.0,
+    "font": "ArialNarrow-Bold"
+  },
+  {
+    "text": "Business Loan",
+    "x": 216.7,
+    "y": 76.4,
+    "size": 9.0,
+    "font": "Helvetica"
+  },
+  {
+    "text": "Date Applied",
+    "x": 47.2,
+    "y": 79.7,
+    "size": 8.0,
+    "font": "ArialNarrow"
+  },
+  {
+    "text": "Type Of Loan",
+    "x": 173.1,
+    "y": 79.7,
+    "size": 8.0,
+    "font": "ArialNarrow"
+  },
+  {
+    "text": "Loan Desired",
+    "x": 314.7,
+    "y": 79.7,
+    "size": 8.0,
+    "font": "ArialNarrow"
+  },
+  {
+    "text": "Sales Agent",
+    "x": 446.4,
+    "y": 79.7,
+    "size": 8.0,
+    "font": "ArialNarrow"
+  },
+  {
+    "text": "IMPORTANT : PLEASE FILL UP THIS FORM TO FACILITATE YOUR LOAN APPLICATION, PUT N/A IF NOT APPLICABLE",
+    "x": 38.0,
+    "y": 98.3,
+    "size": 8.0,
+    "font": "ArialNarrow-Bold"
+  },
+  {
+    "text": "FACTS ABOUT THE COMPANY",
+    "x": 38.0,
+    "y": 109.1,
+    "size": 8.0,
+    "font": "ArialNarrow-Bold"
+  },
+  {
+    "text": "Name of Company",
+    "x": 38.0,
+    "y": 124.1,
+    "size": 8.0,
+    "font": "ArialNarrow"
+  },
+  {
+    "text": "Acronym",
+    "x": 332.5,
+    "y": 124.1,
+    "size": 8.0,
+    "font": "ArialNarrow"
+  },
+  {
+    "text": "Office Address",
+    "x": 38.0,
+    "y": 139.1,
+    "size": 8.0,
+    "font": "ArialNarrow"
+  },
+  {
+    "text": "Landline Nos.",
+    "x": 332.5,
+    "y": 139.1,
+    "size": 8.0,
+    "font": "ArialNarrow"
+  },
+  {
+    "text": "Mobile Nos.",
+    "x": 332.5,
+    "y": 154.1,
+    "size": 8.0,
+    "font": "ArialNarrow"
+  },
+  {
+    "text": "Nature of Business",
+    "x": 38.0,
+    "y": 169.1,
+    "size": 8.0,
+    "font": "ArialNarrow"
+  },
+  {
+    "text": "Fax No.",
+    "x": 332.5,
+    "y": 169.1,
+    "size": 8.0,
+    "font": "ArialNarrow"
+  },
+  {
+    "text": "No. of Branches",
+    "x": 38.0,
+    "y": 184.2,
+    "size": 8.0,
+    "font": "ArialNarrow"
+  },
+  {
+    "text": "Date Establised",
+    "x": 332.5,
+    "y": 184.2,
+    "size": 8.0,
+    "font": "ArialNarrow"
+  },
+  {
+    "text": "E-mail Address",
+    "x": 38.0,
+    "y": 199.2,
+    "size": 8.0,
+    "font": "ArialNarrow"
+  },
+  {
+    "text": "No. of Employees",
+    "x": 332.5,
+    "y": 199.2,
+    "size": 8.0,
+    "font": "ArialNarrow"
+  },
+  {
+    "text": "TIN",
+    "x": 38.0,
+    "y": 214.2,
+    "size": 8.0,
+    "font": "ArialNarrow"
+  },
+  {
+    "text": "Website",
+    "x": 332.5,
+    "y": 214.2,
+    "size": 8.0,
+    "font": "ArialNarrow"
+  },
+  {
+    "text": "COMPANY OFFICERS",
+    "x": 38.0,
+    "y": 231.6,
+    "size": 8.0,
+    "font": "ArialNarrow-Bold"
+  },
+  {
+    "text": "Name",
+    "x": 38.0,
+    "y": 245.6,
+    "size": 8.0,
+    "font": "ArialNarrow"
+  },
+  {
+    "text": "Address",
+    "x": 166.1,
+    "y": 245.6,
+    "size": 8.0,
+    "font": "ArialNarrow"
+  },
+  {
+    "text": "Position",
+    "x": 409.3,
+    "y": 245.6,
+    "size": 8.0,
+    "font": "ArialNarrow"
+  },
+  {
+    "text": "MAJOR STOCKHOLDERS",
+    "x": 38.0,
+    "y": 308.8,
+    "size": 8.0,
+    "font": "ArialNarrow-Bold"
+  },
+  {
+    "text": "Name",
+    "x": 38.0,
+    "y": 322.8,
+    "size": 8.0,
+    "font": "ArialNarrow"
+  },
+  {
+    "text": "Address",
+    "x": 166.1,
+    "y": 322.8,
+    "size": 8.0,
+    "font": "ArialNarrow"
+  },
+  {
+    "text": "Position",
+    "x": 409.3,
+    "y": 322.8,
+    "size": 8.0,
+    "font": "ArialNarrow"
+  },
+  {
+    "text": "Equity",
+    "x": 499.0,
+    "y": 322.8,
+    "size": 8.0,
+    "font": "ArialNarrow"
+  },
+  {
+    "text": "TRADE REFERENCES",
+    "x": 38.0,
+    "y": 416.0,
+    "size": 8.0,
+    "font": "ArialNarrow-Bold"
+  },
+  {
+    "text": "Customer / Client",
+    "x": 38.0,
+    "y": 430.0,
+    "size": 8.0,
+    "font": "ArialNarrow"
+  },
+  {
+    "text": "Address",
+    "x": 166.1,
+    "y": 430.0,
+    "size": 8.0,
+    "font": "ArialNarrow"
+  },
+  {
+    "text": "Contact Person",
+    "x": 409.3,
+    "y": 430.0,
+    "size": 8.0,
+    "font": "ArialNarrow"
+  },
+  {
+    "text": "Contact No.",
+    "x": 499.0,
+    "y": 430.0,
+    "size": 8.0,
+    "font": "ArialNarrow"
+  },
+  {
+    "text": "Supplier",
+    "x": 38.0,
+    "y": 490.0,
+    "size": 8.0,
+    "font": "ArialNarrow"
+  },
+  {
+    "text": "Address",
+    "x": 166.1,
+    "y": 490.0,
+    "size": 8.0,
+    "font": "ArialNarrow"
+  },
+  {
+    "text": "Contact Person",
+    "x": 409.3,
+    "y": 490.0,
+    "size": 8.0,
+    "font": "ArialNarrow"
+  },
+  {
+    "text": "Contact No.",
+    "x": 499.0,
+    "y": 490.0,
+    "size": 8.0,
+    "font": "ArialNarrow"
+  },
+  {
+    "text": "CREDIT REFERENCES",
+    "x": 38.0,
+    "y": 553.2,
+    "size": 8.0,
+    "font": "ArialNarrow-Bold"
+  },
+  {
+    "text": "Creditors / Banks",
+    "x": 38.0,
+    "y": 567.2,
+    "size": 8.0,
+    "font": "ArialNarrow"
+  },
+  {
+    "text": "Type of Loan",
+    "x": 166.1,
+    "y": 567.2,
+    "size": 8.0,
+    "font": "ArialNarrow"
+  },
+  {
+    "text": "Outstanding Balance",
+    "x": 294.4,
+    "y": 567.2,
+    "size": 8.0,
+    "font": "ArialNarrow"
+  },
+  {
+    "text": "Monthly Payment",
+    "x": 408.2,
+    "y": 567.2,
+    "size": 8.0,
+    "font": "ArialNarrow"
+  },
+  {
+    "text": "Contact No.",
+    "x": 498.2,
+    "y": 567.2,
+    "size": 8.0,
+    "font": "ArialNarrow"
+  },
+  {
+    "text": "BANK ACCOUNTS",
+    "x": 38.0,
+    "y": 630.5,
+    "size": 8.0,
+    "font": "ArialNarrow-Bold"
+  },
+  {
+    "text": "Bank Name",
+    "x": 38.0,
+    "y": 644.5,
+    "size": 8.0,
+    "font": "ArialNarrow"
+  },
+  {
+    "text": "Branch",
+    "x": 166.1,
+    "y": 644.5,
+    "size": 8.0,
+    "font": "ArialNarrow"
+  },
+  {
+    "text": "Account No.",
+    "x": 294.1,
+    "y": 644.5,
+    "size": 8.0,
+    "font": "ArialNarrow"
+  },
+  {
+    "text": "Account Type",
+    "x": 408.5,
+    "y": 644.5,
+    "size": 8.0,
+    "font": "ArialNarrow"
+  },
+  {
+    "text": "Contact No.",
+    "x": 498.2,
+    "y": 644.5,
+    "size": 8.0,
+    "font": "ArialNarrow"
+  },
+  {
+    "text": "I certify that the statements on this application are correct and complete. By filling out this form, I agree that the details I provided, including but not limited to my name, address,",
+    "x": 50.8,
+    "y": 707.7,
+    "size": 8.0,
+    "font": "ArialNarrow"
+  },
+  {
+    "text": "phone number, email, and other information, personal or otherwise, will be collected by  LOAN STAR LENDING GROUP CORP. to process my loan application . The use of the",
+    "x": 50.8,
+    "y": 718.1,
+    "size": 8.0,
+    "font": "ArialNarrow"
+  },
+  {
+    "text": "information shall be under applicable laws, rules, and regulations of the Republic of the Philippine. I also authorized the company to conduct phone and field verification with all",
+    "x": 50.8,
+    "y": 728.5,
+    "size": 8.0,
+    "font": "ArialNarrow"
+  },
+  {
+    "text": "the information I provided. I agree that this application may remain your property whether or not this credit application is approved.",
+    "x": 50.8,
+    "y": 738.9,
+    "size": 8.0,
+    "font": "ArialNarrow"
+  },
+  {
+    "text": "This is to Authorize Loan Loan Star Lending Group Corp. or its authorized representative to verify my/our savings/checking account with your bank. You are allowed to disclose",
+    "x": 50.8,
+    "y": 757.1,
+    "size": 8.0,
+    "font": "ArialNarrow"
+  },
+  {
+    "text": "the date of opening of my/our savings/checking account the handling and the average daily balance (ADB) for the last six months.",
+    "x": 50.8,
+    "y": 767.5,
+    "size": 8.0,
+    "font": "ArialNarrow"
+  },
+  {
+    "text": "Bank Name and Account Number",
+    "x": 50.8,
+    "y": 778.9,
+    "size": 8.0,
+    "font": "ArialNarrow"
+  },
+  {
+    "text": "REQUIREMENTS",
+    "x": 144.9,
+    "y": 796.8,
+    "size": 10.0,
+    "font": "ArialNarrow-Bold"
+  },
+  {
+    "text": "1 SEC Registration, Articles of Incorporation and By-Laws.(GIS)",
+    "x": 54.4,
+    "y": 813.9,
+    "size": 8.0,
+    "font": "ArialNarrow"
+  },
+  {
+    "text": "2 Company profile",
+    "x": 54.4,
+    "y": 824.7,
+    "size": 8.0,
+    "font": "ArialNarrow"
+  },
+  {
+    "text": "3 At least two (2) years of financial statement W/ ITR",
+    "x": 54.4,
+    "y": 835.5,
+    "size": 8.0,
+    "font": "ArialNarrow"
+  },
+  {
+    "text": "4 Six (6) months latest bank statement",
+    "x": 54.4,
+    "y": 846.3,
+    "size": 8.0,
+    "font": "ArialNarrow"
+  },
+  {
+    "text": "Signature",
+    "x": 402.4,
+    "y": 847.4,
+    "size": 8.0,
+    "font": "ArialNarrow"
+  },
+  {
+    "text": "Over",
+    "x": 432.8,
+    "y": 847.4,
+    "size": 8.0,
+    "font": "ArialNarrow"
+  },
+  {
+    "text": "Printed",
+    "x": 449.4,
+    "y": 847.4,
+    "size": 8.0,
+    "font": "ArialNarrow"
+  },
+  {
+    "text": "Name",
+    "x": 472.4,
+    "y": 847.4,
+    "size": 8.0,
+    "font": "ArialNarrow"
+  },
+  {
+    "text": "5 Two (2) valid ID of Official Representative",
+    "x": 54.4,
+    "y": 857.1,
+    "size": 8.0,
+    "font": "ArialNarrow"
+  },
+  {
+    "text": "6 TIN and CTC of the company and representative/s.",
+    "x": 54.4,
+    "y": 867.9,
+    "size": 8.0,
+    "font": "ArialNarrow"
+  },
+  {
+    "text": "7 Board Resolution and Secretary Certificate to avail loan",
+    "x": 54.4,
+    "y": 878.7,
+    "size": 8.0,
+    "font": "ArialNarrow"
+  },
+  {
+    "text": "8 Business proof of billing",
+    "x": 54.4,
+    "y": 889.5,
+    "size": 8.0,
+    "font": "ArialNarrow"
+  },
+  {
+    "text": "9 Location Sketch",
+    "x": 54.4,
+    "y": 900.3,
+    "size": 8.0,
+    "font": "ArialNarrow"
+  }
+]

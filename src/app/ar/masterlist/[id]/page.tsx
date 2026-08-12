@@ -19,8 +19,15 @@ import {
   Th,
 } from "@/components/ui";
 import { DocumentChecklist } from "@/components/DocumentChecklist";
+import {
+  masterlistEmploymentLabels,
+  masterlistSecondaryIdentity,
+} from "@/lib/ar/masterlist-display";
 import { canMarkPaidOff } from "@/lib/ar/paid-off";
 import { formatStatusLabel } from "@/lib/applications/status";
+
+/** UI-only toggle — the accounting checklist card isn't wired to any workflow gate. */
+const SHOW_ACCOUNTING_CHECKLIST = false;
 
 type Lookup = {
   portfolios: Array<{ id: string; name: string }>;
@@ -128,8 +135,6 @@ export default function ArMasterlistDetailPage() {
   const [portfolioId, setPortfolioId] = useState("");
   const [collectorId, setCollectorId] = useState("");
   const [remedialId, setRemedialId] = useState("");
-  const [transmittal, setTransmittal] = useState("pending");
-  const [clearing, setClearing] = useState("pending");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
@@ -152,12 +157,6 @@ export default function ArMasterlistDetailPage() {
       };
       setRecord(recData.record);
       setPayments(recData.payments ?? []);
-      setTransmittal(
-        (recData.record.check_transmittal_status as string) ?? "pending",
-      );
-      setClearing(
-        (recData.record.check_clearing_status as string) ?? "pending",
-      );
       const assignmentsRaw = recData.record.assignments as
         | Record<string, unknown>
         | Record<string, unknown>[]
@@ -200,29 +199,6 @@ export default function ArMasterlistDetailPage() {
       });
       if (!res.ok) throw new Error("Assignment failed");
       setMessage("Assignment saved.");
-      await load({ silent: true });
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed");
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  async function saveCheckStatuses() {
-    setSaving(true);
-    setMessage(null);
-    setError(null);
-    try {
-      const res = await fetch(`/api/ar/masterlist/${id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          checkTransmittalStatus: transmittal,
-          checkClearingStatus: clearing,
-        }),
-      });
-      if (!res.ok) throw new Error("Failed to save check statuses");
-      setMessage("Check statuses saved.");
       await load({ silent: true });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed");
@@ -312,6 +288,15 @@ export default function ArMasterlistDetailPage() {
   const agingBucket = String(record.aging_bucket ?? "");
   const applicationStatus = String(record.application_status ?? "");
   const remedialFlag = Boolean(record.remedial_flag);
+  const segment =
+    record.segment === "sme" ? "sme" : ("seafarer" as const);
+  const employmentLabels = masterlistEmploymentLabels(segment);
+  const manningAgency = (record.manning_agency as string | null) ?? null;
+  const vesselName = (record.vessel_name as string | null) ?? null;
+  const secondaryIdentity = masterlistSecondaryIdentity({
+    manning_agency: manningAgency,
+    vessel_name: vesselName,
+  });
   const outstanding = Number(record.outstanding_balance ?? 0);
   const monthly = Number(record.monthly_amortization ?? 0);
   const terms = Number(record.terms ?? 0);
@@ -346,36 +331,14 @@ export default function ArMasterlistDetailPage() {
   const portfolioLabel =
     lookups?.portfolios.find((p) => p.id === portfolioId)?.name ?? null;
 
-  const clearingStartedAt = record.clearing_started_at as string | null;
-  const clearingDay =
-    clearing === "clearing" && clearingStartedAt
-      ? Math.max(
-          1,
-          Math.floor(
-            (Date.now() - new Date(clearingStartedAt).getTime()) /
-              (1000 * 60 * 60 * 24),
-          ) + 1,
-        )
-      : null;
-  const clearingOverdue = clearingDay !== null && clearingDay > 3;
-
   const nextActions: string[] = [];
   if (!isPaidOff && !collectorId) {
     nextActions.push("Assign a collector so this account appears in collection.");
-  }
-  if (!isPaidOff && clearingOverdue) {
-    nextActions.push("Check clearing has passed 3 days — follow up with the bank.");
   }
   if (!isPaidOff && !remedialFlag && isHighAging(agingBucket)) {
     nextActions.push(
       "Aging has reached the 90-day threshold — consider remedial turnover.",
     );
-  }
-  if (
-    !isPaidOff &&
-    (transmittal === "pending" || clearing === "pending")
-  ) {
-    nextActions.push("Update check transmittal / clearing status.");
   }
   if (isPaidOff) {
     nextActions.length = 0;
@@ -398,10 +361,17 @@ export default function ArMasterlistDetailPage() {
       />
       <PageHeader
         title={borrowerName}
-        description={accountNo ?? (borrowerNo || "Account")}
+        description={
+          secondaryIdentity
+            ? `${accountNo ?? (borrowerNo || "Account")} · ${secondaryIdentity}`
+            : (accountNo ?? (borrowerNo || "Account"))
+        }
       />
 
       <div className="mb-6 flex flex-wrap items-center gap-2">
+        <Badge variant={segment === "sme" ? "navy" : "teal"} dot>
+          {segment === "sme" ? "SME" : "Seafarer"}
+        </Badge>
         <Badge variant={accountStatusVariant(accountStatus)} dot>
           {accountStatus || "—"}
         </Badge>
@@ -469,6 +439,33 @@ export default function ArMasterlistDetailPage() {
           <span className="badge badge-success">Paid off</span>
           This loan has been marked Paid Off.
         </div>
+      ) : null}
+
+      {manningAgency || vesselName ? (
+        <Card className="mb-6 !bg-surface-2/30">
+          <div className="grid gap-3 sm:grid-cols-2">
+            {manningAgency ? (
+              <div>
+                <div className="text-[10.5px] font-medium uppercase tracking-[0.14em] text-ink-400">
+                  {employmentLabels.employer}
+                </div>
+                <div className="mt-1 text-sm font-medium text-ink-900">
+                  {manningAgency}
+                </div>
+              </div>
+            ) : null}
+            {vesselName ? (
+              <div>
+                <div className="text-[10.5px] font-medium uppercase tracking-[0.14em] text-ink-400">
+                  {employmentLabels.secondary}
+                </div>
+                <div className="mt-1 text-sm font-medium text-ink-900">
+                  {vesselName}
+                </div>
+              </div>
+            ) : null}
+          </div>
+        </Card>
       ) : null}
 
       <Card variant="gradient" className="mb-6">
@@ -544,127 +541,53 @@ export default function ArMasterlistDetailPage() {
         ) : null}
       </Card>
 
-      <div className="mb-6 grid gap-6 lg:grid-cols-2">
-        <Card>
-          <h2 className="mb-1 font-display text-lg font-semibold text-navy-900">
-            Assignment
-          </h2>
-          <p className="mb-3 text-sm text-ink-500">
-            Portfolio and collector for this account.
-          </p>
-          <form
-            onSubmit={(e) => void saveAssignment(e)}
-            className="grid gap-3"
-          >
-            <div>
-              <Label>Portfolio</Label>
-              <Select
-                value={portfolioId}
-                onChange={(e) => setPortfolioId(e.target.value)}
-              >
-                <option value="">— Select —</option>
-                {(lookups?.portfolios ?? []).map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.name}
-                  </option>
-                ))}
-              </Select>
-            </div>
-            <div>
-              <Label>Collector</Label>
-              <Select
-                value={collectorId}
-                onChange={(e) => setCollectorId(e.target.value)}
-              >
-                <option value="">— Select —</option>
-                {(lookups?.collectors ?? []).map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.full_name ?? c.email}
-                  </option>
-                ))}
-              </Select>
-            </div>
-            <Button type="submit" loading={saving}>
-              Save assignment
-            </Button>
-          </form>
-        </Card>
-
-        <Card>
-          <h2 className="mb-1 font-display text-lg font-semibold text-navy-900">
-            Check transmittal & clearing
-          </h2>
-          <p className="mb-3 text-sm text-ink-500">
-            Track physical check movement for this account.
-          </p>
-          <div className="mb-3 flex flex-wrap gap-2">
-            <Badge
-              variant={
-                transmittal === "received"
-                  ? "success"
-                  : transmittal === "transmitted"
-                    ? "teal"
-                    : "warning"
-              }
-              dot
+      <Card className="mb-6">
+        <h2 className="mb-1 font-display text-lg font-semibold text-navy-900">
+          Assignment
+        </h2>
+        <p className="mb-3 text-sm text-ink-500">
+          Portfolio and collector for this account.
+        </p>
+        <form
+          onSubmit={(e) => void saveAssignment(e)}
+          className="grid gap-3"
+        >
+          <div>
+            <Label>Portfolio</Label>
+            <Select
+              value={portfolioId}
+              onChange={(e) => setPortfolioId(e.target.value)}
             >
-              Transmittal: {transmittal}
-            </Badge>
-            <Badge
-              variant={
-                clearing === "cleared"
-                  ? "success"
-                  : clearing === "clearing"
-                    ? clearingOverdue
-                      ? "danger"
-                      : "teal"
-                    : "warning"
-              }
-              dot
+              <option value="">— Select —</option>
+              {(lookups?.portfolios ?? []).map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.name}
+                </option>
+              ))}
+            </Select>
+          </div>
+          <div>
+            <Label>Collector</Label>
+            <Select
+              value={collectorId}
+              onChange={(e) => setCollectorId(e.target.value)}
             >
-              Clearing: {clearing}
-              {clearing === "clearing" && clearingDay !== null
-                ? ` — day ${clearingDay} of 3`
-                : ""}
-            </Badge>
+              <option value="">— Select —</option>
+              {(lookups?.collectors ?? []).map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.full_name ?? c.email}
+                </option>
+              ))}
+            </Select>
           </div>
-          {clearingOverdue ? (
-            <div className="banner warn mb-3">
-              Clearing has exceeded the 3-day period — follow up with the bank
-              and mark Cleared once confirmed.
-            </div>
-          ) : null}
-          <div className="grid gap-3">
-            <div>
-              <Label>Transmittal status</Label>
-              <Select
-                value={transmittal}
-                onChange={(e) => setTransmittal(e.target.value)}
-              >
-                <option value="pending">Pending</option>
-                <option value="transmitted">Transmitted</option>
-                <option value="received">Received</option>
-              </Select>
-            </div>
-            <div>
-              <Label>Clearing status</Label>
-              <Select
-                value={clearing}
-                onChange={(e) => setClearing(e.target.value)}
-              >
-                <option value="pending">Pending</option>
-                <option value="clearing">Clearing (3-day)</option>
-                <option value="cleared">Cleared</option>
-              </Select>
-            </div>
-            <Button loading={saving} onClick={() => void saveCheckStatuses()}>
-              Save check statuses
-            </Button>
-          </div>
-        </Card>
-      </div>
+          <Button type="submit" loading={saving}>
+            Save assignment
+          </Button>
+        </form>
+      </Card>
 
-      {record.loan_application_id && record.borrower_id ? (
+      {/* Hidden in UI only (not wired to any workflow gate) — flip to re-enable. */}
+      {SHOW_ACCOUNTING_CHECKLIST && record.loan_application_id && record.borrower_id ? (
         <div className="mb-6">
           <DocumentChecklist
             applicationId={record.loan_application_id as string}

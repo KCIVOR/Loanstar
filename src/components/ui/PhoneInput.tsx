@@ -6,8 +6,12 @@ import {
   useMemo,
   useRef,
   useState,
+  type ComponentType,
   type KeyboardEvent,
+  type SVGProps,
 } from "react";
+
+import * as Flags from "country-flag-icons/react/3x2";
 
 import { cn } from "./cn";
 import { Input } from "./Input";
@@ -15,8 +19,20 @@ import {
   DEFAULT_DIAL_COUNTRY,
   filterDialCountries,
   formatE164,
+  parseE164,
   type DialCountry,
 } from "@/lib/countries/dial-codes";
+
+const FLAG_COMPONENTS = Flags as unknown as Record<
+  string,
+  ComponentType<SVGProps<SVGSVGElement>>
+>;
+
+function CountryFlag({ iso2 }: { iso2: string }) {
+  const Flag = FLAG_COMPONENTS[iso2];
+  if (!Flag) return null;
+  return <Flag className="phone-input-flag-svg" aria-hidden />;
+}
 
 export type PhoneInputProps = {
   id?: string;
@@ -37,8 +53,10 @@ export function PhoneInput({
   disabled = false,
   className = "",
 }: PhoneInputProps) {
-  const [country, setCountry] = useState<DialCountry>(defaultCountry);
-  const [national, setNational] = useState("");
+  const [country, setCountry] = useState<DialCountry>(
+    () => (value ? parseE164(value).country : defaultCountry),
+  );
+  const [national, setNational] = useState(() => (value ? parseE164(value).national : ""));
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [activeIndex, setActiveIndex] = useState(0);
@@ -47,6 +65,7 @@ export function PhoneInput({
   const searchRef = useRef<HTMLInputElement>(null);
   const numberRef = useRef<HTMLInputElement>(null);
   const listId = useId();
+  const lastEmittedRef = useRef(value);
 
   const filtered = useMemo(() => filterDialCountries(query), [query]);
 
@@ -87,7 +106,9 @@ export function PhoneInput({
   }, [query]);
 
   function emit(nextCountry: DialCountry, nextNational: string) {
-    onChange(formatE164(nextCountry.dial, nextNational) ?? "");
+    const formatted = formatE164(nextCountry.dial, nextNational) ?? "";
+    lastEmittedRef.current = formatted;
+    onChange(formatted);
   }
 
   function selectCountry(next: DialCountry) {
@@ -120,12 +141,15 @@ export function PhoneInput({
     }
   }
 
-  // Keep internal national in sync if parent clears value
+  // Re-hydrate from an externally-changed value (e.g. async-loaded record)
+  // but ignore echoes of our own emit() so typing doesn't get clobbered.
   useEffect(() => {
-    if (!value && national) {
-      setNational("");
-    }
-  }, [value, national]);
+    if (value === lastEmittedRef.current) return;
+    lastEmittedRef.current = value;
+    const parsed = parseE164(value);
+    setCountry(parsed.country);
+    setNational(parsed.national);
+  }, [value]);
 
   return (
     <div ref={rootRef} className={cn("phone-input", className)}>
@@ -140,7 +164,7 @@ export function PhoneInput({
         onClick={() => setOpen((v) => !v)}
       >
         <span className="phone-input-flag" aria-hidden>
-          {country.flag}
+          <CountryFlag iso2={country.iso2} />
         </span>
         <span className="phone-input-dial mono">{country.dial}</span>
         <svg
@@ -209,7 +233,7 @@ export function PhoneInput({
                   onClick={() => selectCountry(c)}
                 >
                   <span className="phone-input-flag" aria-hidden>
-                    {c.flag}
+                    <CountryFlag iso2={c.iso2} />
                   </span>
                   <span className="phone-input-name">{c.name}</span>
                   <span className="phone-input-code mono">{c.dial}</span>

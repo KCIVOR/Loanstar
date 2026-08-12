@@ -1,9 +1,14 @@
 import {
+  assessFieldVisitRequired,
+  assessSmeReloanRequired,
+} from "./field-visit";
+import {
   isBorrowerReviewComplete,
   isCiReferencesComplete,
   isCrewingManagerComplete,
   isFindingRecorded,
   type VerificationRecord,
+  type VerificationScope,
 } from "./verification";
 
 /** Thrown when a write targets a locked CIG sequence stage — map to HTTP 400. */
@@ -71,6 +76,9 @@ const CI_REFERENCES_KEYS: ReadonlySet<string> = new Set([
   "picRatingReason",
   "cifVerifiedBy",
   "cifVerifiedDate",
+  // SME Field Visit occupies the same sequence slot as CI & Refs (6.0.a replace).
+  "fieldVisit",
+  "smeReloanVerification",
 ]);
 
 const CREWING_MANAGER_KEYS: ReadonlySet<string> = new Set([
@@ -96,14 +104,36 @@ const STAGE_LABEL: Record<CigSequenceStage, string> = {
   forward: "Submit CI report",
 };
 
+function isSmeFieldStageComplete(
+  verification: VerificationRecord,
+  scope: VerificationScope,
+): boolean {
+  if (scope.isReloan) {
+    return assessSmeReloanRequired(verification.smeReloanVerification).complete;
+  }
+  return assessFieldVisitRequired(verification.fieldVisit).complete;
+}
+
 export function getCigSequenceState(
   verification: VerificationRecord,
   checksComplete: boolean,
+  scope: VerificationScope = {},
 ): CigSequenceState {
+  const segment = scope.segment === "sme" ? "sme" : "seafarer";
   const s1 = isBorrowerReviewComplete(verification);
   const s2 = s1 && checksComplete;
-  const s3 = s2 && isCiReferencesComplete(verification);
-  const s4 = s3 && isCrewingManagerComplete(verification);
+
+  let s3: boolean;
+  let s4: boolean;
+  if (segment === "sme") {
+    // Field Visit replaces PIC + Crewing (6.0.a). Crewing slot auto-completes.
+    s3 = s2 && isSmeFieldStageComplete(verification, scope);
+    s4 = s3;
+  } else {
+    s3 = s2 && isCiReferencesComplete(verification);
+    s4 = s3 && isCrewingManagerComplete(verification);
+  }
+
   const s5 = s4 && isFindingRecorded(verification);
 
   const completed: Record<CigSequenceStage, boolean> = {
@@ -115,7 +145,6 @@ export function getCigSequenceState(
     forward: s5,
   };
 
-  // Stage N unlocked when stage N-1 is complete (S1 always unlocked).
   const unlocked: Record<CigSequenceStage, boolean> = {
     borrower_review: true,
     external_checks: s1,
@@ -190,6 +219,13 @@ export function assertChecksRecordingAllowed(state: CigSequenceState): void {
   );
 }
 
-export function cigSequenceStageLabel(stage: CigSequenceStage): string {
+export function cigSequenceStageLabel(
+  stage: CigSequenceStage,
+  segment?: "seafarer" | "sme" | null,
+): string {
+  if (segment === "sme") {
+    if (stage === "ci_references") return "Field Visit";
+    if (stage === "crewing_manager") return "Field Visit (complete)";
+  }
   return STAGE_LABEL[stage];
 }

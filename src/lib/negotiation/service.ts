@@ -211,20 +211,33 @@ async function persistOverrideComputation(
     throw new Error("Loan type required for override");
   }
 
+  const { data: appRow } = await supabase
+    .from("loan_applications")
+    .select("segment")
+    .eq("id", applicationId)
+    .maybeSingle();
+  const segment = appRow?.segment === "sme" ? "sme" : "seafarer";
+
   const saved = await persistComputation(supabase, {
     loanApplicationId: applicationId,
+    segment,
     loanTypeId: loanType.id,
     loanTypeName: loanType.name,
     inputMode: input.inputMode,
     amount: input.amount,
     terms: input.terms,
-    addonMonths: input.addonMonths ?? existingComp?.addon_months ?? 2,
+    addonMonths:
+      input.addonMonths ??
+      existingComp?.addon_months ??
+      (segment === "sme" ? 0 : 2),
     pfRate: Number(loanType.pf_rate),
     interestRate: Number(loanType.interest_rate),
     securityFeeRate:
-      existingComp?.security_fee_rate != null
-        ? Number(existingComp.security_fee_rate)
-        : Number(loanType.interest_rate),
+      segment === "sme"
+        ? 0
+        : existingComp?.security_fee_rate != null
+          ? Number(existingComp.security_fee_rate)
+          : Number(loanType.interest_rate),
     computedBy: actorId,
   });
 

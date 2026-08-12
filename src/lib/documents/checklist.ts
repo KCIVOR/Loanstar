@@ -8,6 +8,14 @@ export type DocumentStatus =
   | "confirmed"
   | "needs_revision";
 
+export type ChecklistSegment = "seafarer" | "sme";
+export type ChecklistEntityType = "individual" | "corporate";
+
+export type ChecklistScope = {
+  segment?: ChecklistSegment;
+  entityType?: ChecklistEntityType | null;
+};
+
 export type ChecklistItem = {
   documentTypeId: string;
   documentTypeSlug: string;
@@ -42,6 +50,7 @@ type StageChecklistRow = {
   is_required: boolean;
   is_optional_flag: boolean;
   sort_order: number;
+  entity_type: string | null;
   document_types: {
     id: string;
     slug: string;
@@ -67,12 +76,69 @@ type DocumentRow = {
   revision_remarks: string | null;
 };
 
+/** Pure filter used by DB query post-processing and unit tests. */
+export function rowMatchesChecklistScope(
+  row: { segment: string | null; entity_type: string | null },
+  segment: ChecklistSegment,
+  entityType: ChecklistEntityType | null,
+): boolean {
+  if (row.segment !== segment) return false;
+  if (row.entity_type == null) return true;
+  return entityType != null && row.entity_type === entityType;
+}
+
+export async function loadChecklistScope(
+  supabase: SupabaseClient,
+  applicationId: string,
+): Promise<{ segment: ChecklistSegment; entityType: ChecklistEntityType | null }> {
+  const { data, error } = await supabase
+    .from("loan_applications")
+    .select("segment, entity_type")
+    .eq("id", applicationId)
+    .single();
+
+  if (error || !data) {
+    throw new Error(
+      `Failed to load application segment: ${error?.message ?? "not found"}`,
+    );
+  }
+
+  const segment: ChecklistSegment = data.segment === "sme" ? "sme" : "seafarer";
+  const entityType: ChecklistEntityType | null =
+    data.entity_type === "individual" || data.entity_type === "corporate"
+      ? data.entity_type
+      : null;
+
+  return { segment, entityType };
+}
+
+async function resolveChecklistScope(
+  supabase: SupabaseClient,
+  applicationId: string,
+  scope?: ChecklistScope,
+): Promise<{ segment: ChecklistSegment; entityType: ChecklistEntityType | null }> {
+  if (scope?.segment) {
+    return {
+      segment: scope.segment,
+      entityType: scope.entityType ?? null,
+    };
+  }
+  return loadChecklistScope(supabase, applicationId);
+}
+
 export async function getStageChecklist(
   supabase: SupabaseClient,
   stage: Stage | string,
   applicationId: string,
+  scope?: ChecklistScope,
 ): Promise<ChecklistItem[]> {
-  const { data: checklistRows, error: checklistError } = await supabase
+  const { segment, entityType } = await resolveChecklistScope(
+    supabase,
+    applicationId,
+    scope,
+  );
+
+  let checklistQuery = supabase
     .from("stage_checklists")
     .select(
       `
@@ -81,11 +147,23 @@ export async function getStageChecklist(
       is_required,
       is_optional_flag,
       sort_order,
+      entity_type,
       document_types ( id, slug, name )
     `,
     )
     .eq("stage", stage)
+    .eq("segment", segment)
     .order("sort_order");
+
+  if (entityType) {
+    checklistQuery = checklistQuery.or(
+      `entity_type.is.null,entity_type.eq.${entityType}`,
+    );
+  } else {
+    checklistQuery = checklistQuery.is("entity_type", null);
+  }
+
+  const { data: checklistRows, error: checklistError } = await checklistQuery;
 
   if (checklistError) {
     throw new Error(`Failed to load stage checklist: ${checklistError.message}`);
@@ -140,11 +218,29 @@ export async function ensureDocumentSlots(
   stage: Stage | string,
   applicationId: string,
   borrowerId: string,
+  scope?: ChecklistScope,
 ): Promise<void> {
-  const { data: checklistRows, error: checklistError } = await supabase
+  const { segment, entityType } = await resolveChecklistScope(
+    supabase,
+    applicationId,
+    scope,
+  );
+
+  let checklistQuery = supabase
     .from("stage_checklists")
-    .select("document_type_id")
-    .eq("stage", stage);
+    .select("document_type_id, entity_type")
+    .eq("stage", stage)
+    .eq("segment", segment);
+
+  if (entityType) {
+    checklistQuery = checklistQuery.or(
+      `entity_type.is.null,entity_type.eq.${entityType}`,
+    );
+  } else {
+    checklistQuery = checklistQuery.is("entity_type", null);
+  }
+
+  const { data: checklistRows, error: checklistError } = await checklistQuery;
 
   if (checklistError) {
     throw new Error(`Failed to load checklist for slots: ${checklistError.message}`);

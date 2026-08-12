@@ -1,9 +1,15 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
+import { resolveDateBounds, type DateRangeValue } from "@/components/history";
 import { writeAuditEvent } from "@/lib/audit/writer";
 import { handleApiError, jsonOk } from "@/lib/api/handler";
-import { checklistProgress } from "@/lib/agent/pipeline";
+import {
+  clampAgentLeadsQueuePageSize,
+  getAgentLeadsQueue,
+  getAgentLeadsQueueKpiCounts,
+  type AgentLeadsSortKey,
+} from "@/lib/agent/queue";
 import { requireModulePermission } from "@/lib/permissions/server";
 import { createClient } from "@/lib/supabase/server";
 
@@ -14,69 +20,79 @@ const createLeadSchema = z.object({
   applicationId: z.string().uuid().optional(),
 });
 
-type FlagRow = {
-  is_required: boolean;
-  completion_status: string;
-};
+const RANGE_PRESETS = new Set(["30d", "90d", "all", "custom"]);
+const SORT_KEYS = new Set(["priority", "borrower", "created", "progress"]);
+const STAGE_FILTERS = new Set([
+  "all",
+  "awaiting_link",
+  "gathering_docs",
+  "docs_ready",
+]);
+const STATUS_FILTERS = new Set(["all", "open", "converted"]);
 
-async function loadChecklistSummary(
-  supabase: Awaited<ReturnType<typeof createClient>>,
-  applicationId: string,
-) {
-  const { data: flags, error } = await supabase.rpc("get_checklist_flags", {
-    p_application_id: applicationId,
-  });
-
-  if (error) {
-    return { required: 0, complete: 0, percent: null as number | null };
-  }
-
-  return checklistProgress(
-    ((flags ?? []) as FlagRow[]).map((flag) => ({
-      isRequired: Boolean(flag.is_required),
-      completionStatus: String(flag.completion_status ?? "pending"),
-    })),
-  );
-}
-
-export async function GET() {
+/**
+ * Param-driven agent leads queue → `{ rows, totalCount, kpi }`.
+ * `/agent` page sends query params (search/stage/status/range/sort/page).
+ */
+export async function GET(request: Request) {
   try {
     const user = await requireModulePermission("leads", "view");
-    const supabase = await createClient();
+    const { searchParams } = new URL(request.url);
 
-    const { data, error } = await supabase
-      .from("leads")
-      .select(
-        "id, borrower_name, business_name, borrower_id, application_id, status, created_at, updated_at",
-      )
-      .eq("agent_user_id", user.id)
-      .order("created_at", { ascending: false });
+    const search = searchParams.get("search") ?? "";
 
-    if (error) throw new Error(error.message);
+    const stageRaw = searchParams.get("stage") ?? "all";
+    const stageFilter = STAGE_FILTERS.has(stageRaw) ? stageRaw : "all";
 
-    const leads = await Promise.all(
-      (data ?? []).map(async (lead) => {
-        const summary = lead.application_id
-          ? await loadChecklistSummary(supabase, lead.application_id as string)
-          : { required: 0, complete: 0, percent: null as number | null };
+    // Default "all" — preserves open + converted (do not exclude converted).
+    const statusRaw = searchParams.get("status") ?? "all";
+    const statusFilter = STATUS_FILTERS.has(statusRaw) ? statusRaw : "all";
 
-        return {
-          id: lead.id,
-          borrowerName: lead.borrower_name,
-          businessName: lead.business_name,
-          borrowerId: lead.borrower_id,
-          applicationId: lead.application_id,
-          status: lead.status,
-          createdAt: lead.created_at,
-          updatedAt: lead.updated_at,
-          checklistRequired: summary.required,
-          checklistComplete: summary.complete,
-          checklistPercent: summary.percent,
-        };
-      }),
+    // Active queue defaults to All time (must not hide old-but-still-open leads).
+    const rangeRaw = searchParams.get("range") ?? "all";
+    const preset = (
+      RANGE_PRESETS.has(rangeRaw) ? rangeRaw : "all"
+    ) as DateRangeValue["preset"];
+    const dateRange: DateRangeValue = {
+      preset,
+      from: searchParams.get("from") ?? "",
+      to: searchParams.get("to") ?? "",
+    };
+    const { from, to } = resolveDateBounds(dateRange, new Date());
+
+    const sortKeyRaw = searchParams.get("sortKey") ?? "priority";
+    const sortKey = (
+      SORT_KEYS.has(sortKeyRaw) ? sortKeyRaw : "priority"
+    ) as AgentLeadsSortKey;
+    const sortDirRaw = searchParams.get("sortDir") ?? "desc";
+    const sortDir = sortDirRaw === "asc" ? "asc" : "desc";
+
+    const page = Math.max(1, Number(searchParams.get("page") ?? 1) || 1);
+    const pageSize = clampAgentLeadsQueuePageSize(
+      Number(searchParams.get("pageSize") ?? 10),
     );
 
-    return jsonOk({ leads });
+    const supabase = await createClient();
+    const [queue, kpi] = await Promise.all([
+      getAgentLeadsQueue(supabase, user.id, {
+        search,
+        stageFilter,
+        statusFilter,
+        from,
+        to,
+        sortKey,
+        sortDir,
+        page,
+        pageSize,
+      }),
+      getAgentLeadsQueueKpiCounts(supabase, user.id),
+    ]);
+
+    return jsonOk({
+      rows: queue.rows,
+      totalCount: queue.totalCount,
+      kpi,
+    });
   } catch (error) {
     return handleApiError(error);
   }

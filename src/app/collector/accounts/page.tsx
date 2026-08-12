@@ -1,7 +1,19 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
+import {
+  CollectorKpi,
+  collectorIconProps,
+} from "@/components/collector/CollectorKpi";
+import { ContactLogModal } from "@/components/collector/ContactLogModal";
+import { DemandLetterModal } from "@/components/collector/DemandLetterModal";
+import {
+  DateRangeFilter,
+  ViewModeToggle,
+  type DateRangeValue,
+  type HistoryViewMode,
+} from "@/components/history";
 import {
   Alert,
   Badge,
@@ -9,155 +21,286 @@ import {
   EmptyState,
   PageHeader,
   Pagination,
-  Spinner,
+  Select,
+  Skeleton,
   Table,
   Td,
   Th,
   cn,
 } from "@/components/ui";
-import { ContactLogModal } from "@/components/collector/ContactLogModal";
-import { DemandLetterModal } from "@/components/collector/DemandLetterModal";
-import {
-  agingNeedsAttention,
-  nextOpenInstallment,
-  type ScheduleLite,
-} from "@/lib/collector/desk";
+import { masterlistSecondaryIdentity } from "@/lib/ar/masterlist-display";
 import {
   agingVariant,
   formatDate,
   formatMoney,
 } from "@/lib/collector/format";
+import {
+  COLLECTOR_QUEUE_PAGE_SIZES,
+  callbackDue,
+  type CollectorAgingFilter,
+  type CollectorQueueKpis,
+  type CollectorQueueMappedRow,
+  type CollectorQueueSortKey,
+} from "@/lib/collector/queue";
 
-type LastContact = {
-  contactType: string;
-  callbackAt: string | null;
-  createdAt: string;
+type SortKey = CollectorQueueSortKey;
+
+const PAGE_SIZE_OPTIONS = COLLECTOR_QUEUE_PAGE_SIZES;
+
+const DEFAULT_DATE_RANGE: DateRangeValue = {
+  preset: "all",
+  from: "",
+  to: "",
 };
 
-type Account = {
-  id: string;
-  borrower_name: string;
-  loan_account_no: string | null;
-  outstanding_balance: number;
-  aging_bucket: string;
-  amortization_schedules?: ScheduleLite[] | ScheduleLite | null;
-  lastContact?: LastContact | null;
+const EMPTY_KPI: CollectorQueueKpis = {
+  assigned: 0,
+  callbackDue: 0,
+  agingCritical: 0,
+  totalBalance: 0,
 };
 
-function callbackDue(contact: LastContact | null | undefined): boolean {
-  if (!contact?.callbackAt) return false;
-  return new Date(contact.callbackAt).getTime() < Date.now();
+const AGING_CHIPS: Array<{ id: CollectorAgingFilter; label: string }> = [
+  { id: "all", label: "All aging" },
+  { id: "current", label: "Current" },
+  { id: "1-30", label: "1-30" },
+  { id: "31-60", label: "31-60" },
+  { id: "61-90", label: "61-90" },
+  { id: "91+", label: "91+" },
+];
+
+const IconLayers = (
+  <svg {...collectorIconProps}>
+    <path d="m12 2 9 5-9 5-9-5 9-5Z" />
+    <path d="m3 12 9 5 9-5" />
+    <path d="m3 17 9 5 9-5" />
+  </svg>
+);
+const IconPhone = (
+  <svg {...collectorIconProps}>
+    <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z" />
+  </svg>
+);
+const IconAlert = (
+  <svg {...collectorIconProps}>
+    <path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z" />
+    <path d="M12 9v4M12 17h.01" />
+  </svg>
+);
+const IconCash = (
+  <svg {...collectorIconProps}>
+    <path d="M12 1v22M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
+  </svg>
+);
+
+function dateRangePillLabel(value: DateRangeValue): string {
+  if (value.preset === "30d") return "Last 30 days";
+  if (value.preset === "90d") return "Last 90 days";
+  if (value.preset === "all") return "All time";
+  const from = value.from ? formatDate(value.from) : "…";
+  const to = value.to ? formatDate(value.to) : "…";
+  return `${from} → ${to}`;
 }
 
-const PAGE_SIZE = 10;
-type AccountSort = "priority" | "balance" | "borrower" | "due";
+function agingChipLabel(filter: CollectorAgingFilter): string {
+  return AGING_CHIPS.find((chip) => chip.id === filter)?.label ?? filter;
+}
 
-function schedulesOf(account: Account): ScheduleLite[] {
-  const raw = account.amortization_schedules;
-  if (!raw) return [];
-  return Array.isArray(raw) ? raw : [raw];
+function buildQueueQuery(params: {
+  search: string;
+  aging: CollectorAgingFilter;
+  dateRange: DateRangeValue;
+  sortKey: SortKey;
+  sortDir: "asc" | "desc";
+  page: number;
+  pageSize: number;
+}): string {
+  const qs = new URLSearchParams();
+  if (params.search.trim()) qs.set("search", params.search.trim());
+  qs.set("aging", params.aging);
+  qs.set("range", params.dateRange.preset);
+  if (params.dateRange.preset === "custom") {
+    if (params.dateRange.from) qs.set("from", params.dateRange.from);
+    if (params.dateRange.to) qs.set("to", params.dateRange.to);
+  }
+  qs.set("sortKey", params.sortKey);
+  qs.set("sortDir", params.sortDir);
+  qs.set("page", String(params.page));
+  qs.set("pageSize", String(params.pageSize));
+  return qs.toString();
+}
+
+function secondaryOf(row: CollectorQueueMappedRow) {
+  return masterlistSecondaryIdentity({
+    manning_agency: row.manningAgency,
+    vessel_name: row.vesselName,
+  });
 }
 
 export default function CollectorAccountsPage() {
-  const [accounts, setAccounts] = useState<Account[]>([]);
+  const [rows, setRows] = useState<CollectorQueueMappedRow[]>([]);
+  const [totalCount, setTotalCount] = useState(0);
+  const [kpi, setKpi] = useState<CollectorQueueKpis>(EMPTY_KPI);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
   const [search, setSearch] = useState("");
-  const [agingFilter, setAgingFilter] = useState("all");
-  const [sortKey, setSortKey] = useState<AccountSort>("priority");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+  const [agingFilter, setAgingFilter] = useState<CollectorAgingFilter>("all");
+  const [dateRange, setDateRange] = useState<DateRangeValue>(DEFAULT_DATE_RANGE);
+  const [viewMode, setViewMode] = useState<HistoryViewMode>("list");
+  const [pageSize, setPageSize] =
+    useState<(typeof PAGE_SIZE_OPTIONS)[number]>(10);
+  const [filterPanelOpen, setFilterPanelOpen] = useState(false);
+  const [sortKey, setSortKey] = useState<SortKey>("priority");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
   const [page, setPage] = useState(1);
-  const [contactModalFor, setContactModalFor] = useState<Account | null>(null);
-  const [demandModalFor, setDemandModalFor] = useState<Account | null>(null);
+  const [contactModalFor, setContactModalFor] =
+    useState<CollectorQueueMappedRow | null>(null);
+  const [demandModalFor, setDemandModalFor] =
+    useState<CollectorQueueMappedRow | null>(null);
+
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearch(search), 300);
+    return () => clearTimeout(timer);
+  }, [search]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [debouncedSearch, agingFilter, dateRange, pageSize, sortKey, sortDir]);
 
   const load = useCallback(async () => {
     setLoading(true);
+    setError(null);
     try {
-      const res = await fetch("/api/collector/accounts");
+      const query = buildQueueQuery({
+        search: debouncedSearch,
+        aging: agingFilter,
+        dateRange,
+        sortKey,
+        sortDir,
+        page,
+        pageSize,
+      });
+      const res = await fetch(`/api/collector/accounts?${query}`);
       if (!res.ok) throw new Error("Failed to load accounts");
-      const data = (await res.json()) as { accounts: Account[] };
-      setAccounts(data.accounts);
-      setError(null);
+      const data = (await res.json()) as {
+        rows: CollectorQueueMappedRow[];
+        totalCount: number;
+        kpi: CollectorQueueKpis;
+      };
+      setRows(data.rows ?? []);
+      setTotalCount(data.totalCount ?? 0);
+      setKpi(data.kpi ?? EMPTY_KPI);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load");
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [
+    debouncedSearch,
+    agingFilter,
+    dateRange,
+    sortKey,
+    sortDir,
+    page,
+    pageSize,
+  ]);
 
   useEffect(() => {
     void load();
   }, [load]);
 
-  const agingOptions = useMemo(
-    () =>
-      Array.from(
-        new Set(accounts.map((a) => a.aging_bucket).filter(Boolean)),
-      ).map((bucket) => ({ value: bucket, label: bucket })),
-    [accounts],
-  );
-
-  const filtered = useMemo(() => {
-    const term = search.trim().toLowerCase();
-    return accounts.filter((row) => {
-      if (agingFilter !== "all" && row.aging_bucket !== agingFilter) {
-        return false;
-      }
-      if (!term) return true;
-      return (
-        row.borrower_name.toLowerCase().includes(term) ||
-        (row.loan_account_no?.toLowerCase().includes(term) ?? false)
-      );
-    });
-  }, [accounts, search, agingFilter]);
-
-  const sorted = useMemo(() => {
-    const dir = sortDir === "asc" ? 1 : -1;
-    return [...filtered].sort((a, b) => {
-      if (sortKey === "balance") {
-        return (
-          dir *
-          (Number(a.outstanding_balance) - Number(b.outstanding_balance))
-        );
-      }
-      if (sortKey === "borrower") {
-        return dir * a.borrower_name.localeCompare(b.borrower_name);
-      }
-      if (sortKey === "due") {
-        const aDue = nextOpenInstallment(schedulesOf(a))?.due_date ?? "9999";
-        const bDue = nextOpenInstallment(schedulesOf(b))?.due_date ?? "9999";
-        return dir * aDue.localeCompare(bDue);
-      }
-      const aCallback = callbackDue(a.lastContact) ? 0 : 1;
-      const bCallback = callbackDue(b.lastContact) ? 0 : 1;
-      if (aCallback !== bCallback) return aCallback - bCallback;
-      const aFlag = agingNeedsAttention(a.aging_bucket) ? 0 : 1;
-      const bFlag = agingNeedsAttention(b.aging_bucket) ? 0 : 1;
-      if (aFlag !== bFlag) return aFlag - bFlag;
-      return Number(b.outstanding_balance) - Number(a.outstanding_balance);
-    });
-  }, [filtered, sortKey, sortDir]);
-
-  const pageCount = Math.max(1, Math.ceil(sorted.length / PAGE_SIZE));
-  const safePage = Math.min(page, pageCount);
-  const paged = sorted.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
-
-  function toggleSort(key: AccountSort) {
+  function toggleSort(key: SortKey) {
     if (sortKey === key) {
       setSortDir((d) => (d === "asc" ? "desc" : "asc"));
     } else {
       setSortKey(key);
       setSortDir(key === "borrower" || key === "due" ? "asc" : "desc");
     }
-    setPage(1);
   }
 
-  function sortArrow(key: AccountSort) {
+  function sortArrow(key: SortKey) {
     if (sortKey !== key) return null;
     return <span className="arr">{sortDir === "asc" ? "▲" : "▼"}</span>;
   }
 
-  if (loading) return <Spinner />;
+  const pageCount = Math.max(1, Math.ceil(totalCount / pageSize));
+  const safePage = Math.min(page, pageCount);
+
+  const dateIsDefault = dateRange.preset === "all";
+  const activeFilterCount =
+    (agingFilter !== "all" ? 1 : 0) + (dateIsDefault ? 0 : 1);
+
+  const summaryStart = rows.length ? (safePage - 1) * pageSize + 1 : 0;
+  const summaryEnd = (safePage - 1) * pageSize + rows.length;
+
+  function renderActionButtons(acc: CollectorQueueMappedRow) {
+    return (
+      <div className="flex flex-wrap justify-end gap-1.5">
+        <Button
+          variant="secondary"
+          size="sm"
+          onClick={() => setDemandModalFor(acc)}
+        >
+          Demand letter
+        </Button>
+        <Button
+          variant="secondary"
+          size="sm"
+          onClick={() => setContactModalFor(acc)}
+        >
+          Log contact
+        </Button>
+      </div>
+    );
+  }
+
+  function renderBorrowerCell(acc: CollectorQueueMappedRow) {
+    const secondary = secondaryOf(acc);
+    return (
+      <>
+        <div className="flex flex-wrap items-center gap-1.5">
+          <span className="font-medium text-ink-900">{acc.borrowerName}</span>
+          {acc.segment === "sme" ? <Badge variant="navy">SME</Badge> : null}
+        </div>
+        {secondary ? (
+          <div className="text-xs text-ink-500">{secondary}</div>
+        ) : null}
+      </>
+    );
+  }
+
+  function renderNextDue(acc: CollectorQueueMappedRow) {
+    if (!acc.nextDueDate) {
+      return <span className="text-ink-400">—</span>;
+    }
+    return (
+      <span className="text-sm">
+        <span className="mono">{formatDate(acc.nextDueDate)}</span>
+        {acc.nextDueAmount != null ? (
+          <span className="text-ink-500">
+            {" · "}₱{formatMoney(acc.nextDueAmount)}
+          </span>
+        ) : null}
+      </span>
+    );
+  }
+
+  function renderLastContact(acc: CollectorQueueMappedRow) {
+    const overdueCallback = callbackDue(acc.lastContact);
+    if (overdueCallback) {
+      return <Badge variant="danger">Callback due</Badge>;
+    }
+    if (acc.lastContact) {
+      return (
+        <span className="text-sm text-ink-500">
+          {acc.lastContact.contactType} {formatDate(acc.lastContact.createdAt)}
+        </span>
+      );
+    }
+    return <span className="text-ink-400">—</span>;
+  }
 
   return (
     <div>
@@ -172,201 +315,357 @@ export default function CollectorAccountsPage() {
         </div>
       ) : null}
 
-      {accounts.length === 0 ? (
+      <div className="kpi-grid mb-6">
+        {loading ? (
+          <>
+            <Skeleton variant="kpi" />
+            <Skeleton variant="kpi" />
+            <Skeleton variant="kpi" />
+            <Skeleton variant="kpi" />
+          </>
+        ) : (
+          <>
+            <CollectorKpi
+              tone="navy"
+              icon={IconLayers}
+              label="Assigned"
+              value={kpi.assigned}
+            />
+            <CollectorKpi
+              tone="warning"
+              icon={IconPhone}
+              label="Callback-due"
+              value={kpi.callbackDue}
+            />
+            <CollectorKpi
+              tone="danger"
+              icon={IconAlert}
+              label="Needs attention"
+              value={kpi.agingCritical}
+            />
+            <CollectorKpi
+              tone="teal"
+              icon={IconCash}
+              label="Total balance"
+              value={`₱${formatMoney(kpi.totalBalance)}`}
+            />
+          </>
+        )}
+      </div>
+
+      <div className="card mb-4" style={{ overflow: "visible" }}>
+        <div className="tbl-toolbar" style={{ padding: "13px 14px" }}>
+          <div
+            className="gsearch"
+            style={{ maxWidth: 300, flex: 1, minWidth: 190 }}
+          >
+            <span className="icon">
+              <svg
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth={2.2}
+                strokeLinecap="round"
+              >
+                <circle cx="11" cy="11" r="7" />
+                <path d="m21 21-4.3-4.3" />
+              </svg>
+            </span>
+            <input
+              className="input"
+              style={{
+                height: 37,
+                paddingRight: 12,
+                borderRadius: "var(--r-md)",
+              }}
+              placeholder="Search borrower or account"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
+          </div>
+
+          <div className="flex flex-wrap gap-1.5">
+            {AGING_CHIPS.map((chip) => (
+              <button
+                key={chip.id}
+                type="button"
+                className={cn("fchip", agingFilter === chip.id && "is-on")}
+                onClick={() => setAgingFilter(chip.id)}
+              >
+                {chip.label}
+              </button>
+            ))}
+          </div>
+
+          <div className="active-pill-row">
+            {agingFilter !== "all" ? (
+              <span className="active-pill">
+                Aging: {agingChipLabel(agingFilter)}
+                <button
+                  type="button"
+                  aria-label="Clear aging filter"
+                  onClick={() => setAgingFilter("all")}
+                >
+                  ×
+                </button>
+              </span>
+            ) : null}
+            {!dateIsDefault ? (
+              <span className="active-pill">
+                {dateRangePillLabel(dateRange)}
+                <button
+                  type="button"
+                  aria-label="Clear date filter"
+                  onClick={() => setDateRange(DEFAULT_DATE_RANGE)}
+                >
+                  ×
+                </button>
+              </span>
+            ) : null}
+            {activeFilterCount > 0 ? (
+              <button
+                type="button"
+                className="clear-link"
+                onClick={() => {
+                  setAgingFilter("all");
+                  setDateRange(DEFAULT_DATE_RANGE);
+                }}
+              >
+                Clear all
+              </button>
+            ) : null}
+          </div>
+
+          <div className="sp">
+            <ViewModeToggle value={viewMode} onChange={setViewMode} />
+            <button
+              type="button"
+              className={cn("btn btn-outline", filterPanelOpen && "is-on")}
+              onClick={() => setFilterPanelOpen((open) => !open)}
+            >
+              <svg
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth={2}
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                width={16}
+                height={16}
+                aria-hidden
+              >
+                <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3" />
+              </svg>
+              Filters
+              {activeFilterCount > 0 ? (
+                <span
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    minWidth: 16,
+                    height: 16,
+                    padding: "0 4px",
+                    borderRadius: "var(--r-full)",
+                    background: "var(--teal-600)",
+                    color: "#fff",
+                    fontSize: 10,
+                    fontWeight: 700,
+                    fontFamily: "var(--font-mono)",
+                  }}
+                >
+                  {activeFilterCount}
+                </span>
+              ) : null}
+            </button>
+          </div>
+        </div>
+
+        <div className={cn("filter-panel", filterPanelOpen && "is-open")}>
+          <div className="filter-group">
+            <span className="filter-group-label">First payment date</span>
+            <DateRangeFilter value={dateRange} onChange={setDateRange} />
+          </div>
+        </div>
+      </div>
+
+      {loading ? (
+        <div className="mb-4">
+          <Table>
+            <thead>
+              <tr>
+                <Th>Borrower</Th>
+                <Th>Account</Th>
+                <Th num>Balance</Th>
+                <Th>Aging</Th>
+                <Th>Next due</Th>
+                <Th>Last contact</Th>
+                <Th className="w-1">{""}</Th>
+              </tr>
+            </thead>
+            <tbody>
+              {Array.from({ length: 6 }, (_, i) => (
+                <tr key={i}>
+                  <Td colSpan={7}>
+                    <Skeleton variant="line" />
+                  </Td>
+                </tr>
+              ))}
+            </tbody>
+          </Table>
+        </div>
+      ) : kpi.assigned === 0 ? (
         <EmptyState
           title="No accounts assigned"
           description="Assigned borrower accounts will appear here."
           showMark={false}
         />
+      ) : totalCount === 0 ? (
+        <EmptyState
+          title="No matching accounts"
+          description="Try a different search, aging, or date range."
+          showMark={false}
+        />
+      ) : viewMode === "grid" ? (
+        <div className="grid-view mb-4">
+          {rows.map((acc) => {
+            const secondary = secondaryOf(acc);
+            return (
+              <div key={acc.id} className="gcard">
+                <div className="gcard-top">
+                  <span className="gcard-id">
+                    {acc.loanAccountNo ?? acc.borrowerNo}
+                  </span>
+                  <Badge variant={agingVariant(acc.agingBucket)}>
+                    {acc.agingBucket}
+                  </Badge>
+                </div>
+                <div className="gcard-name">
+                  <span className="flex flex-wrap items-center gap-1.5">
+                    {acc.borrowerName}
+                    {acc.segment === "sme" ? (
+                      <Badge variant="navy">SME</Badge>
+                    ) : null}
+                  </span>
+                </div>
+                <div className="gcard-meta">
+                  {secondary ? (
+                    <div className="row">
+                      <span className="k">Identity</span>
+                      <span className="v">{secondary}</span>
+                    </div>
+                  ) : null}
+                  <div className="row">
+                    <span className="k">Balance</span>
+                    <span className="v mono text-teal-600">
+                      {formatMoney(acc.outstandingBalance)}
+                    </span>
+                  </div>
+                  <div className="row">
+                    <span className="k">Next due</span>
+                    <span className="v">{renderNextDue(acc)}</span>
+                  </div>
+                  <div className="row">
+                    <span className="k">Last contact</span>
+                    <span className="v">{renderLastContact(acc)}</span>
+                  </div>
+                </div>
+                {renderActionButtons(acc)}
+              </div>
+            );
+          })}
+        </div>
       ) : (
-        <div className="flex flex-col gap-3.5">
-          <div className="tbl-toolbar">
-            <div className="gsearch" style={{ maxWidth: 280 }}>
-              <span className="icon">
-                <svg
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth={2.2}
-                  strokeLinecap="round"
+        <div className="mb-4">
+          <Table className={viewMode === "compact" ? "is-compact" : undefined}>
+            <thead>
+              <tr>
+                <Th
+                  className="sortable"
+                  onClick={() => toggleSort("borrower")}
                 >
-                  <circle cx="11" cy="11" r="7" />
-                  <path d="m21 21-4.3-4.3" />
-                </svg>
-              </span>
-              <input
-                className="input"
-                style={{
-                  height: 36,
-                  paddingRight: 12,
-                  borderRadius: "var(--r-md)",
-                }}
-                placeholder="Search borrower or account"
-                value={search}
-                onChange={(e) => {
-                  setSearch(e.target.value);
-                  setPage(1);
-                }}
-              />
-            </div>
-            <div className="flex flex-wrap gap-1.5">
-              <button
-                type="button"
-                className={cn("fchip", agingFilter === "all" && "on")}
-                onClick={() => {
-                  setAgingFilter("all");
-                  setPage(1);
-                }}
-              >
-                All aging
-              </button>
-              {agingOptions.map((opt) => (
-                <button
-                  key={opt.value}
-                  type="button"
-                  className={cn("fchip", agingFilter === opt.value && "on")}
-                  onClick={() => {
-                    setAgingFilter(opt.value);
-                    setPage(1);
-                  }}
+                  Borrower
+                  {sortArrow("borrower")}
+                </Th>
+                <Th>Account</Th>
+                <Th
+                  num
+                  className="sortable"
+                  onClick={() => toggleSort("balance")}
                 >
-                  {opt.label}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <div className="tbl-wrap">
-            <Table>
-              <thead>
-                <tr>
-                  <Th>
-                    <button
-                      type="button"
-                      className="inline-flex items-center gap-1"
-                      onClick={() => toggleSort("borrower")}
-                    >
-                      Borrower {sortArrow("borrower")}
-                    </button>
-                  </Th>
-                  <Th>Account</Th>
-                  <Th num>
-                    <button
-                      type="button"
-                      className="inline-flex items-center gap-1"
-                      onClick={() => toggleSort("balance")}
-                    >
-                      Balance {sortArrow("balance")}
-                    </button>
-                  </Th>
-                  <Th>
-                    <button
-                      type="button"
-                      className="inline-flex items-center gap-1"
-                      onClick={() => toggleSort("priority")}
-                    >
-                      Aging {sortArrow("priority")}
-                    </button>
-                  </Th>
-                  <Th>
-                    <button
-                      type="button"
-                      className="inline-flex items-center gap-1"
-                      onClick={() => toggleSort("due")}
-                    >
-                      Next due {sortArrow("due")}
-                    </button>
-                  </Th>
-                  <Th>Last contact</Th>
-                  <Th className="w-1">{""}</Th>
+                  Balance
+                  {sortArrow("balance")}
+                </Th>
+                <Th
+                  className="sortable"
+                  onClick={() => toggleSort("priority")}
+                >
+                  Aging
+                  {sortArrow("priority")}
+                </Th>
+                <Th className="sortable" onClick={() => toggleSort("due")}>
+                  Next due
+                  {sortArrow("due")}
+                </Th>
+                <Th>Last contact</Th>
+                <Th className="w-1">{""}</Th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((acc) => (
+                <tr key={acc.id}>
+                  <Td>{renderBorrowerCell(acc)}</Td>
+                  <Td className="mono">{acc.loanAccountNo ?? "—"}</Td>
+                  <Td num className="mono text-teal-600">
+                    {formatMoney(acc.outstandingBalance)}
+                  </Td>
+                  <Td>
+                    <Badge variant={agingVariant(acc.agingBucket)}>
+                      {acc.agingBucket}
+                    </Badge>
+                  </Td>
+                  <Td>{renderNextDue(acc)}</Td>
+                  <Td>{renderLastContact(acc)}</Td>
+                  <Td>{renderActionButtons(acc)}</Td>
                 </tr>
-              </thead>
-              <tbody>
-                {paged.map((acc) => {
-                  const next = nextOpenInstallment(schedulesOf(acc));
-                  const overdueCallback = callbackDue(acc.lastContact);
-                  return (
-                    <tr key={acc.id}>
-                      <Td className="font-medium text-ink-900">
-                        {acc.borrower_name}
-                      </Td>
-                      <Td className="mono">{acc.loan_account_no ?? "—"}</Td>
-                      <Td num className="mono text-teal-600">
-                        {formatMoney(Number(acc.outstanding_balance))}
-                      </Td>
-                      <Td>
-                        <Badge variant={agingVariant(acc.aging_bucket)}>
-                          {acc.aging_bucket}
-                        </Badge>
-                      </Td>
-                      <Td>
-                        {next ? (
-                          <span className="text-sm">
-                            <span className="mono">
-                              {formatDate(next.due_date)}
-                            </span>
-                            <span className="text-ink-500">
-                              {" · "}₱
-                              {formatMoney(
-                                next.amount_due + next.penalty_amount,
-                              )}
-                            </span>
-                          </span>
-                        ) : (
-                          <span className="text-ink-400">—</span>
-                        )}
-                      </Td>
-                      <Td>
-                        {overdueCallback ? (
-                          <Badge variant="danger">Callback due</Badge>
-                        ) : acc.lastContact ? (
-                          <span className="text-sm text-ink-500">
-                            {acc.lastContact.contactType}{" "}
-                            {formatDate(acc.lastContact.createdAt)}
-                          </span>
-                        ) : (
-                          <span className="text-ink-400">—</span>
-                        )}
-                      </Td>
-                      <Td>
-                        <div className="flex justify-end gap-1.5">
-                          <Button
-                            variant="secondary"
-                            size="sm"
-                            onClick={() => setDemandModalFor(acc)}
-                          >
-                            Demand letter
-                          </Button>
-                          <Button
-                            variant="secondary"
-                            size="sm"
-                            onClick={() => setContactModalFor(acc)}
-                          >
-                            Log contact
-                          </Button>
-                        </div>
-                      </Td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </Table>
-          </div>
-
-          {sorted.length > PAGE_SIZE ? (
-            <Pagination
-              page={safePage}
-              pageCount={pageCount}
-              onPageChange={setPage}
-            />
-          ) : null}
+              ))}
+            </tbody>
+          </Table>
         </div>
       )}
+
+      <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
+        <div className="flex flex-wrap items-center gap-2 text-xs text-ink-400">
+          <span>Show</span>
+          <Select
+            value={String(pageSize)}
+            onChange={(e) => {
+              setPageSize(
+                Number(e.target.value) as (typeof PAGE_SIZE_OPTIONS)[number],
+              );
+            }}
+            style={{ width: 72, height: 34 }}
+          >
+            {PAGE_SIZE_OPTIONS.map((size) => (
+              <option key={size} value={size}>
+                {size}
+              </option>
+            ))}
+          </Select>
+          <span>per page</span>
+        </div>
+        <Pagination
+          page={safePage}
+          pageCount={pageCount}
+          onPageChange={setPage}
+          summary={`Showing ${summaryStart}–${summaryEnd} of ${totalCount}`}
+        />
+      </div>
 
       {contactModalFor ? (
         <ContactLogModal
           open={contactModalFor !== null}
-          borrowerName={contactModalFor.borrower_name}
+          borrowerName={contactModalFor.borrowerName}
           masterlistId={contactModalFor.id}
           onClose={() => setContactModalFor(null)}
           onLogged={() => void load()}
@@ -376,7 +675,7 @@ export default function CollectorAccountsPage() {
       {demandModalFor ? (
         <DemandLetterModal
           open={demandModalFor !== null}
-          borrowerName={demandModalFor.borrower_name}
+          borrowerName={demandModalFor.borrowerName}
           masterlistId={demandModalFor.id}
           onClose={() => setDemandModalFor(null)}
         />

@@ -13,6 +13,7 @@ import {
   type PicWorkInfo,
   type Reference,
 } from "@/lib/borrowers/types";
+import type { BusinessInfo } from "@/lib/borrowers/business-info";
 import { handleApiError, jsonOk } from "@/lib/api/handler";
 import {
   ForbiddenError,
@@ -116,6 +117,9 @@ const patchProfileSchema = z.object({
   financial: financialSchema.optional(),
   allottee: allotteeSchema.optional(),
   picWork: picWorkSchema.optional(),
+  // Loose JSONB, same convention as manningAgency/allottee/picWork above —
+  // mirrors the CSA profile PATCH schema (src/app/api/csa/applications/[id]/route.ts).
+  businessInfo: z.record(z.string(), z.unknown()).optional(),
   dependents: z.array(dependentSchema).optional(),
   references: z.array(referenceSchema).optional(),
   profileData: z.record(z.string(), z.unknown()).optional(),
@@ -171,6 +175,7 @@ export async function PATCH(request: Request) {
       financial: body.financial as FinancialInfo | undefined,
       allottee: body.allottee as AllotteeInfo | undefined,
       picWork: body.picWork as PicWorkInfo | undefined,
+      businessInfo: body.businessInfo as BusinessInfo | undefined,
       dependents: body.dependents as Dependent[] | undefined,
       references: body.references as Reference[] | undefined,
       profileData: body.profileData,

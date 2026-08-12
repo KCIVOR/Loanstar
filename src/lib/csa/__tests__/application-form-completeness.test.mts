@@ -30,6 +30,7 @@ function emptyProfile(): BorrowerProfile {
     financial: {},
     allottee: {},
     picWork: {},
+    businessInfo: {},
     dependents: [],
     references: [],
     profileData: {},
@@ -102,7 +103,10 @@ describe("application form completeness for endorse", () => {
   });
 
   it("does not require dependents, references, allottee, or permanent address", () => {
-    const result = assessApplicationFormCompleteness({
+    // Typed as BorrowerProfile (a superset of ApplicationFormProfile) so this
+    // fixture can carry fields the completeness check never reads — the point
+    // of the test is that they're irrelevant, not that they're absent from the type.
+    const profile: BorrowerProfile = {
       ...completeProfile(),
       dependents: [],
       references: [],
@@ -111,7 +115,8 @@ describe("application form completeness for endorse", () => {
       middleName: null,
       landline: null,
       financial: {},
-    });
+    };
+    const result = assessApplicationFormCompleteness(profile);
     assert.equal(result.complete, true);
     assert.deepEqual(result.missing, []);
   });
@@ -125,5 +130,101 @@ describe("application form completeness for endorse", () => {
     assert.equal(result.complete, false);
     assert.ok(result.missing.includes("Application form: first name"));
     assert.ok(result.missing.includes("Application form: present address"));
+  });
+});
+
+describe("application form completeness SME Phase 3.6", () => {
+  it("does not require manning/rank/vessel for SME individual", () => {
+    const profile = {
+      ...completeProfile(),
+      manningAgency: {},
+      picWork: {},
+      businessInfo: {
+        companyName: "Ana Trading",
+        companyAddress: "123 Market St",
+        yearsOfOperation: "5",
+      },
+    };
+    const result = assessApplicationFormCompleteness(profile, {
+      segment: "sme",
+      entityType: "individual",
+    });
+    assert.equal(result.complete, true);
+    assert.deepEqual(result.missing, []);
+  });
+
+  it("requires Individual business fields from the client PDF", () => {
+    const result = assessApplicationFormCompleteness(
+      {
+        ...completeProfile(),
+        manningAgency: {},
+        picWork: {},
+        businessInfo: {},
+      },
+      { segment: "sme", entityType: "individual" },
+    );
+    assert.equal(result.complete, false);
+    assert.ok(!result.missing.includes("Application form: manning agency name"));
+    assert.ok(!result.missing.includes("Application form: rank"));
+    assert.ok(!result.missing.includes("Application form: vessel"));
+    assert.deepEqual(
+      result.missing.filter((m) => m.startsWith("Application form:")),
+      [
+        "Application form: company / employer name",
+        "Application form: company address",
+        "Application form: years of operation",
+      ],
+    );
+  });
+
+  it("requires Corporate business fields from the client PDF", () => {
+    const result = assessApplicationFormCompleteness(
+      {
+        ...completeProfile(),
+        manningAgency: {},
+        picWork: {},
+        businessInfo: { companyName: "RC Ramos" },
+      },
+      { segment: "sme", entityType: "corporate" },
+    );
+    assert.equal(result.complete, false);
+    assert.ok(
+      result.missing.includes("Application form: office address"),
+    );
+    assert.ok(
+      result.missing.includes("Application form: nature of business"),
+    );
+    assert.ok(result.missing.includes("Application form: TIN"));
+    assert.ok(
+      result.missing.includes("Application form: date established"),
+    );
+  });
+
+  it("is complete for SME corporate when PDF identity fields are filled", () => {
+    const result = assessApplicationFormCompleteness(
+      {
+        ...completeProfile(),
+        manningAgency: {},
+        picWork: {},
+        businessInfo: {
+          companyName: "RC Ramos Construction",
+          officeAddress: "Makati",
+          natureOfBusiness: "Construction",
+          tin: "123-456-789",
+          dateEstablished: "2010-01-01",
+        },
+      },
+      { segment: "sme", entityType: "corporate" },
+    );
+    assert.equal(result.complete, true);
+    assert.deepEqual(result.missing, []);
+  });
+
+  it("keeps Seafarer missing[] byte-identical when scope omitted", () => {
+    const withDefault = assessApplicationFormCompleteness(emptyProfile());
+    const withExplicit = assessApplicationFormCompleteness(emptyProfile(), {
+      segment: "seafarer",
+    });
+    assert.deepEqual(withDefault.missing, withExplicit.missing);
   });
 });

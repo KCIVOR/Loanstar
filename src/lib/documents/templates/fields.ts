@@ -39,8 +39,77 @@ export const FIELD_GROUPS: FieldGroup[] = [
       { key: "coBorrowerName", label: "Co-borrower name", sample: "" },
       { key: "borrowerNo", label: "Borrower no.", sample: "BN302754" },
       { key: "address", label: "Address", sample: "544 J. Buizon Street Brgy. Sto. Cristo, Baliwag, Bulacan 3006" },
-      { key: "manningAgency", label: "Manning agency", sample: "Marlow Navigation Philippines Inc." },
-      { key: "principalShip", label: "Principal / ship", sample: "Marlow Navigation Co. Ltd" },
+      { key: "manningAgency", label: "Manning agency (SME: company name)", sample: "Marlow Navigation Philippines Inc." },
+      { key: "principalShip", label: "Principal / ship (SME: nature of business)", sample: "Marlow Navigation Co. Ltd" },
+    ],
+  },
+  {
+    label: "SME business",
+    fields: [
+      { key: "dateApplied", label: "Date applied", sample: "06/01/2026" },
+      { key: "typeOfLoan", label: "Type of loan", sample: "Business Loan" },
+      { key: "loanDesired", label: "Loan desired", sample: "500,000.00" },
+      { key: "salesAgent", label: "Sales agent", sample: "J. Santos" },
+      { key: "businessCompanyName", label: "Business / company name", sample: "Acme Trading Corp." },
+      { key: "businessAcronym", label: "Company acronym", sample: "ATC" },
+      { key: "businessNature", label: "Nature of business", sample: "Wholesale trade" },
+      { key: "businessAddress", label: "Business / office address", sample: "123 Rizal Ave, Quezon City" },
+      { key: "businessLandline", label: "Business landline nos.", sample: "02-8123-4567" },
+      { key: "businessMobile", label: "Business mobile nos.", sample: "0917-123-4567" },
+      { key: "businessFax", label: "Fax no.", sample: "" },
+      { key: "businessBranches", label: "No. of branches", sample: "2" },
+      { key: "businessDateEstablished", label: "Date established", sample: "01/15/2018" },
+      { key: "businessEmail", label: "Company e-mail", sample: "info@acme.example" },
+      { key: "businessEmployees", label: "No. of employees", sample: "25" },
+      { key: "businessTin", label: "Business TIN", sample: "123-456-789-000" },
+      { key: "businessWebsite", label: "Website", sample: "www.acme.example" },
+      { key: "businessPosition", label: "Owner / officer position", sample: "Proprietor" },
+      { key: "businessYearsOfStay", label: "Years of stay (company)", sample: "5" },
+      { key: "businessYearsOfOperation", label: "Years of operation", sample: "8" },
+      { key: "businessContactNumber", label: "Company contact number", sample: "0917-555-0100" },
+      { key: "previousEmployer", label: "Previous employer", sample: "" },
+      { key: "previousCompanyAddress", label: "Previous company address", sample: "" },
+      { key: "previousYearsOfStay", label: "Previous years of stay", sample: "" },
+      { key: "previousContactNumber", label: "Previous contact number", sample: "" },
+      { key: "bankAuthorizationAccount", label: "Bank name and account number (ADB auth)", sample: "BDO — 1234567890" },
+      { key: "noOfDependents", label: "No. of dependents", sample: "2" },
+      { key: "landline", label: "Landline", sample: "02-8123-0000" },
+      { key: "mobileNumber", label: "Mobile number", sample: "0917-123-4567" },
+      { key: "relativesLivingInProvince", label: "Relatives living in province — name", sample: "Rosa Del Poso" },
+      { key: "relativesLivingInProvinceAddress", label: "Relatives living in province — address", sample: "Baliwag, Bulacan" },
+      { key: "relativesLivingInProvinceContact", label: "Relatives living in province — contact", sample: "0917-000-3333" },
+    ],
+  },
+  {
+    label: "SME Individual — income declaration",
+    fields: [
+      { key: "ownGrossIncome", label: "Own — gross income", sample: "80,000.00" },
+      { key: "ownLessExpenses", label: "Own — less expenses", sample: "30,000.00" },
+      { key: "ownNetIncome", label: "Own — net income", sample: "50,000.00" },
+      { key: "spouseGrossIncome", label: "Spouse — gross income", sample: "40,000.00" },
+      { key: "spouseLessExpenses", label: "Spouse — less expenses", sample: "15,000.00" },
+      { key: "spouseNetIncome", label: "Spouse — net income", sample: "25,000.00" },
+      { key: "otherIncomeSource", label: "Other income — source", sample: "Rental" },
+      { key: "otherMonthlyIncome", label: "Other income — monthly", sample: "10,000.00" },
+      { key: "totalNetIncome", label: "Total net income", sample: "85,000.00" },
+    ],
+  },
+  {
+    label: "SME Individual — spouse",
+    fields: [
+      { key: "spouseLastName", label: "Spouse last name", sample: "Del Poso" },
+      { key: "spouseFirstName", label: "Spouse first name", sample: "Maria" },
+      { key: "spouseMiddleName", label: "Spouse middle name", sample: "Cruz" },
+      { key: "spouseDateOfBirth", label: "Spouse date of birth", sample: "03/20/1987" },
+      { key: "spousePresentAddress", label: "Spouse present address", sample: "544 J. Buizon Street, Baliwag" },
+      { key: "spouseYearsOfStayPresent", label: "Spouse yrs of stay (present)", sample: "5" },
+      { key: "spouseProvincialAddress", label: "Spouse provincial address", sample: "Baliwag, Bulacan" },
+      { key: "spouseYearsOfStayProvincial", label: "Spouse yrs of stay (provincial)", sample: "20" },
+      { key: "spouseCompanyName", label: "Spouse company / employer", sample: "ABC Retail" },
+      { key: "spouseYearsOfStayCompany", label: "Spouse yrs of stay (company)", sample: "3" },
+      { key: "spousePosition", label: "Spouse position", sample: "Cashier" },
+      { key: "spouseContactNumber", label: "Spouse contact number", sample: "0917-987-6543" },
+      { key: "spouseCompanyAddress", label: "Spouse company address", sample: "Malolos, Bulacan" },
     ],
   },
   {
@@ -63,7 +132,7 @@ export const FIELD_GROUPS: FieldGroup[] = [
       { key: "mobileTelNumbers", label: "Mobile / tel. numbers", sample: "0917-123-4567" },
       { key: "email", label: "Email address", sample: "jonathan.delposo@example.com" },
       { key: "viber", label: "Viber", sample: "0917-123-4567" },
-      { key: "skype", label: "Skype", sample: "" },
+      { key: "teams", label: "Teams", sample: "" },
       { key: "othersContact", label: "Other contact", sample: "" },
       { key: "roaming", label: "Roaming number", sample: "" },
       { key: "facebook", label: "Facebook", sample: "jonathan.delposo" },
@@ -232,6 +301,68 @@ export const FIELD_COLLECTIONS: MergeCollection[] = [
       { key: "relationship", label: "Relation", sample: "Friend" },
       { key: "phone", label: "Contact no.", sample: "0917-000-1111" },
       { key: "occupation", label: "Occupation", sample: "Teacher" },
+      { key: "address", label: "Address", sample: "Quezon City" },
+    ],
+  },
+  {
+    key: "companyOfficers",
+    label: "SME — company officers",
+    fields: [
+      { key: "name", label: "Name", sample: "Juan Dela Cruz" },
+      { key: "address", label: "Address", sample: "Makati City" },
+      { key: "position", label: "Position", sample: "President" },
+    ],
+  },
+  {
+    key: "majorStockholders",
+    label: "SME — major stockholders",
+    fields: [
+      { key: "name", label: "Name", sample: "Juan Dela Cruz" },
+      { key: "address", label: "Address", sample: "Makati City" },
+      { key: "position", label: "Position", sample: "Director" },
+      { key: "equity", label: "Equity", sample: "60%" },
+    ],
+  },
+  {
+    key: "tradeCustomers",
+    label: "SME — trade customers / clients",
+    fields: [
+      { key: "name", label: "Customer / client", sample: "XYZ Merchants" },
+      { key: "address", label: "Address", sample: "Pasig City" },
+      { key: "contactPerson", label: "Contact person", sample: "Ana Reyes" },
+      { key: "contactNo", label: "Contact no.", sample: "0917-111-2222" },
+    ],
+  },
+  {
+    key: "tradeSuppliers",
+    label: "SME — trade suppliers",
+    fields: [
+      { key: "name", label: "Supplier", sample: "Supply Co." },
+      { key: "address", label: "Address", sample: "Caloocan" },
+      { key: "contactPerson", label: "Contact person", sample: "Ben Lim" },
+      { key: "contactNo", label: "Contact no.", sample: "0917-333-4444" },
+    ],
+  },
+  {
+    key: "creditReferences",
+    label: "SME — credit references",
+    fields: [
+      { key: "creditorBank", label: "Creditors / banks", sample: "BDO" },
+      { key: "typeOfLoan", label: "Type of loan", sample: "Business loan" },
+      { key: "outstandingBalance", label: "Outstanding balance", sample: "100,000.00" },
+      { key: "monthlyPayment", label: "Monthly payment", sample: "10,000.00" },
+      { key: "contactNo", label: "Contact no.", sample: "02-8888-0000" },
+    ],
+  },
+  {
+    key: "bankAccounts",
+    label: "SME — bank accounts",
+    fields: [
+      { key: "bankName", label: "Bank name", sample: "BDO" },
+      { key: "branch", label: "Branch", sample: "Makati Ave" },
+      { key: "accountNo", label: "Account no.", sample: "1234567890" },
+      { key: "accountType", label: "Account type", sample: "Checking" },
+      { key: "contactNo", label: "Contact no.", sample: "02-8888-0000" },
     ],
   },
 ];
@@ -242,6 +373,8 @@ export const FIELD_FLAGS: MergeField[] = [
   { key: "isCash", label: "Released via cash", sample: "" },
   { key: "hasCoBorrower", label: "Has co-borrower", sample: "" },
   { key: "isFinal", label: "Final demand (legal-action clause)", sample: "true" },
+  { key: "isSme", label: "SME segment application", sample: "" },
+  { key: "isSeafarer", label: "Seafarer segment application", sample: "true" },
 ];
 
 /** Build the sample render context from the catalog (drives preview). */
@@ -281,8 +414,38 @@ export function buildSampleContext(): Record<string, unknown> {
     { name: "Ana Del Poso", age: "9", contactNo: "", occupation: "Grade 3" },
   ];
   ctx.references = [
-    { name: "Pedro Cruz", relationship: "Friend", phone: "0917-000-1111", occupation: "Teacher" },
-    { name: "Liza Reyes", relationship: "Neighbor", phone: "0917-000-2222", occupation: "Nurse" },
+    { name: "Pedro Cruz", relationship: "Friend", phone: "0917-000-1111", occupation: "Teacher", address: "Quezon City" },
+    { name: "Liza Reyes", relationship: "Neighbor", phone: "0917-000-2222", occupation: "Nurse", address: "Makati" },
+  ];
+  ctx.companyOfficers = [
+    { name: "Juan Dela Cruz", address: "Makati City", position: "President" },
+  ];
+  ctx.majorStockholders = [
+    { name: "Juan Dela Cruz", address: "Makati City", position: "Director", equity: "60%" },
+  ];
+  ctx.tradeCustomers = [
+    { name: "XYZ Merchants", address: "Pasig City", contactPerson: "Ana Reyes", contactNo: "0917-111-2222" },
+  ];
+  ctx.tradeSuppliers = [
+    { name: "Supply Co.", address: "Caloocan", contactPerson: "Ben Lim", contactNo: "0917-333-4444" },
+  ];
+  ctx.creditReferences = [
+    {
+      creditorBank: "BDO",
+      typeOfLoan: "Business loan",
+      outstandingBalance: "100,000.00",
+      monthlyPayment: "10,000.00",
+      contactNo: "02-8888-0000",
+    },
+  ];
+  ctx.bankAccounts = [
+    {
+      bankName: "BDO",
+      branch: "Makati Ave",
+      accountNo: "1234567890",
+      accountType: "Checking",
+      contactNo: "02-8888-0000",
+    },
   ];
   return ctx;
 }

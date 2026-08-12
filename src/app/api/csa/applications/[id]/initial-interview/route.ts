@@ -10,6 +10,7 @@ import {
   listInterviewRecordPrerequisites,
   recordInitialInterview,
 } from "@/lib/csa/initial-interview";
+import { csaScreeningCheckSlug } from "@/lib/csa/sme-duplication";
 import {
   mapBorrowerRow,
   type BorrowerRow,
@@ -23,23 +24,25 @@ const schema = z.object({
   notes: z.string(),
 });
 
-async function isNclRecorded(
+async function isScreeningRecorded(
   supabase: Awaited<ReturnType<typeof createClient>>,
   applicationId: string,
+  segment: string | null | undefined,
 ): Promise<boolean> {
-  const { data: nclType } = await supabase
+  const slug = csaScreeningCheckSlug(segment);
+  const { data: checkType } = await supabase
     .from("check_types")
     .select("id")
-    .eq("slug", "ncl")
+    .eq("slug", slug)
     .single();
-  if (!nclType?.id) return false;
-  const { data: nclCheck } = await supabase
+  if (!checkType?.id) return false;
+  const { data: check } = await supabase
     .from("checks_recorded")
     .select("result")
     .eq("loan_application_id", applicationId)
-    .eq("check_type_id", nclType.id)
+    .eq("check_type_id", checkType.id)
     .maybeSingle();
-  return nclCheck?.result === "pass" || nclCheck?.result === "fail";
+  return check?.result === "pass" || check?.result === "fail";
 }
 
 /**
@@ -60,8 +63,17 @@ export async function POST(request: Request, { params }: RouteParams) {
     ) as BorrowerRow | null;
     const formCompleteness = assessApplicationFormCompleteness(
       borrowerRow ? mapBorrowerRow(borrowerRow) : null,
+      {
+        segment: application.segment === "sme" ? "sme" : "seafarer",
+        entityType:
+          application.entity_type === "individual" ||
+          application.entity_type === "corporate"
+            ? application.entity_type
+            : null,
+      },
     );
-    const nclRecorded = await isNclRecorded(supabase, id);
+    const segment = application.segment === "sme" ? "sme" : "seafarer";
+    const nclRecorded = await isScreeningRecorded(supabase, id, segment);
 
     try {
       assertCanRecordInitialInterview({
@@ -70,6 +82,7 @@ export async function POST(request: Request, { params }: RouteParams) {
         formCompleteness,
         nclRecorded,
         notes: body.notes,
+        segment,
       });
     } catch (err) {
       const message = err instanceof Error ? err.message : "Prerequisites not met";
@@ -83,6 +96,7 @@ export async function POST(request: Request, { params }: RouteParams) {
           (application.privacy_orientation_at as string | null) ?? null,
         formCompleteness,
         nclRecorded,
+        segment,
       });
       return NextResponse.json(
         {

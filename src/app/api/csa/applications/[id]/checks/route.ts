@@ -4,12 +4,18 @@ import { z } from "zod";
 import { writeAuditEvent } from "@/lib/audit/writer";
 import { handleApiError, jsonOk } from "@/lib/api/handler";
 import { assertCsaCanEdit } from "@/lib/csa/application";
+import {
+  csaScreeningCheckSlug,
+  findSmeDuplicationMatches,
+} from "@/lib/csa/sme-duplication";
 import { requireModulePermission } from "@/lib/permissions/server";
 import { createClient } from "@/lib/supabase/server";
 
 type RouteParams = { params: Promise<{ id: string }> };
 
 const checkSchema = z.object({
+  /** Required — do not assume a single check per stage (Phase 7.4). */
+  checkSlug: z.string().min(1),
   result: z.enum(["pass", "fail"]),
   notes: z.string().optional(),
   proofFileName: z.string().optional(),
@@ -23,16 +29,30 @@ export async function GET(_request: Request, { params }: RouteParams) {
     const { id } = await params;
     const supabase = await createClient();
 
+    const { data: app, error: appError } = await supabase
+      .from("loan_applications")
+      .select("segment")
+      .eq("id", id)
+      .single();
+
+    if (appError || !app) {
+      throw new Error(appError?.message ?? "Application not found");
+    }
+
+    const segment = app.segment === "sme" ? "sme" : "seafarer";
+
     const { data: mappings, error: mapError } = await supabase
       .from("stage_check_mapping")
       .select(
         `
         stage,
         sort_order,
+        segment,
         check_types ( id, slug, name )
       `,
       )
-      .eq("stage", "csa");
+      .eq("stage", "csa")
+      .eq("segment", segment);
 
     if (mapError) {
       throw new Error(mapError.message);
@@ -73,7 +93,16 @@ export async function GET(_request: Request, { params }: RouteParams) {
       };
     });
 
-    return jsonOk({ checks });
+    const duplication =
+      segment === "sme"
+        ? await findSmeDuplicationMatches(supabase, id)
+        : null;
+
+    return jsonOk({
+      checks,
+      screeningSlug: csaScreeningCheckSlug(segment),
+      duplication,
+    });
   } catch (error) {
     return handleApiError(error);
   }
@@ -85,16 +114,47 @@ export async function POST(request: Request, { params }: RouteParams) {
     const { id } = await params;
     const body = checkSchema.parse(await request.json());
     const supabase = await createClient();
-    await assertCsaCanEdit(supabase, id);
+    const application = await assertCsaCanEdit(supabase, id);
+    const segment = application.segment === "sme" ? "sme" : "seafarer";
+    const expectedSlug = csaScreeningCheckSlug(segment);
 
-    const { data: nclType, error: typeError } = await supabase
+    if (body.checkSlug !== expectedSlug) {
+      return NextResponse.json(
+        {
+          error: `Check '${body.checkSlug}' is not valid for this application's segment (expected '${expectedSlug}')`,
+        },
+        { status: 400 },
+      );
+    }
+
+    const { data: checkType, error: typeError } = await supabase
       .from("check_types")
-      .select("id")
-      .eq("slug", "ncl")
+      .select("id, slug")
+      .eq("slug", body.checkSlug)
       .single();
 
-    if (typeError || !nclType) {
-      throw new Error("NCL check type not configured");
+    if (typeError || !checkType) {
+      throw new Error(`Check type '${body.checkSlug}' not configured`);
+    }
+
+    const { data: mapping, error: mapError } = await supabase
+      .from("stage_check_mapping")
+      .select("id")
+      .eq("stage", "csa")
+      .eq("segment", segment)
+      .eq("check_type_id", checkType.id)
+      .maybeSingle();
+
+    if (mapError) {
+      throw new Error(mapError.message);
+    }
+    if (!mapping) {
+      return NextResponse.json(
+        {
+          error: `Check '${body.checkSlug}' is not mapped for CSA/${segment}`,
+        },
+        { status: 400 },
+      );
     }
 
     const { data, error } = await supabase
@@ -102,7 +162,7 @@ export async function POST(request: Request, { params }: RouteParams) {
       .upsert(
         {
           loan_application_id: id,
-          check_type_id: nclType.id,
+          check_type_id: checkType.id,
           stage: "csa",
           result: body.result,
           notes: body.notes ?? null,
@@ -128,7 +188,11 @@ export async function POST(request: Request, { params }: RouteParams) {
       action: "update",
       entityType: "checks_recorded",
       entityId: data.id,
-      afterData: { applicationId: id, result: body.result, slug: "ncl" },
+      afterData: {
+        applicationId: id,
+        result: body.result,
+        slug: body.checkSlug,
+      },
     });
 
     return jsonOk({
@@ -137,6 +201,7 @@ export async function POST(request: Request, { params }: RouteParams) {
         result: data.result,
         notes: data.notes,
         checkedAt: data.checked_at,
+        slug: body.checkSlug,
       },
     });
   } catch (error) {

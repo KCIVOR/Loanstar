@@ -15,6 +15,10 @@ import {
   Th,
 } from "@/components/ui";
 import {
+  masterlistEmploymentLabels,
+  masterlistSecondaryIdentity,
+} from "@/lib/ar/masterlist-display";
+import {
   severityLabel,
   severityVariant,
   type RemedialSeverity,
@@ -25,6 +29,9 @@ type Account = {
   borrowerName: string;
   borrowerNo: string;
   loanAccountNo: string | null;
+  segment?: string | null;
+  manningAgency?: string | null;
+  vesselName?: string | null;
   outstandingBalance: number;
   agingBucket: string;
   accountStatus: string;
@@ -138,6 +145,11 @@ export default function RemedialAccountPage() {
   }
 
   const paidCount = schedules.filter((s) => s.status === "paid").length;
+  const employmentLabels = masterlistEmploymentLabels(account.segment);
+  const secondary = masterlistSecondaryIdentity({
+    manning_agency: account.manningAgency,
+    vessel_name: account.vesselName,
+  });
 
   return (
     <div>
@@ -151,7 +163,11 @@ export default function RemedialAccountPage() {
       <PageHeader
         title={account.borrowerName}
         description={
-          account.loanAccountNo ?? account.borrowerNo ?? "Remedial account"
+          secondary
+            ? `${account.loanAccountNo ?? account.borrowerNo ?? "Remedial account"} · ${secondary}`
+            : (account.loanAccountNo ??
+              account.borrowerNo ??
+              "Remedial account")
         }
       />
 
@@ -160,6 +176,18 @@ export default function RemedialAccountPage() {
           <Alert>{error}</Alert>
         </div>
       ) : null}
+
+      <div className="mb-4 flex flex-wrap items-center gap-2">
+        <Badge variant={account.segment === "sme" ? "navy" : "teal"} dot>
+          {account.segment === "sme" ? "SME" : "Seafarer"}
+        </Badge>
+        {account.manningAgency ? (
+          <span className="text-sm text-ink-600">
+            <span className="text-ink-400">{employmentLabels.employer}: </span>
+            {account.manningAgency}
+          </span>
+        ) : null}
+      </div>
 
       <div className="banner warn mb-6">
         <svg

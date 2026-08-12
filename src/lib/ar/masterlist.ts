@@ -1,13 +1,44 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { appendStatusHistory } from "@/lib/applications/status";
-import { getActiveComputation } from "@/lib/csa/computation";
+import type { BusinessInfo } from "@/lib/borrowers/business-info";
 import { mapBorrowerRow } from "@/lib/borrowers/types";
+import { getActiveComputation } from "@/lib/csa/computation";
 import {
   canMarkPaidOff,
   PaidOffEligibilityError,
 } from "@/lib/ar/paid-off";
 import { generateAmortizationSchedule } from "@/lib/ar/schedule";
+
+/**
+ * Denormalized employment/identity columns on masterlist.
+ * SME reuses manning_agency / vessel_name for company + nature (no schema change).
+ */
+export function resolveMasterlistEmploymentFields(input: {
+  segment: string | null | undefined;
+  manningAgencyName?: string | null;
+  vesselName?: string | null;
+  businessInfo?: BusinessInfo | null;
+}): { manningAgency: string | null; vesselName: string | null } {
+  if (input.segment === "sme") {
+    const biz = input.businessInfo ?? {};
+    const company = (biz.companyName ?? "").trim() || null;
+    const natureOrAddress =
+      (biz.natureOfBusiness ?? "").trim() ||
+      (biz.officeAddress ?? biz.companyAddress ?? "").trim() ||
+      null;
+    return { manningAgency: company, vesselName: natureOrAddress };
+  }
+  return {
+    manningAgency: (input.manningAgencyName ?? "").trim() || null,
+    vesselName: (input.vesselName ?? "").trim() || null,
+  };
+}
+
+// `masterlistEmploymentLabels` and `masterlistSecondaryIdentity` moved to
+// `@/lib/ar/masterlist-display` — every caller is a Client Component, and this
+// module transitively imports `next/headers` (server-only), which breaks the
+// production build. Import them from there, never re-export them here.
 
 export async function initializeArAccount(
   supabase: SupabaseClient,
@@ -32,6 +63,7 @@ export async function initializeArAccount(
       id,
       application_no,
       borrower_id,
+      segment,
       borrowers (*)
     `,
     )
@@ -41,6 +73,10 @@ export async function initializeArAccount(
   if (!app?.borrower_id) {
     throw new Error("Application not found");
   }
+
+  // Phase 5.0: persist segment at insert — aging/penalty reads masterlist.segment.
+  // Legacy apps with null segment default to seafarer (pre-Phase-1 rows).
+  const segment = app.segment === "sme" ? "sme" : "seafarer";
 
   const { data: releaseFile } = await supabase
     .from("release_files")
@@ -57,10 +93,12 @@ export async function initializeArAccount(
   const borrowerRow = Array.isArray(borrowerRaw) ? borrowerRaw[0] : borrowerRaw;
   const borrower = borrowerRow ? mapBorrowerRow(borrowerRow) : null;
 
-  const manningAgency =
-    (borrower?.manningAgency as { name?: string } | null)?.name ?? null;
-  const vesselName =
-    (borrower?.picWork as { vessel?: string } | null)?.vessel ?? null;
+  const employment = resolveMasterlistEmploymentFields({
+    segment,
+    manningAgencyName: borrower?.manningAgency?.name ?? null,
+    vesselName: borrower?.picWork?.vessel ?? null,
+    businessInfo: borrower?.businessInfo ?? null,
+  });
 
   const releaseDate =
     computation.releaseDate ?? new Date().toISOString().slice(0, 10);
@@ -77,6 +115,7 @@ export async function initializeArAccount(
       borrower_name: borrower
         ? `${borrower.firstName} ${borrower.lastName}`.trim()
         : "Unknown",
+      segment,
       loan_amount: computation.principal,
       principal: computation.principal,
       total_loan: computation.totalLoan,
@@ -86,8 +125,8 @@ export async function initializeArAccount(
       first_payment_date: computation.firstPaymentDate,
       release_date: releaseDate,
       loan_type_name: computation.loanTypeName,
-      manning_agency: manningAgency,
-      vessel_name: vesselName,
+      manning_agency: employment.manningAgency,
+      vessel_name: employment.vesselName,
       coverage_ratio: computation.coverageRatio,
       release_path: releaseFile?.release_path ?? null,
       atm_bank_name: releaseFile?.atm_bank_name ?? null,

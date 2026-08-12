@@ -18,16 +18,19 @@ import {
   Spinner,
   Stepper,
   Textarea,
+  Modal,
 } from "@/components/ui";
 import { DocumentChecklist } from "@/components/DocumentChecklist";
 import {
   CiReferencesFormModal,
   ciFormCompletionBadge,
 } from "@/components/cig/CiReferencesFormModal";
+import { FieldVisitForm } from "@/components/cig/FieldVisitForm";
+import { SmeReloanVerificationForm } from "@/components/cig/SmeReloanVerificationForm";
 import { statusBadgeVariant } from "@/lib/applications/status";
 import { buildPipelineSteps } from "@/lib/applications/pipeline";
 import type { StatusHistoryEntry } from "@/lib/applications/status";
-import { COMMITTEE_SIZE, tatTone } from "@/lib/committee/votes";
+import { tatTone } from "@/lib/committee/votes";
 import type {
   PicAddress,
   PicDemeanorTag,
@@ -36,6 +39,13 @@ import type {
   ReferenceVerification,
   VerificationChecklist,
 } from "@/lib/cig/verification";
+import {
+  RESIDENCE_TYPES,
+  assessFieldVisitRequired,
+  assessSmeReloanRequired,
+  type FieldVisit,
+  type SmeReloanVerification,
+} from "@/lib/cig/field-visit";
 
 type CommitteeDetail = {
   application: {
@@ -45,9 +55,11 @@ type CommitteeDetail = {
     statusLabel: string;
     blocker: string | null;
     isReloan: boolean;
+    segment: "seafarer" | "sme";
     statusHistory: StatusHistoryEntry[] | null;
     canDecide: boolean;
     votesNeeded: number;
+    committeeSize: number;
     canOverride: boolean;
     canAdjustPreDecision: boolean;
   };
@@ -84,6 +96,8 @@ type CommitteeDetail = {
     picRatingReason: string | null;
     cifVerifiedBy: string | null;
     cifVerifiedDate: string | null;
+    fieldVisit: FieldVisit | null;
+    smeReloanVerification: SmeReloanVerification | null;
   } | null;
   completeness: {
     ready: boolean;
@@ -299,6 +313,7 @@ export default function CommitteeApplicationPage() {
   const [overrideTerms, setOverrideTerms] = useState("6");
   const [voteComment, setVoteComment] = useState("");
   const [showCiForm, setShowCiForm] = useState(false);
+  const [showFieldVisitForm, setShowFieldVisitForm] = useState(false);
   const [assessmentForm, setAssessmentForm] = useState({
     characterNotes: "",
     capacityNotes: "",
@@ -639,17 +654,55 @@ export default function CommitteeApplicationPage() {
               </p>
             </div>
             <div className="flex flex-wrap items-center gap-2">
-              <Badge variant={ciFormCompletionBadge(data.verification).variant}>
-                {ciFormCompletionBadge(data.verification).label}
-              </Badge>
-              <Button
-                type="button"
-                variant="secondary"
-                size="sm"
-                onClick={() => setShowCiForm(true)}
-              >
-                View full CI &amp; References Form
-              </Button>
+              {data.application.segment !== "sme" ? (
+                <>
+                  <Badge variant={ciFormCompletionBadge(data.verification).variant}>
+                    {ciFormCompletionBadge(data.verification).label}
+                  </Badge>
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => setShowCiForm(true)}
+                  >
+                    View full CI &amp; References Form
+                  </Button>
+                </>
+              ) : (
+                <>
+                  <Badge
+                    variant={
+                      (data.application.isReloan
+                        ? assessSmeReloanRequired(
+                            data.verification.smeReloanVerification,
+                          )
+                        : assessFieldVisitRequired(data.verification.fieldVisit)
+                      ).complete
+                        ? "success"
+                        : "warning"
+                    }
+                  >
+                    {(data.application.isReloan
+                      ? assessSmeReloanRequired(
+                          data.verification.smeReloanVerification,
+                        )
+                      : assessFieldVisitRequired(data.verification.fieldVisit)
+                    ).complete
+                      ? "Complete"
+                      : "In progress"}
+                  </Badge>
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => setShowFieldVisitForm(true)}
+                  >
+                    {data.application.isReloan
+                      ? "View full SME re-loan Form"
+                      : "View full Field Visit Form"}
+                  </Button>
+                </>
+              )}
             </div>
           </div>
           {data.verification.finding ? (
@@ -706,6 +759,8 @@ export default function CommitteeApplicationPage() {
             </div>
           </div>
 
+          {data.application.segment !== "sme" ? (
+            <>
           <div className="mt-4 border-t border-line-soft pt-4">
             <div className="text-xs font-semibold uppercase tracking-wide text-ink-500">
               Crewing manager
@@ -962,10 +1017,128 @@ export default function CommitteeApplicationPage() {
               </div>
             </div>
           </div>
+            </>
+          ) : (
+            <div className="mt-4 border-t border-line-soft pt-4">
+              <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+                <div className="text-xs font-semibold uppercase tracking-wide text-ink-500">
+                  {data.application.isReloan
+                    ? "SME re-loan verification"
+                    : "SME Field Visit"}
+                </div>
+              </div>
+              {data.application.isReloan ? (
+                data.verification.smeReloanVerification ? (
+                  <div className="mt-2 grid gap-x-4 gap-y-1 text-sm text-ink-700 sm:grid-cols-2">
+                    <p>
+                      <span className="text-ink-400">Date visited:</span>{" "}
+                      {displayText(
+                        data.verification.smeReloanVerification.header?.dateVisited,
+                      )}
+                    </p>
+                    <p>
+                      <span className="text-ink-400">Visited by:</span>{" "}
+                      {displayText(
+                        data.verification.smeReloanVerification.header?.visitedBy,
+                      )}
+                    </p>
+                    <p>
+                      <span className="text-ink-400">Residence type:</span>{" "}
+                      {displayText(
+                        data.verification.smeReloanVerification.residence?.typeOfResidence,
+                      )}
+                    </p>
+                    <p>
+                      <span className="text-ink-400">Business condition:</span>{" "}
+                      {displayText(
+                        data.verification.smeReloanVerification.business?.condition,
+                      )}
+                    </p>
+                    <p>
+                      <span className="text-ink-400">Risk:</span>{" "}
+                      {displayText(data.verification.smeReloanVerification.risk)}
+                    </p>
+                    <p>
+                      <span className="text-ink-400">Recommendation:</span>{" "}
+                      {displayText(
+                        data.verification.smeReloanVerification.recommendation,
+                      )}
+                    </p>
+                    <p>
+                      <span className="text-ink-400">Net income / month:</span>{" "}
+                      {data.verification.smeReloanVerification.baseOnFs
+                        ?.netIncomePerMonth != null
+                        ? `₱${formatMoney(
+                            data.verification.smeReloanVerification.baseOnFs
+                              .netIncomePerMonth,
+                          )}`
+                        : "—"}
+                    </p>
+                    <p>
+                      <span className="text-ink-400">Verified by:</span>{" "}
+                      {displayText(data.verification.smeReloanVerification.verifiedBy)}
+                    </p>
+                  </div>
+                ) : (
+                  <p className="mt-1 text-sm text-ink-400">Not recorded.</p>
+                )
+              ) : data.verification.fieldVisit ? (
+                <div className="mt-2 grid gap-x-4 gap-y-1 text-sm text-ink-700 sm:grid-cols-2">
+                  <p>
+                    <span className="text-ink-400">Date visited:</span>{" "}
+                    {displayText(data.verification.fieldVisit.header?.dateVisited)}
+                  </p>
+                  <p>
+                    <span className="text-ink-400">Visited by:</span>{" "}
+                    {displayText(data.verification.fieldVisit.header?.visitedBy)}
+                  </p>
+                  <p>
+                    <span className="text-ink-400">Client:</span>{" "}
+                    {displayText(data.verification.fieldVisit.header?.clientName)}
+                  </p>
+                  <p>
+                    <span className="text-ink-400">Residence type:</span>{" "}
+                    {data.verification.fieldVisit.residence?.residenceType
+                      ? RESIDENCE_TYPES.find(
+                          (t) =>
+                            t.id ===
+                            data.verification!.fieldVisit!.residence!.residenceType,
+                        )?.label ??
+                        data.verification.fieldVisit.residence.residenceType
+                      : "—"}
+                  </p>
+                  <p>
+                    <span className="text-ink-400">Credit realization risk:</span>{" "}
+                    {displayText(
+                      data.verification.fieldVisit.recommendation?.creditRealizationRisk,
+                    )}
+                  </p>
+                  <p>
+                    <span className="text-ink-400">Recommendation:</span>{" "}
+                    {data.verification.fieldVisit.recommendation?.recommendation ===
+                    "for_approval"
+                      ? "For approval"
+                      : data.verification.fieldVisit.recommendation?.recommendation ===
+                          "for_disapproval"
+                        ? "For disapproval"
+                        : "—"}
+                  </p>
+                  <p>
+                    <span className="text-ink-400">Prepared by:</span>{" "}
+                    {displayText(
+                      data.verification.fieldVisit.recommendation?.preparedBy,
+                    )}
+                  </p>
+                </div>
+              ) : (
+                <p className="mt-1 text-sm text-ink-400">Not recorded.</p>
+              )}
+            </div>
+          )}
         </Card>
       ) : null}
 
-      {data.verification && showCiForm ? (
+      {data.verification && showCiForm && data.application.segment !== "sme" ? (
         <CiReferencesFormModal
           open={showCiForm}
           onClose={() => setShowCiForm(false)}
@@ -974,7 +1147,37 @@ export default function CommitteeApplicationPage() {
           onSave={async () => undefined}
           saving={false}
           readOnly
+          verifierName=""
         />
+      ) : null}
+
+      {data.verification && showFieldVisitForm && data.application.segment === "sme" ? (
+        <Modal
+          open={showFieldVisitForm}
+          onClose={() => setShowFieldVisitForm(false)}
+          title={
+            data.application.isReloan ? "SME re-loan verification" : "SME Field Visit"
+          }
+          className="!max-w-4xl"
+        >
+          <div className="max-h-[65vh] overflow-y-auto pr-1">
+            {data.application.isReloan ? (
+              <SmeReloanVerificationForm
+                value={data.verification.smeReloanVerification}
+                onChange={() => undefined}
+                onSave={() => undefined}
+                readOnly
+              />
+            ) : (
+              <FieldVisitForm
+                value={data.verification.fieldVisit}
+                onChange={() => undefined}
+                onSave={() => undefined}
+                readOnly
+              />
+            )}
+          </div>
+        </Modal>
       ) : null}
 
       {data.borrower ? (
@@ -1200,7 +1403,7 @@ export default function CommitteeApplicationPage() {
             }}
           >
             {data.tally.label ??
-              `${data.tally.approve} approve · ${data.tally.deny} deny`}
+              `${data.tally.approve}/${data.application.committeeSize} approve · ${data.tally.deny}/${data.application.committeeSize} deny`}
           </div>
         </div>
 
@@ -1507,7 +1710,7 @@ export default function CommitteeApplicationPage() {
             Final action
           </h2>
           <p className="text-sm text-ink-500">
-            Waiting for votes ({votesCast}/{COMMITTEE_SIZE} cast)
+            Waiting for votes ({votesCast}/{data.application.committeeSize} cast)
             {data.application.votesNeeded > 0
               ? ` — ${data.application.votesNeeded} more needed before a decision.`
               : "."}

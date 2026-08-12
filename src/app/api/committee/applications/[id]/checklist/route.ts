@@ -2,6 +2,7 @@ import { handleApiError, jsonOk } from "@/lib/api/handler";
 import {
   getCompletionSummary,
   getStageChecklist,
+  loadChecklistScope,
 } from "@/lib/documents/checklist";
 import { requireModulePermission } from "@/lib/permissions/server";
 import { createClient } from "@/lib/supabase/server";
@@ -14,8 +15,9 @@ export async function GET(_request: Request, { params }: RouteParams) {
     await requireModulePermission("committee", "view");
     const { id } = await params;
     const supabase = await createClient();
+    const scope = await loadChecklistScope(supabase, id);
 
-    const items = await getStageChecklist(supabase, "intake", id);
+    const items = await getStageChecklist(supabase, "intake", id, scope);
     const summary = getCompletionSummary(items);
 
     return jsonOk({ stage: "intake", items, summary });

@@ -10,6 +10,7 @@ import {
   Input,
   Label,
   PageHeader,
+  PhoneInput,
   Spinner,
 } from "@/components/ui";
 
@@ -29,7 +30,9 @@ export default function ConfigPage() {
   const [testingSms, setTestingSms] = useState(false);
 
   const [penaltyRate, setPenaltyRate] = useState("");
+  const [penaltyRateSme, setPenaltyRateSme] = useState("");
   const [coverageRatio, setCoverageRatio] = useState("");
+  const [committeeSize, setCommitteeSize] = useState("");
   const [aging30, setAging30] = useState("");
   const [aging60, setAging60] = useState("");
   const [aging90, setAging90] = useState("");
@@ -61,7 +64,9 @@ export default function ConfigPage() {
 
       for (const s of data.settings) {
         if (s.key === "penalty_rate") setPenaltyRate(String(s.value));
+        if (s.key === "penalty_rate_sme") setPenaltyRateSme(String(s.value));
         if (s.key === "coverage_ratio") setCoverageRatio(String(s.value));
+        if (s.key === "committee_size") setCommitteeSize(String(s.value));
         if (s.key === "aging_thresholds" && typeof s.value === "object") {
           const v = s.value as Record<string, number>;
           setAging30(String(v["30"] ?? ""));
@@ -104,7 +109,9 @@ export default function ConfigPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           penalty_rate: Number(penaltyRate),
+          penalty_rate_sme: Number(penaltyRateSme),
           coverage_ratio: Number(coverageRatio),
+          committee_size: Number(committeeSize),
           aging_thresholds: {
             "30": Number(aging30),
             "60": Number(aging60),
@@ -195,7 +202,7 @@ export default function ConfigPage() {
           <div className="max-w-md space-y-4">
             <div>
               <Label htmlFor="penalty" required>
-                Penalty rate (decimal)
+                Penalty rate — Seafarer (decimal)
               </Label>
               <Input
                 id="penalty"
@@ -213,6 +220,26 @@ export default function ConfigPage() {
               </p>
             </div>
             <div>
+              <Label htmlFor="penalty-sme" required>
+                Penalty rate — SME (decimal)
+              </Label>
+              <Input
+                id="penalty-sme"
+                type="number"
+                step="0.001"
+                min="0"
+                max="1"
+                required
+                value={penaltyRateSme}
+                onChange={(e) => setPenaltyRateSme(e.target.value)}
+                className="mono"
+              />
+              <p className="mt-1 text-xs text-ink-400">
+                {settings.find((s) => s.key === "penalty_rate_sme")
+                  ?.description ?? "Maximum penalty rate per month (SME)"}
+              </p>
+            </div>
+            <div>
               <Label htmlFor="coverage" required>
                 Coverage ratio (decimal)
               </Label>
@@ -227,6 +254,25 @@ export default function ConfigPage() {
                 onChange={(e) => setCoverageRatio(e.target.value)}
                 className="mono"
               />
+            </div>
+            <div>
+              <Label htmlFor="committee-size" required>
+                Committee size (approvers required)
+              </Label>
+              <Input
+                id="committee-size"
+                type="number"
+                step="1"
+                min="1"
+                max="15"
+                required
+                value={committeeSize}
+                onChange={(e) => setCommitteeSize(e.target.value)}
+                className="mono"
+              />
+              <p className="mt-1 text-xs text-ink-400">
+                {settings.find((s) => s.key === "committee_size")?.description}
+              </p>
             </div>
             <div>
               <Label>Aging thresholds (days)</Label>
@@ -351,13 +397,12 @@ export default function ConfigPage() {
             </div>
             <div className="border-t border-line-soft pt-4">
               <Label htmlFor="test-mobile">Send test SMS</Label>
-              <div className="mt-1 flex flex-wrap gap-2">
-                <Input
+              <div className="mt-1 flex flex-wrap items-start gap-2">
+                <PhoneInput
                   id="test-mobile"
                   value={testMobile}
-                  onChange={(e) => setTestMobile(e.target.value)}
-                  placeholder="0917…"
-                  className="mono max-w-xs"
+                  onChange={setTestMobile}
+                  className="max-w-xs"
                 />
                 <Button
                   type="button"

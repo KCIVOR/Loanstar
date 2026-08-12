@@ -11,8 +11,13 @@ import {
   Input,
   Label,
   PageHeader,
+  PhoneInput,
+  Select,
 } from "@/components/ui";
 import { parseBorrowerNameParts } from "@/lib/csa/leads";
+
+type LoanSegment = "seafarer" | "sme";
+type EntityType = "individual" | "corporate";
 
 function CsaNewApplicationForm() {
   const router = useRouter();
@@ -30,6 +35,8 @@ function CsaNewApplicationForm() {
   const [lastName, setLastName] = useState(prefill.lastName);
   const [middleName, setMiddleName] = useState("");
   const [mobilePhone, setMobilePhone] = useState("");
+  const [segment, setSegment] = useState<LoanSegment>("seafarer");
+  const [entityType, setEntityType] = useState<EntityType>("individual");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -44,6 +51,8 @@ function CsaNewApplicationForm() {
         lastName,
         middleName: middleName || undefined,
         mobilePhone: mobilePhone || undefined,
+        segment,
+        entityType: segment === "sme" ? entityType : undefined,
       };
 
       const res = await fetch(
@@ -98,6 +107,37 @@ function CsaNewApplicationForm() {
           Borrower details
         </h2>
         <form onSubmit={(e) => void handleSubmit(e)} className="grid gap-4 sm:grid-cols-2">
+          <div>
+            <Label htmlFor="segment" required>
+              Loan segment
+            </Label>
+            <Select
+              id="segment"
+              value={segment}
+              onChange={(e) => setSegment(e.target.value as LoanSegment)}
+            >
+              <option value="seafarer">Seafarer</option>
+              <option value="sme">SME</option>
+            </Select>
+          </div>
+          {segment === "sme" ? (
+            <div>
+              <Label htmlFor="entityType" required>
+                Entity type
+              </Label>
+              <Select
+                id="entityType"
+                value={entityType}
+                onChange={(e) => setEntityType(e.target.value as EntityType)}
+                required
+              >
+                <option value="individual">Individual</option>
+                <option value="corporate">Corporate</option>
+              </Select>
+            </div>
+          ) : (
+            <div aria-hidden className="hidden sm:block" />
+          )}
           <div className="sm:col-span-2">
             <Label htmlFor="email" required>
               Email
@@ -142,10 +182,10 @@ function CsaNewApplicationForm() {
           </div>
           <div>
             <Label htmlFor="mobilePhone">Mobile phone</Label>
-            <Input
+            <PhoneInput
               id="mobilePhone"
               value={mobilePhone}
-              onChange={(e) => setMobilePhone(e.target.value)}
+              onChange={setMobilePhone}
             />
           </div>
           <div className="sm:col-span-2">

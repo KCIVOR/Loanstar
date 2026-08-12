@@ -1,82 +1,78 @@
-import { computeTatDays } from "@/lib/committee/votes";
+import { resolveDateBounds, type DateRangeValue } from "@/components/history";
 import { handleApiError, jsonOk } from "@/lib/api/handler";
+import {
+  ACTIVE_COMMITTEE_STATUSES,
+  COMMITTEE_QUEUE_PAGE_SIZES,
+  getCommitteeQueue,
+  getCommitteeQueueKpiCounts,
+  type CommitteeQueueSortKey,
+  type CommitteeStatusFilter,
+} from "@/lib/committee/queue";
 import { requireModulePermission } from "@/lib/permissions/server";
 import { createClient } from "@/lib/supabase/server";
 
-export async function GET() {
+const STATUS_FILTERS = new Set(["all", ...ACTIVE_COMMITTEE_STATUSES]);
+const RANGE_PRESETS = new Set(["30d", "90d", "all", "custom"]);
+const SORT_KEYS = new Set(["status", "tat", "forwarded"]);
+
+export async function GET(request: Request) {
   try {
     await requireModulePermission("committee", "view");
+    const { searchParams } = new URL(request.url);
+
+    const search = searchParams.get("search") ?? "";
+    const statusRaw = searchParams.get("status") ?? "all";
+    const statusFilter = (
+      STATUS_FILTERS.has(statusRaw) ? statusRaw : "all"
+    ) as CommitteeStatusFilter;
+
+    // Active queue defaults to All time (must not hide old-but-still-open items).
+    const rangeRaw = searchParams.get("range") ?? "all";
+    const preset = (
+      RANGE_PRESETS.has(rangeRaw) ? rangeRaw : "all"
+    ) as DateRangeValue["preset"];
+    const dateRange: DateRangeValue = {
+      preset,
+      from: searchParams.get("from") ?? "",
+      to: searchParams.get("to") ?? "",
+    };
+    const { from, to } = resolveDateBounds(dateRange, new Date());
+
+    const sortKeyRaw = searchParams.get("sortKey");
+    const sortKey = (
+      sortKeyRaw && SORT_KEYS.has(sortKeyRaw) ? sortKeyRaw : undefined
+    ) as CommitteeQueueSortKey | undefined;
+    const sortDirRaw = searchParams.get("sortDir") ?? "desc";
+    const sortDir = sortDirRaw === "asc" ? "asc" : "desc";
+
+    const page = Math.max(1, Number(searchParams.get("page") ?? 1) || 1);
+    const pageSizeRaw = Number(searchParams.get("pageSize") ?? 10);
+    const pageSize = (
+      COMMITTEE_QUEUE_PAGE_SIZES as readonly number[]
+    ).includes(pageSizeRaw)
+      ? pageSizeRaw
+      : 10;
+
     const supabase = await createClient();
+    const [queue, kpi] = await Promise.all([
+      getCommitteeQueue(supabase, {
+        search,
+        statusFilter,
+        from,
+        to,
+        sortKey,
+        sortDir,
+        page,
+        pageSize,
+      }),
+      getCommitteeQueueKpiCounts(supabase),
+    ]);
 
-    const { data, error } = await supabase
-      .from("loan_applications")
-      .select(
-        `
-        id,
-        application_no,
-        status,
-        is_reloan,
-        endorsed_at,
-        created_at,
-        updated_at,
-        borrowers (
-          borrower_no,
-          first_name,
-          last_name,
-          email
-        ),
-        verifications (
-          finding,
-          forwarded_at,
-          completed_at
-        )
-      `,
-      )
-      .in("status", ["for_approval", "negotiating_terms", "committee_hold"])
-      .order("updated_at", { ascending: true });
-
-    if (error) {
-      throw new Error(error.message);
-    }
-
-    const applications = (data ?? []).map((row) => {
-      const borrower = Array.isArray(row.borrowers)
-        ? row.borrowers[0]
-        : row.borrowers;
-      const verification = Array.isArray(row.verifications)
-        ? row.verifications[0]
-        : row.verifications;
-
-      return {
-        id: row.id,
-        applicationNo: row.application_no,
-        status: row.status,
-        isReloan: row.is_reloan,
-        createdAt: row.created_at,
-        updatedAt: row.updated_at,
-        tatDays: computeTatDays(
-          verification?.forwarded_at ?? null,
-          null,
-        ),
-        borrower: borrower
-          ? {
-              borrowerNo: borrower.borrower_no,
-              firstName: borrower.first_name,
-              lastName: borrower.last_name,
-              email: borrower.email,
-            }
-          : null,
-        verification: verification
-          ? {
-              finding: verification.finding,
-              forwardedAt: verification.forwarded_at,
-              completedAt: verification.completed_at,
-            }
-          : null,
-      };
+    return jsonOk({
+      rows: queue.rows,
+      totalCount: queue.totalCount,
+      kpi,
     });
-
-    return jsonOk({ applications });
   } catch (error) {
     return handleApiError(error);
   }

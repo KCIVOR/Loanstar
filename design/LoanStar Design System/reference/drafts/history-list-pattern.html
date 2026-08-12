@@ -1,0 +1,1033 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Draft — Module History / Closed-Records List Pattern</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@600;700;800&family=Public+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+/* ============================================================
+   MERIDIAN tokens — copied from src/app/globals.css so this
+   draft matches the live app pixel-for-pixel.
+   ============================================================ */
+:root {
+  --navy-950:#071633; --navy-900:#0C2247; --navy-800:#123061; --navy-700:#1A407D;
+  --navy-600:#23539E; --navy-500:#2F68BE; --navy-200:#B9CBE7; --navy-100:#DCE5F3; --navy-50:#EEF3FA;
+  --teal-700:#0A7D71; --teal-600:#0D9488; --teal-500:#12A797; --teal-400:#2DC7B6; --teal-100:#C9F0EA; --teal-50:#E9FAF7;
+  --ink-900:#16233B; --ink-700:#3E4C66; --ink-500:#62708A; --ink-400:#8C99B0; --ink-300:#B4BECF;
+  --line:#D9E0EB; --line-soft:#E7ECF3; --surface:#FFFFFF; --surface-2:#F3F6FA; --canvas:#F7F9FC;
+  --success:#178A50; --success-bg:#E8F6EE; --success-line:#BCE4CD;
+  --warning:#B96A00; --warning-bg:#FDF3E3; --warning-line:#F2D9AC;
+  --danger:#C2362F; --danger-bg:#FCEBEA; --danger-line:#F2C4C1;
+  --info:#23539E; --info-bg:#E8F0FB; --info-line:#C4D6EF;
+  --r-sm:6px; --r-md:10px; --r-lg:14px; --r-xl:20px; --r-full:999px;
+  --sh-1:0 1px 2px rgba(12,34,71,.06); --sh-2:0 2px 8px rgba(12,34,71,.08); --sh-3:0 8px 24px rgba(12,34,71,.12);
+  --font-display:'Sora',sans-serif; --font-body:'Public Sans',sans-serif; --font-mono:'JetBrains Mono',monospace;
+}
+* { box-sizing:border-box; }
+body { margin:0; background:var(--canvas); font-family:var(--font-body); color:var(--ink-900); -webkit-font-smoothing:antialiased; }
+
+/* ---- shell layout ---- */
+.shell { display:flex; min-height:100vh; }
+.sidebar { width:236px; flex-shrink:0; background:var(--navy-950); display:flex; flex-direction:column; }
+.side-brand { height:56px; display:flex; align-items:center; justify-content:center; border-bottom:1px solid var(--navy-800); }
+.side-brand span { font-family:var(--font-display); font-weight:800; font-size:17px; color:#fff; letter-spacing:-.01em; }
+.side-brand b { color:var(--teal-400); }
+.side-nav { flex:1; overflow-y:auto; padding:10px; }
+.side-grp { font-family:var(--font-mono); font-size:10.5px; letter-spacing:.14em; text-transform:uppercase; color:var(--navy-200); opacity:.7; padding:14px 12px 6px; }
+.side-link { display:flex; align-items:center; gap:10px; padding:9px 12px; border-radius:var(--r-sm); color:var(--navy-100); text-decoration:none; font-size:13.5px; font-weight:500; position:relative; cursor:pointer; transition:background .15s,color .15s; }
+.side-link svg { width:16px; height:16px; opacity:.8; flex-shrink:0; }
+.side-link:hover { background:rgba(255,255,255,.06); color:#fff; }
+.side-link.is-active { background:rgba(45,199,182,.16); color:#fff; }
+.side-link.is-active svg { opacity:1; }
+.side-link.is-active::before { content:""; position:absolute; left:0; top:8px; bottom:8px; width:3px; border-radius:2px; background:var(--teal-400); }
+.side-children { margin:0 0 2px 15px; padding-left:6px; border-left:1px solid var(--navy-800); display:flex; flex-direction:column; gap:1px; }
+.side-link--child { padding:7px 10px; font-size:12.5px; font-weight:500; color:var(--navy-200); display:flex; align-items:center; gap:8px; border-radius:var(--r-sm); cursor:pointer; transition:background .15s,color .15s; }
+.side-link--child:hover { background:rgba(255,255,255,.06); color:#fff; }
+.side-link--child.is-active { color:#fff; background:rgba(255,255,255,.05); }
+.side-link-dot { width:6px; height:6px; border-radius:50%; background:currentColor; opacity:.45; flex-shrink:0; }
+.side-link--child.is-active .side-link-dot { opacity:1; background:var(--teal-400); }
+.new-pill { margin-left:auto; font-family:var(--font-mono); font-size:9px; font-weight:700; letter-spacing:.04em; color:var(--navy-950); background:var(--teal-400); border-radius:var(--r-full); padding:1px 6px; }
+
+.main { flex:1; min-width:0; display:flex; flex-direction:column; }
+.topbar { height:56px; flex-shrink:0; display:flex; align-items:center; justify-content:space-between; gap:12px; border-bottom:1px solid var(--line-soft); background:#fff; padding:0 24px; }
+.crumbs { display:flex; align-items:center; gap:6px; font-size:12px; color:var(--ink-400); }
+.crumbs b { color:var(--ink-900); font-weight:600; }
+.avatar { width:28px; height:28px; border-radius:50%; background:linear-gradient(135deg,var(--teal-400),var(--teal-700)); color:#fff; display:flex; align-items:center; justify-content:center; font-family:var(--font-display); font-size:11px; font-weight:700; }
+.content { flex:1; padding:26px 32px 60px; max-width:1220px; width:100%; margin:0 auto; }
+
+/* ---- draft banner ---- */
+.draft-banner { display:flex; align-items:center; gap:10px; background:var(--warning-bg); border:1px solid var(--warning-line); color:var(--warning); border-radius:var(--r-md); padding:10px 14px; font-size:12.5px; font-weight:600; margin-bottom:20px; }
+.draft-banner svg { width:16px; height:16px; flex-shrink:0; }
+
+/* ---- module switcher ---- */
+.mod-switch { display:flex; flex-wrap:wrap; gap:3px; margin-bottom:22px; padding:4px; background:var(--surface-2); border:1px solid var(--line); border-radius:var(--r-md); width:fit-content; }
+.mod-btn { border:none; background:transparent; padding:8px 14px; border-radius:var(--r-sm); font-family:var(--font-body); font-size:12.5px; font-weight:600; color:var(--ink-500); cursor:pointer; white-space:nowrap; transition:background .15s,color .15s,box-shadow .15s; }
+.mod-btn:hover { color:var(--navy-800); }
+.mod-btn.is-active { background:#fff; color:var(--navy-900); box-shadow:var(--sh-1); }
+
+/* ---- page header ---- */
+.page-head { margin-bottom:20px; display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:16px; }
+.page-head-left { display:flex; align-items:center; gap:14px; }
+.page-icon { width:44px; height:44px; border-radius:var(--r-lg); background:var(--navy-50); border:1px solid var(--navy-100); color:var(--navy-700); display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+.page-icon svg { width:21px; height:21px; }
+.page-head h1 { font-family:var(--font-display); font-size:23px; font-weight:700; letter-spacing:-.01em; color:var(--navy-900); margin:0; }
+.page-head p { margin:3px 0 0; font-size:13px; color:var(--ink-500); }
+
+/* ---- buttons ---- */
+.btn { font-family:var(--font-body); font-weight:600; font-size:13.5px; display:inline-flex; align-items:center; justify-content:center; gap:7px; padding:0 15px; height:37px; border-radius:var(--r-md); border:1px solid transparent; cursor:pointer; white-space:nowrap; transition:background .15s,border-color .15s,color .15s; }
+.btn svg { width:15px; height:15px; }
+.btn-outline { background:#fff; color:var(--navy-800); border-color:var(--line); }
+.btn-outline:hover { border-color:var(--navy-600); color:var(--navy-600); }
+.btn-outline.is-on { background:var(--navy-50); border-color:var(--navy-200); color:var(--navy-800); }
+.btn-count { display:inline-flex; align-items:center; justify-content:center; min-width:16px; height:16px; padding:0 4px; border-radius:var(--r-full); background:var(--teal-600); color:#fff; font-size:10px; font-weight:700; font-family:var(--font-mono); }
+.chev-ic { transition:transform .18s ease; }
+.btn-outline.is-on .chev-ic { transform:rotate(180deg); }
+
+/* ---- KPI strip ---- */
+.kpi-row { display:grid; grid-template-columns:repeat(auto-fit,minmax(140px,1fr)); gap:10px; margin-bottom:18px; }
+.kpi-card { background:#fff; border:1px solid var(--line); border-radius:var(--r-lg); padding:13px 15px; cursor:pointer; text-align:left; transition:border-color .15s,box-shadow .15s,transform .15s; box-shadow:var(--sh-1); }
+.kpi-card:hover { border-color:var(--navy-200); box-shadow:var(--sh-2); transform:translateY(-1px); }
+.kpi-card.is-on { border-color:var(--navy-600); box-shadow:0 0 0 3px var(--navy-50); }
+.kpi-k { display:flex; align-items:center; gap:6px; font-size:10.5px; font-weight:700; letter-spacing:.06em; text-transform:uppercase; color:var(--ink-500); }
+.kpi-k .dot { width:6px; height:6px; border-radius:50%; flex-shrink:0; }
+.kpi-v { font-family:var(--font-mono); font-size:22px; font-weight:600; color:var(--navy-900); margin-top:6px; letter-spacing:-.01em; }
+
+/* ---- toolbar card ---- */
+.toolbar-card { background:#fff; border:1px solid var(--line); border-radius:var(--r-lg); box-shadow:var(--sh-1); margin-bottom:16px; overflow:visible; }
+.toolbar-row { display:flex; align-items:center; gap:10px; padding:13px 14px; flex-wrap:wrap; }
+.gsearch { position:relative; flex:1; min-width:190px; max-width:300px; }
+.gsearch input { width:100%; height:37px; padding:0 12px 0 38px; border-radius:var(--r-md); border:1px solid var(--line); background:var(--surface-2); font-family:var(--font-body); font-size:13.5px; color:var(--ink-900); transition:border-color .15s,background .15s,box-shadow .15s; }
+.gsearch input::placeholder { color:var(--ink-400); }
+.gsearch input:focus { outline:none; border-color:var(--teal-600); background:#fff; box-shadow:0 0 0 3px var(--teal-100); }
+.gsearch .icon { position:absolute; left:12px; top:50%; transform:translateY(-50%); color:var(--ink-400); display:flex; }
+.gsearch .icon svg { width:16px; height:16px; }
+.toolbar-row .sp { margin-left:auto; display:flex; gap:8px; align-items:center; }
+.active-pill-row { display:flex; flex-wrap:wrap; gap:6px; align-items:center; }
+.active-pill { display:inline-flex; align-items:center; gap:6px; height:26px; padding:0 6px 0 10px; border-radius:var(--r-full); background:var(--navy-50); border:1px solid var(--navy-100); color:var(--navy-800); font-size:11.5px; font-weight:600; }
+.active-pill button { border:none; background:rgba(18,48,97,.08); color:var(--navy-700); width:16px; height:16px; border-radius:50%; display:inline-flex; align-items:center; justify-content:center; cursor:pointer; font-size:11px; line-height:1; }
+.active-pill button:hover { background:rgba(18,48,97,.18); }
+.clear-link { border:none; background:none; color:var(--ink-500); font-size:11.5px; font-weight:600; cursor:pointer; font-family:var(--font-body); text-decoration:underline; text-underline-offset:2px; }
+.clear-link:hover { color:var(--danger); }
+
+/* ---- view mode segmented control ---- */
+.seg { display:inline-flex; padding:3px; background:var(--surface-2); border:1px solid var(--line); border-radius:var(--r-md); gap:2px; }
+.seg button { border:none; background:transparent; width:32px; height:29px; border-radius:var(--r-sm); display:inline-flex; align-items:center; justify-content:center; cursor:pointer; color:var(--ink-500); transition:background .15s,color .15s,box-shadow .15s; }
+.seg button svg { width:15px; height:15px; }
+.seg button:hover { color:var(--navy-800); }
+.seg button.is-on { background:#fff; color:var(--navy-900); box-shadow:var(--sh-1); }
+
+/* ---- collapsible filter panel ---- */
+.filter-panel { display:none; border-top:1px solid var(--line-soft); padding:14px; animation:panelIn .22s ease; }
+.filter-panel.is-open { display:block; }
+@keyframes panelIn { from{ opacity:0; transform:translateY(-4px); } to{ opacity:1; transform:none; } }
+.filter-group { display:flex; flex-direction:column; gap:8px; margin-bottom:14px; }
+.filter-group:last-child { margin-bottom:0; }
+.filter-group-label { font-family:var(--font-mono); font-size:10px; font-weight:700; letter-spacing:.1em; text-transform:uppercase; color:var(--ink-400); }
+.filter-bar { display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
+.fchip { display:inline-flex; align-items:center; gap:6px; height:32px; padding:0 13px; border-radius:var(--r-full); border:1px solid var(--line); background:#fff; font-size:12.5px; font-weight:500; color:var(--ink-700); cursor:pointer; font-family:var(--font-body); transition:background .15s,border-color .15s,color .15s; }
+.fchip:hover { border-color:var(--navy-600); }
+.fchip.is-on { background:var(--navy-900); border-color:var(--navy-900); color:#fff; font-weight:600; }
+.fchip svg { width:13px; height:13px; }
+
+/* ---- custom date picker row ---- */
+.date-row { display:none; align-items:flex-end; gap:10px; flex-wrap:wrap; margin-top:10px; padding:12px; background:var(--surface-2); border:1px solid var(--line-soft); border-radius:var(--r-md); }
+.date-row.is-open { display:flex; }
+.date-field { display:flex; flex-direction:column; gap:5px; }
+.date-field label { font-size:11.5px; font-weight:600; color:var(--ink-700); }
+.date-field input { height:34px; padding:0 10px; border-radius:var(--r-sm); border:1px solid var(--line); background:#fff; font-family:var(--font-mono); font-size:12.5px; color:var(--ink-900); }
+.date-field input:focus { outline:none; border-color:var(--teal-600); box-shadow:0 0 0 3px var(--teal-100); }
+.date-sep { font-size:12px; color:var(--ink-400); padding-bottom:9px; }
+.date-quick { display:flex; gap:6px; margin-left:auto; padding-bottom:1px; }
+.date-quick button { height:28px; padding:0 10px; border-radius:var(--r-sm); border:1px solid var(--line); background:#fff; font-size:11.5px; font-weight:600; color:var(--ink-700); cursor:pointer; font-family:var(--font-body); }
+.date-quick button:hover { border-color:var(--navy-600); color:var(--navy-700); }
+
+/* ---- table ---- */
+.table-wrap { width:100%; overflow-x:auto; border:1px solid var(--line); border-radius:var(--r-lg); background:#fff; box-shadow:var(--sh-1); }
+table.tbl { width:100%; border-collapse:collapse; font-size:13.5px; min-width:640px; }
+.tbl thead th { text-align:left; padding:11px 16px; background:var(--surface-2); font-size:11px; font-weight:700; letter-spacing:.07em; text-transform:uppercase; color:var(--ink-500); border-bottom:1px solid var(--line); white-space:nowrap; }
+.tbl thead th.sortable { cursor:pointer; user-select:none; }
+.tbl thead th.sortable:hover { color:var(--navy-800); }
+.tbl thead th .arr { font-size:9px; margin-left:4px; color:var(--teal-600); }
+.tbl thead th .arr.idle { color:var(--ink-300); }
+.tbl th.num, .tbl td.num { text-align:right; }
+.tbl tbody td { padding:13px 16px; border-bottom:1px solid var(--line-soft); vertical-align:middle; }
+.tbl tbody tr:last-child td { border-bottom:none; }
+.tbl tbody tr { transition:background .12s; animation:rowIn .28s ease backwards; }
+.tbl tbody tr:hover td { background:var(--surface-2); }
+@keyframes rowIn { from{ opacity:0; transform:translateY(5px); } to{ opacity:1; transform:none; } }
+.tbl.is-compact { font-size:12.5px; }
+.tbl.is-compact thead th { padding:8px 12px; font-size:10px; }
+.tbl.is-compact tbody td { padding:7px 12px; }
+.tbl.is-compact .badge { height:20px; font-size:10.5px; padding:0 8px; }
+.mono { font-family:var(--font-mono); }
+.cell-primary { font-weight:600; color:var(--ink-900); }
+
+/* ---- grid / card view ---- */
+.grid-view { display:none; grid-template-columns:repeat(auto-fill,minmax(258px,1fr)); gap:12px; }
+.grid-view.is-on { display:grid; }
+.gcard { background:#fff; border:1px solid var(--line); border-radius:var(--r-lg); box-shadow:var(--sh-1); padding:15px; display:flex; flex-direction:column; gap:11px; transition:border-color .15s,box-shadow .15s,transform .15s; animation:rowIn .3s ease backwards; cursor:pointer; }
+.gcard:hover { border-color:var(--navy-200); box-shadow:var(--sh-2); transform:translateY(-2px); }
+.gcard-top { display:flex; align-items:center; justify-content:space-between; gap:8px; }
+.gcard-id { font-family:var(--font-mono); font-size:12px; font-weight:600; color:var(--ink-500); }
+.gcard-name { font-family:var(--font-display); font-size:15px; font-weight:600; color:var(--navy-900); line-height:1.3; }
+.gcard-meta { display:flex; flex-direction:column; gap:7px; border-top:1px dashed var(--line); padding-top:11px; }
+.gcard-meta .row { display:flex; align-items:center; justify-content:space-between; gap:10px; }
+.gcard-meta .k { font-size:11.5px; color:var(--ink-500); }
+.gcard-meta .v { font-size:12.5px; font-weight:600; color:var(--ink-900); text-align:right; }
+.gcard-meta .v.mono { font-family:var(--font-mono); }
+.gcard-meta .v.amt { color:var(--teal-700); }
+
+/* ---- badges ---- */
+.badge { display:inline-flex; align-items:center; gap:6px; height:23px; padding:0 10px; border-radius:var(--r-full); font-size:11.5px; font-weight:600; letter-spacing:.01em; border:1px solid transparent; white-space:nowrap; }
+.badge .dot { width:6px; height:6px; border-radius:50%; background:currentColor; }
+.badge-navy { background:var(--navy-50); color:var(--navy-700); border-color:var(--navy-100); }
+.badge-teal { background:var(--teal-50); color:var(--teal-700); border-color:var(--teal-100); }
+.badge-success { background:var(--success-bg); color:var(--success); border-color:var(--success-line); }
+.badge-warning { background:var(--warning-bg); color:var(--warning); border-color:var(--warning-line); }
+.badge-danger { background:var(--danger-bg); color:var(--danger); border-color:var(--danger-line); }
+.badge-neutral { background:var(--surface-2); color:var(--ink-500); border-color:var(--line); }
+
+/* ---- footer / pagination ---- */
+.tbl-footer { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:12px; margin-top:14px; }
+.footer-left { display:flex; align-items:center; gap:12px; flex-wrap:wrap; }
+.tbl-summary { font-size:12px; color:var(--ink-400); }
+.psize { display:flex; align-items:center; gap:7px; font-size:12px; color:var(--ink-500); }
+.psize select { height:31px; padding:0 26px 0 9px; border-radius:var(--r-sm); border:1px solid var(--line); background:#fff; font-family:var(--font-mono); font-size:12.5px; font-weight:500; color:var(--ink-900); cursor:pointer; appearance:none;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2362708A' stroke-width='2.6' stroke-linecap='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat:no-repeat; background-position:right 8px center; }
+.psize select:focus { outline:none; border-color:var(--teal-600); box-shadow:0 0 0 3px var(--teal-100); }
+.pager { display:flex; align-items:center; gap:6px; }
+.pg { min-width:32px; height:32px; padding:0 8px; border-radius:var(--r-sm); border:1px solid var(--line); background:#fff; color:var(--ink-700); font-size:12.5px; font-weight:500; cursor:pointer; display:inline-flex; align-items:center; justify-content:center; font-family:var(--font-mono); transition:border-color .15s,color .15s,background .15s; }
+.pg:hover:not(:disabled) { border-color:var(--navy-600); color:var(--navy-700); }
+.pg:disabled { opacity:.4; cursor:not-allowed; }
+.pg.is-active { background:var(--navy-900); border-color:var(--navy-900); color:#fff; }
+.pg.gap { border:none; background:none; cursor:default; color:var(--ink-400); }
+
+/* ---- empty state ---- */
+.empty { display:none; flex-direction:column; align-items:center; text-align:center; padding:52px 20px; border:1px dashed var(--line); border-radius:var(--r-lg); background:#fff; color:var(--ink-500); font-size:13.5px; }
+.empty.is-on { display:flex; }
+.empty .empty-ic { width:44px; height:44px; border-radius:50%; background:var(--surface-2); color:var(--ink-400); display:flex; align-items:center; justify-content:center; margin-bottom:12px; }
+.empty .empty-ic svg { width:20px; height:20px; }
+
+/* ---- annotation callout ---- */
+.note { display:flex; gap:10px; background:var(--info-bg); border:1px solid var(--info-line); border-radius:var(--r-md); padding:12px 14px; margin:22px 0 0; font-size:12.5px; color:var(--navy-800); }
+.note svg { width:16px; height:16px; flex-shrink:0; margin-top:1px; color:var(--info); }
+.note b { display:block; margin-bottom:2px; }
+
+.fade-wrap { transition:opacity .16s ease; }
+.fade-wrap.is-fading { opacity:0; }
+
+@media (max-width: 680px) {
+  .sidebar { display:none; }
+  .content { padding:18px; }
+}
+</style>
+</head>
+<body>
+
+<div class="shell">
+  <!-- ===================== SIDEBAR ===================== -->
+  <aside class="sidebar">
+    <div class="side-brand"><span>Loan<b>Star</b></span></div>
+    <nav class="side-nav" id="sideNav">
+      <p class="side-grp">Your Portals</p>
+    </nav>
+  </aside>
+
+  <!-- ===================== MAIN ===================== -->
+  <div class="main">
+    <div class="topbar">
+      <div class="crumbs">
+        <span id="crumbModule">CSA</span> <span>›</span> <b id="crumbPage">Application History</b>
+      </div>
+      <div class="avatar">JD</div>
+    </div>
+
+    <div class="content">
+
+      <div class="draft-banner">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 9v4M12 17h.01M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0Z"/></svg>
+        Draft only — static mockup with sample data. Try: KPI quick-filters, Filters panel, custom date range, view modes, sortable columns, page size.
+      </div>
+
+      <div class="mod-switch" id="modSwitch"></div>
+
+      <div class="fade-wrap" id="fadeWrap">
+
+        <div class="page-head">
+          <div class="page-head-left">
+            <div class="page-icon" id="pageIcon"></div>
+            <div>
+              <h1 id="pageTitle">Application History</h1>
+              <p id="pageDesc">Applications you endorsed, once they leave your active queue.</p>
+            </div>
+          </div>
+          <button type="button" class="btn btn-outline">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            Export
+          </button>
+        </div>
+
+        <div class="kpi-row" id="kpiRow"></div>
+
+        <div class="toolbar-card">
+          <div class="toolbar-row">
+            <div class="gsearch">
+              <span class="icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
+              </span>
+              <input type="text" id="searchInput" placeholder="Search borrower, ID, reference…" />
+            </div>
+            <div class="active-pill-row" id="activePills"></div>
+            <div class="sp">
+              <div class="seg" id="viewSeg">
+                <button type="button" data-view="list" title="List view">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
+                </button>
+                <button type="button" data-view="grid" title="Grid view">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/></svg>
+                </button>
+                <button type="button" data-view="compact" title="Compact view">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/><line x1="3" y1="14" x2="21" y2="14"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+                </button>
+              </div>
+              <button type="button" class="btn btn-outline" id="filterToggle">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>
+                Filters
+                <span class="btn-count" id="filterCount" style="display:none;">0</span>
+                <svg class="chev-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round" width="12" height="12"><polyline points="6 9 12 15 18 9"/></svg>
+              </button>
+            </div>
+          </div>
+
+          <div class="filter-panel" id="filterPanel">
+            <div class="filter-group">
+              <span class="filter-group-label">Status</span>
+              <div class="filter-bar" id="statusFilters"></div>
+            </div>
+            <div class="filter-group">
+              <span class="filter-group-label">Date range</span>
+              <div class="filter-bar" id="rangeFilters"></div>
+              <div class="date-row" id="dateRow">
+                <div class="date-field">
+                  <label for="dateFrom">From</label>
+                  <input type="date" id="dateFrom" />
+                </div>
+                <span class="date-sep">→</span>
+                <div class="date-field">
+                  <label for="dateTo">To</label>
+                  <input type="date" id="dateTo" />
+                </div>
+                <div class="date-quick">
+                  <button type="button" data-quick="7">Last 7d</button>
+                  <button type="button" data-quick="30">Last 30d</button>
+                  <button type="button" data-quick="mtd">This month</button>
+                  <button type="button" data-quick="ytd">This year</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="table-wrap" id="tableWrap">
+          <table class="tbl" id="tbl">
+            <thead><tr id="tblHead"></tr></thead>
+            <tbody id="tblBody"></tbody>
+          </table>
+        </div>
+
+        <div class="grid-view" id="gridView"></div>
+
+        <div class="empty" id="emptyState">
+          <span class="empty-ic">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+          </span>
+          <p style="font-weight:600;color:var(--ink-700);margin:0 0 4px;">No matching records</p>
+          <p style="margin:0;">Try clearing a filter or search term.</p>
+        </div>
+
+        <div class="tbl-footer">
+          <div class="footer-left">
+            <span class="tbl-summary" id="tblSummary"></span>
+            <span class="psize">
+              Show
+              <select id="pageSize">
+                <option value="10">10</option>
+                <option value="20">20</option>
+                <option value="30">30</option>
+                <option value="50">50</option>
+                <option value="100">100</option>
+              </select>
+              per page
+            </span>
+          </div>
+          <div class="pager" id="pager"></div>
+        </div>
+
+        <div class="note">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>
+          <div>
+            <b>Why this page</b>
+            Once a case leaves the active queue (endorsed, decided, released, or closed), staff currently lose access to it. This read-only history view keeps every stage auditable without granting edit rights back into a finished case.
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+/* "Today" for this mock — matches the sample data window. */
+const TODAY = new Date("2026-08-11T00:00:00");
+
+/* ---------------------------------------------------------------
+   Module presets. Columns are field specs so the status column is
+   declared explicitly (statusKey) rather than guessed from a label.
+   --------------------------------------------------------------- */
+const MODULES = {
+  csa: {
+    portalLabel:"CSA", pageLabel:"Application History", icon:"intake",
+    title:"Application History",
+    desc:"Applications you endorsed, once they leave your active queue.",
+    statuses:["All","Endorsed","Denied","Withdrawn"],
+    statusKey:"status", dateKey:"date", dateLabel:"Endorsed On",
+    searchPlaceholder:"Search borrower, application no…",
+    columns:[
+      { key:"id", label:"Application No.", mono:true, primary:true },
+      { key:"borrower", label:"Borrower" },
+      { key:"loanType", label:"Loan Type" },
+      { key:"amount", label:"Amount", num:true, money:true },
+      { key:"status", label:"Status", badge:true },
+      { key:"date", label:"Endorsed On", date:true },
+    ],
+    card:{ id:"id", title:"borrower", meta:["loanType","amount","date"] },
+    rows:[
+      { id:"APP-20881", borrower:"Reyes, Marco",      loanType:"Salary Loan",  amount:150000, status:"endorsed",  date:"2026-08-08" },
+      { id:"APP-20874", borrower:"Villanueva, Ana",   loanType:"SME Loan",     amount:320000, status:"denied",    date:"2026-08-07" },
+      { id:"APP-20869", borrower:"Mendoza, Paolo",    loanType:"Salary Loan",  amount:95000,  status:"endorsed",  date:"2026-08-07" },
+      { id:"APP-20860", borrower:"Cruz, Bea",         loanType:"Salary Loan",  amount:120000, status:"endorsed",  date:"2026-08-05" },
+      { id:"APP-20855", borrower:"Domingo, Rey",      loanType:"Pension Loan", amount:60000,  status:"withdrawn", date:"2026-08-03" },
+      { id:"APP-20849", borrower:"Ilagan, Kim",       loanType:"SME Loan",     amount:410000, status:"endorsed",  date:"2026-08-02" },
+      { id:"APP-20841", borrower:"Santos, Liza",      loanType:"Salary Loan",  amount:135000, status:"endorsed",  date:"2026-07-31" },
+      { id:"APP-20836", borrower:"Padilla, Erwin",    loanType:"Pension Loan", amount:75000,  status:"denied",    date:"2026-07-30" },
+      { id:"APP-20828", borrower:"Rivera, Joy",       loanType:"Salary Loan",  amount:110000, status:"endorsed",  date:"2026-07-28" },
+      { id:"APP-20820", borrower:"Estrada, Nino",     loanType:"SME Loan",     amount:285000, status:"endorsed",  date:"2026-07-26" },
+      { id:"APP-20814", borrower:"Bacani, Cheryl",    loanType:"Salary Loan",  amount:98000,  status:"withdrawn", date:"2026-07-24" },
+      { id:"APP-20807", borrower:"Gutierrez, Alvin",  loanType:"Pension Loan", amount:52000,  status:"endorsed",  date:"2026-07-22" },
+      { id:"APP-20799", borrower:"Lorenzo, Faye",     loanType:"Salary Loan",  amount:143000, status:"endorsed",  date:"2026-07-20" },
+      { id:"APP-20791", borrower:"Tolentino, Mark",   loanType:"SME Loan",     amount:365000, status:"denied",    date:"2026-07-18" },
+      { id:"APP-20784", borrower:"Salvador, Rina",    loanType:"Salary Loan",  amount:127000, status:"endorsed",  date:"2026-07-15" },
+      { id:"APP-20776", borrower:"Aguilar, Dex",      loanType:"Pension Loan", amount:68000,  status:"endorsed",  date:"2026-07-12" },
+      { id:"APP-20768", borrower:"Buenaventura, Lia", loanType:"Salary Loan",  amount:104000, status:"endorsed",  date:"2026-07-09" },
+      { id:"APP-20759", borrower:"Cabrera, Jomar",    loanType:"SME Loan",     amount:295000, status:"withdrawn", date:"2026-07-05" },
+      { id:"APP-20748", borrower:"Delos Reyes, Tin",  loanType:"Salary Loan",  amount:118000, status:"endorsed",  date:"2026-07-01" },
+      { id:"APP-20736", borrower:"Enriquez, Bong",    loanType:"Pension Loan", amount:71000,  status:"denied",    date:"2026-06-26" },
+      { id:"APP-20724", borrower:"Fajardo, Mimi",     loanType:"Salary Loan",  amount:132000, status:"endorsed",  date:"2026-06-20" },
+      { id:"APP-20711", borrower:"Galang, Ruel",      loanType:"SME Loan",     amount:340000, status:"endorsed",  date:"2026-06-14" },
+    ],
+  },
+  committee: {
+    portalLabel:"Committee", pageLabel:"Decision History", icon:"committee",
+    title:"Decision History",
+    desc:"Applications you and the committee have already voted on.",
+    statuses:["All","Approved","Rejected","Revisit"],
+    statusKey:"decision", dateKey:"date", dateLabel:"Decided On",
+    searchPlaceholder:"Search borrower, application no…",
+    columns:[
+      { key:"id", label:"Application No.", mono:true, primary:true },
+      { key:"borrower", label:"Borrower" },
+      { key:"amount", label:"Amount", num:true, money:true },
+      { key:"vote", label:"Your Vote" },
+      { key:"decision", label:"Final Decision", badge:true },
+      { key:"date", label:"Decided On", date:true },
+    ],
+    card:{ id:"id", title:"borrower", meta:["amount","vote","date"] },
+    rows:[
+      { id:"APP-20790", borrower:"Fernandez, Iggy",  amount:180000, vote:"Approve", decision:"approved", date:"2026-08-06" },
+      { id:"APP-20786", borrower:"Chua, Wilma",      amount:240000, vote:"Approve", decision:"approved", date:"2026-08-06" },
+      { id:"APP-20781", borrower:"Ramos, Nico",      amount:95000,  vote:"Reject",  decision:"rejected", date:"2026-08-05" },
+      { id:"APP-20775", borrower:"Torres, Mae",      amount:220000, vote:"Approve", decision:"approved", date:"2026-08-02" },
+      { id:"APP-20769", borrower:"Yap, Carlo",       amount:310000, vote:"Revisit", decision:"revisit",  date:"2026-08-01" },
+      { id:"APP-20760", borrower:"Aquino, Jed",      amount:140000, vote:"Revisit", decision:"revisit",  date:"2026-07-30" },
+      { id:"APP-20754", borrower:"Ocampo, Sandra",   amount:88000,  vote:"Approve", decision:"approved", date:"2026-07-28" },
+      { id:"APP-20747", borrower:"Bautista, Rene",   amount:405000, vote:"Reject",  decision:"rejected", date:"2026-07-25" },
+      { id:"APP-20739", borrower:"Lim, Patricia",    amount:165000, vote:"Approve", decision:"approved", date:"2026-07-22" },
+      { id:"APP-20731", borrower:"Navarro, Toti",    amount:127000, vote:"Approve", decision:"approved", date:"2026-07-18" },
+      { id:"APP-20722", borrower:"Soriano, Grace",   amount:275000, vote:"Reject",  decision:"rejected", date:"2026-07-14" },
+      { id:"APP-20714", borrower:"Panganiban, Ed",   amount:99000,  vote:"Approve", decision:"approved", date:"2026-07-10" },
+      { id:"APP-20705", borrower:"Vergara, Loida",   amount:188000, vote:"Approve", decision:"approved", date:"2026-07-04" },
+      { id:"APP-20693", borrower:"Marquez, Alan",    amount:355000, vote:"Revisit", decision:"revisit",  date:"2026-06-27" },
+    ],
+  },
+  collector_accounts: {
+    portalLabel:"Collection", pageLabel:"Closed Accounts", icon:"collection",
+    title:"Closed Accounts",
+    desc:"Accounts that were fully settled or moved out of your desk.",
+    statuses:["All","Fully Paid","Transferred","Written Off"],
+    statusKey:"reason", dateKey:"date", dateLabel:"Closed On",
+    searchPlaceholder:"Search borrower, loan account no…",
+    columns:[
+      { key:"id", label:"Loan Account No.", mono:true, primary:true },
+      { key:"borrower", label:"Borrower" },
+      { key:"balance", label:"Outstanding", num:true, money:true },
+      { key:"reason", label:"Closed Reason", badge:true },
+      { key:"date", label:"Closed On", date:true },
+    ],
+    card:{ id:"id", title:"borrower", meta:["balance","date"] },
+    rows:[
+      { id:"LN-04421", borrower:"Bautista, Karen",  balance:0,     reason:"fully_paid",  date:"2026-08-09" },
+      { id:"LN-04412", borrower:"Sison, Marlon",    balance:0,     reason:"fully_paid",  date:"2026-08-07" },
+      { id:"LN-04390", borrower:"Garcia, Ronald",   balance:0,     reason:"fully_paid",  date:"2026-08-04" },
+      { id:"LN-04378", borrower:"Uy, Angelica",     balance:38200, reason:"written_off", date:"2026-08-01" },
+      { id:"LN-04355", borrower:"Manalo, Trisha",   balance:12400, reason:"transferred", date:"2026-07-29" },
+      { id:"LN-04340", borrower:"Rosales, Ben",     balance:0,     reason:"fully_paid",  date:"2026-07-26" },
+      { id:"LN-04322", borrower:"Alonzo, Kaye",     balance:24700, reason:"transferred", date:"2026-07-24" },
+      { id:"LN-04301", borrower:"Ocampo, Wes",      balance:0,     reason:"fully_paid",  date:"2026-07-22" },
+      { id:"LN-04288", borrower:"Cordero, Nikki",   balance:0,     reason:"fully_paid",  date:"2026-07-17" },
+      { id:"LN-04270", borrower:"Fabian, Louie",    balance:51300, reason:"written_off", date:"2026-07-12" },
+      { id:"LN-04255", borrower:"Herrera, Dana",    balance:0,     reason:"fully_paid",  date:"2026-07-08" },
+      { id:"LN-04231", borrower:"Ignacio, Ferdie",  balance:18900, reason:"transferred", date:"2026-07-02" },
+      { id:"LN-04210", borrower:"Jimenez, Roselle", balance:0,     reason:"fully_paid",  date:"2026-06-25" },
+    ],
+  },
+  ar: {
+    portalLabel:"Accounting (AR)", pageLabel:"Posting History", icon:"ar",
+    title:"Posting History",
+    desc:"Reconciled DCRs and closed masterlist accounts.",
+    statuses:["All","Reconciled","Closed","Rejected"],
+    statusKey:"status", dateKey:"date", dateLabel:"Posted On",
+    searchPlaceholder:"Search reference, collector, borrower…",
+    columns:[
+      { key:"id", label:"Reference", mono:true, primary:true },
+      { key:"subject", label:"Borrower / DCR" },
+      { key:"amount", label:"Amount", num:true, money:true },
+      { key:"status", label:"Status", badge:true },
+      { key:"date", label:"Posted On", date:true },
+    ],
+    card:{ id:"id", title:"subject", meta:["amount","date"] },
+    rows:[
+      { id:"DCR-1188", subject:"Collector: J. Reyes", amount:58200, status:"reconciled", date:"2026-08-09" },
+      { id:"LN-04421", subject:"Bautista, Karen",     amount:21000, status:"closed",     date:"2026-08-09" },
+      { id:"DCR-1181", subject:"Collector: A. Lim",   amount:36750, status:"reconciled", date:"2026-08-08" },
+      { id:"DCR-1174", subject:"Collector: M. Cruz",  amount:44900, status:"reconciled", date:"2026-08-06" },
+      { id:"DCR-1168", subject:"Collector: J. Reyes", amount:29400, status:"rejected",   date:"2026-08-04" },
+      { id:"LN-04390", subject:"Garcia, Ronald",      amount:18500, status:"closed",     date:"2026-08-04" },
+      { id:"DCR-1159", subject:"Collector: R. Tan",   amount:61300, status:"reconciled", date:"2026-08-01" },
+      { id:"DCR-1150", subject:"Collector: A. Lim",   amount:42100, status:"reconciled", date:"2026-07-29" },
+      { id:"LN-04301", subject:"Ocampo, Wes",         amount:26800, status:"closed",     date:"2026-07-22" },
+      { id:"DCR-1138", subject:"Collector: M. Cruz",  amount:33200, status:"rejected",   date:"2026-07-18" },
+      { id:"DCR-1127", subject:"Collector: R. Tan",   amount:54600, status:"reconciled", date:"2026-07-14" },
+      { id:"DCR-1115", subject:"Collector: J. Reyes", amount:47800, status:"reconciled", date:"2026-07-07" },
+    ],
+  },
+  lra: {
+    portalLabel:"Release (LRA)", pageLabel:"Released Loans", icon:"release",
+    title:"Released Loans",
+    desc:"Loans you've already released and briefed.",
+    statuses:["All","Released","Cancelled"],
+    statusKey:"status", dateKey:"date", dateLabel:"Released On",
+    searchPlaceholder:"Search borrower, application no…",
+    columns:[
+      { key:"id", label:"Application No.", mono:true, primary:true },
+      { key:"borrower", label:"Borrower" },
+      { key:"amount", label:"Net Proceeds", num:true, money:true },
+      { key:"status", label:"Status", badge:true },
+      { key:"date", label:"Released On", date:true },
+    ],
+    card:{ id:"id", title:"borrower", meta:["amount","date"] },
+    rows:[
+      { id:"APP-20699", borrower:"Navarro, Pia",     amount:165000, status:"released",  date:"2026-08-07" },
+      { id:"APP-20691", borrower:"Reyes, Marco",     amount:142500, status:"released",  date:"2026-08-05" },
+      { id:"APP-20682", borrower:"Salazar, Dan",     amount:88500,  status:"released",  date:"2026-08-03" },
+      { id:"APP-20676", borrower:"Tan, Belle",       amount:203000, status:"released",  date:"2026-07-31" },
+      { id:"APP-20670", borrower:"Lim, Grace",       amount:0,      status:"cancelled", date:"2026-07-28" },
+      { id:"APP-20663", borrower:"Ubaldo, Chris",    amount:117400, status:"released",  date:"2026-07-25" },
+      { id:"APP-20654", borrower:"Velasco, Ana Mae", amount:96200,  status:"released",  date:"2026-07-21" },
+      { id:"APP-20645", borrower:"Wong, Peter",      amount:275000, status:"released",  date:"2026-07-16" },
+      { id:"APP-20637", borrower:"Xavier, Lorna",    amount:0,      status:"cancelled", date:"2026-07-11" },
+      { id:"APP-20628", borrower:"Yulo, Migs",       amount:134800, status:"released",  date:"2026-07-06" },
+      { id:"APP-20615", borrower:"Zamora, Precy",    amount:181000, status:"released",  date:"2026-06-29" },
+    ],
+  },
+  agent: {
+    portalLabel:"Leads", pageLabel:"Closed Leads", icon:"leads",
+    title:"Closed Leads",
+    desc:"Leads that were converted to an application or dropped.",
+    statuses:["All","Converted","Dropped"],
+    statusKey:"status", dateKey:"date", dateLabel:"Closed On",
+    searchPlaceholder:"Search lead name, contact no…",
+    columns:[
+      { key:"id", label:"Lead Name", primary:true },
+      { key:"contact", label:"Contact", mono:true },
+      { key:"interest", label:"Loan Interest" },
+      { key:"status", label:"Status", badge:true },
+      { key:"date", label:"Closed On", date:true },
+    ],
+    card:{ id:"contact", title:"id", meta:["interest","date"] },
+    rows:[
+      { id:"Ibarra, Sam",     contact:"0917 555 0142", interest:"Salary Loan",  status:"converted", date:"2026-08-05" },
+      { id:"Bituin, Rose",    contact:"0917 555 0166", interest:"Salary Loan",  status:"converted", date:"2026-08-03" },
+      { id:"Castro, Nina",    contact:"0917 555 0288", interest:"SME Loan",     status:"dropped",   date:"2026-07-30" },
+      { id:"Dizon, Paul",     contact:"0917 555 0311", interest:"Pension Loan", status:"converted", date:"2026-07-27" },
+      { id:"Ong, Kevin",      contact:"0917 555 0391", interest:"Pension Loan", status:"converted", date:"2026-07-25" },
+      { id:"Perez, Hazel",    contact:"0917 555 0422", interest:"Salary Loan",  status:"dropped",   date:"2026-07-21" },
+      { id:"Quinto, Jaime",   contact:"0917 555 0478", interest:"SME Loan",     status:"converted", date:"2026-07-17" },
+      { id:"Robles, Divine",  contact:"0917 555 0503", interest:"Salary Loan",  status:"dropped",   date:"2026-07-13" },
+      { id:"Suarez, Manny",   contact:"0917 555 0559", interest:"Pension Loan", status:"converted", date:"2026-07-08" },
+      { id:"Trinidad, Cathy", contact:"0917 555 0612", interest:"Salary Loan",  status:"converted", date:"2026-07-02" },
+    ],
+  },
+};
+
+const STATUS_VARIANT = {
+  endorsed:"teal", approved:"success", released:"success", reconciled:"success",
+  fully_paid:"success", converted:"success", closed:"neutral",
+  denied:"danger", rejected:"danger", cancelled:"danger", dropped:"danger", written_off:"danger",
+  withdrawn:"neutral", transferred:"warning", revisit:"warning",
+};
+const VARIANT_HEX = {
+  teal:"var(--teal-600)", success:"var(--success)", danger:"var(--danger)",
+  warning:"var(--warning)", neutral:"var(--ink-400)",
+};
+
+const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+function fmtDate(iso) {
+  const d = new Date(iso + "T00:00:00");
+  return `${MONTHS[d.getMonth()]} ${String(d.getDate()).padStart(2,"0")}, ${d.getFullYear()}`;
+}
+function fmtMoney(n) {
+  return "₱" + Number(n).toLocaleString("en-PH", { minimumFractionDigits:2, maximumFractionDigits:2 });
+}
+function toISO(d) {
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
+}
+function daysAgoISO(n) {
+  const d = new Date(TODAY); d.setDate(d.getDate() - n); return toISO(d);
+}
+function statusSlug(label) { return label.toLowerCase().replaceAll(" ", "_"); }
+function badge(value) {
+  const variant = STATUS_VARIANT[value] || "neutral";
+  const label = value.replaceAll("_", " ");
+  return `<span class="badge badge-${variant}"><span class="dot"></span>${label.charAt(0).toUpperCase()+label.slice(1)}</span>`;
+}
+
+/* Sidebar tree — mirrors src/components/admin/Sidebar.tsx PORTAL_NAV_ITEMS,
+   with the missing history/closed child added (marked NEW) per module. */
+const SIDEBAR = [
+  { key:"borrower", label:"Borrower Portal", icon:"home" },
+  { key:"agent_grp", label:"Leads", icon:"leads", children:[
+      { key:"agent_list", label:"Leads list" },
+      { key:"agent", label:"Closed leads", isNew:true },
+  ]},
+  { key:"csa_grp", label:"Intake", icon:"intake", children:[
+      { key:"csa_list", label:"Intake list" },
+      { key:"csa_leads", label:"Leads list" },
+      { key:"csa", label:"Application history", isNew:true },
+  ]},
+  { key:"cig_grp", label:"Verification", icon:"verify", children:[
+      { key:"cig_queue", label:"Verification queue" },
+      { key:"cig_denials", label:"Denial calls" },
+      { key:"cig_callbacks", label:"Scheduled callbacks" },
+      { key:"cig_history", label:"Recent verifications" },
+  ]},
+  { key:"committee_grp", label:"Committee", icon:"committee", children:[
+      { key:"committee_queue", label:"Voting queue" },
+      { key:"committee", label:"Decision history", isNew:true },
+  ]},
+  { key:"lra_grp", label:"Release (LRA)", icon:"release", children:[
+      { key:"lra_queue", label:"Release queue" },
+      { key:"lra", label:"Released loans", isNew:true },
+  ]},
+  { key:"ar_grp", label:"Accounting (AR)", icon:"ar", children:[
+      { key:"ar_masterlist", label:"Masterlist" },
+      { key:"ar_dcr", label:"DCR queue" },
+      { key:"ar", label:"Posting history", isNew:true },
+  ]},
+  { key:"collector_grp", label:"Collection", icon:"collection", children:[
+      { key:"collector_overview", label:"Overview" },
+      { key:"collector_briefings", label:"Briefings" },
+      { key:"collector_active", label:"Accounts" },
+      { key:"collector_accounts", label:"Closed accounts", isNew:true },
+      { key:"collector_proofs", label:"Payment proofs" },
+      { key:"collector_dcr", label:"DCR" },
+      { key:"collector_history", label:"History (DCR/payments)" },
+  ]},
+  { key:"remedial_grp", label:"Remedial", icon:"remedial", children:[
+      { key:"remedial_queue", label:"Recovery queue" },
+      { key:"remedial", label:"Closed cases", isNew:true },
+  ]},
+];
+
+const ICONS = {
+  home:'<path d="M3 9.5 12 3l9 6.5V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1Z"/>',
+  leads:'<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/>',
+  intake:'<polyline points="22 12 16 12 14 15 10 15 8 12 2 12"/><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/>',
+  verify:'<circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>',
+  committee:'<path d="M7 21h10"/><path d="M12 3v18"/><path d="M3 7h2c2 0 5-1 7-2 2 1 5 2 7 2h2"/>',
+  release:'<path d="m22 2-7 20-4-9-9-4Z"/><path d="M22 2 11 13"/>',
+  ar:'<rect x="4" y="2" width="16" height="20" rx="2"/><line x1="8" y1="6" x2="16" y2="6"/>',
+  collection:'<circle cx="8" cy="8" r="6"/><path d="M18.09 10.37A6 6 0 1 1 10.34 18"/>',
+  remedial:'<path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/>',
+};
+function iconSvg(name) {
+  return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${ICONS[name]||""}</svg>`;
+}
+
+function renderSidebar(activeKey) {
+  let html = "";
+  SIDEBAR.forEach(item => {
+    if (item.children) {
+      const parentActive = item.children.some(c => c.key === activeKey);
+      html += `<div class="side-link${parentActive?" is-active":""}">${iconSvg(item.icon)}${item.label}</div>`;
+      html += `<div class="side-children">`;
+      item.children.forEach(c => {
+        html += `<div class="side-link--child${c.key===activeKey?" is-active":""}" data-nav="${c.key}">
+          <span class="side-link-dot"></span>${c.label}
+          ${c.isNew ? '<span class="new-pill">NEW</span>' : ''}
+        </div>`;
+      });
+      html += `</div>`;
+    } else {
+      html += `<div class="side-link${item.key===activeKey?" is-active":""}">${iconSvg(item.icon)}${item.label}</div>`;
+    }
+  });
+  document.getElementById("sideNav").innerHTML = html;
+  document.querySelectorAll("[data-nav]").forEach(el => {
+    if (MODULES[el.dataset.nav]) {
+      el.addEventListener("click", () => switchModule(el.dataset.nav));
+    }
+  });
+}
+
+/* ---------------- state ---------------- */
+const RANGE_PRESETS = ["Last 30 days","Last 90 days","All time","Custom"];
+let currentMod = "csa";
+let currentStatus = "All";
+let currentRange = "Last 30 days";
+let customFrom = "";
+let customTo = "";
+let currentSearch = "";
+let filterPanelOpen = false;
+let viewMode = "list";
+let pageSize = 10;
+let page = 1;
+let sortKey = "date";
+let sortDir = "desc";
+
+function renderModSwitch() {
+  const el = document.getElementById("modSwitch");
+  el.innerHTML = Object.keys(MODULES).map(mod =>
+    `<button class="mod-btn${mod===currentMod?" is-active":""}" data-mod="${mod}">${MODULES[mod].portalLabel}</button>`
+  ).join("");
+  el.querySelectorAll(".mod-btn").forEach(btn =>
+    btn.addEventListener("click", () => switchModule(btn.dataset.mod))
+  );
+}
+
+function switchModule(mod) {
+  if (mod === currentMod || !MODULES[mod]) return;
+  const wrap = document.getElementById("fadeWrap");
+  wrap.classList.add("is-fading");
+  setTimeout(() => {
+    currentMod = mod;
+    currentStatus = "All";
+    currentRange = "Last 30 days";
+    customFrom = ""; customTo = "";
+    currentSearch = "";
+    page = 1;
+    sortKey = MODULES[mod].dateKey;
+    sortDir = "desc";
+    document.getElementById("searchInput").value = "";
+    render();
+    wrap.classList.remove("is-fading");
+  }, 140);
+}
+
+function activeFilterCount() {
+  let n = 0;
+  if (currentStatus !== "All") n++;
+  if (currentRange !== "Last 30 days") n++;
+  return n;
+}
+
+document.getElementById("filterToggle").addEventListener("click", () => {
+  filterPanelOpen = !filterPanelOpen;
+  document.getElementById("filterPanel").classList.toggle("is-open", filterPanelOpen);
+  document.getElementById("filterToggle").classList.toggle("is-on", filterPanelOpen);
+});
+
+document.getElementById("viewSeg").querySelectorAll("button").forEach(b => {
+  b.addEventListener("click", () => { viewMode = b.dataset.view; page = 1; render(); });
+});
+
+document.getElementById("pageSize").addEventListener("change", (e) => {
+  pageSize = Number(e.target.value); page = 1; render();
+});
+
+document.getElementById("searchInput").addEventListener("input", (e) => {
+  currentSearch = e.target.value; page = 1; render();
+});
+
+document.getElementById("dateFrom").addEventListener("change", (e) => {
+  customFrom = e.target.value; currentRange = "Custom"; page = 1; render();
+});
+document.getElementById("dateTo").addEventListener("change", (e) => {
+  customTo = e.target.value; currentRange = "Custom"; page = 1; render();
+});
+document.querySelectorAll("[data-quick]").forEach(b => {
+  b.addEventListener("click", () => {
+    const q = b.dataset.quick;
+    if (q === "mtd") {
+      customFrom = toISO(new Date(TODAY.getFullYear(), TODAY.getMonth(), 1));
+    } else if (q === "ytd") {
+      customFrom = toISO(new Date(TODAY.getFullYear(), 0, 1));
+    } else {
+      customFrom = daysAgoISO(Number(q));
+    }
+    customTo = toISO(TODAY);
+    currentRange = "Custom";
+    page = 1;
+    render();
+  });
+});
+
+/* ---------------- filtering ---------------- */
+function rangeBounds() {
+  if (currentRange === "All time") return [null, null];
+  if (currentRange === "Custom") return [customFrom || null, customTo || null];
+  if (currentRange === "Last 90 days") return [daysAgoISO(90), null];
+  return [daysAgoISO(30), null];
+}
+
+function filteredRows(cfg) {
+  const [from, to] = rangeBounds();
+  const term = currentSearch.trim().toLowerCase();
+  let rows = cfg.rows.filter(r => {
+    if (currentStatus !== "All" && r[cfg.statusKey] !== statusSlug(currentStatus)) return false;
+    const d = r[cfg.dateKey];
+    if (from && d < from) return false;
+    if (to && d > to) return false;
+    if (term) {
+      const hay = Object.values(r).map(v => String(v).toLowerCase()).join(" ");
+      if (!hay.includes(term)) return false;
+    }
+    return true;
+  });
+  rows.sort((a, b) => {
+    const av = a[sortKey], bv = b[sortKey];
+    let cmp;
+    if (typeof av === "number" && typeof bv === "number") cmp = av - bv;
+    else cmp = String(av).localeCompare(String(bv));
+    return sortDir === "asc" ? cmp : -cmp;
+  });
+  return rows;
+}
+
+function pageWindow(current, count) {
+  if (count <= 7) return Array.from({length:count}, (_,i) => i+1);
+  const set = new Set([1, count]);
+  for (let p = current-1; p <= current+1; p++) if (p >= 1 && p <= count) set.add(p);
+  const sorted = [...set].sort((a,b)=>a-b);
+  const out = [];
+  sorted.forEach((n,i) => {
+    if (i && n - sorted[i-1] > 1) out.push("gap");
+    out.push(n);
+  });
+  return out;
+}
+
+/* ---------------- render ---------------- */
+function render() {
+  const cfg = MODULES[currentMod];
+
+  document.getElementById("crumbModule").textContent = cfg.portalLabel;
+  document.getElementById("crumbPage").textContent = cfg.pageLabel;
+  document.getElementById("pageTitle").textContent = cfg.title;
+  document.getElementById("pageDesc").textContent = cfg.desc;
+  document.getElementById("pageIcon").innerHTML = iconSvg(cfg.icon);
+  document.getElementById("searchInput").placeholder = cfg.searchPlaceholder;
+
+  document.querySelectorAll(".mod-btn").forEach(b =>
+    b.classList.toggle("is-active", b.dataset.mod === currentMod));
+  renderSidebar(currentMod);
+
+  document.getElementById("viewSeg").querySelectorAll("button").forEach(b =>
+    b.classList.toggle("is-on", b.dataset.view === viewMode));
+
+  /* status chips */
+  const statusEl = document.getElementById("statusFilters");
+  statusEl.innerHTML = cfg.statuses.map(s =>
+    `<button class="fchip${s===currentStatus?" is-on":""}" data-status="${s}">${s}</button>`).join("");
+  statusEl.querySelectorAll(".fchip").forEach(chip =>
+    chip.addEventListener("click", () => { currentStatus = chip.dataset.status; page = 1; render(); }));
+
+  /* date range chips */
+  const rangeEl = document.getElementById("rangeFilters");
+  rangeEl.innerHTML = RANGE_PRESETS.map(r => {
+    const ic = r === "Custom"
+      ? '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>'
+      : "";
+    return `<button class="fchip${r===currentRange?" is-on":""}" data-range="${r}">${ic}${r}</button>`;
+  }).join("");
+  rangeEl.querySelectorAll(".fchip").forEach(chip =>
+    chip.addEventListener("click", () => {
+      currentRange = chip.dataset.range;
+      if (currentRange === "Custom" && !customFrom && !customTo) {
+        customFrom = daysAgoISO(30); customTo = toISO(TODAY);
+      }
+      page = 1; render();
+    }));
+
+  /* custom date picker row */
+  const dateRow = document.getElementById("dateRow");
+  dateRow.classList.toggle("is-open", currentRange === "Custom");
+  document.getElementById("dateFrom").value = customFrom;
+  document.getElementById("dateTo").value = customTo;
+
+  /* filter count badge */
+  const count = activeFilterCount();
+  const countEl = document.getElementById("filterCount");
+  countEl.textContent = count;
+  countEl.style.display = count ? "inline-flex" : "none";
+
+  /* active filter pills */
+  const pillsEl = document.getElementById("activePills");
+  let pills = "";
+  if (currentStatus !== "All") pills += `<span class="active-pill">${currentStatus}<button data-clear="status">×</button></span>`;
+  if (currentRange !== "Last 30 days") {
+    const label = currentRange === "Custom"
+      ? `${customFrom ? fmtDate(customFrom) : "…"} → ${customTo ? fmtDate(customTo) : "…"}`
+      : currentRange;
+    pills += `<span class="active-pill">${label}<button data-clear="range">×</button></span>`;
+  }
+  pillsEl.innerHTML = pills + (count ? `<button class="clear-link" id="clearAll">Clear all</button>` : "");
+  pillsEl.querySelectorAll("[data-clear]").forEach(b =>
+    b.addEventListener("click", () => {
+      if (b.dataset.clear === "status") currentStatus = "All";
+      if (b.dataset.clear === "range") { currentRange = "Last 30 days"; customFrom = ""; customTo = ""; }
+      page = 1; render();
+    }));
+  const clearAll = document.getElementById("clearAll");
+  if (clearAll) clearAll.addEventListener("click", () => {
+    currentStatus = "All"; currentRange = "Last 30 days"; customFrom = ""; customTo = ""; page = 1; render();
+  });
+
+  /* KPI cards — counts respect the date range, not the status filter */
+  const [from, to] = rangeBounds();
+  const inRange = cfg.rows.filter(r => {
+    const d = r[cfg.dateKey];
+    if (from && d < from) return false;
+    if (to && d > to) return false;
+    return true;
+  });
+  const kpiEl = document.getElementById("kpiRow");
+  let kpiHtml = `<button class="kpi-card${currentStatus==="All"?" is-on":""}" data-status="All">
+      <span class="kpi-k"><span class="dot" style="background:var(--navy-600);"></span>Total records</span>
+      <div class="kpi-v">${inRange.length}</div>
+    </button>`;
+  cfg.statuses.slice(1).forEach(s => {
+    const slug = statusSlug(s);
+    const n = inRange.filter(r => r[cfg.statusKey] === slug).length;
+    kpiHtml += `<button class="kpi-card${currentStatus===s?" is-on":""}" data-status="${s}">
+        <span class="kpi-k"><span class="dot" style="background:${VARIANT_HEX[STATUS_VARIANT[slug]||"neutral"]};"></span>${s}</span>
+        <div class="kpi-v">${n}</div>
+      </button>`;
+  });
+  kpiEl.innerHTML = kpiHtml;
+  kpiEl.querySelectorAll(".kpi-card").forEach(card =>
+    card.addEventListener("click", () => { currentStatus = card.dataset.status; page = 1; render(); }));
+
+  /* rows + pagination math */
+  const rows = filteredRows(cfg);
+  const pageCount = Math.max(1, Math.ceil(rows.length / pageSize));
+  if (page > pageCount) page = pageCount;
+  const start = (page - 1) * pageSize;
+  const pageRows = rows.slice(start, start + pageSize);
+
+  const hasRows = rows.length > 0;
+  document.getElementById("emptyState").classList.toggle("is-on", !hasRows);
+  document.getElementById("tableWrap").style.display = (hasRows && viewMode !== "grid") ? "" : "none";
+  document.getElementById("gridView").classList.toggle("is-on", hasRows && viewMode === "grid");
+  document.getElementById("tbl").classList.toggle("is-compact", viewMode === "compact");
+
+  /* table head (sortable) */
+  document.getElementById("tblHead").innerHTML = cfg.columns.map(c => {
+    const active = sortKey === c.key;
+    const arrow = active
+      ? `<span class="arr">${sortDir === "asc" ? "▲" : "▼"}</span>`
+      : `<span class="arr idle">▼</span>`;
+    return `<th class="sortable${c.num?" num":""}" data-sort="${c.key}">${c.label}${arrow}</th>`;
+  }).join("");
+  document.querySelectorAll("[data-sort]").forEach(th =>
+    th.addEventListener("click", () => {
+      const k = th.dataset.sort;
+      if (sortKey === k) sortDir = sortDir === "asc" ? "desc" : "asc";
+      else { sortKey = k; sortDir = "asc"; }
+      render();
+    }));
+
+  /* table body */
+  document.getElementById("tblBody").innerHTML = pageRows.map((r, idx) => {
+    const cells = cfg.columns.map(c => {
+      const v = r[c.key];
+      if (c.badge) return `<td>${badge(v)}</td>`;
+      if (c.money) return `<td class="num mono"${Number(v)>0?' style="color:var(--teal-700)"':""}>${fmtMoney(v)}</td>`;
+      if (c.date) return `<td class="mono">${fmtDate(v)}</td>`;
+      const cls = [c.mono && "mono", c.primary && "cell-primary"].filter(Boolean).join(" ");
+      return `<td${cls?` class="${cls}"`:""}>${v}</td>`;
+    }).join("");
+    return `<tr style="animation-delay:${idx*22}ms">${cells}</tr>`;
+  }).join("");
+
+  /* grid view */
+  document.getElementById("gridView").innerHTML = pageRows.map((r, idx) => {
+    const cardCfg = cfg.card;
+    const metaRows = cardCfg.meta.map(k => {
+      const col = cfg.columns.find(c => c.key === k);
+      if (!col) return "";
+      const v = r[k];
+      let disp = v, cls = "v";
+      if (col.money) { disp = fmtMoney(v); cls = "v mono amt"; }
+      else if (col.date) { disp = fmtDate(v); cls = "v mono"; }
+      return `<div class="row"><span class="k">${col.label}</span><span class="${cls}">${disp}</span></div>`;
+    }).join("");
+    return `<div class="gcard" style="animation-delay:${idx*25}ms">
+      <div class="gcard-top">
+        <span class="gcard-id">${r[cardCfg.id]}</span>
+        ${badge(r[cfg.statusKey])}
+      </div>
+      <div class="gcard-name">${r[cardCfg.title]}</div>
+      <div class="gcard-meta">${metaRows}</div>
+    </div>`;
+  }).join("");
+
+  /* footer summary + pager */
+  document.getElementById("tblSummary").textContent = hasRows
+    ? `Showing ${start+1}–${Math.min(start+pageSize, rows.length)} of ${rows.length}`
+    : "No results";
+  document.getElementById("pageSize").value = String(pageSize);
+
+  const pagerEl = document.getElementById("pager");
+  let pagerHtml = `<button class="pg" ${page<=1?"disabled":""} data-page="${page-1}">‹</button>`;
+  pageWindow(page, pageCount).forEach(p => {
+    pagerHtml += p === "gap"
+      ? `<span class="pg gap">…</span>`
+      : `<button class="pg${p===page?" is-active":""}" data-page="${p}">${p}</button>`;
+  });
+  pagerHtml += `<button class="pg" ${page>=pageCount?"disabled":""} data-page="${page+1}">›</button>`;
+  pagerEl.innerHTML = pagerHtml;
+  pagerEl.querySelectorAll("[data-page]").forEach(b =>
+    b.addEventListener("click", () => {
+      const p = Number(b.dataset.page);
+      if (p >= 1 && p <= pageCount) { page = p; render(); }
+    }));
+}
+
+renderModSwitch();
+render();
+</script>
+</body>
+</html>

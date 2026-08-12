@@ -1,5 +1,11 @@
 /** Intake document types staff-only (CSA). Hidden from borrower/agent portals. */
-export const CSA_ONLY_INTAKE_SLUGS = ["clearance_form"] as const;
+export const CSA_ONLY_INTAKE_SLUGS = [
+  "clearance_form",
+  "declaration_form",
+  "agency_consent_letter",
+  "data_privacy_consent",
+  "bap_customer_consent",
+] as const;
 
 export type CsaOnlyIntakeSlug = (typeof CSA_ONLY_INTAKE_SLUGS)[number];
 

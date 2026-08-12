@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { FormEvent, useState } from "react";
 
-import { Alert, Button, Card, Input, Label, LoanStarLogo } from "@/components/ui";
+import { Alert, Button, Input, Label, LoanStarLogo } from "@/components/ui";
 import { createClient } from "@/lib/supabase/client";
 
 export default function ForgotPasswordPage() {
@@ -31,41 +31,94 @@ export default function ForgotPasswordPage() {
   }
 
   return (
-    <div className="flex min-h-full flex-1 items-center justify-center bg-navy-950 px-4 py-12">
-      <Card className="w-full max-w-sm">
-        <div className="flex flex-col items-center text-center">
-          <LoanStarLogo height={48} />
-          <h1 className="mt-4 font-display text-xl font-semibold text-navy-900">Reset password</h1>
-          <p className="mt-1 text-sm text-ink-400">Enter your email to receive a reset link.</p>
-        </div>
-
-        <form onSubmit={(e) => void handleSubmit(e)} className="mt-6 space-y-4">
-          {error ? <Alert>{error}</Alert> : null}
-          {message ? <Alert variant="success">{message}</Alert> : null}
-          <div>
-            <Label htmlFor="email">Email</Label>
-            <Input
-              id="email"
-              type="email"
-              required
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-            />
+    <div className="login-shell">
+      <div className="login-brand">
+        <Link href="/" className="inline-flex items-center no-underline">
+          <LoanStarLogo height={36} />
+        </Link>
+        <div className="mid">
+          <h2>
+            Your loan, <em>charted clearly</em> — wherever you sail.
+          </h2>
+          <p>
+            Track your application, view your payment schedule, and download
+            your statement of account from any port in the world.
+          </p>
+          <div className="login-quote">
+            <div className="q">
+              &ldquo;Na-approve yung loan ko bago pa ako sumakay. Kitang-kita
+              ko rin lahat ng bawas at schedule — walang gulat.&rdquo;
+            </div>
+            <div className="who">
+              <span className="av">JD</span>
+              <div>
+                <b>Juan D.</b>
+                <span>Able Seaman · MV Pacific Star</span>
+              </div>
+            </div>
           </div>
-          <Button type="submit" disabled={loading} className="w-full">
-            {loading ? "Sending…" : "Send reset link"}
-          </Button>
-        </form>
+        </div>
+        <div className="foot-note">MERIDIAN · SECURE PORTAL · LOANSTAR 2026</div>
+      </div>
 
-        <p className="mt-4 text-center text-sm text-ink-400">
-          <Link
-            href="/login"
-            className="font-medium text-teal-700 underline-offset-2 hover:underline"
-          >
+      <div className="login-panel">
+        <div className="login-card">
+          <Link href="/login" className="login-back">
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2.4"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden
+            >
+              <path d="M19 12H5M12 19l-7-7 7-7" />
+            </svg>
             Back to sign in
           </Link>
-        </p>
-      </Card>
+          <h3>Reset password</h3>
+          <p className="s">Enter your email to receive a reset link.</p>
+
+          <form onSubmit={(e) => void handleSubmit(e)}>
+            {error ? (
+              <div className="mb-4">
+                <Alert>{error}</Alert>
+              </div>
+            ) : null}
+            {message ? (
+              <div className="mb-4">
+                <Alert variant="success">{message}</Alert>
+              </div>
+            ) : null}
+
+            <div className="mb-[22px]">
+              <Label htmlFor="email" required>
+                Email
+              </Label>
+              <Input
+                id="email"
+                type="email"
+                required
+                autoComplete="email"
+                placeholder="you@email.com"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+              />
+            </div>
+
+            <Button
+              type="submit"
+              variant="accent"
+              size="lg"
+              block
+              loading={loading}
+            >
+              Send reset link
+            </Button>
+          </form>
+        </div>
+      </div>
     </div>
   );
 }

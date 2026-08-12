@@ -3,7 +3,7 @@ import { z } from "zod";
 
 import { writeAuditEvent } from "@/lib/audit/writer";
 import { handleApiError, jsonOk } from "@/lib/api/handler";
-import { witnessSignGeneratedDocument } from "@/lib/lra/release-service";
+import { witnessSignGeneratedDocument, unwitnessSignGeneratedDocument } from "@/lib/lra/release-service";
 import { requireModulePermission } from "@/lib/permissions/server";
 import { createClient } from "@/lib/supabase/server";
 
@@ -51,6 +51,46 @@ export async function POST(request: Request, { params }: RouteParams) {
     if (error instanceof z.ZodError) {
       return NextResponse.json({ error: error.message }, { status: 400 });
     }
+    return handleApiError(error);
+  }
+}
+
+export async function DELETE(_request: Request, { params }: RouteParams) {
+  try {
+    const user = await requireModulePermission("release_lra", "edit");
+    const { id, docId } = await params;
+    const supabase = await createClient();
+
+    const { data: doc } = await supabase
+      .from("generated_documents")
+      .select("id, release_files!inner ( loan_application_id )")
+      .eq("id", docId)
+      .single();
+
+    const rfRaw = doc?.release_files;
+    const rf = Array.isArray(rfRaw) ? rfRaw[0] : rfRaw;
+
+    if (!doc || rf?.loan_application_id !== id) {
+      return NextResponse.json({ error: "Document not found" }, { status: 404 });
+    }
+
+    const result = await unwitnessSignGeneratedDocument(supabase, docId, user.id);
+
+    await writeAuditEvent({
+      actorId: user.id,
+      moduleSlug: "release_lra",
+      action: "update",
+      entityType: "generated_document",
+      entityId: docId,
+      afterData: {
+        applicationId: id,
+        trigger: "lra_unwitness_sign_release_doc",
+        ...result,
+      },
+    });
+
+    return jsonOk(result);
+  } catch (error) {
     return handleApiError(error);
   }
 }

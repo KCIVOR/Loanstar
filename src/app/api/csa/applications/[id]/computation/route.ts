@@ -18,9 +18,14 @@ const computeSchema = z.object({
   inputMode: z.enum(["NET_SARADO", "NET_LESS_SECURITY", "PRINCIPAL"]),
   amount: z.number().positive(),
   terms: z.number().int().min(1),
-  addonMonths: z.number().int().min(1).optional(),
+  /** SF requires ≥1 (G1); SME allows 0 (workbook default). */
+  addonMonths: z.number().int().min(0).optional(),
   loanTypeId: z.string().uuid().optional(),
   securityFeeRate: z.number().min(0).optional(),
+  /** SME: loan_desired × admin_rate (outside PF bundle). Ignored for Seafarer. */
+  adminRate: z.number().min(0).optional(),
+  /** SME: With DS & Notary flag. Default true when omitted. */
+  withDsAndNotary: z.boolean().optional(),
   otherDeductions: z
     .object({
       otherLoan: z.number().min(0).optional(),
@@ -124,11 +129,15 @@ export async function POST(request: Request, { params }: RouteParams) {
     // Profile form stores PHP as monthlyIncomePhp; legacy rows may use monthlyIncome.
     const monthlyIncome =
       financial.monthlyIncomePhp ?? financial.monthlyIncome ?? null;
+    const segment = application.segment === "sme" ? "sme" : "seafarer";
     const securityFeeRate =
-      body.securityFeeRate ?? Number(loanType.interest_rate);
+      segment === "sme"
+        ? 0
+        : (body.securityFeeRate ?? Number(loanType.interest_rate));
 
     const saved = await persistComputation(supabase, {
       loanApplicationId: id,
+      segment,
       loanTypeId: loanType.id,
       loanTypeName: loanType.name,
       inputMode: body.inputMode,
@@ -138,6 +147,8 @@ export async function POST(request: Request, { params }: RouteParams) {
       pfRate: Number(loanType.pf_rate),
       interestRate: Number(loanType.interest_rate),
       securityFeeRate,
+      adminRate: body.adminRate,
+      withDsAndNotary: body.withDsAndNotary,
       otherDeductions: body.otherDeductions,
       releaseDate: body.releaseDate,
       dueDay: body.dueDay,

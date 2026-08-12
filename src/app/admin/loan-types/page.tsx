@@ -23,6 +23,7 @@ type LoanType = {
   name: string;
   interest_rate: number;
   pf_rate: number;
+  segment: "seafarer" | "sme" | null;
   is_active: boolean;
   effective_from: string;
   effective_to: string | null;
@@ -39,6 +40,7 @@ export default function LoanTypesPage() {
   const [saving, setSaving] = useState(false);
 
   const [name, setName] = useState("");
+  const [segment, setSegment] = useState<"seafarer" | "sme">("seafarer");
   const [interestRate, setInterestRate] = useState("");
   const [pfRate, setPfRate] = useState("");
   const [effectiveFrom, setEffectiveFrom] = useState(
@@ -71,7 +73,7 @@ export default function LoanTypesPage() {
     setMessage(null);
 
     const pf = Number(pfRate);
-    if (pf < MIN_PF_RATE) {
+    if (segment !== "sme" && pf < MIN_PF_RATE) {
       setError(
         `PF rate must be at least ${(MIN_PF_RATE * 100).toFixed(3)}% (G2 guard)`,
       );
@@ -89,6 +91,7 @@ export default function LoanTypesPage() {
           pfRate: pf,
           effectiveFrom,
           deactivatePrevious: true,
+          segment,
         }),
       });
       if (!res.ok) {
@@ -180,6 +183,21 @@ export default function LoanTypesPage() {
               placeholder="REGULAR"
             />
           </div>
+          <div>
+            <Label htmlFor="lt-segment" required>
+              Segment
+            </Label>
+            <Select
+              id="lt-segment"
+              value={segment}
+              onChange={(e) =>
+                setSegment(e.target.value as "seafarer" | "sme")
+              }
+            >
+              <option value="seafarer">Seafarer</option>
+              <option value="sme">SME</option>
+            </Select>
+          </div>
           <div className="grid gap-4 sm:grid-cols-2">
             <div>
               <Label htmlFor="lt-interest" required>
@@ -197,7 +215,11 @@ export default function LoanTypesPage() {
             </div>
             <div>
               <Label htmlFor="lt-pf" required>
-                PF rate (decimal, min {(MIN_PF_RATE * 100).toFixed(3)}%)
+                PF rate (decimal
+                {segment === "sme"
+                  ? "; G2 floor does not apply"
+                  : `, min ${(MIN_PF_RATE * 100).toFixed(3)}%`}
+                )
               </Label>
               <Input
                 id="lt-pf"
@@ -232,6 +254,7 @@ export default function LoanTypesPage() {
           <thead>
             <tr>
               <Th>Name</Th>
+              <Th>Segment</Th>
               <Th num>Interest</Th>
               <Th num>PF Rate</Th>
               <Th>Status</Th>
@@ -243,6 +266,9 @@ export default function LoanTypesPage() {
             {loanTypes.map((lt) => (
               <tr key={lt.id}>
                 <Td className="font-medium text-ink-900">{lt.name}</Td>
+                <Td className="capitalize text-sm">
+                  {lt.segment ?? "seafarer"}
+                </Td>
                 <Td num>{formatRate(lt.interest_rate)}</Td>
                 <Td num>{formatRate(lt.pf_rate)}</Td>
                 <Td>

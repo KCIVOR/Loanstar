@@ -1,5 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
+import { daysSince } from "@/lib/cig/desk";
+
 export type DenialCallItem = {
   noticeId: string;
   applicationId: string;
@@ -95,4 +97,98 @@ export async function markDenialInformed(
   }
 
   return { noticeId: data.id as string };
+}
+
+/** Case-insensitive match on borrower name, application no, or application id. */
+export function denialCallMatchesSearch(
+  item: Pick<DenialCallItem, "applicationId" | "applicationNo" | "borrower">,
+  term: string,
+): boolean {
+  const q = term.trim().toLowerCase();
+  if (!q) return true;
+  const name = item.borrower
+    ? `${item.borrower.firstName} ${item.borrower.lastName}`.toLowerCase()
+    : "";
+  return (
+    name.includes(q) ||
+    (item.applicationNo?.toLowerCase().includes(q) ?? false) ||
+    item.applicationId.toLowerCase().includes(q)
+  );
+}
+
+/** Stable copy-sort by `deniedAt` (ISO timestamps). Does not mutate `rows`. */
+export function sortDenialCallsByDeniedAt<T extends { deniedAt: string }>(
+  rows: T[],
+  dir: "asc" | "desc",
+): T[] {
+  const mult = dir === "asc" ? 1 : -1;
+  return [...rows].sort((a, b) => {
+    const aTime = Date.parse(a.deniedAt) || 0;
+    const bTime = Date.parse(b.deniedAt) || 0;
+    if (aTime === bTime) return 0;
+    return (aTime - bTime) * mult;
+  });
+}
+
+export const DENIAL_WAITING_BUCKETS = ["all", "1-3", "4-7", "8+"] as const;
+export type DenialWaitingBucket = (typeof DENIAL_WAITING_BUCKETS)[number];
+
+export const DENIAL_LIST_PAGE_SIZES = [10, 20, 30, 50, 100] as const;
+
+/** Clamp page size to the allowlist; invalid values fall back to 10. */
+export function clampDenialListPageSize(n: number): number {
+  return (DENIAL_LIST_PAGE_SIZES as readonly number[]).includes(n) ? n : 10;
+}
+
+/** Whole days since deniedAt; invalid/missing → null. */
+export function daysWaiting(
+  deniedAt: string | null | undefined,
+  asOf = new Date(),
+): number | null {
+  return daysSince(deniedAt, asOf);
+}
+
+/** Map a raw waiting query/chip value to a fixed bucket, else `"all"`. */
+export function waitingBucketFilterSpec(raw: string): DenialWaitingBucket {
+  if (raw === "1-3" || raw === "4-7" || raw === "8+") return raw;
+  return "all";
+}
+
+/**
+ * Map days → bucket id (excluding "all"): 1-3, 4-7, 8+.
+ * Day 0 is not in any chip bucket (only "all").
+ */
+export function waitingBucketForDays(
+  days: number,
+): Exclude<DenialWaitingBucket, "all"> | null {
+  if (days >= 8) return "8+";
+  if (days >= 4) return "4-7";
+  if (days >= 1) return "1-3";
+  return null;
+}
+
+export function passesWaitingBucket(
+  days: number | null,
+  spec: DenialWaitingBucket,
+): boolean {
+  if (spec === "all") return true;
+  if (days == null || days === 0) return false;
+  return waitingBucketForDays(days) === spec;
+}
+
+/** KPIs over the full pending set (before search/waiting filter). */
+export function computeDenialListKpis(
+  rows: { deniedAt: string }[],
+  asOf = new Date(),
+): {
+  pending: number;
+  oldestWaitingDays: number;
+} {
+  if (rows.length === 0) return { pending: 0, oldestWaitingDays: 0 };
+  let oldestWaitingDays = 0;
+  for (const row of rows) {
+    const days = daysWaiting(row.deniedAt, asOf);
+    if (days != null && days > oldestWaitingDays) oldestWaitingDays = days;
+  }
+  return { pending: rows.length, oldestWaitingDays };
 }

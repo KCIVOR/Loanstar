@@ -16,30 +16,31 @@ export type VoteTally = {
   hasMajority: boolean;
 };
 
-export const COMMITTEE_SIZE = 3;
+export const DEFAULT_COMMITTEE_SIZE = 3;
 
 /** Server-side gate: every final action requires a full committee ballot. */
-export function assertAllVotesCast(votes: VoteRecord[]): void {
-  if (votes.length < COMMITTEE_SIZE) {
+export function assertAllVotesCast(votes: VoteRecord[], committeeSize: number): void {
+  if (votes.length < committeeSize) {
     throw new Error(
-      "All 3 committee votes must be cast before a final action",
+      `All ${committeeSize} committee votes must be cast before a final action`,
     );
   }
 }
 
-export function computeVoteTally(votes: VoteRecord[]): VoteTally {
+export function computeVoteTally(votes: VoteRecord[], committeeSize: number): VoteTally {
   const approve = votes.filter((v) => v.vote === "approve").length;
   const deny = votes.filter((v) => v.vote === "deny").length;
   const total = votes.length;
+  const majority = Math.floor(committeeSize / 2) + 1;
 
   let label: string | null = null;
   let hasMajority = false;
 
-  if (approve >= 2) {
-    label = `${approve}/${COMMITTEE_SIZE} — Approve`;
+  if (approve >= majority) {
+    label = `${approve}/${committeeSize} — Approve`;
     hasMajority = true;
-  } else if (deny >= 2) {
-    label = `${deny}/${COMMITTEE_SIZE} — Deny`;
+  } else if (deny >= majority) {
+    label = `${deny}/${committeeSize} — Deny`;
     hasMajority = true;
   }
 

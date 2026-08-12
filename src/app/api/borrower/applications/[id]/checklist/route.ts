@@ -22,6 +22,8 @@ async function assertOwnApplication(userId: string, applicationId: string) {
       `
       id,
       borrower_id,
+      segment,
+      entity_type,
       borrowers!inner ( user_id )
     `,
     )
@@ -42,6 +44,11 @@ async function assertOwnApplication(userId: string, applicationId: string) {
   return {
     id: data.id as string,
     borrowerId: data.borrower_id as string,
+    segment: (data.segment === "sme" ? "sme" : "seafarer") as "seafarer" | "sme",
+    entityType:
+      data.entity_type === "individual" || data.entity_type === "corporate"
+        ? (data.entity_type as "individual" | "corporate")
+        : null,
   };
 }
 
@@ -58,15 +65,21 @@ export async function GET(request: Request, { params }: RouteParams) {
       throw new ForbiddenError("Invalid checklist stage");
     }
 
+    const scope = {
+      segment: application.segment,
+      entityType: application.entityType,
+    };
+
     await ensureDocumentSlots(
       supabase,
       stageParam,
       application.id,
       application.borrowerId,
+      scope,
     );
 
     const items = excludeCsaOnlyIntakeItems(
-      await getStageChecklist(supabase, stageParam, application.id),
+      await getStageChecklist(supabase, stageParam, application.id, scope),
     );
     const summary = getCompletionSummary(items);
 

@@ -7,8 +7,16 @@ export const INITIAL_INTERVIEW_MISSING = "Initial interview not recorded";
 export const INITIAL_INTERVIEW_NOTES_REQUIRED =
   "Initial interview notes required";
 export const NCL_NOT_RECORDED = "NCL check not recorded";
+export const SME_DUPLICATION_NOT_RECORDED =
+  "SME duplication check not recorded";
 export const INITIAL_INTERVIEW_COMPUTATION_ERROR =
   "Initial interview must be recorded before preparing the loan computation";
+
+function screeningNotRecordedMessage(
+  segment?: string | null,
+): string {
+  return segment === "sme" ? SME_DUPLICATION_NOT_RECORDED : NCL_NOT_RECORDED;
+}
 
 export type InitialInterviewCompleteness = {
   complete: boolean;
@@ -32,6 +40,8 @@ export type RecordInterviewPrereqContext = {
   formCompleteness: ApplicationFormCompleteness;
   nclRecorded: boolean;
   notes: string | null | undefined;
+  /** Defaults to Seafarer (NCL) when omitted. */
+  segment?: string | null;
 };
 
 /**
@@ -53,7 +63,7 @@ export function assertCanRecordInitialInterview(
     missing.push(...ctx.formCompleteness.missing);
   }
   if (!ctx.nclRecorded) {
-    missing.push(NCL_NOT_RECORDED);
+    missing.push(screeningNotRecordedMessage(ctx.segment));
   }
   if (!ctx.notes?.trim()) {
     missing.push(INITIAL_INTERVIEW_NOTES_REQUIRED);
@@ -78,7 +88,7 @@ export function listInterviewRecordPrerequisites(
     missing.push(...ctx.formCompleteness.missing);
   }
   if (!ctx.nclRecorded) {
-    missing.push(NCL_NOT_RECORDED);
+    missing.push(screeningNotRecordedMessage(ctx.segment));
   }
   return missing;
 }

@@ -1,18 +1,24 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
+import {
+  DateRangeFilter,
+  ViewModeToggle,
+  type DateRangeValue,
+  type HistoryViewMode,
+} from "@/components/history";
 import {
   Alert,
   Badge,
   Button,
   cn,
-  DropdownMenu,
   EmptyState,
   PageHeader,
   Pagination,
-  Spinner,
+  Select,
+  Skeleton,
   Table,
   Td,
   Th,
@@ -21,9 +27,11 @@ import {
   formatStatusLabel,
   statusBadgeVariant,
 } from "@/lib/applications/status";
+import { formatDate } from "@/lib/committee/format";
+import type { CommitteeStatusFilter } from "@/lib/committee/queue";
 import { tatTone } from "@/lib/committee/votes";
 
-type CommitteeItem = {
+type QueueItem = {
   id: string;
   applicationNo: string | null;
   status: string;
@@ -34,33 +42,57 @@ type CommitteeItem = {
     borrowerNo: string;
     firstName: string;
     lastName: string;
+    email: string;
   } | null;
   verification: {
-    finding: "positive" | "negative" | null;
+    finding: string | null;
     forwardedAt: string | null;
     completedAt: string | null;
   } | null;
   tatDays: number | null;
 };
 
-const PAGE_SIZE = 10;
+type QueueKpi = {
+  total: number;
+  needsDecision: number;
+  onHold: number;
+  inNegotiation: number;
+  tatOverdue: number;
+};
 
-function formatDate(value: string) {
-  return new Date(value).toLocaleDateString("en-PH", {
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-  });
-}
+type SortKey = "priority" | "tat" | "forwarded" | "status";
+
+const PAGE_SIZE_OPTIONS = [10, 20, 30, 50, 100] as const;
+
+const DEFAULT_DATE_RANGE: DateRangeValue = {
+  preset: "all",
+  from: "",
+  to: "",
+};
+
+const EMPTY_KPI: QueueKpi = {
+  total: 0,
+  needsDecision: 0,
+  onHold: 0,
+  inNegotiation: 0,
+  tatOverdue: 0,
+};
+
+const STATUS_CHIPS: Array<{ id: CommitteeStatusFilter; label: string }> = [
+  { id: "all", label: "All" },
+  { id: "for_approval", label: "Needs decision" },
+  { id: "committee_hold", label: "On hold" },
+  { id: "negotiating_terms", label: "In negotiation" },
+];
 
 const iconProps = {
   viewBox: "0 0 24 24",
   fill: "none",
   stroke: "currentColor",
   strokeWidth: 2,
-  strokeLinecap: "round",
-  strokeLinejoin: "round",
-} as const;
+  strokeLinecap: "round" as const,
+  strokeLinejoin: "round" as const,
+};
 
 const IconLayers = (
   <svg {...iconProps}>
@@ -121,126 +153,183 @@ function Kpi({
   );
 }
 
-type SortKey = "priority" | "tat" | "forwarded" | "status";
+function queueBorrowerName(app: QueueItem): string {
+  return app.borrower
+    ? `${app.borrower.firstName} ${app.borrower.lastName}`
+    : "Unknown borrower";
+}
+
+function dateRangePillLabel(value: DateRangeValue): string {
+  if (value.preset === "30d") return "Last 30 days";
+  if (value.preset === "90d") return "Last 90 days";
+  if (value.preset === "all") return "All time";
+  const from = value.from ? formatDate(value.from) : "…";
+  const to = value.to ? formatDate(value.to) : "…";
+  return `${from} → ${to}`;
+}
+
+function statusFilterLabel(filter: CommitteeStatusFilter): string {
+  return STATUS_CHIPS.find((chip) => chip.id === filter)?.label ?? filter;
+}
+
+function findingBadge(finding: string | null | undefined) {
+  if (finding === "positive") {
+    return <Badge variant="success">Positive</Badge>;
+  }
+  if (finding === "negative") {
+    return <Badge variant="danger">Negative</Badge>;
+  }
+  return <Badge variant="neutral">Pending</Badge>;
+}
+
+function buildQueueQuery(params: {
+  search: string;
+  statusFilter: CommitteeStatusFilter;
+  dateRange: DateRangeValue;
+  sortKey: SortKey;
+  sortDir: "asc" | "desc";
+  page: number;
+  pageSize: number;
+}): string {
+  const qs = new URLSearchParams();
+  if (params.search.trim()) qs.set("search", params.search.trim());
+  qs.set("status", params.statusFilter);
+  qs.set("range", params.dateRange.preset);
+  if (params.dateRange.preset === "custom") {
+    if (params.dateRange.from) qs.set("from", params.dateRange.from);
+    if (params.dateRange.to) qs.set("to", params.dateRange.to);
+  }
+  // `priority` is client-only (current page); omit sortKey so server uses updated_at default.
+  if (params.sortKey !== "priority") {
+    qs.set("sortKey", params.sortKey);
+    qs.set("sortDir", params.sortDir);
+  } else {
+    qs.set("sortDir", "desc");
+  }
+  qs.set("page", String(params.page));
+  qs.set("pageSize", String(params.pageSize));
+  return qs.toString();
+}
 
 export default function CommitteeDashboardPage() {
-  const [applications, setApplications] = useState<CommitteeItem[]>([]);
+  const [rows, setRows] = useState<QueueItem[]>([]);
+  const [totalCount, setTotalCount] = useState(0);
+  const [kpi, setKpi] = useState<QueueKpi>(EMPTY_KPI);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState("all");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+  const [statusFilter, setStatusFilter] =
+    useState<CommitteeStatusFilter>("all");
+  const [dateRange, setDateRange] = useState<DateRangeValue>(DEFAULT_DATE_RANGE);
+  const [viewMode, setViewMode] = useState<HistoryViewMode>("list");
+  const [pageSize, setPageSize] =
+    useState<(typeof PAGE_SIZE_OPTIONS)[number]>(10);
+  const [filterPanelOpen, setFilterPanelOpen] = useState(false);
   const [sortKey, setSortKey] = useState<SortKey>("priority");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
   const [page, setPage] = useState(1);
+
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearch(search), 300);
+    return () => clearTimeout(timer);
+  }, [search]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [debouncedSearch, statusFilter, dateRange, pageSize, sortKey, sortDir]);
 
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch("/api/committee/applications");
+      const query = buildQueueQuery({
+        search: debouncedSearch,
+        statusFilter,
+        dateRange,
+        sortKey,
+        sortDir,
+        page,
+        pageSize,
+      });
+      const res = await fetch(`/api/committee/applications?${query}`);
       if (!res.ok) throw new Error("Failed to load queue");
-      const data = (await res.json()) as { applications: CommitteeItem[] };
-      setApplications(data.applications);
+      const data = (await res.json()) as {
+        rows: QueueItem[];
+        totalCount: number;
+        kpi: QueueKpi;
+      };
+      setRows(data.rows ?? []);
+      setTotalCount(data.totalCount ?? 0);
+      setKpi(data.kpi ?? EMPTY_KPI);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load");
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [
+    debouncedSearch,
+    statusFilter,
+    dateRange,
+    sortKey,
+    sortDir,
+    page,
+    pageSize,
+  ]);
 
   useEffect(() => {
     void load();
   }, [load]);
 
-  if (loading) return <Spinner />;
-
-  const total = applications.length;
-  const needsDecision = applications.filter(
-    (a) => a.status === "for_approval",
-  ).length;
-  const onCommitteeHold = applications.filter(
-    (a) => a.status === "committee_hold",
-  ).length;
-  const inNegotiation = applications.filter(
-    (a) => a.status === "negotiating_terms",
-  ).length;
-  const tatOverdue = applications.filter(
-    (a) => a.tatDays != null && a.tatDays >= 5,
-  ).length;
-
-  const statusOptions = Array.from(
-    new Set(applications.map((a) => a.status)),
-  ).map((status) => ({ value: status, label: formatStatusLabel(status) }));
-
-  function toggleSort(key: SortKey) {
-    if (sortKey === key) {
-      setSortDir((d) => (d === "asc" ? "desc" : "asc"));
-    } else {
-      setSortKey(key);
-      setSortDir(key === "tat" ? "desc" : "asc");
-    }
-    setPage(1);
-  }
-
-  const term = search.trim().toLowerCase();
-  const filtered = applications.filter((app) => {
-    const matchesStatus = statusFilter === "all" || app.status === statusFilter;
-    if (!matchesStatus) return false;
-    if (!term) return true;
-    const name = app.borrower
-      ? `${app.borrower.firstName} ${app.borrower.lastName}`.toLowerCase()
-      : "";
-    return (
-      name.includes(term) ||
-      (app.borrower?.borrowerNo.toLowerCase().includes(term) ?? false) ||
-      (app.applicationNo?.toLowerCase().includes(term) ?? false)
-    );
-  });
-
-  const dir = sortDir === "asc" ? 1 : -1;
-  const sorted = [...filtered].sort((a, b) => {
-    if (sortKey === "tat") {
-      return dir * ((a.tatDays ?? -1) - (b.tatDays ?? -1));
-    }
-    if (sortKey === "forwarded") {
+  const displayRows = useMemo(() => {
+    if (sortKey !== "priority") return rows;
+    return [...rows].sort((a, b) => {
+      const aFlag =
+        (a.tatDays != null && a.tatDays >= 5) ||
+        a.verification?.finding === "negative"
+          ? 0
+          : 1;
+      const bFlag =
+        (b.tatDays != null && b.tatDays >= 5) ||
+        b.verification?.finding === "negative"
+          ? 0
+          : 1;
+      if (aFlag !== bFlag) return aFlag - bFlag;
       const aTime = a.verification?.forwardedAt
         ? new Date(a.verification.forwardedAt).getTime()
         : 0;
       const bTime = b.verification?.forwardedAt
         ? new Date(b.verification.forwardedAt).getTime()
         : 0;
-      return dir * (aTime - bTime);
-    }
-    if (sortKey === "status") {
-      return dir * a.status.localeCompare(b.status);
-    }
-    // priority: TAT overdue and negative findings float to the top, then oldest-forwarded first
-    const aFlag =
-      (a.tatDays != null && a.tatDays >= 5) || a.verification?.finding === "negative"
-        ? 0
-        : 1;
-    const bFlag =
-      (b.tatDays != null && b.tatDays >= 5) || b.verification?.finding === "negative"
-        ? 0
-        : 1;
-    if (aFlag !== bFlag) return aFlag - bFlag;
-    const aTime = a.verification?.forwardedAt
-      ? new Date(a.verification.forwardedAt).getTime()
-      : 0;
-    const bTime = b.verification?.forwardedAt
-      ? new Date(b.verification.forwardedAt).getTime()
-      : 0;
-    return aTime - bTime;
-  });
+      return aTime - bTime;
+    });
+  }, [rows, sortKey]);
 
-  const pageCount = Math.max(1, Math.ceil(sorted.length / PAGE_SIZE));
+  const pageCount = Math.max(1, Math.ceil(totalCount / pageSize));
   const safePage = Math.min(page, pageCount);
-  const paged = sorted.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
+
+  function toggleSort(key: SortKey) {
+    if (sortKey === key) {
+      setSortDir((d) => (d === "asc" ? "desc" : "asc"));
+    } else {
+      setSortKey(key);
+      setSortDir(key === "tat" || key === "forwarded" ? "desc" : "asc");
+    }
+  }
 
   function sortArrow(key: SortKey) {
     if (sortKey !== key) return null;
     return <span className="arr">{sortDir === "asc" ? "▲" : "▼"}</span>;
   }
+
+  const dateIsDefault = dateRange.preset === "all";
+  const activeFilterCount =
+    (statusFilter !== "all" ? 1 : 0) + (dateIsDefault ? 0 : 1);
+
+  const summaryStart = displayRows.length
+    ? (safePage - 1) * pageSize + 1
+    : 0;
+  const summaryEnd = (safePage - 1) * pageSize + displayRows.length;
 
   return (
     <div>
@@ -256,238 +345,372 @@ export default function CommitteeDashboardPage() {
       ) : null}
 
       <div className="kpi-grid mb-6">
-        <Kpi tone="navy" icon={IconLayers} label="In queue" value={total} />
-        <Kpi
-          tone="teal"
-          icon={IconGavel}
-          label="Needs decision"
-          value={needsDecision}
-        />
-        <Kpi
-          tone="danger"
-          icon={IconClock}
-          label="On hold"
-          value={onCommitteeHold}
-        />
-        <Kpi
-          tone="navy"
-          icon={IconHandshake}
-          label="In negotiation"
-          value={inNegotiation}
-        />
-        <Kpi
-          tone="danger"
-          icon={IconClock}
-          label="TAT overdue (5d+)"
-          value={tatOverdue}
-        />
+        {loading ? (
+          <>
+            <Skeleton variant="kpi" />
+            <Skeleton variant="kpi" />
+            <Skeleton variant="kpi" />
+            <Skeleton variant="kpi" />
+            <Skeleton variant="kpi" />
+          </>
+        ) : (
+          <>
+            <Kpi tone="navy" icon={IconLayers} label="In queue" value={kpi.total} />
+            <Kpi
+              tone="teal"
+              icon={IconGavel}
+              label="Needs decision"
+              value={kpi.needsDecision}
+            />
+            <Kpi
+              tone="danger"
+              icon={IconClock}
+              label="On hold"
+              value={kpi.onHold}
+            />
+            <Kpi
+              tone="navy"
+              icon={IconHandshake}
+              label="In negotiation"
+              value={kpi.inNegotiation}
+            />
+            <Kpi
+              tone="danger"
+              icon={IconClock}
+              label="TAT overdue (5d+)"
+              value={kpi.tatOverdue}
+            />
+          </>
+        )}
       </div>
 
-      {applications.length === 0 ? (
+      <div className="card mb-4" style={{ overflow: "visible" }}>
+        <div className="tbl-toolbar" style={{ padding: "13px 14px" }}>
+          <div
+            className="gsearch"
+            style={{ maxWidth: 300, flex: 1, minWidth: 190 }}
+          >
+            <span className="icon">
+              <svg
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth={2.2}
+                strokeLinecap="round"
+              >
+                <circle cx="11" cy="11" r="7" />
+                <path d="m21 21-4.3-4.3" />
+              </svg>
+            </span>
+            <input
+              className="input"
+              style={{
+                height: 37,
+                paddingRight: 12,
+                borderRadius: "var(--r-md)",
+              }}
+              placeholder="Search borrower or application no."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
+          </div>
+
+          <div className="active-pill-row">
+            {statusFilter !== "all" ? (
+              <span className="active-pill">
+                {statusFilterLabel(statusFilter)}
+                <button
+                  type="button"
+                  aria-label="Clear status filter"
+                  onClick={() => setStatusFilter("all")}
+                >
+                  ×
+                </button>
+              </span>
+            ) : null}
+            {!dateIsDefault ? (
+              <span className="active-pill">
+                {dateRangePillLabel(dateRange)}
+                <button
+                  type="button"
+                  aria-label="Clear date filter"
+                  onClick={() => setDateRange(DEFAULT_DATE_RANGE)}
+                >
+                  ×
+                </button>
+              </span>
+            ) : null}
+            {activeFilterCount > 0 ? (
+              <button
+                type="button"
+                className="clear-link"
+                onClick={() => {
+                  setStatusFilter("all");
+                  setDateRange(DEFAULT_DATE_RANGE);
+                }}
+              >
+                Clear all
+              </button>
+            ) : null}
+          </div>
+
+          <div className="sp">
+            <ViewModeToggle value={viewMode} onChange={setViewMode} />
+            <button
+              type="button"
+              className={cn("btn btn-outline", filterPanelOpen && "is-on")}
+              onClick={() => setFilterPanelOpen((open) => !open)}
+            >
+              <svg
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth={2}
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                width={16}
+                height={16}
+                aria-hidden
+              >
+                <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3" />
+              </svg>
+              Filters
+              {activeFilterCount > 0 ? (
+                <span
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    minWidth: 16,
+                    height: 16,
+                    padding: "0 4px",
+                    borderRadius: "var(--r-full)",
+                    background: "var(--teal-600)",
+                    color: "#fff",
+                    fontSize: 10,
+                    fontWeight: 700,
+                    fontFamily: "var(--font-mono)",
+                  }}
+                >
+                  {activeFilterCount}
+                </span>
+              ) : null}
+            </button>
+          </div>
+        </div>
+
+        <div className={cn("filter-panel", filterPanelOpen && "is-open")}>
+          <div className="filter-group">
+            <span className="filter-group-label">Status</span>
+            <div className="filter-bar">
+              {STATUS_CHIPS.map((chip) => (
+                <button
+                  key={chip.id}
+                  type="button"
+                  className={cn("fchip", statusFilter === chip.id && "is-on")}
+                  onClick={() => setStatusFilter(chip.id)}
+                >
+                  {chip.label}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className="filter-group">
+            <span className="filter-group-label">Forwarded date</span>
+            <DateRangeFilter value={dateRange} onChange={setDateRange} />
+          </div>
+        </div>
+      </div>
+
+      {loading ? (
+        <div className="mb-4">
+          <Table>
+            <thead>
+              <tr>
+                <Th>Application</Th>
+                <Th>Status</Th>
+                <Th>CIG finding</Th>
+                <Th>TAT</Th>
+                <Th>Forwarded</Th>
+                <Th className="w-1">{""}</Th>
+              </tr>
+            </thead>
+            <tbody>
+              {Array.from({ length: 6 }, (_, i) => (
+                <tr key={i}>
+                  <Td colSpan={6}>
+                    <Skeleton variant="line" />
+                  </Td>
+                </tr>
+              ))}
+            </tbody>
+          </Table>
+        </div>
+      ) : kpi.total === 0 ? (
         <EmptyState
           title="Queue is clear"
           description="No files pending committee decision."
         />
-      ) : (
-        <div className="flex flex-col gap-3.5">
-          <div className="tbl-toolbar">
-            <div className="gsearch" style={{ maxWidth: 280 }}>
-              <span className="icon">
-                <svg
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth={2.2}
-                  strokeLinecap="round"
-                >
-                  <circle cx="11" cy="11" r="7" />
-                  <path d="m21 21-4.3-4.3" />
-                </svg>
-              </span>
-              <input
-                className="input"
-                style={{
-                  height: 36,
-                  paddingRight: 12,
-                  borderRadius: "var(--r-md)",
-                }}
-                placeholder="Search borrower or application no."
-                value={search}
-                onChange={(e) => {
-                  setSearch(e.target.value);
-                  setPage(1);
-                }}
-              />
-            </div>
-
-            <DropdownMenu
-              trigger={
-                <span
-                  className={cn("fchip", statusFilter !== "all" && "is-on")}
-                >
-                  {statusFilter === "all" ? (
-                    <>
-                      Filter
-                      <svg
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth={2}
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                      >
-                        <path d="M22 3H2l8 9.46V19l4 2v-8.54Z" />
-                      </svg>
-                    </>
-                  ) : (
-                    <>
-                      Status: <b>{formatStatusLabel(statusFilter)}</b>
-                      <span
-                        className="x"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setStatusFilter("all");
-                          setPage(1);
-                        }}
-                      >
-                        ×
-                      </span>
-                    </>
-                  )}
+      ) : totalCount === 0 ? (
+        <EmptyState
+          title="No matching applications"
+          description="Try a different search term or status filter."
+          showMark={false}
+        />
+      ) : viewMode === "grid" ? (
+        <div className="grid-view mb-4">
+          {displayRows.map((app) => (
+            <div key={app.id} className="gcard">
+              <div className="gcard-top">
+                <span className="gcard-id">
+                  {app.applicationNo ??
+                    app.borrower?.borrowerNo ??
+                    app.id.slice(0, 8)}
                 </span>
-              }
-              items={[
-                {
-                  label: "All statuses",
-                  onClick: () => {
-                    setStatusFilter("all");
-                    setPage(1);
-                  },
-                },
-                ...statusOptions.map((opt) => ({
-                  label: opt.label,
-                  onClick: () => {
-                    setStatusFilter(opt.value);
-                    setPage(1);
-                  },
-                })),
-              ]}
-            />
-          </div>
-
-          {sorted.length ? (
-            <>
-              <Table>
-                <thead>
-                  <tr>
-                    <Th>Application</Th>
-                    <Th
-                      className="sortable"
-                      onClick={() => toggleSort("status")}
-                    >
-                      Status
-                      {sortArrow("status")}
-                    </Th>
-                    <Th>CIG finding</Th>
-                    <Th
-                      className="sortable"
-                      onClick={() => toggleSort("tat")}
-                    >
-                      TAT
-                      {sortArrow("tat")}
-                    </Th>
-                    <Th
-                      className="sortable"
-                      onClick={() => toggleSort("forwarded")}
-                    >
-                      Forwarded
-                      {sortArrow("forwarded")}
-                    </Th>
-                    <Th className="w-1">{""}</Th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {paged.map((app) => (
-                    <tr key={app.id}>
-                      <Td>
-                        <div className="font-medium text-ink-900">
-                          {app.borrower
-                            ? `${app.borrower.firstName} ${app.borrower.lastName}`
-                            : "Unknown borrower"}
-                        </div>
-                        <span className="id">
-                          {app.applicationNo ??
-                            app.borrower?.borrowerNo ??
-                            app.id.slice(0, 8)}
-                          {app.isReloan ? " · Reloan" : ""}
-                        </span>
-                      </Td>
-                      <Td>
-                        <Badge variant={statusBadgeVariant(app.status)} dot>
-                          {formatStatusLabel(app.status)}
-                        </Badge>
-                      </Td>
-                      <Td>
-                        {app.verification?.finding ? (
-                          <Badge
-                            variant={
-                              app.verification.finding === "positive"
-                                ? "success"
-                                : "danger"
-                            }
-                          >
-                            {app.verification.finding === "positive"
-                              ? "Positive"
-                              : "Negative"}
-                          </Badge>
-                        ) : (
-                          <Badge variant="neutral">Pending</Badge>
-                        )}
-                      </Td>
-                      <Td>
-                        {app.tatDays != null ? (
-                          <Badge variant={tatTone(app.tatDays)} dot>
-                            <span className="mono">{app.tatDays}d</span>
-                          </Badge>
-                        ) : (
-                          <span className="text-ink-300">—</span>
-                        )}
-                      </Td>
-                      <Td className="mono">
-                        {app.verification?.forwardedAt
-                          ? formatDate(app.verification.forwardedAt)
-                          : "—"}
-                      </Td>
-                      <Td>
-                        <Link href={`/committee/applications/${app.id}`}>
-                          <Button variant="secondary" size="sm">
-                            Review
-                          </Button>
-                        </Link>
-                      </Td>
-                    </tr>
-                  ))}
-                </tbody>
-              </Table>
-
-              <Pagination
-                page={safePage}
-                pageCount={pageCount}
-                onPageChange={setPage}
-                summary={`Showing ${paged.length ? (safePage - 1) * PAGE_SIZE + 1 : 0}–${
-                  (safePage - 1) * PAGE_SIZE + paged.length
-                } of ${sorted.length}`}
-              />
-            </>
-          ) : (
-            <EmptyState
-              title="No matching applications"
-              description="Try a different search term or status filter."
-              showMark={false}
-            />
-          )}
+                <Badge variant={statusBadgeVariant(app.status)} dot>
+                  {formatStatusLabel(app.status)}
+                </Badge>
+              </div>
+              <div className="gcard-name">{queueBorrowerName(app)}</div>
+              <div className="gcard-meta">
+                <div className="row">
+                  <span className="k">CIG finding</span>
+                  <span className="v">
+                    {app.verification?.finding === "positive"
+                      ? "Positive"
+                      : app.verification?.finding === "negative"
+                        ? "Negative"
+                        : "Pending"}
+                  </span>
+                </div>
+                <div className="row">
+                  <span className="k">TAT</span>
+                  <span className="v mono">
+                    {app.tatDays != null ? `${app.tatDays}d` : "—"}
+                  </span>
+                </div>
+                <div className="row">
+                  <span className="k">Forwarded</span>
+                  <span className="v mono">
+                    {app.verification?.forwardedAt
+                      ? formatDate(app.verification.forwardedAt)
+                      : "—"}
+                  </span>
+                </div>
+              </div>
+              <Link href={`/committee/applications/${app.id}`}>
+                <Button variant="secondary" size="sm">
+                  Review
+                </Button>
+              </Link>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div className="mb-4">
+          <Table
+            className={viewMode === "compact" ? "is-compact" : undefined}
+          >
+            <thead>
+              <tr>
+                <Th>Application</Th>
+                <Th
+                  className="sortable"
+                  onClick={() => toggleSort("status")}
+                >
+                  Status
+                  {sortArrow("status")}
+                </Th>
+                <Th>CIG finding</Th>
+                <Th className="sortable" onClick={() => toggleSort("tat")}>
+                  TAT
+                  {sortArrow("tat")}
+                </Th>
+                <Th
+                  className="sortable"
+                  onClick={() => toggleSort("forwarded")}
+                >
+                  Forwarded
+                  {sortArrow("forwarded")}
+                </Th>
+                <Th className="w-1">{""}</Th>
+              </tr>
+            </thead>
+            <tbody>
+              {displayRows.map((app) => (
+                <tr key={app.id}>
+                  <Td>
+                    <div className="font-medium text-ink-900">
+                      {queueBorrowerName(app)}
+                    </div>
+                    <span className="id">
+                      {app.applicationNo ??
+                        app.borrower?.borrowerNo ??
+                        app.id.slice(0, 8)}
+                      {app.isReloan ? " · Reloan" : ""}
+                    </span>
+                  </Td>
+                  <Td>
+                    <Badge variant={statusBadgeVariant(app.status)} dot>
+                      {formatStatusLabel(app.status)}
+                    </Badge>
+                  </Td>
+                  <Td>{findingBadge(app.verification?.finding)}</Td>
+                  <Td>
+                    {app.tatDays != null ? (
+                      <Badge variant={tatTone(app.tatDays)} dot>
+                        <span className="mono">{app.tatDays}d</span>
+                      </Badge>
+                    ) : (
+                      <span className="text-ink-300">—</span>
+                    )}
+                  </Td>
+                  <Td className="mono">
+                    {app.verification?.forwardedAt
+                      ? formatDate(app.verification.forwardedAt)
+                      : "—"}
+                  </Td>
+                  <Td>
+                    <Link href={`/committee/applications/${app.id}`}>
+                      <Button variant="secondary" size="sm">
+                        Review
+                      </Button>
+                    </Link>
+                  </Td>
+                </tr>
+              ))}
+            </tbody>
+          </Table>
         </div>
       )}
+
+      <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
+        <div className="flex flex-wrap items-center gap-2 text-xs text-ink-400">
+          <span>Show</span>
+          <Select
+            value={String(pageSize)}
+            onChange={(e) => {
+              setPageSize(
+                Number(e.target.value) as (typeof PAGE_SIZE_OPTIONS)[number],
+              );
+            }}
+            style={{ width: 72, height: 34 }}
+          >
+            {PAGE_SIZE_OPTIONS.map((size) => (
+              <option key={size} value={size}>
+                {size}
+              </option>
+            ))}
+          </Select>
+          <span>per page</span>
+        </div>
+        <Pagination
+          page={safePage}
+          pageCount={pageCount}
+          onPageChange={setPage}
+          summary={`Showing ${summaryStart}–${summaryEnd} of ${totalCount}`}
+        />
+      </div>
     </div>
   );
 }

@@ -18,7 +18,7 @@ export async function PATCH(request: Request, { params }: RouteParams) {
     const body = schema.parse(await request.json());
     const supabase = await createClient();
 
-    const { error } = await supabase
+    const { data, error } = await supabase
       .from("payments")
       .update({
         status: body.status,
@@ -26,9 +26,16 @@ export async function PATCH(request: Request, { params }: RouteParams) {
         reviewed_at: new Date().toISOString(),
       })
       .eq("id", id)
-      .eq("status", "pending_verification");
+      .eq("status", "pending_verification")
+      .select("id")
+      .maybeSingle();
 
-    if (error) throw new Error(error.message);
+    if (error) {
+      throw new Error(error.message);
+    }
+    if (!data) {
+      throw new Error("Payment is no longer pending review");
+    }
 
     return jsonOk({ status: body.status });
   } catch (error) {

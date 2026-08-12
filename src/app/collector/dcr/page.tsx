@@ -67,7 +67,7 @@ export default function CollectorDcrPage() {
     try {
       const [payRes, dcrRes] = await Promise.all([
         fetch("/api/collector/payments?scope=dcr"),
-        fetch("/api/collector/dcr?limit=30"),
+        fetch("/api/collector/dcr?limit=100"),
       ]);
       if (!payRes.ok) throw new Error("Failed to load payments");
       const payData = (await payRes.json()) as {
@@ -219,19 +219,24 @@ export default function CollectorDcrPage() {
         title="DCR builder"
         description="Batch confirmed payments into a daily collection report for AR."
         actions={
-          draftDcrId ? (
-            <Button
-              loading={acting}
-              onClick={() => setConfirmSubmit(true)}
-              disabled={draftItems.length === 0}
-            >
-              Submit DCR
-            </Button>
-          ) : (
-            <Button loading={acting} onClick={() => void startDcr()}>
-              New DCR
-            </Button>
-          )
+          <div className="flex gap-2">
+            <Link href="/collector/dcr/history" className="btn btn-secondary">
+              DCR history
+            </Link>
+            {draftDcrId ? (
+              <Button
+                loading={acting}
+                onClick={() => setConfirmSubmit(true)}
+                disabled={draftItems.length === 0}
+              >
+                Submit DCR
+              </Button>
+            ) : (
+              <Button loading={acting} onClick={() => void startDcr()}>
+                New DCR
+              </Button>
+            )}
+          </div>
         }
       />
 

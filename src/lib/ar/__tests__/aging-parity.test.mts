@@ -181,6 +181,27 @@ describe("simulateAgingStep (Phase 7 parity fixtures)", () => {
     assert.equal(out.rollover, null);
   });
 
+  it("1 dpd SME vs Seafarer — different config rates, same outstanding (Phase 5.4)", () => {
+    const schedules = [{ ...base, dueDate: "2026-07-16" }, next];
+    const asOf = "2026-07-17T12:00:00.000Z";
+    const sme = simulateAgingStep({
+      schedules,
+      asOf,
+      penaltyRate: 0.05, // penalty_rate_sme
+    });
+    const seafarer = simulateAgingStep({
+      schedules,
+      asOf,
+      penaltyRate: 0.15, // penalty_rate (live Seafarer config)
+    });
+    assert.equal(sme.penaltyWritten!.penaltyAmount, 500);
+    assert.equal(seafarer.penaltyWritten!.penaltyAmount, 1500);
+    assert.notEqual(
+      sme.penaltyWritten!.penaltyAmount,
+      seafarer.penaltyWritten!.penaltyAmount,
+    );
+  });
+
   it("30 dpd — single rollover into next installment", () => {
     const out = simulateAgingStep({
       schedules: [{ ...base, dueDate: "2026-06-17" }, next],

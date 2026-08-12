@@ -3,7 +3,7 @@ import { z } from "zod";
 
 import { writeAuditEvent } from "@/lib/audit/writer";
 import { handleApiError, jsonOk } from "@/lib/api/handler";
-import { assertCigVerificationStage } from "@/lib/cig/queue";
+import { assertCigVerificationStage } from "@/lib/cig/queue-guards";
 import {
   assertChecksRecordingAllowed,
   CigSequenceError,
@@ -33,6 +33,20 @@ export async function GET(_request: Request, { params }: RouteParams) {
     const { id } = await params;
     const supabase = await createClient();
 
+    const { data: app, error: appError } = await supabase
+      .from("loan_applications")
+      .select("segment")
+      .eq("id", id)
+      .single();
+
+    if (appError || !app) {
+      throw new Error(appError?.message ?? "Application not found");
+    }
+
+    // Phase 7.1 provisional: CIG mappings remain Seafarer-only until client
+    // confirms nfis/mf/lslg for SME — SME apps get an empty check list.
+    const segment = app.segment === "sme" ? "sme" : "seafarer";
+
     const { data: mappings, error: mapError } = await supabase
       .from("stage_check_mapping")
       .select(
@@ -42,7 +56,8 @@ export async function GET(_request: Request, { params }: RouteParams) {
         check_types ( id, slug, name )
       `,
       )
-      .eq("stage", "cig");
+      .eq("stage", "cig")
+      .eq("segment", segment);
 
     if (mapError) {
       throw new Error(mapError.message);
@@ -97,8 +112,16 @@ export async function POST(request: Request, { params }: RouteParams) {
 
     const verification = await getOrCreateVerification(supabase, id);
     const checksBefore = await getCigChecksComplete(supabase, id);
+    const { data: appRow } = await supabase
+      .from("loan_applications")
+      .select("segment, is_reloan")
+      .eq("id", id)
+      .maybeSingle();
     assertChecksRecordingAllowed(
-      getCigSequenceState(verification, checksBefore.complete),
+      getCigSequenceState(verification, checksBefore.complete, {
+        segment: appRow?.segment === "sme" ? "sme" : "seafarer",
+        isReloan: Boolean(appRow?.is_reloan),
+      }),
     );
 
     const { data: checkType, error: typeError } = await supabase
@@ -109,6 +132,27 @@ export async function POST(request: Request, { params }: RouteParams) {
 
     if (typeError || !checkType) {
       return NextResponse.json({ error: "Unknown check type" }, { status: 400 });
+    }
+
+    const segment = appRow?.segment === "sme" ? "sme" : "seafarer";
+    const { data: mapping, error: mapError } = await supabase
+      .from("stage_check_mapping")
+      .select("id")
+      .eq("stage", "cig")
+      .eq("segment", segment)
+      .eq("check_type_id", checkType.id)
+      .maybeSingle();
+
+    if (mapError) {
+      throw new Error(mapError.message);
+    }
+    if (!mapping) {
+      return NextResponse.json(
+        {
+          error: `Check '${body.checkTypeSlug}' is not mapped for CIG/${segment}`,
+        },
+        { status: 400 },
+      );
     }
 
     const { data, error } = await supabase

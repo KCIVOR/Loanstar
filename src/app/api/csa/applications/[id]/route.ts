@@ -45,6 +45,7 @@ const patchSchema = z.object({
       financial: z.record(z.string(), z.unknown()).optional(),
       allottee: z.record(z.string(), z.unknown()).optional(),
       picWork: z.record(z.string(), z.unknown()).optional(),
+      businessInfo: z.record(z.string(), z.unknown()).optional(),
       dependents: z.array(z.record(z.string(), z.unknown())).optional(),
       references: z.array(z.record(z.string(), z.unknown())).optional(),
       profileData: z.record(z.string(), z.unknown()).optional(),
@@ -76,7 +77,14 @@ export async function GET(_request: Request, { params }: RouteParams) {
       .eq("loan_application_id", id)
       .maybeSingle();
 
-    const checklist = await getStageChecklist(supabase, "intake", id);
+    const checklist = await getStageChecklist(supabase, "intake", id, {
+      segment: application.segment === "sme" ? "sme" : "seafarer",
+      entityType:
+        application.entity_type === "individual" ||
+        application.entity_type === "corporate"
+          ? application.entity_type
+          : null,
+    });
     const computation = await getActiveComputation(supabase, id);
     const endorseReadiness = await getEndorseReadiness(supabase, id);
     const negotiation = await getNegotiation(supabase, id);
@@ -111,6 +119,12 @@ export async function GET(_request: Request, { params }: RouteParams) {
         statusLabel: formatStatusLabel(application.status),
         statusHistory: application.status_history,
         blocker: application.blocker,
+        segment: application.segment === "sme" ? "sme" : "seafarer",
+        entityType:
+          application.entity_type === "individual" ||
+          application.entity_type === "corporate"
+            ? application.entity_type
+            : null,
         isReloan: application.is_reloan,
         endorsedAt: application.endorsed_at,
         privacyOrientationAt:
@@ -174,6 +188,7 @@ export async function PATCH(request: Request, { params }: RouteParams) {
         financial: body.borrower.financial as never,
         allottee: body.borrower.allottee as never,
         picWork: body.borrower.picWork as never,
+        businessInfo: body.borrower.businessInfo as never,
         dependents: body.borrower.dependents as never,
         references: body.borrower.references,
         profileData: body.borrower.profileData,

@@ -48,13 +48,44 @@ export function formatCoverageBlocker(threshold: number): string {
 }
 
 /**
+ * SME affordability is NOT enforced yet.
+ *
+ * The Seafarer 35% coverage ratio measures monthly amort / personal salary —
+ * meaningless for a business borrower. Do not reuse that rule for SME.
+ * A real credit-policy rule (likely Field CI "30% of monthly net income" or
+ * similar) must be designed and enforced before SME goes near production
+ * lending decisions. Until then, endorse must not block on this check.
+ */
+export function skipCoverageForSegment(
+  segment: string | null | undefined,
+): boolean {
+  return segment === "sme";
+}
+
+export type CoverageEndorseOptions = {
+  segment?: string | null;
+};
+
+/**
  * Endorse gate: null ratio is non-blocking (income undeclared);
  * ratio must be <= threshold when known.
+ * SME: always non-blocking (see skipCoverageForSegment).
  */
 export function evaluateCoverageForEndorse(
   coverageRatio: number | null,
   threshold: number,
+  options?: CoverageEndorseOptions,
 ): CoverageEndorseEvaluation {
+  if (skipCoverageForSegment(options?.segment)) {
+    return {
+      coverageOk: true,
+      warnings: [
+        "SME affordability: no affordability check enforced — credit-policy rule required before production lending",
+      ],
+      blocker: null,
+    };
+  }
+
   if (coverageRatio == null) {
     return {
       coverageOk: true,

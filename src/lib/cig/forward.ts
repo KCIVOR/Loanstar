@@ -3,6 +3,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { appendStatusHistory } from "@/lib/applications/status";
 import { notifyBorrowerForApplication } from "@/lib/notifications/write";
 
+import type { FieldVisit, SmeReloanVerification } from "./field-visit";
 import {
   assessVerificationCompleteness,
   getCigChecksComplete,
@@ -36,11 +37,21 @@ export async function forwardToCommittee(
     return { forwarded: false, missing: ["CI report already submitted"] };
   }
 
+  const { data: appRow } = await supabase
+    .from("loan_applications")
+    .select("segment, is_reloan")
+    .eq("id", applicationId)
+    .maybeSingle();
+
   const checks = await getCigChecksComplete(supabase, applicationId);
   const completeness = assessVerificationCompleteness(
     verification,
     checks.complete,
     checks.missing,
+    {
+      segment: appRow?.segment === "sme" ? "sme" : "seafarer",
+      isReloan: Boolean(appRow?.is_reloan),
+    },
   );
 
   if (!completeness.complete) {
@@ -123,6 +134,8 @@ export type VerificationPatch = Partial<{
   cifVerifiedDate: string | null;
   finding: "positive" | "negative";
   findingNotes: string | null;
+  fieldVisit: FieldVisit;
+  smeReloanVerification: SmeReloanVerification;
 }>;
 
 export function patchToRow(patch: VerificationPatch): Record<string, unknown> {
@@ -210,6 +223,12 @@ export function patchToRow(patch: VerificationPatch): Record<string, unknown> {
   }
   if (patch.findingNotes !== undefined) {
     row.finding_notes = patch.findingNotes;
+  }
+  if (patch.fieldVisit !== undefined) {
+    row.field_visit = patch.fieldVisit;
+  }
+  if (patch.smeReloanVerification !== undefined) {
+    row.sme_reloan_verification = patch.smeReloanVerification;
   }
   return row;
 }

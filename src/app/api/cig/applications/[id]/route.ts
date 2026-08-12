@@ -1,10 +1,11 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
+import { resolveDisplayName } from "@/lib/account/display-name";
 import { formatStatusLabel } from "@/lib/applications/status";
 import { writeAuditEvent } from "@/lib/audit/writer";
 import { handleApiError, jsonOk } from "@/lib/api/handler";
-import { assertCigVerificationStage } from "@/lib/cig/queue";
+import { assertCigVerificationStage } from "@/lib/cig/queue-guards";
 import { saveVerificationPatch } from "@/lib/cig/forward";
 import { getReceiptReadiness } from "@/lib/cig/receipt";
 import {
@@ -178,9 +179,29 @@ const patchSchema = z.object({
       cifVerifiedDate: z.string().nullable().optional(),
       finding: z.enum(["positive", "negative"]).optional(),
       findingNotes: z.string().nullable().optional(),
+      fieldVisit: z
+        .object({
+          header: z.record(z.string(), z.unknown()).nullable().optional(),
+          residence: z.record(z.string(), z.unknown()).nullable().optional(),
+          business: z.record(z.string(), z.unknown()).nullable().optional(),
+          recommendation: z.record(z.string(), z.unknown()).nullable().optional(),
+        })
+        .optional(),
+      smeReloanVerification: z.record(z.string(), z.unknown()).optional(),
     })
     .optional(),
 });
+
+function verificationScope(application: {
+  segment?: string | null;
+  is_reloan?: boolean | null;
+}) {
+  return {
+    segment:
+      application.segment === "sme" ? ("sme" as const) : ("seafarer" as const),
+    isReloan: Boolean(application.is_reloan),
+  };
+}
 
 export async function GET(_request: Request, { params }: RouteParams) {
   try {
@@ -196,12 +217,14 @@ export async function GET(_request: Request, { params }: RouteParams) {
 
     const verification = await getOrCreateVerification(supabase, id);
     const checks = await getCigChecksComplete(supabase, id);
+    const scope = verificationScope(application);
     const completeness = assessVerificationCompleteness(
       verification,
       checks.complete,
       checks.missing,
+      scope,
     );
-    const sequence = getCigSequenceState(verification, checks.complete);
+    const sequence = getCigSequenceState(verification, checks.complete, scope);
 
     const { data: activeCallback } = await supabase
       .from("callbacks")
@@ -224,6 +247,8 @@ export async function GET(_request: Request, { params }: RouteParams) {
         endorsedAt: application.endorsed_at,
         blocker: application.blocker,
         editable: application.status === "for_verification",
+        segment: scope.segment,
+        isReloan: scope.isReloan,
       },
       borrower,
       verification,
@@ -293,14 +318,34 @@ export async function PATCH(request: Request, { params }: RouteParams) {
       });
     }
 
+    const scope = verificationScope(application);
+
     if (body.verification) {
       const current = await getOrCreateVerification(supabase, id);
       const checksBefore = await getCigChecksComplete(supabase, id);
-      const sequence = getCigSequenceState(current, checksBefore.complete);
+      const sequence = getCigSequenceState(
+        current,
+        checksBefore.complete,
+        scope,
+      );
       assertVerificationPatchAllowed(
         body.verification as Record<string, unknown>,
         sequence,
       );
+
+      if (body.verification.cifVerifiedBy !== undefined) {
+        const { data: profile } = await supabase
+          .from("profiles")
+          .select("full_name")
+          .eq("id", user.id)
+          .maybeSingle();
+
+        body.verification.cifVerifiedBy = resolveDisplayName(
+          profile?.full_name as string | null | undefined,
+          user.user_metadata?.full_name as string | undefined,
+          user.email,
+        );
+      }
 
       await saveVerificationPatch(supabase, id, body.verification);
 
@@ -322,12 +367,13 @@ export async function PATCH(request: Request, { params }: RouteParams) {
       verification,
       checks.complete,
       checks.missing,
+      scope,
     );
 
     return jsonOk({
       success: true,
       completeness,
-      sequence: getCigSequenceState(verification, checks.complete),
+      sequence: getCigSequenceState(verification, checks.complete, scope),
     });
   } catch (error) {
     if (error instanceof z.ZodError) {

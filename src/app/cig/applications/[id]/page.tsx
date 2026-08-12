@@ -27,8 +27,19 @@ import {
   ciFormCompletionBadge,
   type CiFormDraft,
 } from "@/components/cig/CiReferencesFormModal";
+import { FieldVisitForm } from "@/components/cig/FieldVisitForm";
+import { SmeReloanVerificationForm } from "@/components/cig/SmeReloanVerificationForm";
+import { usePermissions } from "@/hooks/usePermissions";
 import { formatStatusLabel, statusBadgeVariant } from "@/lib/applications/status";
 import type { BorrowerProfile } from "@/lib/borrowers/types";
+import type {
+  FieldVisit,
+  SmeReloanVerification,
+} from "@/lib/cig/field-visit";
+import {
+  assessFieldVisitRequired,
+  assessSmeReloanRequired,
+} from "@/lib/cig/field-visit";
 import {
   buildCigWorkspaceSteps,
   cigChecksSummary,
@@ -75,6 +86,8 @@ type VerificationData = {
   picRatingReason: string | null;
   cifVerifiedBy: string | null;
   cifVerifiedDate: string | null;
+  fieldVisit: FieldVisit | null;
+  smeReloanVerification: SmeReloanVerification | null;
   finding: "positive" | "negative" | null;
   findingNotes: string | null;
   forwardedAt: string | null;
@@ -156,6 +169,8 @@ function displayText(value: string | null | undefined): string {
 export default function CigApplicationPage() {
   const params = useParams();
   const applicationId = params.id as string;
+  const { permissions } = usePermissions();
+  const verifierName = permissions?.fullName ?? "";
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -166,6 +181,7 @@ export default function CigApplicationPage() {
   const [verification, setVerification] = useState<VerificationData | null>(null);
   const [showCiForm, setShowCiForm] = useState(false);
   const [showApplicationForm, setShowApplicationForm] = useState(false);
+  const [showFieldVisitForm, setShowFieldVisitForm] = useState(false);
   const [checks, setChecks] = useState<CheckItem[]>([]);
   const [completeness, setCompleteness] = useState<{ complete: boolean; missing: string[] }>({
     complete: false,
@@ -174,6 +190,8 @@ export default function CigApplicationPage() {
   const [sequence, setSequence] = useState<CigSequenceState>(FALLBACK_SEQUENCE);
   const [applicationStatus, setApplicationStatus] = useState("");
   const [applicationNo, setApplicationNo] = useState<string | null>(null);
+  const [segment, setSegment] = useState<"seafarer" | "sme">("seafarer");
+  const [isReloan, setIsReloan] = useState(false);
   const [endorsedAt, setEndorsedAt] = useState<string | null>(null);
   const [callbackAt, setCallbackAt] = useState("");
   const [callbackNotes, setCallbackNotes] = useState("");
@@ -203,6 +221,8 @@ export default function CigApplicationPage() {
           statusLabel: string;
           applicationNo: string | null;
           endorsedAt: string | null;
+          segment?: "seafarer" | "sme";
+          isReloan?: boolean;
         };
         borrower: (BorrowerProfile & { id?: string }) | null;
         verification: VerificationData;
@@ -214,6 +234,10 @@ export default function CigApplicationPage() {
       setEditable(appData.application.editable);
       setApplicationStatus(appData.application.status);
       setApplicationNo(appData.application.applicationNo);
+      setSegment(
+        appData.application.segment === "sme" ? "sme" : "seafarer",
+      );
+      setIsReloan(Boolean(appData.application.isReloan));
       setEndorsedAt(appData.application.endorsedAt);
       setBorrower(appData.borrower);
       setBorrowerId(appData.borrower?.id ?? null);
@@ -951,7 +975,9 @@ export default function CigApplicationPage() {
               </h2>
               <p className="mb-4 shrink-0 text-sm text-ink-500">
                 {editable
-                  ? "Complete sections in order: borrower review → checks → CI & Refs → crewing → finding."
+                  ? segment === "sme"
+                    ? "Complete sections in order: borrower review → checks → Field Visit → finding."
+                    : "Complete sections in order: borrower review → checks → CI & Refs → crewing → finding."
                   : "Submitted to Committee — view only."}
               </p>
               <div
@@ -1184,178 +1210,263 @@ export default function CigApplicationPage() {
               </Card>
             ) : null}
 
-            {editable && checksUnlocked && !ciUnlocked ? (
-              <Card className="!bg-surface-2/40">
-                <p className="text-sm text-ink-500">
-                  <b>Next:</b> CI &amp; References Form unlocks when all
-                  external checks are recorded.
-                </p>
-              </Card>
-            ) : null}
-
-            {ciUnlocked ? (
-              <Card>
-                <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <h2 className="mb-1 font-display text-lg font-semibold text-navy-900">
-                      CI &amp; References Form
-                    </h2>
-                    <p className="mb-3 text-sm text-ink-500">
-                      {editable
-                        ? "PIC (person-in-charge) and character reference phone verification — recreates CI AND REFERENCES FORM 1.xlsx."
-                        : "Submitted to Committee — view only."}
+            {segment === "sme" ? (
+              <>
+                {editable && checksUnlocked && !ciUnlocked ? (
+                  <Card className="!bg-surface-2/40">
+                    <p className="text-sm text-ink-500">
+                      <b>Next:</b> Field Visit unlocks when all external checks
+                      are recorded.
                     </p>
-                  </div>
-                  <Badge variant={ciFormCompletionBadge(verification).variant}>
-                    {ciFormCompletionBadge(verification).label}
-                  </Badge>
-                </div>
-                <Button
-                  type="button"
-                  variant="secondary"
-                  onClick={() => setShowCiForm(true)}
-                >
-                  {editable
-                    ? "Open CI & References Form"
-                    : "View CI & References Form"}
-                </Button>
-              </Card>
-            ) : null}
+                  </Card>
+                ) : null}
 
-            {editable && ciUnlocked && !crewingUnlocked ? (
-              <Card className="!bg-surface-2/40">
-                <p className="text-sm text-ink-500">
-                  <b>Next:</b> Crewing manager unlocks when CI &amp; References
-                  is complete.
-                </p>
-              </Card>
-            ) : null}
-
-            {crewingUnlocked ? (
-              <Card>
-                <h2 className="mb-1 font-display text-lg font-semibold text-navy-900">
-                  Crewing manager
-                </h2>
-                <p className="mb-3 text-sm text-ink-500">
-                  Details confirmed directly with the manning agency&apos;s
-                  crewing manager.
-                </p>
-                <div className="grid gap-3 sm:grid-cols-2">
-                  <div>
-                    <Label htmlFor="cmDeparture">Departure date</Label>
-                    <Input
-                      id="cmDeparture"
-                      type="date"
-                      disabled={!editable}
-                      value={verification.cmDepartureDate ?? ""}
-                      onChange={(e) =>
-                        setVerification({
-                          ...verification,
-                          cmDepartureDate: e.target.value,
-                        })
-                      }
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="cmSalary">Salary</Label>
-                    <div className="affix">
-                      <span className="add">₱</span>
-                      <Input
-                        id="cmSalary"
-                        type="number"
-                        step="0.01"
-                        disabled={!editable}
-                        value={verification.cmSalary ?? ""}
-                        onChange={(e) =>
-                          setVerification({
-                            ...verification,
-                            cmSalary: e.target.value
-                              ? Number(e.target.value)
-                              : null,
-                          })
+                {ciUnlocked ? (
+                  <Card>
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <h2 className="mb-1 font-display text-lg font-semibold text-navy-900">
+                          {isReloan
+                            ? "SME re-loan verification"
+                            : "SME Field Visit"}
+                        </h2>
+                        <p className="mb-3 text-sm text-ink-500">
+                          {editable
+                            ? isReloan
+                              ? "Re-verification of field investigation for repeat borrowers."
+                              : "Site visit form — replaces PIC/CM phone verification for SME."
+                            : "Submitted to Committee — view only."}
+                        </p>
+                      </div>
+                      <Badge
+                        variant={
+                          (isReloan
+                            ? assessSmeReloanRequired(
+                                verification.smeReloanVerification,
+                              )
+                            : assessFieldVisitRequired(
+                                verification.fieldVisit,
+                              )
+                          ).complete
+                            ? "success"
+                            : "warning"
                         }
-                        mono
-                      />
+                      >
+                        {(isReloan
+                          ? assessSmeReloanRequired(
+                              verification.smeReloanVerification,
+                            )
+                          : assessFieldVisitRequired(verification.fieldVisit)
+                        ).complete
+                          ? "Complete"
+                          : "In progress"}
+                      </Badge>
                     </div>
-                  </div>
-                  <div>
-                    <Label htmlFor="cmPosition">Position</Label>
-                    <Input
-                      id="cmPosition"
-                      disabled={!editable}
-                      value={verification.cmPosition ?? ""}
-                      onChange={(e) =>
-                        setVerification({
-                          ...verification,
-                          cmPosition: e.target.value,
-                        })
-                      }
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="cmContract">Contract status</Label>
-                    <Input
-                      id="cmContract"
-                      disabled={!editable}
-                      value={verification.cmContractStatus ?? ""}
-                      onChange={(e) =>
-                        setVerification({
-                          ...verification,
-                          cmContractStatus: e.target.value,
-                        })
-                      }
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="cmFitToWork">Fit to work?</Label>
-                    <Select
-                      id="cmFitToWork"
-                      disabled={!editable}
-                      value={
-                        verification.cmFitToWork === null
-                          ? ""
-                          : verification.cmFitToWork
-                            ? "yes"
-                            : "no"
-                      }
-                      onChange={(e) =>
-                        setVerification({
-                          ...verification,
-                          cmFitToWork:
-                            e.target.value === ""
-                              ? null
-                              : e.target.value === "yes",
-                        })
-                      }
-                    >
-                      <option value="">Select</option>
-                      <option value="yes">Yes</option>
-                      <option value="no">No</option>
-                    </Select>
-                  </div>
-                </div>
-                {editable ? (
-                  <div className="mt-4">
                     <Button
                       type="button"
-                      loading={saving}
-                      onClick={() => void saveSequenceStage("crewing_manager")}
+                      variant="secondary"
+                      onClick={() => setShowFieldVisitForm(true)}
                     >
-                      Save crewing manager
+                      {editable
+                        ? isReloan
+                          ? "Open SME re-loan verification"
+                          : "Open SME Field Visit"
+                        : isReloan
+                          ? "View SME re-loan verification"
+                          : "View SME Field Visit"}
                     </Button>
-                  </div>
+                  </Card>
                 ) : null}
-              </Card>
-            ) : null}
 
-            {editable && crewingUnlocked && !findingUnlocked ? (
-              <Card className="!bg-surface-2/40">
-                <p className="text-sm text-ink-500">
-                  <b>Next:</b> Finding unlocks after crewing manager is saved
-                  complete.
-                </p>
-              </Card>
-            ) : null}
+                {editable && crewingUnlocked && !findingUnlocked ? (
+                  <Card className="!bg-surface-2/40">
+                    <p className="text-sm text-ink-500">
+                      <b>Next:</b> Finding unlocks after Field Visit is
+                      complete.
+                    </p>
+                  </Card>
+                ) : null}
+              </>
+            ) : (
+              <>
+                {editable && checksUnlocked && !ciUnlocked ? (
+                  <Card className="!bg-surface-2/40">
+                    <p className="text-sm text-ink-500">
+                      <b>Next:</b> CI &amp; References Form unlocks when all
+                      external checks are recorded.
+                    </p>
+                  </Card>
+                ) : null}
+
+                {ciUnlocked ? (
+                  <Card>
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <h2 className="mb-1 font-display text-lg font-semibold text-navy-900">
+                          CI &amp; References Form
+                        </h2>
+                        <p className="mb-3 text-sm text-ink-500">
+                          {editable
+                            ? "PIC (person-in-charge) and character reference phone verification — recreates CI AND REFERENCES FORM 1.xlsx."
+                            : "Submitted to Committee — view only."}
+                        </p>
+                      </div>
+                      <Badge
+                        variant={ciFormCompletionBadge(verification).variant}
+                      >
+                        {ciFormCompletionBadge(verification).label}
+                      </Badge>
+                    </div>
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      onClick={() => setShowCiForm(true)}
+                    >
+                      {editable
+                        ? "Open CI & References Form"
+                        : "View CI & References Form"}
+                    </Button>
+                  </Card>
+                ) : null}
+
+                {editable && ciUnlocked && !crewingUnlocked ? (
+                  <Card className="!bg-surface-2/40">
+                    <p className="text-sm text-ink-500">
+                      <b>Next:</b> Crewing manager unlocks when CI &amp;
+                      References is complete.
+                    </p>
+                  </Card>
+                ) : null}
+
+                {crewingUnlocked ? (
+                  <Card>
+                    <h2 className="mb-1 font-display text-lg font-semibold text-navy-900">
+                      Crewing manager
+                    </h2>
+                    <p className="mb-3 text-sm text-ink-500">
+                      Details confirmed directly with the manning agency&apos;s
+                      crewing manager.
+                    </p>
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      <div>
+                        <Label htmlFor="cmDeparture">Departure date</Label>
+                        <Input
+                          id="cmDeparture"
+                          type="date"
+                          disabled={!editable}
+                          value={verification.cmDepartureDate ?? ""}
+                          onChange={(e) =>
+                            setVerification({
+                              ...verification,
+                              cmDepartureDate: e.target.value,
+                            })
+                          }
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="cmSalary">Salary</Label>
+                        <div className="affix">
+                          <span className="add">₱</span>
+                          <Input
+                            id="cmSalary"
+                            type="number"
+                            step="0.01"
+                            disabled={!editable}
+                            value={verification.cmSalary ?? ""}
+                            onChange={(e) =>
+                              setVerification({
+                                ...verification,
+                                cmSalary: e.target.value
+                                  ? Number(e.target.value)
+                                  : null,
+                              })
+                            }
+                            mono
+                          />
+                        </div>
+                      </div>
+                      <div>
+                        <Label htmlFor="cmPosition">Position</Label>
+                        <Input
+                          id="cmPosition"
+                          disabled={!editable}
+                          value={verification.cmPosition ?? ""}
+                          onChange={(e) =>
+                            setVerification({
+                              ...verification,
+                              cmPosition: e.target.value,
+                            })
+                          }
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="cmContract">Contract status</Label>
+                        <Input
+                          id="cmContract"
+                          disabled={!editable}
+                          value={verification.cmContractStatus ?? ""}
+                          onChange={(e) =>
+                            setVerification({
+                              ...verification,
+                              cmContractStatus: e.target.value,
+                            })
+                          }
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="cmFitToWork">Fit to work?</Label>
+                        <Select
+                          id="cmFitToWork"
+                          disabled={!editable}
+                          value={
+                            verification.cmFitToWork === null
+                              ? ""
+                              : verification.cmFitToWork
+                                ? "yes"
+                                : "no"
+                          }
+                          onChange={(e) =>
+                            setVerification({
+                              ...verification,
+                              cmFitToWork:
+                                e.target.value === ""
+                                  ? null
+                                  : e.target.value === "yes",
+                            })
+                          }
+                        >
+                          <option value="">Select</option>
+                          <option value="yes">Yes</option>
+                          <option value="no">No</option>
+                        </Select>
+                      </div>
+                    </div>
+                    {editable ? (
+                      <div className="mt-4">
+                        <Button
+                          type="button"
+                          loading={saving}
+                          onClick={() =>
+                            void saveSequenceStage("crewing_manager")
+                          }
+                        >
+                          Save crewing manager
+                        </Button>
+                      </div>
+                    ) : null}
+                  </Card>
+                ) : null}
+
+                {editable && crewingUnlocked && !findingUnlocked ? (
+                  <Card className="!bg-surface-2/40">
+                    <p className="text-sm text-ink-500">
+                      <b>Next:</b> Finding unlocks after crewing manager is
+                      saved complete.
+                    </p>
+                  </Card>
+                ) : null}
+              </>
+            )}
 
             {findingUnlocked ? (
               <Card>
@@ -1413,7 +1524,7 @@ export default function CigApplicationPage() {
               </Card>
             ) : null}
           </div>
-          {showCiForm ? (
+          {showCiForm && segment !== "sme" ? (
             <CiReferencesFormModal
               open={showCiForm}
               onClose={() => setShowCiForm(false)}
@@ -1422,7 +1533,71 @@ export default function CigApplicationPage() {
               onSave={saveCiForm}
               saving={saving}
               readOnly={!editable}
+              verifierName={verifierName}
             />
+          ) : null}
+
+          {showFieldVisitForm && segment === "sme" ? (
+            <Modal
+              open={showFieldVisitForm}
+              onClose={() => setShowFieldVisitForm(false)}
+              title={
+                isReloan ? "SME re-loan verification" : "SME Field Visit"
+              }
+              className="!max-w-4xl"
+            >
+              <div className="max-h-[65vh] overflow-y-auto pr-1">
+                {isReloan ? (
+                  <SmeReloanVerificationForm
+                    value={verification.smeReloanVerification}
+                    onChange={(next) =>
+                      setVerification({
+                        ...verification,
+                        smeReloanVerification: next,
+                      })
+                    }
+                    onSave={(next) => {
+                      if (!sequence.unlocked.ci_references) {
+                        setError(cigSequenceLockedHint("ci_references"));
+                        return;
+                      }
+                      setVerification({
+                        ...verification,
+                        smeReloanVerification: next,
+                      });
+                      void saveVerification({
+                        smeReloanVerification: next,
+                      });
+                    }}
+                    saving={saving}
+                    readOnly={!editable}
+                  />
+                ) : (
+                  <FieldVisitForm
+                    value={verification.fieldVisit}
+                    onChange={(next) =>
+                      setVerification({
+                        ...verification,
+                        fieldVisit: next,
+                      })
+                    }
+                    onSave={(next) => {
+                      if (!sequence.unlocked.ci_references) {
+                        setError(cigSequenceLockedHint("ci_references"));
+                        return;
+                      }
+                      setVerification({
+                        ...verification,
+                        fieldVisit: next,
+                      });
+                      void saveVerification({ fieldVisit: next });
+                    }}
+                    saving={saving}
+                    readOnly={!editable}
+                  />
+                )}
+              </div>
+            </Modal>
           ) : null}
 
         {editable && !forwarded ? (
@@ -1437,13 +1612,18 @@ export default function CigApplicationPage() {
             </p>
             {!forwardReady ? (
               <div className="banner warn mb-4">
-                <span>
-                  Not ready yet —{" "}
-                  {completeness.missing[0] ?? "complete the form and checks"}
-                  {completeness.missing.length > 1
-                    ? ` (+${completeness.missing.length - 1} more)`
-                    : ""}
-                </span>
+                <b>Not ready yet — the following must be completed first:</b>
+                {completeness.missing.length > 0 ? (
+                  <ul className="mt-1 list-disc pl-5">
+                    {completeness.missing.map((item) => (
+                      <li key={item}>{item}</li>
+                    ))}
+                  </ul>
+                ) : (
+                  <span className="mt-1 block">
+                    Complete the form and checks.
+                  </span>
+                )}
               </div>
             ) : null}
             <Button

@@ -15,27 +15,17 @@ import {
   PageHeader,
   Spinner,
 } from "@/components/ui";
-import {
-  agingNeedsAttention,
-  dcrItemTotal,
-  nextOpenInstallment,
-  type ScheduleLite,
-} from "@/lib/collector/desk";
+import { dcrItemTotal } from "@/lib/collector/desk";
 import {
   agingVariant,
   formatDate,
   formatMoney,
   paymentStatusVariant,
 } from "@/lib/collector/format";
-
-type Account = {
-  id: string;
-  borrower_name: string;
-  loan_account_no: string | null;
-  outstanding_balance: number;
-  aging_bucket: string;
-  amortization_schedules?: ScheduleLite[] | ScheduleLite | null;
-};
+import type {
+  CollectorQueueKpis,
+  CollectorQueueMappedRow,
+} from "@/lib/collector/queue";
 
 type Payment = {
   id: string;
@@ -80,11 +70,12 @@ const IconCash = (
   </svg>
 );
 
-function schedulesOf(account: Account): ScheduleLite[] {
-  const raw = account.amortization_schedules;
-  if (!raw) return [];
-  return Array.isArray(raw) ? raw : [raw];
-}
+const EMPTY_KPI: CollectorQueueKpis = {
+  assigned: 0,
+  callbackDue: 0,
+  agingCritical: 0,
+  totalBalance: 0,
+};
 
 function firstMl(pay: Payment) {
   const m = pay.masterlist;
@@ -93,7 +84,8 @@ function firstMl(pay: Payment) {
 }
 
 export default function CollectorOverviewPage() {
-  const [accounts, setAccounts] = useState<Account[]>([]);
+  const [rows, setRows] = useState<CollectorQueueMappedRow[]>([]);
+  const [kpi, setKpi] = useState<CollectorQueueKpis>(EMPTY_KPI);
   const [payments, setPayments] = useState<Payment[]>([]);
   const [dcrs, setDcrs] = useState<DcrRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -105,13 +97,19 @@ export default function CollectorOverviewPage() {
     setLoading(true);
     try {
       const [accRes, payRes, dcrRes] = await Promise.all([
-        fetch("/api/collector/accounts"),
+        fetch(
+          "/api/collector/accounts?range=all&sortKey=priority&page=1&pageSize=10",
+        ),
         fetch("/api/collector/payments?scope=desk"),
         fetch("/api/collector/dcr?limit=20"),
       ]);
       if (!accRes.ok) throw new Error("Failed to load overview");
-      const accData = (await accRes.json()) as { accounts: Account[] };
-      setAccounts(accData.accounts);
+      const accData = (await accRes.json()) as {
+        rows: CollectorQueueMappedRow[];
+        kpi: CollectorQueueKpis;
+      };
+      setRows(accData.rows ?? []);
+      setKpi(accData.kpi ?? EMPTY_KPI);
       if (payRes.ok) {
         const payData = (await payRes.json()) as { payments: Payment[] };
         setPayments(payData.payments);
@@ -160,10 +158,7 @@ export default function CollectorOverviewPage() {
 
   if (loading) return <Spinner />;
 
-  const attention = accounts.filter((a) =>
-    agingNeedsAttention(a.aging_bucket),
-  );
-  const attentionIds = new Set(attention.map((a) => a.id));
+  const attentionCount = kpi.agingCritical;
   const pendingProofs = payments.filter(
     (p) => p.status === "pending_verification",
   );
@@ -171,10 +166,7 @@ export default function CollectorOverviewPage() {
   const draftItems = draft?.dcr_items ?? [];
   const draftTotal = dcrItemTotal(draftItems);
 
-  const topAccounts = [
-    ...attention,
-    ...accounts.filter((a) => !attentionIds.has(a.id)),
-  ].slice(0, 5);
+  const topAccounts = rows.slice(0, 5);
 
   return (
     <div>
@@ -208,7 +200,7 @@ export default function CollectorOverviewPage() {
         </div>
       ) : null}
 
-      {attention.length > 0 || pendingProofs.length > 0 || draft ? (
+      {attentionCount > 0 || pendingProofs.length > 0 || draft ? (
         <div className="banner warn mb-6">
           <svg
             width="16"
@@ -225,13 +217,13 @@ export default function CollectorOverviewPage() {
             <path d="M12 9v4M12 17h.01" />
           </svg>
           <span>
-            {attention.length > 0 ? (
+            {attentionCount > 0 ? (
               <>
-                <span className="mono font-semibold">{attention.length}</span>{" "}
-                account{attention.length === 1 ? "" : "s"} need attention
+                <span className="mono font-semibold">{attentionCount}</span>{" "}
+                account{attentionCount === 1 ? "" : "s"} need attention
               </>
             ) : null}
-            {attention.length > 0 && pendingProofs.length > 0 ? " · " : null}
+            {attentionCount > 0 && pendingProofs.length > 0 ? " · " : null}
             {pendingProofs.length > 0 ? (
               <>
                 <span className="mono font-semibold">
@@ -240,7 +232,7 @@ export default function CollectorOverviewPage() {
                 proof{pendingProofs.length === 1 ? "" : "s"} to review
               </>
             ) : null}
-            {(attention.length > 0 || pendingProofs.length > 0) && draft
+            {(attentionCount > 0 || pendingProofs.length > 0) && draft
               ? " · "
               : null}
             {draft ? (
@@ -261,13 +253,13 @@ export default function CollectorOverviewPage() {
           tone="navy"
           icon={IconLayers}
           label="Assigned"
-          value={accounts.length}
+          value={kpi.assigned}
         />
         <CollectorKpi
           tone="danger"
           icon={IconAlert}
           label="Needs attention"
-          value={attention.length}
+          value={kpi.agingCritical}
         />
         <CollectorKpi
           tone="warning"
@@ -332,7 +324,7 @@ export default function CollectorOverviewPage() {
             View all
           </Link>
         </div>
-        {topAccounts.length === 0 ? (
+        {kpi.assigned === 0 ? (
           <EmptyState
             title="No accounts assigned"
             description="AR will assign borrowers to your portfolio."
@@ -340,35 +332,32 @@ export default function CollectorOverviewPage() {
           />
         ) : (
           <ul className="divide-y divide-line-soft rounded-[var(--r-md)] border border-line-soft bg-surface">
-            {topAccounts.map((acc) => {
-              const next = nextOpenInstallment(schedulesOf(acc));
-              return (
-                <li
-                  key={acc.id}
-                  className="flex flex-wrap items-center justify-between gap-2 px-4 py-3"
-                >
-                  <div>
-                    <div className="font-medium text-ink-900">
-                      {acc.borrower_name}
-                    </div>
-                    <div className="mono text-xs text-ink-500">
-                      {acc.loan_account_no ?? "—"}
-                      {next
-                        ? ` · due ${formatDate(next.due_date)}`
-                        : ""}
-                    </div>
+            {topAccounts.map((acc) => (
+              <li
+                key={acc.id}
+                className="flex flex-wrap items-center justify-between gap-2 px-4 py-3"
+              >
+                <div>
+                  <div className="font-medium text-ink-900">
+                    {acc.borrowerName}
                   </div>
-                  <div className="flex items-center gap-2">
-                    <span className="mono text-sm text-teal-600">
-                      ₱{formatMoney(Number(acc.outstanding_balance))}
-                    </span>
-                    <Badge variant={agingVariant(acc.aging_bucket)}>
-                      {acc.aging_bucket}
-                    </Badge>
+                  <div className="mono text-xs text-ink-500">
+                    {acc.loanAccountNo ?? "—"}
+                    {acc.nextDueDate
+                      ? ` · due ${formatDate(acc.nextDueDate)}`
+                      : ""}
                   </div>
-                </li>
-              );
-            })}
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="mono text-sm text-teal-600">
+                    ₱{formatMoney(acc.outstandingBalance)}
+                  </span>
+                  <Badge variant={agingVariant(acc.agingBucket)}>
+                    {acc.agingBucket}
+                  </Badge>
+                </div>
+              </li>
+            ))}
           </ul>
         )}
       </section>

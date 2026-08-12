@@ -44,11 +44,20 @@ export function Td({
   children,
   num = false,
   className = "",
+  colSpan,
 }: {
   children: ReactNode;
   variant?: "default" | "navy";
   num?: boolean;
   className?: string;
+  colSpan?: number;
 }) {
-  return <td className={cn(num && "num", className) || undefined}>{children}</td>;
+  return (
+    <td
+      className={cn(num && "num", className) || undefined}
+      colSpan={colSpan}
+    >
+      {children}
+    </td>
+  );
 }

@@ -5,7 +5,8 @@ import {
   getCommitteeVotes,
 } from "@/lib/committee/actions";
 import { getCommitteeDecisionEmailStatus } from "@/lib/committee/decision-email-status";
-import { computeTatDays, computeVoteTally, COMMITTEE_SIZE } from "@/lib/committee/votes";
+import { getCommitteeSize } from "@/lib/committee/committee-size";
+import { computeTatDays, computeVoteTally } from "@/lib/committee/votes";
 import { getCommitteeAssessment } from "@/lib/committee/assessment";
 import { getCommitteeCompleteness } from "@/lib/committee/completeness";
 import { getApplicationForStaff } from "@/lib/csa/application";
@@ -21,6 +22,7 @@ export async function GET(_request: Request, { params }: RouteParams) {
     const user = await requireModulePermission("committee", "view");
     const { id } = await params;
     const supabase = await createClient();
+    const committeeSize = await getCommitteeSize();
 
     const application = await getApplicationForStaff(supabase, id);
     const borrowerRaw = application.borrowers;
@@ -36,7 +38,8 @@ export async function GET(_request: Request, { params }: RouteParams) {
         cm_departure_date, cm_salary, cm_position, cm_contract_status, cm_fit_to_work, cm_notes,
         pic_verification, reference_verifications, verification_checklist,
         pic_payment_preference, pic_demeanor, pic_rating, pic_rating_reason,
-        cif_verified_by, cif_verified_date
+        cif_verified_by, cif_verified_date,
+        field_visit, sme_reloan_verification
       `,
       )
       .eq("loan_application_id", id)
@@ -63,7 +66,7 @@ export async function GET(_request: Request, { params }: RouteParams) {
     const assessment = await getCommitteeAssessment(supabase, id);
 
     const votes = await getCommitteeVotes(supabase, id);
-    const tally = computeVoteTally(votes);
+    const tally = computeVoteTally(votes, committeeSize);
     const latestAction = await getLatestCommitteeAction(supabase, id);
     const decisionEmail =
       latestAction != null
@@ -111,12 +114,14 @@ export async function GET(_request: Request, { params }: RouteParams) {
         statusLabel: formatStatusLabel(application.status),
         blocker: application.blocker,
         isReloan: application.is_reloan,
+        segment: application.segment === "sme" ? "sme" : "seafarer",
         statusHistory: application.status_history,
         canDecide:
           (application.status === "for_approval" ||
             application.status === "committee_hold") &&
-          votes.length >= COMMITTEE_SIZE,
-        votesNeeded: Math.max(0, COMMITTEE_SIZE - votes.length),
+          votes.length >= committeeSize,
+        votesNeeded: Math.max(0, committeeSize - votes.length),
+        committeeSize,
         canOverride: application.status === "negotiating_terms",
         canAdjustPreDecision: application.status === "for_approval",
       },
@@ -156,6 +161,8 @@ export async function GET(_request: Request, { params }: RouteParams) {
             picRatingReason: verification.pic_rating_reason,
             cifVerifiedBy: verification.cif_verified_by,
             cifVerifiedDate: verification.cif_verified_date,
+            fieldVisit: verification.field_visit,
+            smeReloanVerification: verification.sme_reloan_verification,
           }
         : null,
       completeness,

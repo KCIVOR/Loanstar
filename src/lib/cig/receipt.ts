@@ -4,6 +4,7 @@ import { appendStatusHistory } from "@/lib/applications/status";
 import {
   getCompletionSummary,
   getStageChecklist,
+  loadChecklistScope,
 } from "@/lib/documents/checklist";
 
 export type ReceiptCheckItem = {
@@ -32,7 +33,13 @@ export async function getReceiptReadiness(
     presentAddress?: unknown;
   } | null,
 ): Promise<ReceiptReadiness> {
-  const checklist = await getStageChecklist(supabase, "intake", applicationId);
+  const scope = await loadChecklistScope(supabase, applicationId);
+  const checklist = await getStageChecklist(
+    supabase,
+    "intake",
+    applicationId,
+    scope,
+  );
   const summary = getCompletionSummary(checklist);
   const checklistComplete =
     summary.required > 0 && summary.complete === summary.required;

@@ -4,6 +4,7 @@ import { z } from "zod";
 import { writeAuditEvent } from "@/lib/audit/writer";
 import { handleApiError, jsonOk } from "@/lib/api/handler";
 import { castCommitteeVote, getCommitteeVotes } from "@/lib/committee/actions";
+import { getCommitteeSize } from "@/lib/committee/committee-size";
 import { computeVoteTally } from "@/lib/committee/votes";
 import { requireModulePermission } from "@/lib/permissions/server";
 import { createClient } from "@/lib/supabase/server";
@@ -21,6 +22,7 @@ export async function POST(request: Request, { params }: RouteParams) {
     const { id } = await params;
     const body = voteSchema.parse(await request.json());
     const supabase = await createClient();
+    const committeeSize = await getCommitteeSize();
 
     const votes = await castCommitteeVote(
       supabase,
@@ -29,7 +31,7 @@ export async function POST(request: Request, { params }: RouteParams) {
       body.vote,
       body.comment || null,
     );
-    const tally = computeVoteTally(votes);
+    const tally = computeVoteTally(votes, committeeSize);
 
     await writeAuditEvent({
       actorId: user.id,
@@ -54,8 +56,9 @@ export async function GET(_request: Request, { params }: RouteParams) {
     await requireModulePermission("committee", "view");
     const { id } = await params;
     const supabase = await createClient();
+    const committeeSize = await getCommitteeSize();
     const votes = await getCommitteeVotes(supabase, id);
-    return jsonOk({ votes, tally: computeVoteTally(votes) });
+    return jsonOk({ votes, tally: computeVoteTally(votes, committeeSize) });
   } catch (error) {
     return handleApiError(error);
   }

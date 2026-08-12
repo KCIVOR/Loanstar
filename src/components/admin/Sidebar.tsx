@@ -224,7 +224,17 @@ const PORTAL_NAV_ITEMS: PortalNavItem[] = [
     label: "Leads",
     icon: "leads",
     modules: ["leads"],
+    children: [
+      {
+        href: "/agent",
+        label: "Leads pipeline",
+        exact: true,
+        matchPrefixes: ["/agent/leads"],
+      },
+      { href: "/agent/history", label: "Closed leads" },
+    ],
   },
+
   {
     href: "/csa",
     label: "Intake",
@@ -238,6 +248,7 @@ const PORTAL_NAV_ITEMS: PortalNavItem[] = [
         matchPrefixes: ["/csa/applications"],
       },
       { href: "/csa/leads", label: "Leads list" },
+      { href: "/csa/history", label: "Application history" },
     ],
   },
   {
@@ -254,24 +265,38 @@ const PORTAL_NAV_ITEMS: PortalNavItem[] = [
       },
       { href: "/cig/denials", label: "Denial calls" },
       { href: "/cig/callbacks", label: "Scheduled callbacks" },
-      { href: "/cig/history", label: "Recent verifications" },
+      { href: "/cig/history", label: "History" },
     ],
   },
-  { href: "/committee", label: "Committee", icon: "committee", modules: ["committee"] },
-  { href: "/lra", label: "Release (LRA)", icon: "release", modules: ["release_lra"] },
+  {
+    href: "/committee",
+    label: "Committee",
+    icon: "committee",
+    modules: ["committee"],
+    children: [
+      { href: "/committee", label: "Voting queue", exact: true },
+      { href: "/committee/history", label: "Decision history" },
+    ],
+  },
+  {
+    href: "/lra",
+    label: "Release (LRA)",
+    icon: "release",
+    modules: ["release_lra"],
+    children: [
+      { href: "/lra", label: "Release queue", exact: true, matchPrefixes: ["/lra/applications"] },
+      { href: "/lra/history", label: "Released loans" },
+    ],
+  },
   {
     href: "/ar",
     label: "Accounting (AR)",
     icon: "accounting",
     modules: ["accounting_ar"],
     children: [
-      {
-        href: "/ar",
-        label: "Masterlist",
-        exact: true,
-        matchPrefixes: ["/ar/masterlist"],
-      },
+      { href: "/ar", label: "Masterlist", exact: true, matchPrefixes: ["/ar/masterlist"] },
       { href: "/ar/dcr", label: "DCR queue" },
+      { href: "/ar/history", label: "Posting history" },
     ],
   },
   {
@@ -285,7 +310,9 @@ const PORTAL_NAV_ITEMS: PortalNavItem[] = [
       { href: "/collector/accounts", label: "Accounts" },
       { href: "/collector/proofs", label: "Payment proofs" },
       { href: "/collector/dcr", label: "DCR" },
+      { href: "/collector/dcr/history", label: "DCR history" },
       { href: "/collector/history", label: "History" },
+      { href: "/collector/closed-accounts", label: "Closed accounts" },
     ],
   },
   {

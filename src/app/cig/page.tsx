@@ -1,8 +1,14 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
+import {
+  DateRangeFilter,
+  ViewModeToggle,
+  type DateRangeValue,
+  type HistoryViewMode,
+} from "@/components/history";
 import {
   Alert,
   Badge,
@@ -11,7 +17,8 @@ import {
   EmptyState,
   PageHeader,
   Pagination,
-  Spinner,
+  Select,
+  Skeleton,
   Table,
   Td,
   Th,
@@ -21,31 +28,43 @@ import {
   statusBadgeVariant,
 } from "@/lib/applications/status";
 import {
-  cigMatchesWorkFilter,
   cigNeedsAttention,
   cigNextActionLabel,
   daysSince,
   type CigWorkFilter,
 } from "@/lib/cig/desk";
 import { formatDate } from "@/lib/cig/format";
+import {
+  CIG_QUEUE_PAGE_SIZES,
+  type CigQueueItem,
+  type CigQueueKpis,
+  type CigQueueSortKey,
+} from "@/lib/cig/queue";
 
-type QueueItem = {
-  id: string;
-  applicationNo: string | null;
-  status: string;
-  endorsedAt: string | null;
-  createdAt: string;
-  borrower: {
-    borrowerNo: string;
-    firstName: string;
-    lastName: string;
-    email: string;
-  } | null;
-  isRevision: boolean;
-  callbackOverdueAt: string | null;
+type SortKey = CigQueueSortKey;
+
+const PAGE_SIZE_OPTIONS = CIG_QUEUE_PAGE_SIZES;
+
+const DEFAULT_DATE_RANGE: DateRangeValue = {
+  preset: "all",
+  from: "",
+  to: "",
 };
 
-const PAGE_SIZE = 10;
+const EMPTY_KPI: CigQueueKpis = {
+  inQueue: 0,
+  revisions: 0,
+  callbackOverdue: 0,
+  endorsedToday: 0,
+  needsAttention: 0,
+};
+
+const WORK_CHIPS: Array<{ id: CigWorkFilter; label: string }> = [
+  { id: "all", label: "All" },
+  { id: "revisions", label: "Revisions" },
+  { id: "callback_overdue", label: "Callback overdue" },
+  { id: "endorsed_today", label: "Endorsed today" },
+];
 
 const iconProps = {
   viewBox: "0 0 24 24",
@@ -121,69 +140,121 @@ function Kpi({
   );
 }
 
-type SortKey = "priority" | "endorsed" | "waiting" | "status";
+function dateRangePillLabel(value: DateRangeValue): string {
+  if (value.preset === "30d") return "Last 30 days";
+  if (value.preset === "90d") return "Last 90 days";
+  if (value.preset === "all") return "All time";
+  const from = value.from ? formatDate(value.from) : "…";
+  const to = value.to ? formatDate(value.to) : "…";
+  return `${from} → ${to}`;
+}
 
-const WORK_CHIPS: Array<{ id: CigWorkFilter; label: string }> = [
-  { id: "all", label: "All" },
-  { id: "revisions", label: "Revisions" },
-  { id: "callback_overdue", label: "Callback overdue" },
-  { id: "endorsed_today", label: "Endorsed today" },
-];
+function workChipLabel(filter: CigWorkFilter): string {
+  return WORK_CHIPS.find((chip) => chip.id === filter)?.label ?? filter;
+}
+
+function buildQueueQuery(params: {
+  search: string;
+  workFilter: CigWorkFilter;
+  dateRange: DateRangeValue;
+  sortKey: SortKey;
+  sortDir: "asc" | "desc";
+  page: number;
+  pageSize: number;
+}): string {
+  const qs = new URLSearchParams();
+  if (params.search.trim()) qs.set("search", params.search.trim());
+  qs.set("work", params.workFilter);
+  qs.set("range", params.dateRange.preset);
+  if (params.dateRange.preset === "custom") {
+    if (params.dateRange.from) qs.set("from", params.dateRange.from);
+    if (params.dateRange.to) qs.set("to", params.dateRange.to);
+  }
+  qs.set("sortKey", params.sortKey);
+  qs.set("sortDir", params.sortDir);
+  qs.set("page", String(params.page));
+  qs.set("pageSize", String(params.pageSize));
+  return qs.toString();
+}
+
+function borrowerDisplayName(app: CigQueueItem): string {
+  return app.borrower
+    ? `${app.borrower.firstName} ${app.borrower.lastName}`
+    : "Unknown borrower";
+}
 
 export default function CigDashboardPage() {
-  const [applications, setApplications] = useState<QueueItem[]>([]);
+  const [rows, setRows] = useState<CigQueueItem[]>([]);
+  const [totalCount, setTotalCount] = useState(0);
+  const [kpi, setKpi] = useState<CigQueueKpis>(EMPTY_KPI);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
   const [search, setSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
   const [workFilter, setWorkFilter] = useState<CigWorkFilter>("all");
+  const [dateRange, setDateRange] = useState<DateRangeValue>(DEFAULT_DATE_RANGE);
+  const [viewMode, setViewMode] = useState<HistoryViewMode>("list");
+  const [pageSize, setPageSize] =
+    useState<(typeof PAGE_SIZE_OPTIONS)[number]>(10);
+  const [filterPanelOpen, setFilterPanelOpen] = useState(false);
   const [sortKey, setSortKey] = useState<SortKey>("priority");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
   const [page, setPage] = useState(1);
+
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearch(search), 300);
+    return () => clearTimeout(timer);
+  }, [search]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [debouncedSearch, workFilter, dateRange, pageSize, sortKey, sortDir]);
 
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const queueRes = await fetch("/api/cig/applications");
-      if (!queueRes.ok) throw new Error("Failed to load queue");
-      const data = (await queueRes.json()) as { applications: QueueItem[] };
-      setApplications(data.applications);
+      const query = buildQueueQuery({
+        search: debouncedSearch,
+        workFilter,
+        dateRange,
+        sortKey,
+        sortDir,
+        page,
+        pageSize,
+      });
+      const res = await fetch(`/api/cig/applications?${query}`);
+      if (!res.ok) throw new Error("Failed to load queue");
+      const data = (await res.json()) as {
+        rows: CigQueueItem[];
+        totalCount: number;
+        kpi: CigQueueKpis;
+      };
+      setRows(data.rows ?? []);
+      setTotalCount(data.totalCount ?? 0);
+      setKpi(data.kpi ?? EMPTY_KPI);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load");
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [
+    debouncedSearch,
+    workFilter,
+    dateRange,
+    sortKey,
+    sortDir,
+    page,
+    pageSize,
+  ]);
 
   useEffect(() => {
     void load();
   }, [load]);
 
-  const total = applications.length;
-  const needsAttention = applications.filter((a) =>
-    cigNeedsAttention({
-      isRevision: a.isRevision,
-      callbackOverdueAt: a.callbackOverdueAt,
-    }),
-  ).length;
-  const revisions = applications.filter((a) => a.isRevision).length;
-  const callbackOverdue = applications.filter((a) =>
-    Boolean(a.callbackOverdueAt),
-  ).length;
-  const endorsedToday = applications.filter((a) =>
-    cigMatchesWorkFilter(
-      {
-        isRevision: a.isRevision,
-        callbackOverdueAt: a.callbackOverdueAt,
-        endorsedAt: a.endorsedAt,
-      },
-      "endorsed_today",
-    ),
-  ).length;
-
   function setFilter(next: CigWorkFilter) {
     setWorkFilter(next);
-    setPage(1);
   }
 
   function toggleSort(key: SortKey) {
@@ -193,82 +264,69 @@ export default function CigDashboardPage() {
       setSortKey(key);
       setSortDir(key === "endorsed" || key === "waiting" ? "asc" : "asc");
     }
-    setPage(1);
   }
-
-  const filtered = useMemo(() => {
-    const term = search.trim().toLowerCase();
-    return applications.filter((app) => {
-      if (
-        !cigMatchesWorkFilter(
-          {
-            isRevision: app.isRevision,
-            callbackOverdueAt: app.callbackOverdueAt,
-            endorsedAt: app.endorsedAt,
-          },
-          workFilter,
-        )
-      ) {
-        return false;
-      }
-      if (!term) return true;
-      const name = app.borrower
-        ? `${app.borrower.firstName} ${app.borrower.lastName}`.toLowerCase()
-        : "";
-      return (
-        name.includes(term) ||
-        (app.borrower?.borrowerNo.toLowerCase().includes(term) ?? false) ||
-        (app.borrower?.email.toLowerCase().includes(term) ?? false) ||
-        (app.applicationNo?.toLowerCase().includes(term) ?? false)
-      );
-    });
-  }, [applications, search, workFilter]);
-
-  const sorted = useMemo(() => {
-    const dir = sortDir === "asc" ? 1 : -1;
-    return [...filtered].sort((a, b) => {
-      if (sortKey === "endorsed") {
-        const aTime = a.endorsedAt ? new Date(a.endorsedAt).getTime() : 0;
-        const bTime = b.endorsedAt ? new Date(b.endorsedAt).getTime() : 0;
-        return dir * (aTime - bTime);
-      }
-      if (sortKey === "waiting") {
-        const aDays = daysSince(a.endorsedAt) ?? -1;
-        const bDays = daysSince(b.endorsedAt) ?? -1;
-        return dir * (aDays - bDays);
-      }
-      if (sortKey === "status") {
-        return dir * a.status.localeCompare(b.status);
-      }
-      const aFlag = cigNeedsAttention({
-        isRevision: a.isRevision,
-        callbackOverdueAt: a.callbackOverdueAt,
-      })
-        ? 0
-        : 1;
-      const bFlag = cigNeedsAttention({
-        isRevision: b.isRevision,
-        callbackOverdueAt: b.callbackOverdueAt,
-      })
-        ? 0
-        : 1;
-      if (aFlag !== bFlag) return aFlag - bFlag;
-      const aTime = a.endorsedAt ? new Date(a.endorsedAt).getTime() : 0;
-      const bTime = b.endorsedAt ? new Date(b.endorsedAt).getTime() : 0;
-      return aTime - bTime;
-    });
-  }, [filtered, sortDir, sortKey]);
-
-  const pageCount = Math.max(1, Math.ceil(sorted.length / PAGE_SIZE));
-  const safePage = Math.min(page, pageCount);
-  const paged = sorted.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
 
   function sortArrow(key: SortKey) {
     if (sortKey !== key) return null;
     return <span className="arr">{sortDir === "asc" ? "▲" : "▼"}</span>;
   }
 
-  if (loading) return <Spinner />;
+  const pageCount = Math.max(1, Math.ceil(totalCount / pageSize));
+  const safePage = Math.min(page, pageCount);
+
+  const dateIsDefault = dateRange.preset === "all";
+  const activeFilterCount =
+    (workFilter !== "all" ? 1 : 0) + (dateIsDefault ? 0 : 1);
+
+  const summaryStart = rows.length ? (safePage - 1) * pageSize + 1 : 0;
+  const summaryEnd = (safePage - 1) * pageSize + rows.length;
+
+  const { callbackOverdue, revisions, needsAttention } = kpi;
+
+  function renderVerifyButton(app: CigQueueItem) {
+    return (
+      <Link href={`/cig/applications/${app.id}`}>
+        <Button variant="secondary" size="sm">
+          Verify
+        </Button>
+      </Link>
+    );
+  }
+
+  function renderBorrowerCell(app: CigQueueItem) {
+    return (
+      <>
+        <div className="font-medium text-ink-900">{borrowerDisplayName(app)}</div>
+        <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[12px] text-ink-400">
+          <span className="id">
+            {app.applicationNo ??
+              app.borrower?.borrowerNo ??
+              app.id.slice(0, 8)}
+          </span>
+          {app.borrower?.email ? (
+            <span className="truncate">{app.borrower.email}</span>
+          ) : null}
+        </div>
+      </>
+    );
+  }
+
+  function renderStatusCell(app: CigQueueItem) {
+    return (
+      <>
+        <Badge variant={statusBadgeVariant(app.status)} dot>
+          {formatStatusLabel(app.status)}
+        </Badge>
+        {app.isRevision ? (
+          <div className="mt-1">
+            <Badge variant="danger" dot>
+              Committee revisit
+            </Badge>
+          </div>
+        ) : null}
+      </>
+    );
+  }
 
   return (
     <div>
@@ -319,7 +377,7 @@ export default function CigDashboardPage() {
         </div>
       </section>
 
-      {needsAttention > 0 ? (
+      {!loading && needsAttention > 0 ? (
         <div className="banner warn mb-6">
           <svg
             width="16"
@@ -360,235 +418,380 @@ export default function CigDashboardPage() {
       ) : null}
 
       <div className="kpi-grid mb-4">
-        <Kpi
-          tone="navy"
-          icon={IconLayers}
-          label="In queue"
-          value={total}
-          active={workFilter === "all"}
-          onClick={() => setFilter("all")}
-        />
-        <Kpi
-          tone="danger"
-          icon={IconAlert}
-          label="Revisions"
-          value={revisions}
-          active={workFilter === "revisions"}
-          onClick={() => setFilter("revisions")}
-        />
-        <Kpi
-          tone="warning"
-          icon={IconClock}
-          label="Callback overdue"
-          value={callbackOverdue}
-          active={workFilter === "callback_overdue"}
-          onClick={() => setFilter("callback_overdue")}
-        />
-        <Kpi
-          tone="teal"
-          icon={IconCheck}
-          label="Endorsed today"
-          value={endorsedToday}
-          active={workFilter === "endorsed_today"}
-          onClick={() => setFilter("endorsed_today")}
-        />
+        {loading ? (
+          <>
+            <Skeleton variant="kpi" />
+            <Skeleton variant="kpi" />
+            <Skeleton variant="kpi" />
+            <Skeleton variant="kpi" />
+          </>
+        ) : (
+          <>
+            <Kpi
+              tone="navy"
+              icon={IconLayers}
+              label="In queue"
+              value={kpi.inQueue}
+              active={workFilter === "all"}
+              onClick={() => setFilter("all")}
+            />
+            <Kpi
+              tone="danger"
+              icon={IconAlert}
+              label="Revisions"
+              value={kpi.revisions}
+              active={workFilter === "revisions"}
+              onClick={() => setFilter("revisions")}
+            />
+            <Kpi
+              tone="warning"
+              icon={IconClock}
+              label="Callback overdue"
+              value={kpi.callbackOverdue}
+              active={workFilter === "callback_overdue"}
+              onClick={() => setFilter("callback_overdue")}
+            />
+            <Kpi
+              tone="teal"
+              icon={IconCheck}
+              label="Endorsed today"
+              value={kpi.endorsedToday}
+              active={workFilter === "endorsed_today"}
+              onClick={() => setFilter("endorsed_today")}
+            />
+          </>
+        )}
       </div>
 
-      {applications.length === 0 ? (
+      <div className="card mb-4" style={{ overflow: "visible" }}>
+        <div className="tbl-toolbar" style={{ padding: "13px 14px" }}>
+          <div
+            className="gsearch"
+            style={{ maxWidth: 300, flex: 1, minWidth: 190 }}
+          >
+            <span className="icon">
+              <svg
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth={2.2}
+                strokeLinecap="round"
+              >
+                <circle cx="11" cy="11" r="7" />
+                <path d="m21 21-4.3-4.3" />
+              </svg>
+            </span>
+            <input
+              className="input"
+              style={{
+                height: 37,
+                paddingRight: 12,
+                borderRadius: "var(--r-md)",
+              }}
+              placeholder="Search name, email, or app no."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
+          </div>
+
+          <div className="flex flex-wrap gap-1.5">
+            {WORK_CHIPS.map((chip) => (
+              <button
+                key={chip.id}
+                type="button"
+                className={cn("fchip", workFilter === chip.id && "is-on")}
+                onClick={() => setFilter(chip.id)}
+              >
+                {chip.label}
+              </button>
+            ))}
+          </div>
+
+          <div className="active-pill-row">
+            {workFilter !== "all" ? (
+              <span className="active-pill">
+                Work: {workChipLabel(workFilter)}
+                <button
+                  type="button"
+                  aria-label="Clear work filter"
+                  onClick={() => setFilter("all")}
+                >
+                  ×
+                </button>
+              </span>
+            ) : null}
+            {!dateIsDefault ? (
+              <span className="active-pill">
+                {dateRangePillLabel(dateRange)}
+                <button
+                  type="button"
+                  aria-label="Clear date filter"
+                  onClick={() => setDateRange(DEFAULT_DATE_RANGE)}
+                >
+                  ×
+                </button>
+              </span>
+            ) : null}
+            {activeFilterCount > 0 ? (
+              <button
+                type="button"
+                className="clear-link"
+                onClick={() => {
+                  setFilter("all");
+                  setDateRange(DEFAULT_DATE_RANGE);
+                }}
+              >
+                Clear all
+              </button>
+            ) : null}
+          </div>
+
+          <div className="sp">
+            <ViewModeToggle value={viewMode} onChange={setViewMode} />
+            <button
+              type="button"
+              className={cn("btn btn-outline", filterPanelOpen && "is-on")}
+              onClick={() => setFilterPanelOpen((open) => !open)}
+            >
+              <svg
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth={2}
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                width={16}
+                height={16}
+                aria-hidden
+              >
+                <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3" />
+              </svg>
+              Filters
+              {activeFilterCount > 0 ? (
+                <span
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    minWidth: 16,
+                    height: 16,
+                    padding: "0 4px",
+                    borderRadius: "var(--r-full)",
+                    background: "var(--teal-600)",
+                    color: "#fff",
+                    fontSize: 10,
+                    fontWeight: 700,
+                    fontFamily: "var(--font-mono)",
+                  }}
+                >
+                  {activeFilterCount}
+                </span>
+              ) : null}
+            </button>
+          </div>
+        </div>
+
+        <div className={cn("filter-panel", filterPanelOpen && "is-open")}>
+          <div className="filter-group">
+            <span className="filter-group-label">Endorsed date</span>
+            <DateRangeFilter value={dateRange} onChange={setDateRange} />
+          </div>
+        </div>
+      </div>
+
+      {loading ? (
+        <div className="mb-4">
+          <Table>
+            <thead>
+              <tr>
+                <Th>Borrower</Th>
+                <Th>Status</Th>
+                <Th>Callback</Th>
+                <Th>Endorsed</Th>
+                <Th>Waiting</Th>
+                <Th>Next action</Th>
+                <Th className="w-1">{""}</Th>
+              </tr>
+            </thead>
+            <tbody>
+              {Array.from({ length: 6 }, (_, i) => (
+                <tr key={i}>
+                  <Td colSpan={7}>
+                    <Skeleton variant="line" />
+                  </Td>
+                </tr>
+              ))}
+            </tbody>
+          </Table>
+        </div>
+      ) : kpi.inQueue === 0 ? (
         <EmptyState
           title="Queue is clear"
           description="No applications in the active queue."
         />
+      ) : totalCount === 0 ? (
+        <EmptyState
+          title="No matching applications"
+          description="Try a different search term, work filter, or date range."
+          showMark={false}
+        />
+      ) : viewMode === "grid" ? (
+        <div className="grid-view mb-4">
+          {rows.map((app) => {
+            const nextAction = cigNextActionLabel({
+              isRevision: app.isRevision,
+              callbackOverdueAt: app.callbackOverdueAt,
+            });
+            return (
+              <div key={app.id} className="gcard">
+                <div className="gcard-top">
+                  <span className="gcard-id">
+                    {app.applicationNo ??
+                      app.borrower?.borrowerNo ??
+                      app.id.slice(0, 8)}
+                  </span>
+                  <Badge variant={statusBadgeVariant(app.status)} dot>
+                    {formatStatusLabel(app.status)}
+                  </Badge>
+                </div>
+                <div className="gcard-name">{borrowerDisplayName(app)}</div>
+                <div className="gcard-meta">
+                  <div className="row">
+                    <span className="k">Next action</span>
+                    <span className="v">{nextAction}</span>
+                  </div>
+                  {app.isRevision ? (
+                    <div className="row">
+                      <span className="k">Flag</span>
+                      <span className="v">
+                        <Badge variant="danger" dot>
+                          Committee revisit
+                        </Badge>
+                      </span>
+                    </div>
+                  ) : null}
+                  {app.callbackOverdueAt ? (
+                    <div className="row">
+                      <span className="k">Callback</span>
+                      <span className="v">
+                        <Badge variant="warning" dot>
+                          Overdue{" "}
+                          <span className="mono">
+                            {formatDate(app.callbackOverdueAt)}
+                          </span>
+                        </Badge>
+                      </span>
+                    </div>
+                  ) : null}
+                </div>
+                {renderVerifyButton(app)}
+              </div>
+            );
+          })}
+        </div>
       ) : (
-        <div className="rounded-[var(--r-lg)] border border-line-soft bg-surface-2/50 p-4 sm:p-5">
-          <div className="tbl-toolbar mb-3.5 flex flex-wrap items-center gap-2">
-            <div className="gsearch" style={{ maxWidth: 280 }}>
-              <span className="icon">
-                <svg
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth={2.2}
-                  strokeLinecap="round"
-                >
-                  <circle cx="11" cy="11" r="7" />
-                  <path d="m21 21-4.3-4.3" />
-                </svg>
-              </span>
-              <input
-                className="input"
-                style={{
-                  height: 36,
-                  paddingRight: 12,
-                  borderRadius: "var(--r-md)",
-                }}
-                placeholder="Search name, email, or app no."
-                value={search}
-                onChange={(e) => {
-                  setSearch(e.target.value);
-                  setPage(1);
-                }}
-              />
-            </div>
-
-            <div className="flex flex-wrap gap-1.5">
-              {WORK_CHIPS.map((chip) => (
-                <button
-                  key={chip.id}
-                  type="button"
-                  className={cn("fchip", workFilter === chip.id && "is-on")}
-                  onClick={() => setFilter(chip.id)}
-                >
-                  {chip.label}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {sorted.length ? (
-            <>
-              <div className="tbl-wrap">
-                <Table>
-                  <thead>
-                    <tr>
-                      <Th>Borrower</Th>
-                      <Th
-                        className="sortable"
-                        onClick={() => toggleSort("status")}
-                      >
-                        Status
-                        {sortArrow("status")}
-                      </Th>
-                      <Th>Callback</Th>
-                      <Th
-                        className="sortable"
-                        onClick={() => toggleSort("endorsed")}
-                      >
-                        Endorsed
-                        {sortArrow("endorsed")}
-                      </Th>
-                      <Th
-                        className="sortable"
-                        onClick={() => toggleSort("waiting")}
-                      >
-                        Waiting
-                        {sortArrow("waiting")}
-                      </Th>
-                      <Th>Next action</Th>
-                      <Th className="w-1">{""}</Th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {paged.map((app) => {
-                      const attention = cigNeedsAttention({
-                        isRevision: app.isRevision,
-                        callbackOverdueAt: app.callbackOverdueAt,
-                      });
-                      const waiting = daysSince(app.endorsedAt);
-                      const nextAction = cigNextActionLabel({
-                        isRevision: app.isRevision,
-                        callbackOverdueAt: app.callbackOverdueAt,
-                      });
-                      return (
-                        <tr
-                          key={app.id}
-                          className={cn(
-                            attention &&
-                              "bg-[color-mix(in_srgb,var(--warning-bg)_55%,transparent)]",
-                          )}
-                        >
-                          <Td>
-                            <div className="font-medium text-ink-900">
-                              {app.borrower
-                                ? `${app.borrower.firstName} ${app.borrower.lastName}`
-                                : "Unknown borrower"}
-                            </div>
-                            <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[12px] text-ink-400">
-                              <span className="id">
-                                {app.applicationNo ??
-                                  app.borrower?.borrowerNo ??
-                                  app.id.slice(0, 8)}
-                              </span>
-                              {app.borrower?.email ? (
-                                <span className="truncate">
-                                  {app.borrower.email}
-                                </span>
-                              ) : null}
-                            </div>
-                          </Td>
-                          <Td>
-                            <Badge variant={statusBadgeVariant(app.status)} dot>
-                              {formatStatusLabel(app.status)}
-                            </Badge>
-                            {app.isRevision ? (
-                              <div className="mt-1">
-                                <Badge variant="danger" dot>
-                                  Committee revisit
-                                </Badge>
-                              </div>
-                            ) : null}
-                          </Td>
-                          <Td>
-                            {app.callbackOverdueAt ? (
-                              <Badge variant="warning" dot>
-                                Overdue{" "}
-                                <span className="mono">
-                                  {formatDate(app.callbackOverdueAt)}
-                                </span>
-                              </Badge>
-                            ) : (
-                              <span className="text-ink-300">—</span>
-                            )}
-                          </Td>
-                          <Td className="mono">
-                            {app.endorsedAt ? formatDate(app.endorsedAt) : "—"}
-                          </Td>
-                          <Td className="mono">
-                            {waiting == null
-                              ? "—"
-                              : waiting === 0
-                                ? "Today"
-                                : `${waiting}d`}
-                          </Td>
-                          <Td className="text-[13px] text-ink-700">
-                            {nextAction}
-                          </Td>
-                          <Td>
-                            <Link href={`/cig/applications/${app.id}`}>
-                              <Button variant="secondary" size="sm">
-                                Verify
-                              </Button>
-                            </Link>
-                          </Td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </Table>
-              </div>
-
-              <div className="mt-4">
-                <Pagination
-                  page={safePage}
-                  pageCount={pageCount}
-                  onPageChange={setPage}
-                  summary={`Showing ${
-                    paged.length ? (safePage - 1) * PAGE_SIZE + 1 : 0
-                  }–${
-                    (safePage - 1) * PAGE_SIZE + paged.length
-                  } of ${sorted.length}`}
-                />
-              </div>
-            </>
-          ) : (
-            <EmptyState
-              title="No matching applications"
-              description="Try a different search term or work filter."
-              showMark={false}
-            />
-          )}
+        <div className="mb-4">
+          <Table className={viewMode === "compact" ? "is-compact" : undefined}>
+            <thead>
+              <tr>
+                <Th>Borrower</Th>
+                <Th className="sortable" onClick={() => toggleSort("status")}>
+                  Status
+                  {sortArrow("status")}
+                </Th>
+                <Th>Callback</Th>
+                <Th className="sortable" onClick={() => toggleSort("endorsed")}>
+                  Endorsed
+                  {sortArrow("endorsed")}
+                </Th>
+                <Th className="sortable" onClick={() => toggleSort("waiting")}>
+                  Waiting
+                  {sortArrow("waiting")}
+                </Th>
+                <Th>Next action</Th>
+                <Th className="w-1">{""}</Th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((app) => {
+                const attention = cigNeedsAttention({
+                  isRevision: app.isRevision,
+                  callbackOverdueAt: app.callbackOverdueAt,
+                });
+                const waiting = daysSince(app.endorsedAt);
+                const nextAction = cigNextActionLabel({
+                  isRevision: app.isRevision,
+                  callbackOverdueAt: app.callbackOverdueAt,
+                });
+                return (
+                  <tr
+                    key={app.id}
+                    className={cn(
+                      attention &&
+                        "bg-[color-mix(in_srgb,var(--warning-bg)_55%,transparent)]",
+                    )}
+                  >
+                    <Td>{renderBorrowerCell(app)}</Td>
+                    <Td>{renderStatusCell(app)}</Td>
+                    <Td>
+                      {app.callbackOverdueAt ? (
+                        <Badge variant="warning" dot>
+                          Overdue{" "}
+                          <span className="mono">
+                            {formatDate(app.callbackOverdueAt)}
+                          </span>
+                        </Badge>
+                      ) : (
+                        <span className="text-ink-300">—</span>
+                      )}
+                    </Td>
+                    <Td className="mono">
+                      {app.endorsedAt ? formatDate(app.endorsedAt) : "—"}
+                    </Td>
+                    <Td className="mono">
+                      {waiting == null
+                        ? "—"
+                        : waiting === 0
+                          ? "Today"
+                          : `${waiting}d`}
+                    </Td>
+                    <Td className="text-[13px] text-ink-700">{nextAction}</Td>
+                    <Td>{renderVerifyButton(app)}</Td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </Table>
         </div>
       )}
+
+      <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
+        <div className="flex flex-wrap items-center gap-2 text-xs text-ink-400">
+          <span>Show</span>
+          <Select
+            value={String(pageSize)}
+            onChange={(e) => {
+              setPageSize(
+                Number(e.target.value) as (typeof PAGE_SIZE_OPTIONS)[number],
+              );
+            }}
+            style={{ width: 72, height: 34 }}
+          >
+            {PAGE_SIZE_OPTIONS.map((size) => (
+              <option key={size} value={size}>
+                {size}
+              </option>
+            ))}
+          </Select>
+          <span>per page</span>
+        </div>
+        <Pagination
+          page={safePage}
+          pageCount={pageCount}
+          onPageChange={setPage}
+          summary={`Showing ${summaryStart}–${summaryEnd} of ${totalCount}`}
+        />
+      </div>
     </div>
   );
 }

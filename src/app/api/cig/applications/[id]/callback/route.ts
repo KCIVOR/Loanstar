@@ -3,7 +3,7 @@ import { z } from "zod";
 
 import { writeAuditEvent } from "@/lib/audit/writer";
 import { handleApiError, jsonOk } from "@/lib/api/handler";
-import { assertCigVerificationStage } from "@/lib/cig/queue";
+import { assertCigVerificationStage } from "@/lib/cig/queue-guards";
 import { requireModulePermission } from "@/lib/permissions/server";
 import { createClient } from "@/lib/supabase/server";
 

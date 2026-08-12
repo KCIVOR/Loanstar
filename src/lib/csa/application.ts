@@ -18,6 +18,7 @@ import { assessApplicationFormCompleteness } from "./application-form-completene
 import { getActiveComputation } from "./computation";
 import { assessInitialInterview } from "./initial-interview";
 import { assessPrivacyOrientation } from "./privacy-orientation";
+import { csaScreeningCheckSlug } from "./sme-duplication";
 import { isCsaEditableStatus } from "./status";
 
 export { isCsaEditableStatus, CSA_EDITABLE_STATUSES } from "./status";
@@ -54,6 +55,8 @@ export async function getApplicationForStaff(
       status,
       status_history,
       blocker,
+      segment,
+      entity_type,
       is_reloan,
       parent_application_id,
       endorsed_at,
@@ -88,6 +91,7 @@ export async function getApplicationForStaff(
         financial,
         allottee,
         pic_work,
+        business_info,
         dependents,
         references_data,
         profile_data
@@ -132,27 +136,38 @@ export async function getEndorseReadiness(
   supabase: SupabaseClient,
   applicationId: string,
 ): Promise<EndorseReadiness> {
-  const checklist = await getStageChecklist(supabase, "intake", applicationId);
+  const application = await getApplicationForStaff(supabase, applicationId);
+  const checklist = await getStageChecklist(supabase, "intake", applicationId, {
+    segment: application.segment === "sme" ? "sme" : "seafarer",
+    entityType:
+      application.entity_type === "individual" ||
+      application.entity_type === "corporate"
+        ? application.entity_type
+        : null,
+  });
   const summary = getCompletionSummary(checklist);
   const checklistComplete =
     summary.required > 0 && summary.complete === summary.required;
 
-  const { data: nclType } = await supabase
+  const segment = application.segment === "sme" ? "sme" : "seafarer";
+  const screeningSlug = csaScreeningCheckSlug(segment);
+
+  const { data: screeningType } = await supabase
     .from("check_types")
     .select("id")
-    .eq("slug", "ncl")
+    .eq("slug", screeningSlug)
     .single();
 
   let nclRecorded = false;
-  if (nclType?.id) {
-    const { data: nclCheck } = await supabase
+  if (screeningType?.id) {
+    const { data: screeningCheck } = await supabase
       .from("checks_recorded")
       .select("result")
       .eq("loan_application_id", applicationId)
-      .eq("check_type_id", nclType.id)
+      .eq("check_type_id", screeningType.id)
       .maybeSingle();
     nclRecorded =
-      nclCheck?.result === "pass" || nclCheck?.result === "fail";
+      screeningCheck?.result === "pass" || screeningCheck?.result === "fail";
   }
 
   const activeComputation = await getActiveComputation(supabase, applicationId);
@@ -167,15 +182,23 @@ export async function getEndorseReadiness(
   const coverageEval = evaluateCoverageForEndorse(
     coverageRatio,
     coverageThreshold,
+    { segment: application.segment === "sme" ? "sme" : "seafarer" },
   );
 
-  const application = await getApplicationForStaff(supabase, applicationId);
   const borrowerRaw = application.borrowers;
   const borrowerRow = (
     Array.isArray(borrowerRaw) ? borrowerRaw[0] : borrowerRaw
   ) as BorrowerRow | null;
   const formCompleteness = assessApplicationFormCompleteness(
     borrowerRow ? mapBorrowerRow(borrowerRow) : null,
+    {
+      segment: application.segment === "sme" ? "sme" : "seafarer",
+      entityType:
+        application.entity_type === "individual" ||
+        application.entity_type === "corporate"
+          ? application.entity_type
+          : null,
+    },
   );
   const orientation = assessPrivacyOrientation(
     application.privacy_orientation_at as string | null | undefined,
@@ -190,11 +213,12 @@ export async function getEndorseReadiness(
   if (onHold) {
     missing.push(ON_HOLD_ENDORSE_MISSING);
   }
-  if (!checklistComplete) {
-    missing.push("Intake checklist incomplete");
-  }
   if (!nclRecorded) {
-    missing.push("NCL check not recorded");
+    missing.push(
+      segment === "sme"
+        ? "SME duplication check not recorded"
+        : "NCL check not recorded",
+    );
   }
   if (!signedComputationPresent) {
     missing.push("Signed computation required");
@@ -209,7 +233,6 @@ export async function getEndorseReadiness(
   return {
     ready:
       !onHold &&
-      checklistComplete &&
       nclRecorded &&
       signedComputationPresent &&
       coverageEval.coverageOk &&

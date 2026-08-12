@@ -26,6 +26,8 @@ async function assertOwnApplication(userId: string, applicationId: string) {
       parent_application_id,
       created_at,
       updated_at,
+      segment,
+      entity_type,
       borrowers!inner ( user_id )
     `,
     )
@@ -72,6 +74,12 @@ export async function GET(_request: Request, { params }: RouteParams) {
         parentApplicationId: application.parent_application_id,
         createdAt: application.created_at,
         updatedAt: application.updated_at,
+        segment: application.segment === "sme" ? "sme" : "seafarer",
+        entityType:
+          application.entity_type === "individual" ||
+          application.entity_type === "corporate"
+            ? application.entity_type
+            : null,
       },
     });
   } catch (error) {

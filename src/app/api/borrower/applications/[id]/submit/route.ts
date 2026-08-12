@@ -3,7 +3,6 @@ import { NextResponse } from "next/server";
 import { appendStatusHistory } from "@/lib/applications/status";
 import { writeAuditEvent } from "@/lib/audit/writer";
 import { handleApiError, jsonOk } from "@/lib/api/handler";
-import { getCompletionSummary, getStageChecklist } from "@/lib/documents/checklist";
 import {
   ForbiddenError,
   requireModulePermission,
@@ -21,6 +20,8 @@ async function assertOwnApplication(userId: string, applicationId: string) {
       id,
       status,
       borrower_id,
+      segment,
+      entity_type,
       borrowers!inner ( user_id )
     `,
     )
@@ -42,12 +43,17 @@ async function assertOwnApplication(userId: string, applicationId: string) {
     id: data.id as string,
     status: data.status as string,
     borrowerId: data.borrower_id as string,
+    segment: (data.segment === "sme" ? "sme" : "seafarer") as "seafarer" | "sme",
+    entityType:
+      data.entity_type === "individual" || data.entity_type === "corporate"
+        ? (data.entity_type as "individual" | "corporate")
+        : null,
   };
 }
 
 /** Borrower submits their draft — flips it to documents_pending, the first
- * status CSA's queue picks up. Gated on required intake documents being
- * uploaded (not CSA-confirmed — that's CSA's job after submission). */
+ * status CSA's queue picks up. No longer gated on document completeness; CSA
+ * follows up on missing docs after intake. */
 export async function POST(_request: Request, { params }: RouteParams) {
   try {
     const user = await requireModulePermission("borrower_portal", "edit");
@@ -58,19 +64,6 @@ export async function POST(_request: Request, { params }: RouteParams) {
     if (application.status !== "draft") {
       return NextResponse.json(
         { error: "This application has already been submitted." },
-        { status: 400 },
-      );
-    }
-
-    const items = await getStageChecklist(supabase, "intake", application.id);
-    const summary = getCompletionSummary(items);
-
-    if (summary.uploaded < summary.required) {
-      return NextResponse.json(
-        {
-          error: `Upload all required documents before submitting (${summary.uploaded} of ${summary.required}).`,
-          summary,
-        },
         { status: 400 },
       );
     }

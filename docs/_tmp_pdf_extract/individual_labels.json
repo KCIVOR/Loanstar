@@ -1,0 +1,604 @@
+[
+  {
+    "text": "Reset Form",
+    "x": 70.3,
+    "y": 9.7,
+    "size": 10.0,
+    "font": "ArialNarrow"
+  },
+  {
+    "text": "INDIVIDUAL LOAN APPLICATION",
+    "x": 354.1,
+    "y": 50.8,
+    "size": 9.8,
+    "font": "ArialNarrow-Bold"
+  },
+  {
+    "text": "Business Loan",
+    "x": 218.3,
+    "y": 85.6,
+    "size": 8.0,
+    "font": "Helvetica"
+  },
+  {
+    "text": "Date Applied",
+    "x": 57.0,
+    "y": 87.9,
+    "size": 8.2,
+    "font": "ArialNarrow"
+  },
+  {
+    "text": "Type Of Loan",
+    "x": 169.2,
+    "y": 87.9,
+    "size": 8.2,
+    "font": "ArialNarrow"
+  },
+  {
+    "text": "Loan Desired",
+    "x": 287.7,
+    "y": 87.9,
+    "size": 8.2,
+    "font": "ArialNarrow"
+  },
+  {
+    "text": "Sales Agent",
+    "x": 428.0,
+    "y": 87.9,
+    "size": 8.2,
+    "font": "ArialNarrow"
+  },
+  {
+    "text": "IMPORTANT : PLEASE FILL UP THIS FORM TO FACILITATE YOUR LOAN APPLICATION, PUT N/A IF NOT APPLICABLE",
+    "x": 47.4,
+    "y": 109.9,
+    "size": 8.2,
+    "font": "ArialNarrow"
+  },
+  {
+    "text": "I. APPLICANT DATA",
+    "x": 47.4,
+    "y": 125.5,
+    "size": 8.2,
+    "font": "ArialNarrow-Bold"
+  },
+  {
+    "text": "LAST NAME",
+    "x": 47.4,
+    "y": 138.2,
+    "size": 8.2,
+    "font": "ArialNarrow"
+  },
+  {
+    "text": "FIRST NAME",
+    "x": 197.8,
+    "y": 138.2,
+    "size": 8.2,
+    "font": "ArialNarrow"
+  },
+  {
+    "text": "MIDDLE NAME",
+    "x": 338.1,
+    "y": 138.2,
+    "size": 8.2,
+    "font": "ArialNarrow"
+  },
+  {
+    "text": "STATUS",
+    "x": 474.3,
+    "y": 138.2,
+    "size": 8.2,
+    "font": "ArialNarrow"
+  },
+  {
+    "text": "PRESENT ADDRESS",
+    "x": 47.4,
+    "y": 165.9,
+    "size": 8.2,
+    "font": "ArialNarrow"
+  },
+  {
+    "text": "OWNERSHIP",
+    "x": 379.5,
+    "y": 165.9,
+    "size": 8.2,
+    "font": "ArialNarrow"
+  },
+  {
+    "text": "YRS OF STAY",
+    "x": 474.3,
+    "y": 165.9,
+    "size": 8.2,
+    "font": "ArialNarrow"
+  },
+  {
+    "text": "PROVINCIAL ADDRESS",
+    "x": 47.4,
+    "y": 193.8,
+    "size": 8.2,
+    "font": "ArialNarrow"
+  },
+  {
+    "text": "OWNERSHIP",
+    "x": 379.5,
+    "y": 193.8,
+    "size": 8.2,
+    "font": "ArialNarrow"
+  },
+  {
+    "text": "YRS OF STAY",
+    "x": 474.3,
+    "y": 193.8,
+    "size": 8.2,
+    "font": "ArialNarrow"
+  },
+  {
+    "text": "PLACE OF BIRTH",
+    "x": 47.4,
+    "y": 221.6,
+    "size": 8.2,
+    "font": "ArialNarrow"
+  },
+  {
+    "text": "BIRTH DATE",
+    "x": 197.8,
+    "y": 221.6,
+    "size": 8.2,
+    "font": "ArialNarrow"
+  },
+  {
+    "text": "LANDLINE",
+    "x": 290.9,
+    "y": 221.6,
+    "size": 8.2,
+    "font": "ArialNarrow"
+  },
+  {
+    "text": "MOBILE NUMBER",
+    "x": 379.5,
+    "y": 221.6,
+    "size": 8.2,
+    "font": "ArialNarrow"
+  },
+  {
+    "text": "EMAIL ADDRESS",
+    "x": 474.3,
+    "y": 221.6,
+    "size": 8.2,
+    "font": "ArialNarrow"
+  },
+  {
+    "text": "NO OF DEPENDENTS",
+    "x": 47.4,
+    "y": 248.6,
+    "size": 8.2,
+    "font": "ArialNarrow"
+  },
+  {
+    "text": "NAME",
+    "x": 130.2,
+    "y": 263.0,
+    "size": 8.2,
+    "font": "ArialNarrow"
+  },
+  {
+    "text": "AGE",
+    "x": 254.1,
+    "y": 263.0,
+    "size": 8.2,
+    "font": "ArialNarrow"
+  },
+  {
+    "text": "SCHOOL ATTENDED / IF WORKING EMPLOYERS NAME",
+    "x": 342.5,
+    "y": 263.0,
+    "size": 8.2,
+    "font": "ArialNarrow"
+  },
+  {
+    "text": "`",
+    "x": 430.1,
+    "y": 305.7,
+    "size": 9.8,
+    "font": "ArialNarrow-Bold"
+  },
+  {
+    "text": "COMPANY OR EMPLOYER'S NAME",
+    "x": 47.4,
+    "y": 340.2,
+    "size": 8.2,
+    "font": "ArialNarrow"
+  },
+  {
+    "text": "COMPANY ADDRESS",
+    "x": 197.8,
+    "y": 340.2,
+    "size": 8.2,
+    "font": "ArialNarrow"
+  },
+  {
+    "text": "CONTACT NUMBER",
+    "x": 474.3,
+    "y": 340.2,
+    "size": 8.2,
+    "font": "ArialNarrow"
+  },
+  {
+    "text": "POSITION",
+    "x": 47.4,
+    "y": 365.8,
+    "size": 8.2,
+    "font": "ArialNarrow"
+  },
+  {
+    "text": "YRS OF STAY",
+    "x": 197.8,
+    "y": 365.8,
+    "size": 8.2,
+    "font": "ArialNarrow"
+  },
+  {
+    "text": "YRS OF OPERATION",
+    "x": 290.9,
+    "y": 365.8,
+    "size": 8.2,
+    "font": "ArialNarrow"
+  },
+  {
+    "text": "EMAIL ADDRESS",
+    "x": 379.5,
+    "y": 365.8,
+    "size": 8.2,
+    "font": "ArialNarrow"
+  },
+  {
+    "text": "WEBSITE ADDRESS",
+    "x": 474.3,
+    "y": 365.8,
+    "size": 8.2,
+    "font": "ArialNarrow"
+  },
+  {
+    "text": "PREVIOUS EMPLOYER",
+    "x": 47.4,
+    "y": 391.4,
+    "size": 8.2,
+    "font": "ArialNarrow"
+  },
+  {
+    "text": "COMPANY ADDRESS",
+    "x": 197.9,
+    "y": 391.4,
+    "size": 8.2,
+    "font": "ArialNarrow"
+  },
+  {
+    "text": "YRS OF STAY",
+    "x": 408.1,
+    "y": 391.4,
+    "size": 8.2,
+    "font": "ArialNarrow"
+  },
+  {
+    "text": "CONTACT NUMBER",
+    "x": 474.3,
+    "y": 391.4,
+    "size": 8.2,
+    "font": "ArialNarrow"
+  },
+  {
+    "text": "II. SPOUSE INFORMATION",
+    "x": 47.4,
+    "y": 417.2,
+    "size": 8.2,
+    "font": "ArialNarrow-Bold"
+  },
+  {
+    "text": "LAST NAME",
+    "x": 47.4,
+    "y": 429.8,
+    "size": 8.2,
+    "font": "ArialNarrow"
+  },
+  {
+    "text": "FIRST NAME",
+    "x": 197.8,
+    "y": 429.8,
+    "size": 8.2,
+    "font": "ArialNarrow"
+  },
+  {
+    "text": "MIDDLE NAME",
+    "x": 338.1,
+    "y": 429.8,
+    "size": 8.2,
+    "font": "ArialNarrow"
+  },
+  {
+    "text": "DATE OF BIRTH",
+    "x": 474.3,
+    "y": 429.8,
+    "size": 8.2,
+    "font": "ArialNarrow"
+  },
+  {
+    "text": "PRESENT ADDRESS",
+    "x": 47.4,
+    "y": 454.6,
+    "size": 8.2,
+    "font": "ArialNarrow"
+  },
+  {
+    "text": "YRS OF STAY",
+    "x": 474.3,
+    "y": 454.6,
+    "size": 8.2,
+    "font": "ArialNarrow"
+  },
+  {
+    "text": "PROVINCIAL ADDRESS",
+    "x": 47.4,
+    "y": 483.0,
+    "size": 8.2,
+    "font": "ArialNarrow"
+  },
+  {
+    "text": "YRS OF STAY",
+    "x": 474.3,
+    "y": 483.0,
+    "size": 8.2,
+    "font": "ArialNarrow"
+  },
+  {
+    "text": "COMPANY OR EMPLOYER'S NAME",
+    "x": 47.4,
+    "y": 510.4,
+    "size": 8.2,
+    "font": "ArialNarrow"
+  },
+  {
+    "text": "YRS OF STAY",
+    "x": 197.8,
+    "y": 510.4,
+    "size": 8.2,
+    "font": "ArialNarrow"
+  },
+  {
+    "text": "POSITION",
+    "x": 290.9,
+    "y": 510.4,
+    "size": 8.2,
+    "font": "ArialNarrow"
+  },
+  {
+    "text": "CONTACT NUMBER",
+    "x": 379.5,
+    "y": 510.4,
+    "size": 8.2,
+    "font": "ArialNarrow"
+  },
+  {
+    "text": "COMPANY ADDRESS",
+    "x": 474.3,
+    "y": 510.4,
+    "size": 8.2,
+    "font": "ArialNarrow"
+  },
+  {
+    "text": "III. REFERENCES - Required  2 relatives and 2 not relatives",
+    "x": 47.4,
+    "y": 536.4,
+    "size": 8.2,
+    "font": "ArialNarrow-Bold"
+  },
+  {
+    "text": "NAME",
+    "x": 104.8,
+    "y": 548.9,
+    "size": 8.2,
+    "font": "ArialNarrow"
+  },
+  {
+    "text": "ADDRESS",
+    "x": 243.7,
+    "y": 548.9,
+    "size": 8.2,
+    "font": "ArialNarrow"
+  },
+  {
+    "text": "RELATION",
+    "x": 361.5,
+    "y": 548.9,
+    "size": 8.2,
+    "font": "ArialNarrow"
+  },
+  {
+    "text": "CONTACT NUMBER",
+    "x": 469.1,
+    "y": 548.9,
+    "size": 8.2,
+    "font": "ArialNarrow"
+  },
+  {
+    "text": "RELATIVES LIVING IN PROVINCE",
+    "x": 47.4,
+    "y": 619.4,
+    "size": 8.2,
+    "font": "ArialNarrow"
+  },
+  {
+    "text": "ADDRESS",
+    "x": 197.8,
+    "y": 619.4,
+    "size": 8.2,
+    "font": "ArialNarrow"
+  },
+  {
+    "text": "CONTACT NUMBER",
+    "x": 436.7,
+    "y": 619.4,
+    "size": 8.2,
+    "font": "ArialNarrow"
+  },
+  {
+    "text": "IV. INCOME DECLARATION",
+    "x": 47.4,
+    "y": 646.3,
+    "size": 8.2,
+    "font": "ArialNarrow-Bold"
+  },
+  {
+    "text": "OWN MONTHLY INCOME",
+    "x": 46.0,
+    "y": 661.7,
+    "size": 8.2,
+    "font": "ArialNarrow-BoldItalic"
+  },
+  {
+    "text": "SPOUSE'S MONTHLY INCOME",
+    "x": 212.3,
+    "y": 661.7,
+    "size": 8.2,
+    "font": "ArialNarrow-BoldItalic"
+  },
+  {
+    "text": "OTHER INCOME",
+    "x": 386.7,
+    "y": 661.7,
+    "size": 8.2,
+    "font": "ArialNarrow-BoldItalic"
+  },
+  {
+    "text": "GROSS INCOME",
+    "x": 46.0,
+    "y": 679.5,
+    "size": 8.2,
+    "font": "ArialNarrow"
+  },
+  {
+    "text": "GROSS INCOME",
+    "x": 212.3,
+    "y": 679.5,
+    "size": 8.2,
+    "font": "ArialNarrow"
+  },
+  {
+    "text": "SOURCE OF INCOME",
+    "x": 386.7,
+    "y": 679.5,
+    "size": 8.2,
+    "font": "ArialNarrow"
+  },
+  {
+    "text": "LESS EXPENSES",
+    "x": 46.0,
+    "y": 693.5,
+    "size": 8.2,
+    "font": "ArialNarrow"
+  },
+  {
+    "text": "LESS EXPENSES",
+    "x": 212.3,
+    "y": 693.5,
+    "size": 8.2,
+    "font": "ArialNarrow"
+  },
+  {
+    "text": "MONTHLY INCOME",
+    "x": 386.7,
+    "y": 693.5,
+    "size": 8.2,
+    "font": "ArialNarrow"
+  },
+  {
+    "text": "0.00",
+    "x": 500.6,
+    "y": 709.1,
+    "size": 10.6,
+    "font": "Helvetica"
+  },
+  {
+    "text": "NET INCOME",
+    "x": 46.0,
+    "y": 713.9,
+    "size": 8.2,
+    "font": "ArialNarrow"
+  },
+  {
+    "text": "NET INCOME",
+    "x": 212.3,
+    "y": 713.9,
+    "size": 8.2,
+    "font": "ArialNarrow"
+  },
+  {
+    "text": "TOTAL NET INCOME",
+    "x": 386.7,
+    "y": 713.9,
+    "size": 8.2,
+    "font": "ArialNarrow"
+  },
+  {
+    "text": "I certify that the statements on this application are correct and complete. By filling out this form, I agree that the details I provided, including but not limited",
+    "x": 54.5,
+    "y": 741.9,
+    "size": 9.0,
+    "font": "ArialNarrow"
+  },
+  {
+    "text": "to my name, address, phone number, email, and other information, personal or otherwise, will be collected by LOAN STAR LENDING GROUP CORP. to",
+    "x": 54.5,
+    "y": 752.2,
+    "size": 9.0,
+    "font": "ArialNarrow"
+  },
+  {
+    "text": "process my loan application. The use of the information shall be under applicable laws, rules, and  regulations  of  the  Republic  of  the  Philippine.  I  also",
+    "x": 54.5,
+    "y": 762.5,
+    "size": 9.0,
+    "font": "ArialNarrow"
+  },
+  {
+    "text": "authorized the company to conduct phone and field verification with all the information I provided.",
+    "x": 54.5,
+    "y": 772.8,
+    "size": 9.0,
+    "font": "ArialNarrow"
+  },
+  {
+    "text": "I agree that this application may remain your property whether or not this credit application is approved.",
+    "x": 54.5,
+    "y": 792.6,
+    "size": 9.0,
+    "font": "ArialNarrow"
+  },
+  {
+    "text": "BORROWER'S SIGNATURE OVER PRINTED NAME",
+    "x": 117.4,
+    "y": 850.7,
+    "size": 8.2,
+    "font": "ArialNarrow"
+  },
+  {
+    "text": "CO-BORROWER'S SIGNATURE OVER PRINTED NAME",
+    "x": 332.8,
+    "y": 850.7,
+    "size": 8.2,
+    "font": "ArialNarrow"
+  },
+  {
+    "text": "DATE :",
+    "x": 85.8,
+    "y": 872.1,
+    "size": 8.2,
+    "font": "ArialNarrow"
+  },
+  {
+    "text": "DATE :",
+    "x": 306.5,
+    "y": 872.1,
+    "size": 8.2,
+    "font": "ArialNarrow"
+  }
+]

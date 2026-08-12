@@ -13,6 +13,8 @@ const createChecklistSchema = z.object({
   isRequired: z.boolean().optional().default(true),
   isOptionalFlag: z.boolean().optional().default(false),
   sortOrder: z.number().int().min(0).optional().default(0),
+  segment: z.enum(["seafarer", "sme"]).optional().default("seafarer"),
+  entityType: z.enum(["individual", "corporate"]).nullable().optional(),
 });
 
 export async function GET(request: Request) {
@@ -21,6 +23,8 @@ export async function GET(request: Request) {
     const supabase = await createClient();
     const { searchParams } = new URL(request.url);
     const stage = searchParams.get("stage");
+    const segment = searchParams.get("segment");
+    const entityType = searchParams.get("entityType");
 
     let query = supabase
       .from("stage_checklists")
@@ -28,6 +32,8 @@ export async function GET(request: Request) {
         `
         id,
         stage,
+        segment,
+        entity_type,
         is_required,
         is_optional_flag,
         sort_order,
@@ -40,6 +46,14 @@ export async function GET(request: Request) {
 
     if (stage) {
       query = query.eq("stage", stage);
+    }
+    if (segment === "seafarer" || segment === "sme") {
+      query = query.eq("segment", segment);
+    }
+    if (entityType === "individual" || entityType === "corporate") {
+      query = query.or(`entity_type.is.null,entity_type.eq.${entityType}`);
+    } else if (entityType === "none") {
+      query = query.is("entity_type", null);
     }
 
     const { data, error } = await query;
@@ -54,6 +68,8 @@ export async function GET(request: Request) {
       return {
         id: row.id,
         stage: row.stage,
+        segment: row.segment ?? "seafarer",
+        entityType: row.entity_type ?? null,
         isRequired: row.is_required,
         isOptionalFlag: row.is_optional_flag,
         sortOrder: row.sort_order,
@@ -84,11 +100,15 @@ export async function POST(request: Request) {
         is_required: body.isRequired,
         is_optional_flag: body.isOptionalFlag,
         sort_order: body.sortOrder,
+        segment: body.segment,
+        entity_type: body.entityType ?? null,
       })
       .select(
         `
         id,
         stage,
+        segment,
+        entity_type,
         is_required,
         is_optional_flag,
         sort_order,
@@ -101,7 +121,10 @@ export async function POST(request: Request) {
     if (error) {
       if (error.code === "23505") {
         return NextResponse.json(
-          { error: "Checklist item already exists for this stage and document type" },
+          {
+            error:
+              "Checklist item already exists for this stage, segment, entity type, and document type",
+          },
           { status: 409 },
         );
       }
@@ -124,6 +147,8 @@ export async function POST(request: Request) {
         isRequired: body.isRequired,
         isOptionalFlag: body.isOptionalFlag,
         sortOrder: body.sortOrder,
+        segment: body.segment,
+        entityType: body.entityType ?? null,
       },
     });
 
@@ -132,6 +157,8 @@ export async function POST(request: Request) {
         item: {
           id: item.id,
           stage: item.stage,
+          segment: item.segment ?? "seafarer",
+          entityType: item.entity_type ?? null,
           isRequired: item.is_required,
           isOptionalFlag: item.is_optional_flag,
           sortOrder: item.sort_order,

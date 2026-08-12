@@ -4,6 +4,7 @@ import { appendStatusHistory } from "@/lib/applications/status";
 import { writeAuditEvent } from "@/lib/audit/writer";
 import { notifyBorrowerForApplication } from "@/lib/notifications/write";
 
+import { getCommitteeSize } from "./committee-size";
 import {
   assertAllVotesCast,
   computeVoteTally,
@@ -151,8 +152,9 @@ export async function executeFinalAction(
   assertFinalActionPreconditions(application.status, action, options);
 
   const votes = await getCommitteeVotes(supabase, applicationId);
-  assertAllVotesCast(votes);
-  const tally = computeVoteTally(votes);
+  const committeeSize = await getCommitteeSize();
+  assertAllVotesCast(votes, committeeSize);
+  const tally = computeVoteTally(votes, committeeSize);
 
   const { data: actionRow, error: actionError } = await supabase
     .from("committee_actions")

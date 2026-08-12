@@ -1,3 +1,4 @@
+import { resolveDateBounds, type DateRangeValue } from "@/components/history";
 import { handleApiError, jsonOk } from "@/lib/api/handler";
 import { nextOpenInstallment, type ScheduleLite } from "@/lib/collector/desk";
 import { requireModulePermission } from "@/lib/permissions/server";
@@ -5,7 +6,27 @@ import {
   remedialDaysPastDue,
   remedialSeverity,
 } from "@/lib/remedial/desk";
+import {
+  clampRemedialQueuePageSize,
+  computeRemedialQueueKpis,
+  inTurnedOverBounds,
+  passesSeverity,
+  remedialSearchPredicate,
+  severityFilterSpec,
+  sortRemedialQueue,
+  type RemedialQueueMappedRow,
+  type RemedialQueueSortKey,
+} from "@/lib/remedial/queue";
 import { createClient, createServiceClient } from "@/lib/supabase/server";
+
+const RANGE_PRESETS = new Set(["30d", "90d", "all", "custom"]);
+const SORT_KEYS = new Set<RemedialQueueSortKey>([
+  "priority",
+  "balance",
+  "dpd",
+  "borrower",
+  "turned",
+]);
 
 function asSchedules(raw: unknown): ScheduleLite[] {
   if (!raw) return [];
@@ -22,11 +43,46 @@ function asSchedules(raw: unknown): ScheduleLite[] {
   });
 }
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
     const user = await requireModulePermission("remedial", "view");
+    const { searchParams } = new URL(request.url);
+
+    const search = searchParams.get("search") ?? "";
+    const severitySpec = severityFilterSpec(
+      searchParams.get("severity") ?? "all",
+    );
+
+    const rangeRaw = searchParams.get("range") ?? "all";
+    const preset = (
+      RANGE_PRESETS.has(rangeRaw) ? rangeRaw : "all"
+    ) as DateRangeValue["preset"];
+    const dateRange: DateRangeValue = {
+      preset,
+      from: searchParams.get("from") ?? "",
+      to: searchParams.get("to") ?? "",
+    };
+    const { from, to } = resolveDateBounds(dateRange, new Date());
+
+    const sortKeyRaw = searchParams.get("sortKey") ?? "priority";
+    const sortKey: RemedialQueueSortKey = SORT_KEYS.has(
+      sortKeyRaw as RemedialQueueSortKey,
+    )
+      ? (sortKeyRaw as RemedialQueueSortKey)
+      : "priority";
+    const sortDirRaw = searchParams.get("sortDir") ?? "asc";
+    const sortDir = sortDirRaw === "desc" ? "desc" : "asc";
+
+    const page = Math.max(1, Number(searchParams.get("page") ?? 1) || 1);
+    const pageSize = clampRemedialQueuePageSize(
+      Number(searchParams.get("pageSize") ?? 10),
+    );
+
     const supabase = await createClient();
 
+    // Fetch the officer's assigned+flagged superset, then filter/sort/paginate
+    // in the handler: severity/dpd are computed (not SQL columns) and volume is
+    // per-officer bounded.
     const { data, error } = await supabase
       .from("masterlist")
       .select(
@@ -35,6 +91,9 @@ export async function GET() {
         borrower_name,
         borrower_no,
         loan_account_no,
+        segment,
+        manning_agency,
+        vessel_name,
         outstanding_balance,
         aging_bucket,
         account_status,
@@ -110,7 +169,7 @@ export async function GET() {
       }
     }
 
-    const accounts = (data ?? []).map((row) => {
+    const accounts: RemedialQueueMappedRow[] = (data ?? []).map((row) => {
       const schedules = asSchedules(row.amortization_schedules);
       const next = nextOpenInstallment(schedules);
       const dpd = remedialDaysPastDue(schedules);
@@ -158,6 +217,9 @@ export async function GET() {
         borrowerName: row.borrower_name,
         borrowerNo: row.borrower_no,
         loanAccountNo: row.loan_account_no,
+        segment: row.segment === "sme" ? "sme" : "seafarer",
+        manningAgency: (row.manning_agency as string | null) ?? null,
+        vesselName: (row.vessel_name as string | null) ?? null,
         outstandingBalance: balance,
         agingBucket: aging,
         accountStatus: row.account_status,
@@ -181,7 +243,24 @@ export async function GET() {
       };
     });
 
-    return jsonOk({ accounts });
+    const kpi = computeRemedialQueueKpis(accounts);
+
+    const filtered = accounts.filter(
+      (row) =>
+        inTurnedOverBounds(row.turnedOverAt, from, to) &&
+        passesSeverity(row.severity, severitySpec) &&
+        remedialSearchPredicate(row, search),
+    );
+    const sorted = sortRemedialQueue(filtered, sortKey, sortDir);
+
+    const totalCount = sorted.length;
+    const rows = sorted.slice((page - 1) * pageSize, page * pageSize);
+
+    return jsonOk({
+      rows,
+      totalCount,
+      kpi,
+    });
   } catch (error) {
     return handleApiError(error);
   }

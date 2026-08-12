@@ -1,5 +1,12 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
+import {
+  assessFieldVisitRequired,
+  assessSmeReloanRequired,
+  type FieldVisit,
+  type SmeReloanVerification,
+} from "./field-visit";
+
 // CI & References Form types (loanstar/docs/cig-references-form-plan.md, Phase 2).
 // Field names/order follow CI AND REFERENCES FORM 1.xlsx, Sheet1.
 export type PicAddress = {
@@ -142,11 +149,20 @@ export type VerificationRecord = {
   picRatingReason: string | null;
   cifVerifiedBy: string | null;
   cifVerifiedDate: string | null;
+  /** SME Field Visit (Residence / Business / Recommendation). */
+  fieldVisit: FieldVisit | null;
+  /** SME re-loan lighter re-verification form. */
+  smeReloanVerification: SmeReloanVerification | null;
   finding: "positive" | "negative" | null;
   findingNotes: string | null;
   isComplete: boolean;
   completedAt: string | null;
   forwardedAt: string | null;
+};
+
+export type VerificationScope = {
+  segment?: "seafarer" | "sme" | null;
+  isReloan?: boolean | null;
 };
 
 export type VerificationCompleteness = {
@@ -203,6 +219,9 @@ export function mapVerificationRow(row: Record<string, unknown>): VerificationRe
     picRatingReason: (row.pic_rating_reason as string) ?? null,
     cifVerifiedBy: (row.cif_verified_by as string) ?? null,
     cifVerifiedDate: (row.cif_verified_date as string) ?? null,
+    fieldVisit: (row.field_visit as FieldVisit) ?? null,
+    smeReloanVerification:
+      (row.sme_reloan_verification as SmeReloanVerification) ?? null,
     finding: (row.finding as VerificationRecord["finding"]) ?? null,
     findingNotes: (row.finding_notes as string) ?? null,
     isComplete: Boolean(row.is_complete),
@@ -308,10 +327,21 @@ export async function getCigChecksComplete(
   supabase: SupabaseClient,
   applicationId: string,
 ): Promise<{ complete: boolean; missing: string[] }> {
+  const { data: app } = await supabase
+    .from("loan_applications")
+    .select("segment")
+    .eq("id", applicationId)
+    .maybeSingle();
+  const segment = app?.segment === "sme" ? "sme" : "seafarer";
+
+  // Phase 7.1 provisional: CIG mappings are Seafarer-only until client confirms
+  // which of nfis/mf/lslg_denied_cancelled apply to SME. SME therefore has an
+  // empty CIG check list (complete=true) — not a silent reuse of POEA/Marina.
   const { data: mappings, error: mapError } = await supabase
     .from("stage_check_mapping")
     .select("check_type_id, check_types ( id, slug, name )")
-    .eq("stage", "cig");
+    .eq("stage", "cig")
+    .eq("segment", segment);
 
   if (mapError) {
     throw new Error(mapError.message);
@@ -352,8 +382,11 @@ export function assessVerificationCompleteness(
   verification: VerificationRecord | null,
   checksComplete: boolean,
   checksMissing: string[],
+  scope: VerificationScope = {},
 ): VerificationCompleteness {
   const missing: string[] = [...checksMissing];
+  const segment = scope.segment === "sme" ? "sme" : "seafarer";
+  const isReloan = Boolean(scope.isReloan);
 
   if (!verification) {
     missing.push("Verification form not started");
@@ -374,62 +407,69 @@ export function assessVerificationCompleteness(
     missing.push("Borrower interview: application details confirmation required");
   }
 
-  if (!isFilled(verification.cmPosition)) {
-    missing.push("Crewing manager position required");
-  }
-  if (!isFilled(verification.cmContractStatus)) {
-    missing.push("Crewing manager contract status required");
-  }
-  if (!verification.cmDepartureDate) {
-    missing.push("Crewing manager departure date required");
-  }
-  if (verification.cmFitToWork == null) {
-    missing.push("Crewing manager fit-to-work status required");
-  }
+  if (segment === "sme") {
+    // Phase 6.0.a: Field Visit replaces PIC/CM entirely for SME.
+    const smeForm = isReloan
+      ? assessSmeReloanRequired(verification.smeReloanVerification)
+      : assessFieldVisitRequired(verification.fieldVisit);
+    missing.push(...smeForm.missing);
+  } else {
+    if (!isFilled(verification.cmPosition)) {
+      missing.push("Crewing manager position required");
+    }
+    if (!isFilled(verification.cmContractStatus)) {
+      missing.push("Crewing manager contract status required");
+    }
+    if (!verification.cmDepartureDate) {
+      missing.push("Crewing manager departure date required");
+    }
+    if (verification.cmFitToWork == null) {
+      missing.push("Crewing manager fit-to-work status required");
+    }
 
-  // CI & References Form (loanstar/docs/cig-references-form-plan.md, Phase 4) —
-  // required subset only; the rest of Sheet1's fields are captured but not
-  // gating, since a real call can legitimately leave some of them blank
-  // (e.g. the PIC has no other financing to declare).
-  const pic = verification.picVerification;
-  if (!isFilled(pic?.name)) {
-    missing.push("PIC name required");
-  }
-  if (!isFilled(pic?.contactNumber)) {
-    missing.push("PIC contact number required");
-  }
-  if (!isFilled(pic?.relationToClient)) {
-    missing.push("PIC relation to client required");
-  }
+    // CI & References Form (loanstar/docs/cig-references-form-plan.md, Phase 4) —
+    // required subset only; the rest of Sheet1's fields are captured but not
+    // gating, since a real call can legitimately leave some of them blank
+    // (e.g. the PIC has no other financing to declare).
+    const pic = verification.picVerification;
+    if (!isFilled(pic?.name)) {
+      missing.push("PIC name required");
+    }
+    if (!isFilled(pic?.contactNumber)) {
+      missing.push("PIC contact number required");
+    }
+    if (!isFilled(pic?.relationToClient)) {
+      missing.push("PIC relation to client required");
+    }
 
-  // References are a free add/remove list now (CIG can add/remove rows), not
-  // a fixed Ref 1/Ref 2 pair — so completeness counts how many are actually
-  // filled out rather than checking specific array positions.
-  const refs = verification.referenceVerifications ?? [];
-  const completeRefCount = refs.filter(
-    (ref) =>
-      isFilled(ref?.name) &&
-      isFilled(ref?.contactNumber) &&
-      isFilled(ref?.relationToClient),
-  ).length;
-  if (completeRefCount < 1) {
-    missing.push(
-      `At least 1 complete reference required (name, contact number, relation) — ${completeRefCount} of 1 so far`,
-    );
-  }
+    const refs = verification.referenceVerifications ?? [];
+    const completeRefCount = refs.filter(
+      (ref) =>
+        isFilled(ref?.name) &&
+        isFilled(ref?.contactNumber) &&
+        isFilled(ref?.relationToClient),
+    ).length;
+    if (completeRefCount < 1) {
+      missing.push(
+        `At least 1 complete reference required (name, contact number, relation) — ${completeRefCount} of 1 so far`,
+      );
+    }
 
-  const checklist = verification.verificationChecklist;
-  if (
-    !checklist ||
-    !checklist.validateBorrowerInfo ||
-    !checklist.validatePicInfo ||
-    !checklist.presidePicObligationSpill ||
-    !checklist.verifiedCharacterReferences
-  ) {
-    missing.push("CI & References Form verification checklist must be fully checked");
-  }
-  if (verification.picRating == null) {
-    missing.push("PIC rating required");
+    const checklist = verification.verificationChecklist;
+    if (
+      !checklist ||
+      !checklist.validateBorrowerInfo ||
+      !checklist.validatePicInfo ||
+      !checklist.presidePicObligationSpill ||
+      !checklist.verifiedCharacterReferences
+    ) {
+      missing.push(
+        "CI & References Form verification checklist must be fully checked",
+      );
+    }
+    if (verification.picRating == null) {
+      missing.push("PIC rating required");
+    }
   }
 
   if (!verification.finding) {
@@ -442,11 +482,19 @@ export function assessVerificationCompleteness(
 
   // `complete` uses the same section predicates as hard sequence (S1–S5 + checks)
   // so Submit readiness cannot drift from getCigSequenceState unlock of forward.
+  const smeFormOk =
+    segment === "sme" &&
+    (isReloan
+      ? assessSmeReloanRequired(verification.smeReloanVerification).complete
+      : assessFieldVisitRequired(verification.fieldVisit).complete);
+
   const complete =
     isBorrowerReviewComplete(verification) &&
     checksComplete &&
-    isCiReferencesComplete(verification) &&
-    isCrewingManagerComplete(verification) &&
+    (segment === "sme"
+      ? smeFormOk
+      : isCiReferencesComplete(verification) &&
+        isCrewingManagerComplete(verification)) &&
     isFindingRecorded(verification);
 
   return { complete, missing };

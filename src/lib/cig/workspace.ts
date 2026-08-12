@@ -53,7 +53,7 @@ export function cigChecksSummary(
     total,
     recorded,
     passed,
-    complete: total > 0 ? recorded >= total : false,
+    complete: recorded >= total,
     percent: total === 0 ? 100 : Math.round((recorded / total) * 100),
   };
 }

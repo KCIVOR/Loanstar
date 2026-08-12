@@ -53,6 +53,8 @@ type ApplicationDetail = {
   createdAt: string;
   updatedAt: string;
   timeline: TimelineEntry[];
+  segment: "seafarer" | "sme";
+  entityType: "individual" | "corporate" | null;
 };
 
 type DocsSummary = {
@@ -225,6 +227,7 @@ export default function BorrowerApplicationPage() {
           financial: profile.financial,
           allottee: profile.allottee,
           picWork: profile.picWork,
+          businessInfo: profile.businessInfo,
           dependents: profile.dependents,
           references: profile.references,
           profileData: profile.profileData,
@@ -322,7 +325,7 @@ export default function BorrowerApplicationPage() {
     .slice(0, 3);
 
   const isDraft = application.status === "draft";
-  const canSubmit = isDraft && !!docsSummary && docsSummary.uploaded >= docsSummary.required;
+  const canSubmit = isDraft;
 
   const reload = () => void load({ silent: true });
 
@@ -365,7 +368,12 @@ export default function BorrowerApplicationPage() {
             </div>
           ) : null}
           <div className="max-h-[65vh] overflow-y-auto pr-1">
-            <ApplicantProfileFields profile={profile} onChange={setProfile} />
+            <ApplicantProfileFields
+              profile={profile}
+              onChange={setProfile}
+              segment={application?.segment}
+              entityType={application?.entityType}
+            />
           </div>
         </Modal>
       ) : null}
@@ -501,18 +509,13 @@ export default function BorrowerApplicationPage() {
             </p>
             <p className="mt-1 text-sm text-ink-500">
               {docsSummary
-                ? `This application is not yet visible to Loan Star. Upload all required documents to submit (${docsSummary.uploaded} of ${docsSummary.required}).`
+                ? `This application is not yet visible to Loan Star. You can submit now and finish uploading documents afterward (${docsSummary.uploaded} of ${docsSummary.required} uploaded so far).`
                 : "This application is not yet visible to Loan Star."}
             </p>
           </div>
           <Button
             type="button"
             disabled={!canSubmit}
-            title={
-              !canSubmit
-                ? "Upload all required intake documents first"
-                : undefined
-            }
             onClick={() => setShowSubmitConfirm(true)}
           >
             Submit application

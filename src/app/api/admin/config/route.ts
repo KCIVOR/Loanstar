@@ -13,7 +13,9 @@ import { createClient } from "@/lib/supabase/server";
 
 const CONFIG_KEYS = [
   "penalty_rate",
+  "penalty_rate_sme",
   "coverage_ratio",
+  "committee_size",
   "aging_thresholds",
   "sms_enabled",
   "twilio_account_sid",
@@ -65,7 +67,9 @@ export async function GET() {
 
 const patchConfigSchema = z.object({
   penalty_rate: z.number().min(0).max(1).optional(),
+  penalty_rate_sme: z.number().min(0).max(1).optional(),
   coverage_ratio: z.number().min(0).max(1).optional(),
+  committee_size: z.number().int().min(1).max(15).optional(),
   aging_thresholds: z
     .object({
       "30": z.number().int().positive(),
@@ -103,8 +107,14 @@ export async function PATCH(request: Request) {
     if (body.penalty_rate !== undefined) {
       updates.push({ key: "penalty_rate", value: body.penalty_rate });
     }
+    if (body.penalty_rate_sme !== undefined) {
+      updates.push({ key: "penalty_rate_sme", value: body.penalty_rate_sme });
+    }
     if (body.coverage_ratio !== undefined) {
       updates.push({ key: "coverage_ratio", value: body.coverage_ratio });
+    }
+    if (body.committee_size !== undefined) {
+      updates.push({ key: "committee_size", value: body.committee_size });
     }
     if (body.aging_thresholds !== undefined) {
       updates.push({ key: "aging_thresholds", value: body.aging_thresholds });

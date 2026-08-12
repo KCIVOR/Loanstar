@@ -12,8 +12,11 @@ import {
   cn,
   DropdownMenu,
   EmptyState,
+  Label,
+  Modal,
   PageHeader,
   Pagination,
+  Select,
   Skeleton,
   Table,
   Td,
@@ -73,6 +76,9 @@ type LoanSummary = {
 
 const LOAN_STATUSES = ["released", "closed", "loan_active", "paid_off"];
 const HISTORY_PAGE_SIZE = 5;
+
+type StartSegment = "seafarer" | "sme";
+type StartEntityType = "individual" | "corporate";
 
 function formatMoney(value: number) {
   return value.toLocaleString("en-PH", {
@@ -173,6 +179,10 @@ export default function BorrowerDashboardPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [startAppLoading, setStartAppLoading] = useState(false);
+  const [showSegmentPicker, setShowSegmentPicker] = useState(false);
+  const [pickerSegment, setPickerSegment] = useState<StartSegment>("seafarer");
+  const [pickerEntityType, setPickerEntityType] =
+    useState<StartEntityType>("individual");
   const [historySearch, setHistorySearch] = useState("");
   const [historyStatus, setHistoryStatus] = useState("all");
   const [historyPage, setHistoryPage] = useState(1);
@@ -287,20 +297,31 @@ export default function BorrowerDashboardPage() {
     void load();
   }, [load]);
 
-  async function handleStartApplication() {
+  /**
+   * `body` is only meaningful for a brand-new ("first") application — the
+   * API ignores it for resume/reloan (inherits parent segment instead), so
+   * the reloan "Apply again" click below can keep calling this with no body.
+   */
+  async function handleStartApplication(body?: {
+    segment: StartSegment;
+    entityType?: StartEntityType;
+  }) {
     setStartAppLoading(true);
     setError(null);
     try {
       const res = await fetch("/api/borrower/applications/reloan", {
         method: "POST",
+        headers: body ? { "Content-Type": "application/json" } : undefined,
+        body: body ? JSON.stringify(body) : undefined,
       });
       if (!res.ok) {
-        const body = (await res.json().catch(() => null)) as {
+        const errBody = (await res.json().catch(() => null)) as {
           error?: string;
         } | null;
-        throw new Error(body?.error ?? "Failed to start application");
+        throw new Error(errBody?.error ?? "Failed to start application");
       }
       const json = (await res.json()) as { application: { id: string } };
+      setShowSegmentPicker(false);
       router.push(`/borrower/applications/${json.application.id}`);
     } catch (err) {
       setError(
@@ -309,6 +330,26 @@ export default function BorrowerDashboardPage() {
     } finally {
       setStartAppLoading(false);
     }
+  }
+
+  /** First applications choose a segment via the picker modal; a reloan
+   * always inherits the parent's segment, so it can start immediately. */
+  function handleStartClick() {
+    if (appKind === "first") {
+      setPickerSegment("seafarer");
+      setPickerEntityType("individual");
+      setShowSegmentPicker(true);
+      return;
+    }
+    void handleStartApplication();
+  }
+
+  function handleConfirmSegmentPicker() {
+    void handleStartApplication(
+      pickerSegment === "sme"
+        ? { segment: "sme", entityType: pickerEntityType }
+        : { segment: "seafarer" },
+    );
   }
 
   const statuses = applications.map((a) => a.status);
@@ -695,10 +736,7 @@ export default function BorrowerDashboardPage() {
                 showMark={false}
                 action={
                   canStart.ok ? (
-                    <Button
-                      loading={startAppLoading}
-                      onClick={() => void handleStartApplication()}
-                    >
+                    <Button loading={startAppLoading} onClick={handleStartClick}>
                       {startLabel}
                     </Button>
                   ) : undefined
@@ -886,6 +924,58 @@ export default function BorrowerDashboardPage() {
           ) : null}
         </>
       )}
+
+      <Modal
+        open={showSegmentPicker}
+        title="Start application"
+        onClose={() => setShowSegmentPicker(false)}
+        footer={
+          <Button
+            loading={startAppLoading}
+            onClick={handleConfirmSegmentPicker}
+          >
+            Continue
+          </Button>
+        }
+      >
+        <p className="mb-4 text-sm text-ink-500">
+          Choose the type of loan you are applying for. This cannot be
+          changed after you start.
+        </p>
+        <div className="grid gap-4">
+          <div>
+            <Label htmlFor="start-segment">Loan segment</Label>
+            <Select
+              id="start-segment"
+              value={pickerSegment}
+              onChange={(e) =>
+                setPickerSegment(e.target.value as StartSegment)
+              }
+            >
+              <option value="seafarer">Seafarer</option>
+              <option value="sme">SME (Small &amp; Medium Enterprise)</option>
+            </Select>
+          </div>
+          {pickerSegment === "sme" ? (
+            <div>
+              <Label htmlFor="start-entity-type" required>
+                Entity type
+              </Label>
+              <Select
+                id="start-entity-type"
+                value={pickerEntityType}
+                onChange={(e) =>
+                  setPickerEntityType(e.target.value as StartEntityType)
+                }
+                required
+              >
+                <option value="individual">Individual</option>
+                <option value="corporate">Corporate</option>
+              </Select>
+            </div>
+          ) : null}
+        </div>
+      </Modal>
     </div>
   );
 }

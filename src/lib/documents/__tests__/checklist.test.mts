@@ -1,7 +1,45 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
-import { getCompletionSummary, type ChecklistItem } from "../checklist";
+import {
+  getCompletionSummary,
+  rowMatchesChecklistScope,
+  type ChecklistItem,
+} from "../checklist";
+
+/** Seafarer intake slugs after Phase 2.1 backfill — regression snapshot. */
+const SEAFARER_INTAKE_SLUGS = [
+  "clearance_form",
+  "declaration_form",
+  "house_sketch",
+  "agency_consent_letter",
+  "data_privacy_consent",
+  "bap_customer_consent",
+  "valid_ids",
+  "passport",
+  "seaman_book",
+  "photo_2x2",
+  "contract",
+] as const;
+
+const SME_COMMON_INTAKE_SLUGS = [
+  "business_registration",
+  "owner_authorized_rep_id",
+  "valid_ids",
+  "mayors_permit",
+  "tin_ctc",
+  "location_sketch",
+  "bank_authorization",
+  "lslgc_consent_form_2025",
+  "bap_customer_consent",
+  "client_supplier_list",
+  "proof_of_transaction",
+] as const;
+
+const SME_CORPORATE_ONLY_SLUGS = [
+  "board_resolution",
+  "secretary_certificate",
+] as const;
 
 function item(
   status: ChecklistItem["status"],
@@ -72,3 +110,61 @@ describe("getCompletionSummary (endorse gate semantics)", () => {
     assert.equal(summary.complete, summary.required);
   });
 });
+
+describe("rowMatchesChecklistScope (SME Phase 2)", () => {
+  it("keeps seafarer rows only for seafarer segment", () => {
+    assert.equal(
+      rowMatchesChecklistScope(
+        { segment: "seafarer", entity_type: null },
+        "seafarer",
+        null,
+      ),
+      true,
+    );
+    assert.equal(
+      rowMatchesChecklistScope(
+        { segment: "sme", entity_type: null },
+        "seafarer",
+        null,
+      ),
+      false,
+    );
+  });
+
+  it("includes SME common rows for individual and corporate", () => {
+    const common = { segment: "sme", entity_type: null };
+    assert.equal(rowMatchesChecklistScope(common, "sme", "individual"), true);
+    assert.equal(rowMatchesChecklistScope(common, "sme", "corporate"), true);
+  });
+
+  it("includes corporate-only rows only for corporate entity type", () => {
+    const corporateOnly = { segment: "sme", entity_type: "corporate" };
+    assert.equal(
+      rowMatchesChecklistScope(corporateOnly, "sme", "corporate"),
+      true,
+    );
+    assert.equal(
+      rowMatchesChecklistScope(corporateOnly, "sme", "individual"),
+      false,
+    );
+  });
+
+  it("documents expected intake slug sets (fixtures for browser parity)", () => {
+    assert.equal(SEAFARER_INTAKE_SLUGS.length, 11);
+    assert.equal(SME_COMMON_INTAKE_SLUGS.length, 11);
+    assert.deepEqual([...SME_CORPORATE_ONLY_SLUGS], [
+      "board_resolution",
+      "secretary_certificate",
+    ]);
+    const individual: string[] = [...SME_COMMON_INTAKE_SLUGS];
+    const corporate: string[] = [
+      ...SME_COMMON_INTAKE_SLUGS,
+      ...SME_CORPORATE_ONLY_SLUGS,
+    ];
+    assert.equal(individual.length, 11);
+    assert.equal(corporate.length, 13);
+    assert.ok(!individual.includes("seaman_book"));
+    assert.ok(!individual.includes("board_resolution"));
+  });
+});
+

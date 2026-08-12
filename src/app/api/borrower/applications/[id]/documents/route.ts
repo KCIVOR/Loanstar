@@ -73,7 +73,7 @@ export async function POST(request: Request, { params }: RouteParams) {
       return NextResponse.json(
         {
           error:
-            "Clearance Form is managed by CSA and cannot be uploaded from the borrower portal.",
+            "This document is managed by CSA and cannot be uploaded from the borrower portal — it's signed in person at the branch.",
         },
         { status: 403 },
       );

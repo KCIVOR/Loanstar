@@ -1,8 +1,27 @@
+import type { BusinessInfo } from "@/lib/borrowers/business-info";
 import type { BorrowerProfile } from "@/lib/borrowers/types";
 
 import type { BlriData } from "./blri-data";
 import { formatMoney } from "@/lib/documents/format";
 import type { ReleasePath } from "./constants";
+
+/** Additive scope — omit or pass seafarer to keep Seafarer merge context unchanged. */
+export type ReleaseTemplateScope = {
+  segment?: "seafarer" | "sme" | null;
+};
+
+function smeBusinessSlots(businessInfo: BusinessInfo | undefined): {
+  companyName: string;
+  natureOfBusiness: string;
+  businessAddress: string;
+} {
+  const biz = businessInfo ?? {};
+  return {
+    companyName: (biz.companyName ?? "").trim(),
+    natureOfBusiness: (biz.natureOfBusiness ?? "").trim(),
+    businessAddress: (biz.officeAddress ?? biz.companyAddress ?? "").trim(),
+  };
+}
 
 const ONES = [
   "", "One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight", "Nine",
@@ -92,14 +111,30 @@ export function buildReleaseTemplateContext(
   computation: ReleaseComputation,
   borrower: BorrowerProfile,
   releasePath: ReleasePath,
+  scope?: ReleaseTemplateScope,
 ): Record<string, unknown> {
   const isCheck = releasePath === "with_pdc";
   const disbursementCode = isCheck ? "1100115" : "1100110";
   const disbursementLabel = isCheck ? "Bank" : "CASH";
+  const isSme = scope?.segment === "sme";
+  const sme = isSme ? smeBusinessSlots(borrower.businessInfo) : null;
+
+  // Existing release templates bind manningAgency / principalShip — for SME,
+  // fill those slots from business_info so published templates do not blank
+  // (Phase 8.3: one template + segment-conditional merge values).
+  const manningAgency = isSme
+    ? (sme?.companyName ?? "")
+    : (borrower.manningAgency?.name ?? "");
+  const principalShip = isSme
+    ? (sme?.natureOfBusiness || sme?.businessAddress || "")
+    : (borrower.picWork?.vessel ?? "");
+  const loanReceivableDescription = isSme
+    ? "Loans Receivable - SME Loan"
+    : "Loans Receivable - Seafarer Loan";
 
   const accountingEntries: AccountingEntry[] = [
     {
-      description: "Loans Receivable - Seafarer Loan",
+      description: loanReceivableDescription,
       accountCode: "1100001",
       debit: formatMoney(blri.principal),
       credit: "",
@@ -118,13 +153,13 @@ export function buildReleaseTemplateContext(
     })),
   ];
 
-  return {
+  const base: Record<string, unknown> = {
     companyName: "Loan Star Lending Group Corp.",
     borrowerName: blri.borrowerName,
     borrowerNo: borrower.borrowerNo,
     address: joinAddress(borrower.presentAddress),
-    manningAgency: borrower.manningAgency?.name ?? "",
-    principalShip: borrower.picWork?.vessel ?? "",
+    manningAgency,
+    principalShip,
 
     loanAccountNo: blri.loanAccountNo,
     loanType: computation.loanTypeName ?? "",
@@ -173,4 +208,15 @@ export function buildReleaseTemplateContext(
     })),
     accountingEntries,
   };
+
+  // Additive SME-only keys — Seafarer context stays key-identical to pre-Phase 8.
+  if (isSme && sme) {
+    base.isSme = true;
+    base.isSeafarer = false;
+    base.businessCompanyName = sme.companyName;
+    base.businessNature = sme.natureOfBusiness;
+    base.businessAddress = sme.businessAddress;
+  }
+
+  return base;
 }

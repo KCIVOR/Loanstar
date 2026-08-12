@@ -54,6 +54,20 @@ export async function hasEmploymentContractUploaded(
   supabase: SupabaseClient,
   applicationId: string,
 ): Promise<boolean> {
+  const { data: application, error: appError } = await supabase
+    .from("loan_applications")
+    .select("segment")
+    .eq("id", applicationId)
+    .maybeSingle();
+
+  if (appError) {
+    throw new Error(appError.message);
+  }
+  if (application?.segment === "sme") {
+    // SME intake checklist has no employment-contract-equivalent requirement today.
+    return true;
+  }
+
   const { data: docType, error: typeError } = await supabase
     .from("document_types")
     .select("id")

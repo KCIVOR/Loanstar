@@ -75,3 +75,52 @@ test("particulars and money fields are formatted", () => {
   assert.equal(ctx.manningAgency, "Marlow Navigation Philippines Inc.");
   assert.equal(ctx.address, "544 J. Buizon St, Baliwag, Bulacan");
 });
+
+test("Seafarer context keeps Seafarer loan receivable and no SME keys", () => {
+  const ctx = buildReleaseTemplateContext(BLRI, COMPUTATION, BORROWER, "with_pdc");
+  const entries = ctx.accountingEntries as Array<{ description: string }>;
+  assert.equal(entries[0]?.description, "Loans Receivable - Seafarer Loan");
+  assert.equal(ctx.principalShip, "Marlow Navigation Co. Ltd");
+  assert.equal(ctx.isSme, undefined);
+  assert.equal(ctx.businessCompanyName, undefined);
+
+  const scoped = buildReleaseTemplateContext(
+    BLRI,
+    COMPUTATION,
+    BORROWER,
+    "with_pdc",
+    { segment: "seafarer" },
+  );
+  assert.deepEqual(scoped, ctx);
+});
+
+test("SME context uses business fields and SME loan receivable", () => {
+  const smeBorrower = {
+    ...BORROWER,
+    manningAgency: undefined,
+    picWork: undefined,
+    businessInfo: {
+      companyName: "Acme Trading Corp.",
+      natureOfBusiness: "Wholesale trade",
+      officeAddress: "123 Rizal Ave, Quezon City",
+    },
+  } as unknown as BorrowerProfile;
+
+  const ctx = buildReleaseTemplateContext(
+    BLRI,
+    COMPUTATION,
+    smeBorrower,
+    "with_pdc",
+    { segment: "sme" },
+  );
+
+  const entries = ctx.accountingEntries as Array<{ description: string }>;
+  assert.equal(entries[0]?.description, "Loans Receivable - SME Loan");
+  assert.equal(ctx.manningAgency, "Acme Trading Corp.");
+  assert.equal(ctx.principalShip, "Wholesale trade");
+  assert.equal(ctx.businessCompanyName, "Acme Trading Corp.");
+  assert.equal(ctx.businessNature, "Wholesale trade");
+  assert.equal(ctx.businessAddress, "123 Rizal Ave, Quezon City");
+  assert.equal(ctx.isSme, true);
+  assert.equal(ctx.isSeafarer, false);
+});

@@ -7,6 +7,7 @@ import {
   INITIAL_INTERVIEW_MISSING,
   INITIAL_INTERVIEW_NOTES_REQUIRED,
   NCL_NOT_RECORDED,
+  SME_DUPLICATION_NOT_RECORDED,
   assertCanRecordInitialInterview,
   assertInterviewRecordedForComputation,
   assessInitialInterview,
@@ -87,6 +88,18 @@ describe("assertCanRecordInitialInterview", () => {
           notes: "notes",
         }),
       new RegExp(NCL_NOT_RECORDED),
+    );
+
+    assert.throws(
+      () =>
+        assertCanRecordInitialInterview({
+          privacyOrientationAt: "2026-07-23T00:00:00Z",
+          formCompleteness: okForm,
+          nclRecorded: false,
+          notes: "notes",
+          segment: "sme",
+        }),
+      new RegExp(SME_DUPLICATION_NOT_RECORDED),
     );
 
     assert.throws(

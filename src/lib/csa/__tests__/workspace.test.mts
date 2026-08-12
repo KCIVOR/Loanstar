@@ -101,4 +101,17 @@ describe("csaNextStep", () => {
     });
     assert.match(step.title, /NCL/i);
   });
+
+  it("asks for duplication screening on SME when docs are in", () => {
+    const step = csaNextStep({
+      status: "documents_pending",
+      docsRequired: 8,
+      docsUploaded: 8,
+      nclResult: "pending",
+      hasComputation: false,
+      endorseReady: false,
+      segment: "sme",
+    });
+    assert.match(step.title, /duplication/i);
+  });
 });

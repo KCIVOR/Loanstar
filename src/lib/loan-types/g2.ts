@@ -5,13 +5,32 @@ export type PfRateValidationResult =
   | { valid: true }
   | { valid: false; reason: string };
 
+export type PfRateValidationOptions = {
+  /**
+   * G2 is Seafarer-only (Calculator SME extraction 2026-08-07): real SME loans
+   * run 0–11% PF. SME enrollment skips this floor; DB CHECK is also segment-aware.
+   */
+  segment?: "seafarer" | "sme";
+};
+
 /**
  * Validates that a processing fee rate meets the G2 minimum enrollment threshold.
- * Rejects rates below MIN_PF_RATE (e.g. 6.5% → blocked).
+ * Rejects rates below MIN_PF_RATE for Seafarer (e.g. 6.5% → blocked).
+ * SME: no G2 floor.
  */
-export function validatePfRate(pfRate: number): PfRateValidationResult {
+export function validatePfRate(
+  pfRate: number,
+  options?: PfRateValidationOptions,
+): PfRateValidationResult {
   if (!Number.isFinite(pfRate)) {
     return { valid: false, reason: "Processing fee rate must be a finite number" };
+  }
+
+  if (options?.segment === "sme") {
+    if (pfRate < 0 || pfRate > 1) {
+      return { valid: false, reason: "Processing fee rate must be between 0 and 1" };
+    }
+    return { valid: true };
   }
 
   if (pfRate < MIN_PF_RATE) {
@@ -25,8 +44,11 @@ export function validatePfRate(pfRate: number): PfRateValidationResult {
 }
 
 /** Throws when the pf rate fails G2 validation. */
-export function assertValidPfRate(pfRate: number): void {
-  const result = validatePfRate(pfRate);
+export function assertValidPfRate(
+  pfRate: number,
+  options?: PfRateValidationOptions,
+): void {
+  const result = validatePfRate(pfRate, options);
   if (!result.valid) {
     throw new Error(result.reason);
   }

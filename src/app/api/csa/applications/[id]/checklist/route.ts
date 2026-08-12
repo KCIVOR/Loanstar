@@ -20,7 +20,7 @@ export async function GET(request: Request, { params }: RouteParams) {
 
     const { data: app } = await supabase
       .from("loan_applications")
-      .select("borrower_id")
+      .select("borrower_id, segment, entity_type")
       .eq("id", id)
       .single();
 
@@ -32,14 +32,23 @@ export async function GET(request: Request, { params }: RouteParams) {
       throw new Error("Invalid checklist stage");
     }
 
+    const scope = {
+      segment: (app.segment === "sme" ? "sme" : "seafarer") as "seafarer" | "sme",
+      entityType:
+        app.entity_type === "individual" || app.entity_type === "corporate"
+          ? (app.entity_type as "individual" | "corporate")
+          : null,
+    };
+
     await ensureDocumentSlots(
       supabase,
       stage,
       id,
       app.borrower_id as string,
+      scope,
     );
 
-    const items = await getStageChecklist(supabase, stage, id);
+    const items = await getStageChecklist(supabase, stage, id, scope);
     const summary = getCompletionSummary(items);
 
     return jsonOk({ stage, items, summary });

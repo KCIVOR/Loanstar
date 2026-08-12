@@ -3,6 +3,7 @@ import { z } from "zod";
 
 import { writeAuditEvent } from "@/lib/audit/writer";
 import { handleApiError, jsonOk } from "@/lib/api/handler";
+import { createLoanTypeSchema } from "@/lib/loan-types/create-loan-type";
 import { validatePfRate } from "@/lib/loan-types/g2";
 import { requireModulePermission } from "@/lib/permissions/server";
 import { createClient } from "@/lib/supabase/server";
@@ -17,7 +18,7 @@ export async function GET(request: Request) {
     let query = supabase
       .from("loan_types")
       .select(
-        "id, name, interest_rate, pf_rate, is_active, effective_from, effective_to, enrolled_at, enrolled_by",
+        "id, name, interest_rate, pf_rate, segment, is_active, effective_from, effective_to, enrolled_at, enrolled_by",
       )
       .order("name")
       .order("effective_from", { ascending: false });
@@ -34,20 +35,12 @@ export async function GET(request: Request) {
   }
 }
 
-const createLoanTypeSchema = z.object({
-  name: z.string().min(1).max(100),
-  interestRate: z.number().min(0).max(1),
-  pfRate: z.number().min(0).max(1),
-  effectiveFrom: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
-  deactivatePrevious: z.boolean().default(true),
-});
-
 export async function POST(request: Request) {
   try {
     const user = await requireModulePermission("system_config", "create");
     const body = createLoanTypeSchema.parse(await request.json());
 
-    const g2 = validatePfRate(body.pfRate);
+    const g2 = validatePfRate(body.pfRate, { segment: body.segment });
     if (!g2.valid) {
       return NextResponse.json({ error: g2.reason }, { status: 400 });
     }
@@ -72,12 +65,13 @@ export async function POST(request: Request) {
         name: body.name,
         interest_rate: body.interestRate,
         pf_rate: body.pfRate,
+        segment: body.segment,
         is_active: true,
         effective_from: body.effectiveFrom,
         enrolled_by: user.id,
       })
       .select(
-        "id, name, interest_rate, pf_rate, is_active, effective_from, effective_to, enrolled_at",
+        "id, name, interest_rate, pf_rate, segment, is_active, effective_from, effective_to, enrolled_at",
       )
       .single();
 
