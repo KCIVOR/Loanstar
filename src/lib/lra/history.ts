@@ -266,7 +266,7 @@ export async function getReleasedLoansHistory(
       netRaw === null || netRaw === undefined ? null : Number(netRaw);
 
     const pathRaw = row.release_path as string | null;
-    const releasePathValue =
+    const releasePathValue: ReleasePath | null =
       pathRaw === "with_pdc" || pathRaw === "without_pdc" ? pathRaw : null;
 
     const segmentRaw = app?.segment as string | null | undefined;
