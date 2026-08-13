@@ -28,6 +28,7 @@ import {
   formatStatusLabel,
   statusBadgeVariant,
 } from "@/lib/applications/status";
+import type { BusinessInfo } from "@/lib/borrowers/business-info";
 import { DOCUMENT_BUCKET } from "@/lib/constants";
 import {
   PDC_COLLECT_CLOSE_ERROR,
@@ -45,12 +46,15 @@ type LraWorkspace = {
     status: string;
     statusLabel: string;
     blocker: string | null;
+    segment: "seafarer" | "sme";
+    entityType: "individual" | "corporate" | null;
   };
   borrower: {
     id?: string;
     borrower_no?: string;
     first_name?: string;
     last_name?: string;
+    business_info?: BusinessInfo | null;
   } | null;
   releaseFile: {
     id: string;
@@ -589,10 +593,16 @@ export default function LraApplicationPage() {
     closeBlockers.push(PDC_COLLECT_CLOSE_ERROR);
   }
 
-  const borrowerLabel =
+  const companyName = data.borrower?.business_info?.companyName?.trim();
+  const personalName =
     data.borrower?.first_name || data.borrower?.last_name
       ? `${data.borrower.first_name ?? ""} ${data.borrower.last_name ?? ""}`.trim()
       : "Borrower";
+  const borrowerLabel =
+    data.application.segment === "sme" && companyName
+      ? companyName
+      : personalName;
+  const isSme = data.application.segment === "sme";
   const appNo =
     data.application.applicationNo ??
     data.borrower?.borrower_no ??
@@ -627,6 +637,9 @@ export default function LraApplicationPage() {
       />
 
       <div className="mb-6 flex flex-wrap items-center gap-2">
+        <Badge variant={isSme ? "navy" : "teal"} dot>
+          {isSme ? "SME" : "Seafarer"}
+        </Badge>
         <Badge variant={statusBadgeVariant(data.application.status)} dot>
           {data.application.statusLabel ??
             formatStatusLabel(data.application.status)}

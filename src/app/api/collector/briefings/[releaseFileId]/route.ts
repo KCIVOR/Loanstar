@@ -13,7 +13,7 @@ const ackSchema = z.object({ confirm: z.literal(true) });
 
 export async function POST(request: Request, { params }: RouteParams) {
   try {
-    const user = await requireModulePermission("collection", "execute_trigger");
+    const user = await requireModulePermission("briefings", "execute_trigger");
     const { releaseFileId } = await params;
     ackSchema.parse(await request.json());
     const supabase = await createClient();

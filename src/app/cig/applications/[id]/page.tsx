@@ -191,6 +191,9 @@ export default function CigApplicationPage() {
   const [applicationStatus, setApplicationStatus] = useState("");
   const [applicationNo, setApplicationNo] = useState<string | null>(null);
   const [segment, setSegment] = useState<"seafarer" | "sme">("seafarer");
+  const [entityType, setEntityType] = useState<"individual" | "corporate" | null>(
+    null,
+  );
   const [isReloan, setIsReloan] = useState(false);
   const [endorsedAt, setEndorsedAt] = useState<string | null>(null);
   const [callbackAt, setCallbackAt] = useState("");
@@ -222,6 +225,7 @@ export default function CigApplicationPage() {
           applicationNo: string | null;
           endorsedAt: string | null;
           segment?: "seafarer" | "sme";
+          entityType?: "individual" | "corporate" | null;
           isReloan?: boolean;
         };
         borrower: (BorrowerProfile & { id?: string }) | null;
@@ -237,6 +241,7 @@ export default function CigApplicationPage() {
       setSegment(
         appData.application.segment === "sme" ? "sme" : "seafarer",
       );
+      setEntityType(appData.application.entityType ?? null);
       setIsReloan(Boolean(appData.application.isReloan));
       setEndorsedAt(appData.application.endorsedAt);
       setBorrower(appData.borrower);
@@ -819,7 +824,12 @@ export default function CigApplicationPage() {
             className="!max-w-4xl"
           >
             <div className="max-h-[65vh] overflow-y-auto pr-1">
-              <ApplicantProfileFields profile={borrower} readOnly />
+              <ApplicantProfileFields
+                profile={borrower}
+                segment={segment}
+                entityType={entityType}
+                readOnly
+              />
             </div>
           </Modal>
         </>
@@ -1571,6 +1581,7 @@ export default function CigApplicationPage() {
                     }}
                     saving={saving}
                     readOnly={!editable}
+                    verifierName={verifierName}
                   />
                 ) : (
                   <FieldVisitForm
@@ -1594,6 +1605,7 @@ export default function CigApplicationPage() {
                     }}
                     saving={saving}
                     readOnly={!editable}
+                    verifierName={verifierName}
                   />
                 )}
               </div>

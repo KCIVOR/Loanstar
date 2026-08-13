@@ -7,6 +7,7 @@ export type CsaHistoryRow = {
   applicationNo: string | null;
   status: string;
   statusGroup: CsaHistoryStatusGroup;
+  segment: "sme" | "seafarer" | null;
   borrower: {
     borrowerNo: string;
     firstName: string;
@@ -27,6 +28,7 @@ export type CsaHistorySortKey =
 export type CsaHistoryQueryParams = {
   search?: string;
   statusGroup?: CsaHistoryStatusGroup | "all";
+  segment?: "all" | "seafarer" | "sme";
   from?: string | null;
   to?: string | null;
   sortKey?: CsaHistorySortKey;
@@ -184,6 +186,7 @@ export async function getCsaApplicationHistory(
   const {
     search = "",
     statusGroup = "all",
+    segment: segmentFilter = "all",
     from = null,
     to = null,
     sortKey = "endorsedAt",
@@ -214,6 +217,7 @@ export async function getCsaApplicationHistory(
       id,
       application_no,
       status,
+      segment,
       endorsed_at,
       borrowers!inner (
         borrower_no,
@@ -229,6 +233,10 @@ export async function getCsaApplicationHistory(
   const statuses = statusesForHistoryGroup(statusGroup);
   if (statuses) {
     query = query.in("status", [...statuses]);
+  }
+
+  if (segmentFilter !== "all") {
+    query = query.eq("segment", segmentFilter);
   }
 
   if (from) {
@@ -303,12 +311,17 @@ export async function getCsaApplicationHistory(
       row.id as string,
     );
 
+    const segmentRaw = row.segment as string | null;
+    const segment: "sme" | "seafarer" | null =
+      segmentRaw === "sme" || segmentRaw === "seafarer" ? segmentRaw : null;
+
     return [
       {
         id: row.id as string,
         applicationNo: (row.application_no as string | null) ?? null,
         status: row.status as string,
         statusGroup: csaHistoryStatusGroup(row.status as string),
+        segment,
         borrower: borrower
           ? {
               borrowerNo: borrower.borrower_no as string,

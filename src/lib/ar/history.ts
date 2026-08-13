@@ -5,6 +5,7 @@ export type ClosedAccountRow = {
   loanAccountNo: string | null;
   borrowerName: string;
   borrowerNo: string;
+  segment: "sme" | "seafarer" | null;
   outstandingBalance: number;
   portfolioName: string | null;
   closedAt: string;
@@ -14,6 +15,7 @@ export type ClosedAccountSortKey = "borrower" | "account" | "closedAt";
 
 export type ClosedAccountsQueryParams = {
   search?: string;
+  segment?: "all" | "seafarer" | "sme";
   from?: string | null;
   to?: string | null;
   sortKey?: ClosedAccountSortKey;
@@ -33,6 +35,7 @@ export type ReconciledPostingRow = {
   loanAccountNo: string | null;
   borrowerName: string;
   borrowerNo: string;
+  segment: "sme" | "seafarer" | null;
   amount: number;
   depositReference: string | null;
   postedAt: string;
@@ -42,6 +45,7 @@ export type ReconciledDcrSortKey = "borrower" | "amount" | "postedAt";
 
 export type ReconciledDcrQueryParams = {
   search?: string;
+  segment?: "all" | "seafarer" | "sme";
   from?: string | null;
   to?: string | null;
   sortKey?: ReconciledDcrSortKey;
@@ -105,6 +109,7 @@ export async function getClosedAccountsHistory(
 ): Promise<{ rows: ClosedAccountRow[]; totalCount: number }> {
   const {
     search = "",
+    segment: segmentFilter = "all",
     from = null,
     to = null,
     sortKey = "closedAt",
@@ -127,6 +132,7 @@ export async function getClosedAccountsHistory(
       loan_account_no,
       borrower_name,
       borrower_no,
+      segment,
       outstanding_balance,
       closed_at,
       portfolios ( name )
@@ -135,6 +141,10 @@ export async function getClosedAccountsHistory(
     )
     .eq("account_status", "paid")
     .not("closed_at", "is", null);
+
+  if (segmentFilter !== "all") {
+    query = query.eq("segment", segmentFilter);
+  }
 
   if (from) {
     query = query.gte("closed_at", toInclusiveStart(from));
@@ -176,12 +186,17 @@ export async function getClosedAccountsHistory(
       ? portfolioRaw[0]
       : portfolioRaw;
 
+    const segmentRaw = row.segment as string | null | undefined;
+    const segment: "sme" | "seafarer" | null =
+      segmentRaw === "sme" || segmentRaw === "seafarer" ? segmentRaw : null;
+
     return [
       {
         id: row.id as string,
         loanAccountNo: (row.loan_account_no as string | null) ?? null,
         borrowerName: row.borrower_name as string,
         borrowerNo: row.borrower_no as string,
+        segment,
         outstandingBalance: Number(row.outstanding_balance),
         portfolioName: (portfolio?.name as string | null | undefined) ?? null,
         closedAt,
@@ -273,6 +288,7 @@ export async function getReconciledDcrHistory(
 ): Promise<{ rows: ReconciledPostingRow[]; totalCount: number }> {
   const {
     search = "",
+    segment: segmentFilter = "all",
     from = null,
     to = null,
     sortKey = "postedAt",
@@ -311,7 +327,8 @@ export async function getReconciledDcrHistory(
       masterlist (
         loan_account_no,
         borrower_name,
-        borrower_no
+        borrower_no,
+        segment
       ),
       dcr!inner (
         deposit_reference
@@ -319,6 +336,10 @@ export async function getReconciledDcrHistory(
     `,
       { count: "exact" },
     );
+
+  if (segmentFilter !== "all") {
+    query = query.eq("masterlist.segment", segmentFilter);
+  }
 
   if (from) {
     query = query.gte("posted_at", toInclusiveStart(from));
@@ -369,6 +390,10 @@ export async function getReconciledDcrHistory(
     const dcrRaw = row.dcr;
     const dcr = Array.isArray(dcrRaw) ? dcrRaw[0] : dcrRaw;
 
+    const segmentRaw = masterlist?.segment as string | null | undefined;
+    const segment: "sme" | "seafarer" | null =
+      segmentRaw === "sme" || segmentRaw === "seafarer" ? segmentRaw : null;
+
     return [
       {
         id: row.id as string,
@@ -378,6 +403,7 @@ export async function getReconciledDcrHistory(
           (masterlist?.loan_account_no as string | null | undefined) ?? null,
         borrowerName: (masterlist?.borrower_name as string | undefined) ?? "",
         borrowerNo: (masterlist?.borrower_no as string | undefined) ?? "",
+        segment,
         amount: Number(row.amount),
         depositReference:
           (dcr?.deposit_reference as string | null | undefined) ?? null,

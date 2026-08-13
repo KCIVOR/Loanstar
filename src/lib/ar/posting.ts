@@ -11,6 +11,123 @@ import {
 import { isActiveDcrStatus } from "@/lib/collector/desk";
 import { halfUp } from "@/lib/computation/money";
 
+export type OpenInstallment = {
+  id: string;
+  installmentNo: number;
+  amountDue: number;
+  penaltyAmount: number;
+  amountPaid: number;
+  status: "pending" | "partial" | "overdue";
+};
+
+export type AllocationLine = {
+  amortizationScheduleId: string | null;
+  amount: number;
+};
+
+/**
+ * Fill oldest-open-installment-first up to each row's remaining due; trailing
+ * advance line only when money remains after all open installments are covered.
+ */
+export function computeAutoAllocation(
+  amount: number,
+  openInstallments: OpenInstallment[],
+): AllocationLine[] {
+  let remaining = halfUp(amount);
+  const lines: AllocationLine[] = [];
+
+  for (const inst of openInstallments) {
+    if (remaining <= 0) break;
+
+    const totalDue = halfUp(inst.amountDue + inst.penaltyAmount);
+    const remainingDue = halfUp(totalDue - inst.amountPaid);
+    if (remainingDue <= 0) continue;
+
+    const applied = halfUp(Math.min(remaining, remainingDue));
+    if (applied > 0) {
+      lines.push({ amortizationScheduleId: inst.id, amount: applied });
+      remaining = halfUp(remaining - applied);
+    }
+  }
+
+  if (remaining > 0) {
+    lines.push({ amortizationScheduleId: null, amount: remaining });
+  }
+
+  return lines;
+}
+
+async function fetchOpenInstallments(
+  supabase: SupabaseClient,
+  masterlistId: string,
+): Promise<OpenInstallment[]> {
+  const { data, error } = await supabase
+    .from("amortization_schedules")
+    .select(
+      "id, installment_no, amount_due, penalty_amount, amount_paid, status",
+    )
+    .eq("masterlist_id", masterlistId)
+    .in("status", ["pending", "partial", "overdue"])
+    .order("installment_no");
+
+  if (error) throw new Error(error.message);
+
+  return (data ?? []).map((row) => ({
+    id: row.id as string,
+    installmentNo: row.installment_no as number,
+    amountDue: Number(row.amount_due),
+    penaltyAmount: Number(row.penalty_amount ?? 0),
+    amountPaid: Number(row.amount_paid),
+    status: row.status as OpenInstallment["status"],
+  }));
+}
+
+async function validateAllocationLines(
+  supabase: SupabaseClient,
+  masterlistId: string,
+  paymentAmount: number,
+  allocations: AllocationLine[],
+): Promise<void> {
+  const total = halfUp(
+    allocations.reduce((sum, line) => sum + line.amount, 0),
+  );
+  const expected = halfUp(paymentAmount);
+  if (total !== expected) {
+    throw new Error(
+      `Allocation total ${total.toFixed(2)} does not match the payment amount ${expected.toFixed(2)} — adjust the installment split before adding to the DCR`,
+    );
+  }
+
+  const scheduleIds = allocations
+    .map((line) => line.amortizationScheduleId)
+    .filter((id): id is string => id !== null);
+
+  if (scheduleIds.length === 0) return;
+
+  const { data: schedules, error } = await supabase
+    .from("amortization_schedules")
+    .select("id, masterlist_id, status")
+    .in("id", scheduleIds);
+
+  if (error) throw new Error(error.message);
+
+  const byId = new Map((schedules ?? []).map((row) => [row.id as string, row]));
+
+  for (const scheduleId of scheduleIds) {
+    const schedule = byId.get(scheduleId);
+    if (!schedule || schedule.masterlist_id !== masterlistId) {
+      throw new Error(
+        `Installment ${scheduleId} does not belong to this loan account`,
+      );
+    }
+    if (schedule.status === "rolled" || schedule.status === "paid") {
+      throw new Error(
+        `Installment ${scheduleId} is not available for allocation (${schedule.status as string})`,
+      );
+    }
+  }
+}
+
 function parseRate(raw: unknown, fallback: number): number {
   if (typeof raw === "number" && Number.isFinite(raw)) return raw;
   if (typeof raw === "string") {
@@ -59,6 +176,128 @@ async function getAgingThresholds(
     t30: Number(raw["30"] ?? DEFAULT_AGING_THRESHOLDS.t30),
     t60: Number(raw["60"] ?? DEFAULT_AGING_THRESHOLDS.t60),
     t90: Number(raw["90"] ?? DEFAULT_AGING_THRESHOLDS.t90),
+  };
+}
+
+/**
+ * Maximum remaining balance (₱) AR can write off as a rounding difference.
+ * Falls back to 1.00 when the config row is missing or unparsable.
+ */
+export async function getRoundingWriteoffThreshold(
+  supabase: SupabaseClient,
+): Promise<number> {
+  const { data } = await supabase
+    .from("config_settings")
+    .select("value")
+    .eq("key", "rounding_writeoff_threshold")
+    .maybeSingle();
+
+  return parseRate(data?.value, 1.0);
+}
+
+/**
+ * Closes a small installment remainder as a logged rounding write-off.
+ * Only allowed when remaining due is positive and within the configured threshold.
+ */
+export async function writeOffRoundingDifference(
+  supabase: SupabaseClient,
+  masterlistId: string,
+  amortizationScheduleId: string,
+  actorId: string,
+  notes?: string,
+) {
+  const { data: schedule, error: scheduleError } = await supabase
+    .from("amortization_schedules")
+    .select(
+      "id, masterlist_id, amount_due, penalty_amount, amount_paid, status",
+    )
+    .eq("id", amortizationScheduleId)
+    .maybeSingle();
+
+  if (scheduleError) throw new Error(scheduleError.message);
+  if (!schedule || schedule.masterlist_id !== masterlistId) {
+    throw new Error("Amortization schedule not found for this account");
+  }
+
+  const status = schedule.status as string;
+  if (status === "paid" || status === "rolled") {
+    throw new Error(
+      `Installment cannot be written off — status is already ${status}`,
+    );
+  }
+
+  const amountDue = Number(schedule.amount_due);
+  const penaltyAmount = Number(schedule.penalty_amount ?? 0);
+  const amountPaid = Number(schedule.amount_paid);
+  const remainingDue = halfUp(amountDue + penaltyAmount - amountPaid);
+
+  if (remainingDue <= 0) {
+    throw new Error(
+      "Nothing to write off — installment is already fully paid",
+    );
+  }
+
+  const threshold = await getRoundingWriteoffThreshold(supabase);
+  if (remainingDue > threshold) {
+    throw new Error(
+      `Remaining balance ₱${remainingDue.toFixed(2)} exceeds the rounding write-off limit of ₱${threshold.toFixed(2)} — post a normal payment instead`,
+    );
+  }
+
+  const now = new Date().toISOString();
+  const totalDue = halfUp(amountDue + penaltyAmount);
+
+  const { error: insertError } = await supabase
+    .from("rounding_writeoffs")
+    .insert({
+      masterlist_id: masterlistId,
+      amortization_schedule_id: amortizationScheduleId,
+      amount: remainingDue,
+      performed_by: actorId,
+      performed_at: now,
+      notes: notes ?? null,
+    });
+
+  if (insertError) throw new Error(insertError.message);
+
+  const { error: scheduleUpdateError } = await supabase
+    .from("amortization_schedules")
+    .update({
+      amount_paid: totalDue,
+      status: "paid",
+      paid_at: now,
+    })
+    .eq("id", amortizationScheduleId);
+
+  if (scheduleUpdateError) throw new Error(scheduleUpdateError.message);
+
+  const { data: ml, error: mlReadError } = await supabase
+    .from("masterlist")
+    .select("outstanding_balance")
+    .eq("id", masterlistId)
+    .single();
+
+  if (mlReadError) throw new Error(mlReadError.message);
+
+  const newBalance = Math.max(
+    0,
+    halfUp(Number(ml?.outstanding_balance ?? 0) - remainingDue),
+  );
+
+  const { error: mlUpdateError } = await supabase
+    .from("masterlist")
+    .update({
+      outstanding_balance: newBalance,
+      account_status: newBalance <= 0 ? "paid" : "active",
+    })
+    .eq("id", masterlistId);
+
+  if (mlUpdateError) throw new Error(mlUpdateError.message);
+
+  return {
+    amount: remainingDue,
+    scheduleId: amortizationScheduleId,
+    writtenOffAt: now,
   };
 }
 
@@ -252,24 +491,65 @@ export async function reconcileAndPostDcr(
       continue;
     }
 
-    const { data: nextInstallment } = await supabase
-      .from("amortization_schedules")
-      .select("id, amount_due, amount_paid, penalty_amount, status")
-      .eq("masterlist_id", payment.masterlist_id)
-      .in("status", ["pending", "partial", "overdue"])
-      .order("installment_no")
-      .limit(1)
-      .maybeSingle();
+    const { data: storedAllocations } = await supabase
+      .from("dcr_item_allocations")
+      .select("amortization_schedule_id, amount")
+      .eq("dcr_item_id", item.id);
 
-    await supabase.from("postings").insert({
-      dcr_id: dcrId,
-      payment_id: payment.id,
-      masterlist_id: payment.masterlist_id,
-      amortization_schedule_id: nextInstallment?.id ?? null,
-      amount: item.amount,
-      posted_by: actorId,
-      posted_at: now,
-    });
+    let allocationLines: AllocationLine[];
+    if (storedAllocations?.length) {
+      allocationLines = storedAllocations.map((row) => ({
+        amortizationScheduleId: row.amortization_schedule_id as string | null,
+        amount: Number(row.amount),
+      }));
+    } else {
+      const openInstallments = await fetchOpenInstallments(
+        supabase,
+        payment.masterlist_id as string,
+      );
+      allocationLines = computeAutoAllocation(
+        Number(item.amount),
+        openInstallments,
+      );
+    }
+
+    for (const line of allocationLines) {
+      await supabase.from("postings").insert({
+        dcr_id: dcrId,
+        payment_id: payment.id,
+        masterlist_id: payment.masterlist_id,
+        amortization_schedule_id: line.amortizationScheduleId,
+        amount: line.amount,
+        posted_by: actorId,
+        posted_at: now,
+      });
+
+      if (line.amortizationScheduleId) {
+        const { data: schedule } = await supabase
+          .from("amortization_schedules")
+          .select("id, amount_due, amount_paid, penalty_amount, status")
+          .eq("id", line.amortizationScheduleId)
+          .single();
+
+        if (schedule) {
+          const totalDue =
+            Number(schedule.amount_due) +
+            Number(schedule.penalty_amount ?? 0);
+          const newPaid =
+            Number(schedule.amount_paid) + Number(line.amount);
+          const paid = newPaid >= totalDue;
+
+          await supabase
+            .from("amortization_schedules")
+            .update({
+              amount_paid: newPaid,
+              status: paid ? "paid" : "partial",
+              paid_at: paid ? now : null,
+            })
+            .eq("id", schedule.id);
+        }
+      }
+    }
 
     await supabase
       .from("payments")
@@ -279,23 +559,6 @@ export async function reconcileAndPostDcr(
         reviewed_at: now,
       })
       .eq("id", payment.id);
-
-    if (nextInstallment) {
-      const totalDue =
-        Number(nextInstallment.amount_due) +
-        Number(nextInstallment.penalty_amount ?? 0);
-      const newPaid = Number(nextInstallment.amount_paid) + Number(item.amount);
-      const paid = newPaid >= totalDue;
-
-      await supabase
-        .from("amortization_schedules")
-        .update({
-          amount_paid: newPaid,
-          status: paid ? "paid" : "partial",
-          paid_at: paid ? now : null,
-        })
-        .eq("id", nextInstallment.id);
-    }
 
     const { data: ml } = await supabase
       .from("masterlist")
@@ -408,6 +671,7 @@ export async function addPaymentToDcr(
   dcrId: string,
   paymentId: string,
   collectorUserId: string,
+  allocations?: AllocationLine[],
 ) {
   const { data: dcr } = await supabase
     .from("dcr")
@@ -421,7 +685,7 @@ export async function addPaymentToDcr(
 
   const { data: payment } = await supabase
     .from("payments")
-    .select("id, amount, status")
+    .select("id, amount, status, masterlist_id")
     .eq("id", paymentId)
     .single();
 
@@ -446,13 +710,52 @@ export async function addPaymentToDcr(
     throw new Error("Payment is already on a DCR");
   }
 
-  const { error } = await supabase.from("dcr_items").insert({
-    dcr_id: dcrId,
-    payment_id: paymentId,
-    amount: payment.amount,
-  });
+  const masterlistId = payment.masterlist_id as string;
+  let resolvedAllocations: AllocationLine[];
 
-  if (error) {
-    throw new Error(error.message);
+  if (allocations) {
+    await validateAllocationLines(
+      supabase,
+      masterlistId,
+      Number(payment.amount),
+      allocations,
+    );
+    resolvedAllocations = allocations;
+  } else {
+    const openInstallments = await fetchOpenInstallments(supabase, masterlistId);
+    resolvedAllocations = computeAutoAllocation(
+      Number(payment.amount),
+      openInstallments,
+    );
+  }
+
+  const { data: dcrItem, error } = await supabase
+    .from("dcr_items")
+    .insert({
+      dcr_id: dcrId,
+      payment_id: paymentId,
+      amount: payment.amount,
+    })
+    .select("id")
+    .single();
+
+  if (error || !dcrItem) {
+    throw new Error(error?.message ?? "Failed to add payment to DCR");
+  }
+
+  if (resolvedAllocations.length > 0) {
+    const { error: allocError } = await supabase
+      .from("dcr_item_allocations")
+      .insert(
+        resolvedAllocations.map((line) => ({
+          dcr_item_id: dcrItem.id,
+          amortization_schedule_id: line.amortizationScheduleId,
+          amount: line.amount,
+        })),
+      );
+
+    if (allocError) {
+      throw new Error(allocError.message);
+    }
   }
 }

@@ -42,7 +42,7 @@ async function getBorrowerMasterlist(userId: string, applicationId: string) {
 
   const { data: masterlist } = await supabase
     .from("masterlist")
-    .select("id")
+    .select("id, outstanding_balance")
     .eq("loan_application_id", applicationId)
     .maybeSingle();
 
@@ -55,6 +55,7 @@ async function getBorrowerMasterlist(userId: string, applicationId: string) {
     borrowerId: app.borrower_id as string,
     applicationId: app.id as string,
     applicationStatus: String(app.status),
+    outstandingBalance: Number(masterlist.outstanding_balance ?? 0),
   };
 }
 
@@ -63,7 +64,7 @@ export async function GET(_request: Request, ctx: { params: Promise<{ id: string
     const user = await requireModulePermission("borrower_portal", "view");
     const { id } = await ctx.params;
     const supabase = await createClient();
-    await getBorrowerMasterlist(user.id, id);
+    const ctxData = await getBorrowerMasterlist(user.id, id);
 
     const { data: masterlist } = await supabase
       .from("masterlist")
@@ -82,7 +83,18 @@ export async function GET(_request: Request, ctx: { params: Promise<{ id: string
       .eq("loan_application_id", id)
       .order("created_at", { ascending: false });
 
-    return jsonOk({ loan: masterlist, payments: payments ?? [] });
+    const { data: postings } = await supabase
+      .from("postings")
+      .select("id, amortization_schedule_id, amount, payments ( payment_date )")
+      .eq("masterlist_id", ctxData.masterlistId)
+      .not("amortization_schedule_id", "is", null)
+      .order("posted_at", { ascending: true });
+
+    return jsonOk({
+      loan: masterlist,
+      payments: payments ?? [],
+      postings: postings ?? [],
+    });
   } catch (error) {
     return handleApiError(error);
   }
@@ -96,7 +108,7 @@ export async function POST(request: Request, ctx: { params: Promise<{ id: string
     const supabase = await createClient();
     const ctxData = await getBorrowerMasterlist(user.id, id);
 
-    if (ctxData.applicationStatus === "paid_off") {
+    if (ctxData.applicationStatus === "paid_off" || ctxData.outstandingBalance <= 0) {
       return NextResponse.json(
         { error: "This loan is paid off — payment proofs are closed" },
         { status: 400 },

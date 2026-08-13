@@ -46,6 +46,7 @@ import {
   type FieldVisit,
   type SmeReloanVerification,
 } from "@/lib/cig/field-visit";
+import type { BusinessInfo } from "@/lib/borrowers/business-info";
 
 type CommitteeDetail = {
   application: {
@@ -56,6 +57,7 @@ type CommitteeDetail = {
     blocker: string | null;
     isReloan: boolean;
     segment: "seafarer" | "sme";
+    entityType: "individual" | "corporate" | null;
     statusHistory: StatusHistoryEntry[] | null;
     canDecide: boolean;
     votesNeeded: number;
@@ -69,6 +71,7 @@ type CommitteeDetail = {
     firstName: string;
     lastName: string;
     email: string;
+    businessInfo: BusinessInfo | null;
   } | null;
   verification: {
     finding: "positive" | "negative" | null;
@@ -302,6 +305,7 @@ export default function CommitteeApplicationPage() {
   const [message, setMessage] = useState<string | null>(null);
   const [revisitComment, setRevisitComment] = useState("");
   const [revisitRoute, setRevisitRoute] = useState<"csa" | "cig">("csa");
+  const [confirmRevisit, setConfirmRevisit] = useState(false);
   const [confirmAction, setConfirmAction] = useState<
     "approve" | "deny" | "hold" | null
   >(null);
@@ -501,9 +505,13 @@ export default function CommitteeApplicationPage() {
   if (loading) return <Spinner />;
   if (!data) return <Alert>Application not found.</Alert>;
 
-  const borrowerTitle = data.borrower
-    ? `${data.borrower.firstName} ${data.borrower.lastName}`
-    : "Application";
+  const companyName = data.borrower?.businessInfo?.companyName?.trim();
+  const borrowerTitle =
+    data.application.segment === "sme" && companyName
+      ? companyName
+      : data.borrower
+        ? `${data.borrower.firstName} ${data.borrower.lastName}`
+        : "Application";
   // Vote casting & 4 Cs stay available while ballots fill in; final action
   // alone waits for canDecide (all 3 votes — Phase 2).
   const canVote = data.application.status === "for_approval";
@@ -515,6 +523,7 @@ export default function CommitteeApplicationPage() {
       : isCommitteeHold
         ? data.latestAction?.comment
         : null;
+  const isSme = data.application.segment === "sme";
 
   return (
     <div>
@@ -529,9 +538,14 @@ export default function CommitteeApplicationPage() {
         title={borrowerTitle}
         description={data.application.applicationNo ?? undefined}
         actions={
-          <Badge variant={statusBadgeVariant(data.application.status)}>
-            {data.application.statusLabel}
-          </Badge>
+          <div className="flex flex-wrap items-center gap-2">
+            <Badge variant={isSme ? "navy" : "teal"} dot>
+              {isSme ? "SME" : "Seafarer"}
+            </Badge>
+            <Badge variant={statusBadgeVariant(data.application.status)}>
+              {data.application.statusLabel}
+            </Badge>
+          </div>
         }
       />
 
@@ -1166,6 +1180,7 @@ export default function CommitteeApplicationPage() {
                 value={data.verification.smeReloanVerification}
                 onChange={() => undefined}
                 onSave={() => undefined}
+                verifierName=""
                 readOnly
               />
             ) : (
@@ -1173,6 +1188,7 @@ export default function CommitteeApplicationPage() {
                 value={data.verification.fieldVisit}
                 onChange={() => undefined}
                 onSave={() => undefined}
+                verifierName=""
                 readOnly
               />
             )}
@@ -1189,7 +1205,11 @@ export default function CommitteeApplicationPage() {
           checklistApiPath={`/api/committee/applications/${applicationId}/checklist`}
           viewApiPath={(documentId) => `/api/documents/${documentId}/download`}
           title="Borrower attachments"
-          description="Read-only — Passport, Seaman's Book, Contract, IDs, and House Sketch."
+          description={
+            data.application.segment === "sme"
+              ? "Read-only — business registration, permits, financial statements, and other intake files."
+              : "Read-only — Passport, Seaman's Book, Contract, IDs, and House Sketch."
+          }
         />
       ) : null}
 
@@ -1669,7 +1689,7 @@ export default function CommitteeApplicationPage() {
               className="mt-6 space-y-3 border-t border-line-soft pt-4"
               onSubmit={(e) => {
                 e.preventDefault();
-                void handleAction("revisit");
+                setConfirmRevisit(true);
               }}
             >
               <h3 className="font-medium text-ink-900">Notice to Revisit</h3>
@@ -1703,6 +1723,32 @@ export default function CommitteeApplicationPage() {
                 Send Notice to Revisit
               </Button>
             </form>
+            <ConfirmDialog
+              open={confirmRevisit}
+              title="Send Notice to Revisit?"
+              variant="primary"
+              confirmLabel="Yes, send"
+              onCancel={() => setConfirmRevisit(false)}
+              onConfirm={() => {
+                void handleAction("revisit").then(() => setConfirmRevisit(false));
+              }}
+              loading={saving}
+            >
+              <div className="kv mb-4">
+                <div className="row">
+                  <span className="k">Route to</span>
+                  <span className="v">
+                    {revisitRoute === "csa"
+                      ? "CSA (intake)"
+                      : "CIG (verification)"}
+                  </span>
+                </div>
+                <div className="row">
+                  <span className="k">Remarks</span>
+                  <span className="v">{revisitComment}</span>
+                </div>
+              </div>
+            </ConfirmDialog>
           </Card>
       ) : canVote ? (
         <Card className="mb-6">

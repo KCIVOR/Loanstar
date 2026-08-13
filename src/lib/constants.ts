@@ -15,6 +15,7 @@ export const MODULE_SLUGS = [
   "reports",
   "system_config",
   "audit_log",
+  "briefings",
 ] as const;
 
 export type ModuleSlug = (typeof MODULE_SLUGS)[number];
@@ -117,6 +118,12 @@ export const MODULES: readonly ModuleDefinition[] = [
     name: "Audit Log",
     description: "Audit event log",
     sortOrder: 15,
+  },
+  {
+    slug: "briefings",
+    name: "Briefings",
+    description: "Pre-release borrower briefing sign-off",
+    sortOrder: 16,
   },
 ] as const;
 

@@ -14,6 +14,7 @@ export const MODULE_HOME_PATHS: Record<ModuleSlug, string> = {
   release_lra: "/lra",
   accounting_ar: "/ar",
   collection: "/collector",
+  briefings: "/collector/briefings",
   remedial: "/remedial",
   reports: "/reports",
   system_config: "/admin/config",

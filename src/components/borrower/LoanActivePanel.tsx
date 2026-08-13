@@ -58,6 +58,7 @@ type LoanPanelProps = {
 };
 
 type ScheduleRow = {
+  id: string;
   installment_no: number;
   due_date: string;
   amount_due: number;
@@ -77,11 +78,61 @@ type PaymentRow = {
   file_name: string | null;
 };
 
+type PostingRow = {
+  id: string;
+  amortization_schedule_id: string;
+  amount: number;
+  payments: { payment_date: string } | { payment_date: string }[] | null;
+};
+
 function formatMoney(value: number) {
   return value.toLocaleString("en-PH", {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   });
+}
+
+function formatDate(value: string) {
+  return new Date(value).toLocaleDateString("en-PH", {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+  });
+}
+
+/** Groups postings by installment; each value is sorted payment dates (asc). */
+function paymentDatesByScheduleId(
+  postings: PostingRow[],
+): Map<string, string[]> {
+  const map = new Map<string, string[]>();
+  for (const posting of postings) {
+    const scheduleId = posting.amortization_schedule_id;
+    if (!scheduleId) continue;
+    const raw = posting.payments;
+    const payment = Array.isArray(raw) ? raw[0] : raw;
+    const date = payment?.payment_date;
+    if (!date) continue;
+    const list = map.get(scheduleId) ?? [];
+    list.push(date);
+    map.set(scheduleId, list);
+  }
+  for (const [id, dates] of map) {
+    map.set(
+      id,
+      [...dates].sort((a, b) => a.localeCompare(b)),
+    );
+  }
+  return map;
+}
+
+function formatInstallmentPaymentDate(dates: string[] | undefined): string {
+  if (!dates || dates.length === 0) return "—";
+  const mostRecent = dates[dates.length - 1];
+  const label = formatDate(mostRecent);
+  if (dates.length > 1) {
+    return `${label} (+${dates.length - 1} more)`;
+  }
+  return label;
 }
 
 export function LoanActivePanel({
@@ -90,6 +141,7 @@ export function LoanActivePanel({
 }: LoanPanelProps) {
   const [loan, setLoan] = useState<Record<string, unknown> | null>(null);
   const [payments, setPayments] = useState<PaymentRow[]>([]);
+  const [postings, setPostings] = useState<PostingRow[]>([]);
   const [loading, setLoading] = useState(false);
   const [amount, setAmount] = useState("");
   const [paymentDate, setPaymentDate] = useState("");
@@ -119,9 +171,11 @@ export function LoanActivePanel({
       const data = (await res.json()) as {
         loan: Record<string, unknown>;
         payments: PaymentRow[];
+        postings?: PostingRow[];
       };
       setLoan(data.loan);
       setPayments(data.payments);
+      setPostings(data.postings ?? []);
     } finally {
       setLoading(false);
     }
@@ -248,14 +302,16 @@ export function LoanActivePanel({
 
   if (!loan) return null;
 
+  const isFullyPaid = isPaidOff || Number(loan?.outstanding_balance ?? -1) <= 0;
   const schedules = [...((loan.amortization_schedules as ScheduleRow[]) ?? [])].sort(
     (a, b) => a.installment_no - b.installment_no,
   );
+  const paymentDatesBySchedule = paymentDatesByScheduleId(postings);
   const totalLoan = Number(loan.total_loan ?? 0);
   let runningBalance = totalLoan;
   const scheduleRows = schedules.map((row) => {
     runningBalance -= Number(row.amount_due);
-    return { ...row, balanceAfter: Math.max(runningBalance, 0) };
+    return { ...row, id: row.id, balanceAfter: Math.max(runningBalance, 0) };
   });
   const totalAmortization = schedules.reduce(
     (sum, row) => sum + Number(row.amount_due),
@@ -289,7 +345,7 @@ export function LoanActivePanel({
         </div>
       ) : null}
 
-      {isPaidOff ? (
+      {isFullyPaid ? (
         <Alert variant="success" className="mb-4">
           This loan is fully paid. No further payment proofs are needed.
         </Alert>
@@ -301,6 +357,7 @@ export function LoanActivePanel({
           <tr>
             <Th num>#</Th>
             <Th>Due date</Th>
+            <Th>Payment date</Th>
             <Th num>Amortization</Th>
             <Th num>Balance</Th>
             <Th>Status</Th>
@@ -321,6 +378,18 @@ export function LoanActivePanel({
                   }
                 >
                   {row.due_date}
+                </span>
+              </Td>
+              <Td className="mono">
+                <span
+                  title={paymentDatesBySchedule
+                    .get(String(row.id))
+                    ?.map((d) => formatDate(d))
+                    .join(", ")}
+                >
+                  {formatInstallmentPaymentDate(
+                    paymentDatesBySchedule.get(String(row.id)),
+                  )}
                 </span>
               </Td>
               <Td num className="mono">
@@ -347,6 +416,7 @@ export function LoanActivePanel({
           <tr className="tfoot-row">
             <Td>{""}</Td>
             <Td>Total</Td>
+            <Td>{""}</Td>
             <Td num className="mono">
               {formatMoney(totalAmortization)}
             </Td>
@@ -358,7 +428,7 @@ export function LoanActivePanel({
         </tbody>
       </Table>
 
-      {!isPaidOff ? (
+      {!isFullyPaid ? (
         <>
           <h3 className="mb-2 font-medium text-ink-900">Submit payment proof</h3>
           <form

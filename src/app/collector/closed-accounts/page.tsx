@@ -10,6 +10,7 @@ import {
 } from "@/components/history";
 import {
   Alert,
+  Badge,
   EmptyState,
   PageHeader,
   Pagination,
@@ -32,6 +33,7 @@ import {
 } from "@/lib/collector/history";
 
 type HistoryTab = "paidOff" | "turnedOver";
+type SegmentFilter = "all" | "seafarer" | "sme";
 
 const DEFAULT_DATE_RANGE: DateRangeValue = {
   preset: "30d",
@@ -41,6 +43,21 @@ const DEFAULT_DATE_RANGE: DateRangeValue = {
 
 const EMPTY_PAID_OFF_KPI: CollectorClosedAccountsKpiCounts = { total: 0 };
 const EMPTY_TURNED_OVER_KPI: CollectorTurnedOverKpiCounts = { total: 0 };
+
+const SEGMENT_CHIPS: Array<{ id: SegmentFilter; label: string }> = [
+  { id: "all", label: "All" },
+  { id: "seafarer", label: "Seafarer" },
+  { id: "sme", label: "SME" },
+];
+
+function segmentBadge(segment: "sme" | "seafarer" | null | undefined) {
+  const isSme = segment === "sme";
+  return (
+    <Badge variant={isSme ? "navy" : "teal"} dot>
+      {isSme ? "SME" : "Seafarer"}
+    </Badge>
+  );
+}
 
 function dateRangePillLabel(value: DateRangeValue): string {
   if (value.preset === "30d") return "Last 30 days";
@@ -53,6 +70,7 @@ function dateRangePillLabel(value: DateRangeValue): string {
 
 function buildHistoryQuery(params: {
   search: string;
+  segment: SegmentFilter;
   dateRange: DateRangeValue;
   sortKey: string;
   sortDir: "asc" | "desc";
@@ -61,6 +79,7 @@ function buildHistoryQuery(params: {
 }): string {
   const qs = new URLSearchParams();
   if (params.search.trim()) qs.set("search", params.search.trim());
+  qs.set("segment", params.segment);
   qs.set("range", params.dateRange.preset);
   if (params.dateRange.preset === "custom") {
     if (params.dateRange.from) qs.set("from", params.dateRange.from);
@@ -83,6 +102,7 @@ function PaidOffHistoryPanel() {
 
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
+  const [segmentFilter, setSegmentFilter] = useState<SegmentFilter>("all");
   const [dateRange, setDateRange] = useState<DateRangeValue>(DEFAULT_DATE_RANGE);
   const [viewMode, setViewMode] = useState<HistoryViewMode>("list");
   const [pageSize, setPageSize] =
@@ -100,7 +120,7 @@ function PaidOffHistoryPanel() {
 
   useEffect(() => {
     setPage(1);
-  }, [debouncedSearch, dateRange, pageSize, sortKey, sortDir]);
+  }, [debouncedSearch, segmentFilter, dateRange, pageSize, sortKey, sortDir]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -108,6 +128,7 @@ function PaidOffHistoryPanel() {
     try {
       const query = buildHistoryQuery({
         search: debouncedSearch,
+        segment: segmentFilter,
         dateRange,
         sortKey,
         sortDir,
@@ -131,7 +152,7 @@ function PaidOffHistoryPanel() {
     } finally {
       setLoading(false);
     }
-  }, [debouncedSearch, dateRange, sortKey, sortDir, page, pageSize]);
+  }, [debouncedSearch, segmentFilter, dateRange, sortKey, sortDir, page, pageSize]);
 
   useEffect(() => {
     void load();
@@ -155,7 +176,8 @@ function PaidOffHistoryPanel() {
   }
 
   const dateIsDefault = dateRange.preset === "30d";
-  const activeFilterCount = dateIsDefault ? 0 : 1;
+  const activeFilterCount =
+    (segmentFilter !== "all" ? 1 : 0) + (dateIsDefault ? 0 : 1);
 
   const summaryStart = rows.length ? (safePage - 1) * pageSize + 1 : 0;
   const summaryEnd = (safePage - 1) * pageSize + rows.length;
@@ -204,6 +226,18 @@ function PaidOffHistoryPanel() {
           </div>
 
           <div className="active-pill-row">
+            {segmentFilter !== "all" ? (
+              <span className="active-pill">
+                Segment: {segmentFilter === "sme" ? "SME" : "Seafarer"}
+                <button
+                  type="button"
+                  aria-label="Clear segment filter"
+                  onClick={() => setSegmentFilter("all")}
+                >
+                  ×
+                </button>
+              </span>
+            ) : null}
             {!dateIsDefault ? (
               <span className="active-pill">
                 {dateRangePillLabel(dateRange)}
@@ -220,7 +254,10 @@ function PaidOffHistoryPanel() {
               <button
                 type="button"
                 className="clear-link"
-                onClick={() => setDateRange(DEFAULT_DATE_RANGE)}
+                onClick={() => {
+                  setSegmentFilter("all");
+                  setDateRange(DEFAULT_DATE_RANGE);
+                }}
               >
                 Clear all
               </button>
@@ -274,6 +311,21 @@ function PaidOffHistoryPanel() {
 
         <div className={cn("filter-panel", filterPanelOpen && "is-open")}>
           <div className="filter-group">
+            <span className="filter-group-label">Segment</span>
+            <div className="filter-bar">
+              {SEGMENT_CHIPS.map((chip) => (
+                <button
+                  key={chip.id}
+                  type="button"
+                  className={cn("fchip", segmentFilter === chip.id && "is-on")}
+                  onClick={() => setSegmentFilter(chip.id)}
+                >
+                  {chip.label}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className="filter-group">
             <span className="filter-group-label">Closed date</span>
             <DateRangeFilter value={dateRange} onChange={setDateRange} />
           </div>
@@ -287,6 +339,7 @@ function PaidOffHistoryPanel() {
               <tr>
                 <Th>Borrower</Th>
                 <Th>Account</Th>
+                <Th>Segment</Th>
                 <Th num>Balance (at closure)</Th>
                 <Th>Closed date</Th>
               </tr>
@@ -294,7 +347,7 @@ function PaidOffHistoryPanel() {
             <tbody>
               {Array.from({ length: 6 }, (_, i) => (
                 <tr key={i}>
-                  <Td colSpan={4}>
+                  <Td colSpan={5}>
                     <Skeleton variant="line" />
                   </Td>
                 </tr>
@@ -325,6 +378,10 @@ function PaidOffHistoryPanel() {
               </div>
               <div className="gcard-name">{row.borrowerName}</div>
               <div className="gcard-meta">
+                <div className="row">
+                  <span className="k">Segment</span>
+                  <span className="v">{segmentBadge(row.segment)}</span>
+                </div>
                 <div className="row">
                   <span className="k">Balance (at closure)</span>
                   <span className="v mono">
@@ -360,6 +417,7 @@ function PaidOffHistoryPanel() {
                   Account
                   {sortArrow("account")}
                 </Th>
+                <Th>Segment</Th>
                 <Th num>Balance (at closure)</Th>
                 <Th
                   className="sortable"
@@ -386,6 +444,7 @@ function PaidOffHistoryPanel() {
                       {row.loanAccountNo ?? "—"}
                     </span>
                   </Td>
+                  <Td>{segmentBadge(row.segment)}</Td>
                   <Td num className="mono">
                     {formatMoney(row.outstandingBalance)}
                   </Td>
@@ -438,6 +497,7 @@ function TurnedOverHistoryPanel() {
 
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
+  const [segmentFilter, setSegmentFilter] = useState<SegmentFilter>("all");
   const [dateRange, setDateRange] = useState<DateRangeValue>(DEFAULT_DATE_RANGE);
   const [viewMode, setViewMode] = useState<HistoryViewMode>("list");
   const [pageSize, setPageSize] =
@@ -455,7 +515,7 @@ function TurnedOverHistoryPanel() {
 
   useEffect(() => {
     setPage(1);
-  }, [debouncedSearch, dateRange, pageSize, sortKey, sortDir]);
+  }, [debouncedSearch, segmentFilter, dateRange, pageSize, sortKey, sortDir]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -463,6 +523,7 @@ function TurnedOverHistoryPanel() {
     try {
       const query = buildHistoryQuery({
         search: debouncedSearch,
+        segment: segmentFilter,
         dateRange,
         sortKey,
         sortDir,
@@ -486,7 +547,7 @@ function TurnedOverHistoryPanel() {
     } finally {
       setLoading(false);
     }
-  }, [debouncedSearch, dateRange, sortKey, sortDir, page, pageSize]);
+  }, [debouncedSearch, segmentFilter, dateRange, sortKey, sortDir, page, pageSize]);
 
   useEffect(() => {
     void load();
@@ -510,7 +571,8 @@ function TurnedOverHistoryPanel() {
   }
 
   const dateIsDefault = dateRange.preset === "30d";
-  const activeFilterCount = dateIsDefault ? 0 : 1;
+  const activeFilterCount =
+    (segmentFilter !== "all" ? 1 : 0) + (dateIsDefault ? 0 : 1);
 
   const summaryStart = rows.length ? (safePage - 1) * pageSize + 1 : 0;
   const summaryEnd = (safePage - 1) * pageSize + rows.length;
@@ -559,6 +621,18 @@ function TurnedOverHistoryPanel() {
           </div>
 
           <div className="active-pill-row">
+            {segmentFilter !== "all" ? (
+              <span className="active-pill">
+                Segment: {segmentFilter === "sme" ? "SME" : "Seafarer"}
+                <button
+                  type="button"
+                  aria-label="Clear segment filter"
+                  onClick={() => setSegmentFilter("all")}
+                >
+                  ×
+                </button>
+              </span>
+            ) : null}
             {!dateIsDefault ? (
               <span className="active-pill">
                 {dateRangePillLabel(dateRange)}
@@ -575,7 +649,10 @@ function TurnedOverHistoryPanel() {
               <button
                 type="button"
                 className="clear-link"
-                onClick={() => setDateRange(DEFAULT_DATE_RANGE)}
+                onClick={() => {
+                  setSegmentFilter("all");
+                  setDateRange(DEFAULT_DATE_RANGE);
+                }}
               >
                 Clear all
               </button>
@@ -629,6 +706,21 @@ function TurnedOverHistoryPanel() {
 
         <div className={cn("filter-panel", filterPanelOpen && "is-open")}>
           <div className="filter-group">
+            <span className="filter-group-label">Segment</span>
+            <div className="filter-bar">
+              {SEGMENT_CHIPS.map((chip) => (
+                <button
+                  key={chip.id}
+                  type="button"
+                  className={cn("fchip", segmentFilter === chip.id && "is-on")}
+                  onClick={() => setSegmentFilter(chip.id)}
+                >
+                  {chip.label}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className="filter-group">
             <span className="filter-group-label">Turned-over date</span>
             <DateRangeFilter value={dateRange} onChange={setDateRange} />
           </div>
@@ -642,6 +734,7 @@ function TurnedOverHistoryPanel() {
               <tr>
                 <Th>Borrower</Th>
                 <Th>Account</Th>
+                <Th>Segment</Th>
                 <Th>Turned-over date</Th>
                 <Th>Reason</Th>
               </tr>
@@ -649,7 +742,7 @@ function TurnedOverHistoryPanel() {
             <tbody>
               {Array.from({ length: 6 }, (_, i) => (
                 <tr key={i}>
-                  <Td colSpan={4}>
+                  <Td colSpan={5}>
                     <Skeleton variant="line" />
                   </Td>
                 </tr>
@@ -680,6 +773,10 @@ function TurnedOverHistoryPanel() {
               </div>
               <div className="gcard-name">{row.borrowerName}</div>
               <div className="gcard-meta">
+                <div className="row">
+                  <span className="k">Segment</span>
+                  <span className="v">{segmentBadge(row.segment)}</span>
+                </div>
                 <div className="row">
                   <span className="k">Turned-over date</span>
                   <span className="v mono">{formatDate(row.turnedOverAt)}</span>
@@ -713,6 +810,7 @@ function TurnedOverHistoryPanel() {
                   Account
                   {sortArrow("account")}
                 </Th>
+                <Th>Segment</Th>
                 <Th
                   className="sortable"
                   onClick={() => toggleSort("turnedOverAt")}
@@ -739,6 +837,7 @@ function TurnedOverHistoryPanel() {
                       {row.loanAccountNo ?? "—"}
                     </span>
                   </Td>
+                  <Td>{segmentBadge(row.segment)}</Td>
                   <Td className="mono">{formatDate(row.turnedOverAt)}</Td>
                   <Td>{row.turnoverReason}</Td>
                 </tr>

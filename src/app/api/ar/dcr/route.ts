@@ -23,7 +23,7 @@ export async function GET() {
             masterlist_id,
             storage_path,
             file_name,
-            masterlist ( borrower_name, loan_account_no )
+            masterlist ( borrower_name, loan_account_no, segment )
           )
         )
       `,

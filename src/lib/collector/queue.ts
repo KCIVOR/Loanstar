@@ -23,6 +23,7 @@ export type CollectorLastContact = {
 
 export type CollectorQueueMappedRow = {
   id: string;
+  borrowerId: string;
   borrowerName: string;
   borrowerNo: string;
   loanAccountNo: string | null;
@@ -87,6 +88,26 @@ export function passesAgingFilter(
 ): boolean {
   if (spec === "all") return true;
   return bucket === spec;
+}
+
+export const COLLECTOR_SEGMENT_FILTERS = ["all", "seafarer", "sme"] as const;
+
+export type CollectorSegmentFilter =
+  (typeof COLLECTOR_SEGMENT_FILTERS)[number];
+
+/** Map a raw segment query param to Seafarer/SME, else `"all"`. */
+export function segmentFilterSpec(raw: string): CollectorSegmentFilter {
+  if (raw === "seafarer" || raw === "sme") return raw;
+  return "all";
+}
+
+/** Exact segment match; `"all"` always passes. */
+export function passesSegmentFilter(
+  segment: string,
+  spec: CollectorSegmentFilter,
+): boolean {
+  if (spec === "all") return true;
+  return segment === spec;
 }
 
 export function sanitizeSearchTerm(term: string): string {

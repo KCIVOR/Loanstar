@@ -6,6 +6,7 @@ export type CommitteeHistoryRow = {
   id: string;
   applicationId: string;
   applicationNo: string | null;
+  segment: "sme" | "seafarer" | null;
   borrower: {
     borrowerNo: string;
     firstName: string;
@@ -30,6 +31,7 @@ export type CommitteeHistorySortKey =
 export type CommitteeHistoryQueryParams = {
   search?: string;
   action?: CommitteeDecisionAction | "all";
+  segment?: "all" | "seafarer" | "sme";
   from?: string | null;
   to?: string | null;
   sortKey?: CommitteeHistorySortKey;
@@ -179,6 +181,7 @@ export async function getCommitteeDecisionHistory(
   const {
     search = "",
     action = "all",
+    segment: segmentFilter = "all",
     from = null,
     to = null,
     sortKey = "actedAt",
@@ -223,6 +226,7 @@ export async function getCommitteeDecisionHistory(
       loan_applications (
         application_no,
         status,
+        segment,
         borrowers (
           borrower_no,
           first_name,
@@ -237,6 +241,10 @@ export async function getCommitteeDecisionHistory(
   const actionEq = actionFilterSpec(action);
   if (actionEq) {
     query = query.eq("action", actionEq);
+  }
+
+  if (segmentFilter !== "all") {
+    query = query.eq("loan_applications.segment", segmentFilter);
   }
 
   if (from) {
@@ -309,10 +317,15 @@ export async function getCommitteeDecisionHistory(
       | Array<{ voterId: string; vote: "approve" | "deny" }>
       | null;
 
+    const segmentRaw = app?.segment as string | null | undefined;
+    const segment: "sme" | "seafarer" | null =
+      segmentRaw === "sme" || segmentRaw === "seafarer" ? segmentRaw : null;
+
     return {
       id: row.id as string,
       applicationId,
       applicationNo: (app?.application_no as string | null) ?? null,
+      segment,
       borrower: borrower
         ? {
             borrowerNo: borrower.borrower_no as string,

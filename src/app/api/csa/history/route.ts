@@ -11,6 +11,7 @@ import { requireModulePermission } from "@/lib/permissions/server";
 import { createClient } from "@/lib/supabase/server";
 
 const STATUS_GROUPS = new Set(["all", "in_progress", "denied", "released"]);
+const SEGMENT_FILTERS = new Set(["all", "seafarer", "sme"]);
 const RANGE_PRESETS = new Set(["30d", "90d", "all", "custom"]);
 const SORT_KEYS = new Set([
   "applicationNo",
@@ -30,6 +31,11 @@ export async function GET(request: Request) {
     const statusGroup = (
       STATUS_GROUPS.has(statusRaw) ? statusRaw : "all"
     ) as CsaHistoryStatusGroup | "all";
+
+    const segmentRaw = searchParams.get("segment") ?? "all";
+    const segmentFilter = (
+      SEGMENT_FILTERS.has(segmentRaw) ? segmentRaw : "all"
+    ) as "all" | "seafarer" | "sme";
 
     const rangeRaw = searchParams.get("range") ?? "30d";
     const preset = (
@@ -62,6 +68,7 @@ export async function GET(request: Request) {
       getCsaApplicationHistory(supabase, {
         search,
         statusGroup,
+        segment: segmentFilter,
         from,
         to,
         sortKey,

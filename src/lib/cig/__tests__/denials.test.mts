@@ -8,6 +8,7 @@ import {
   denialCallMatchesSearch,
   DENIAL_LIST_PAGE_SIZES,
   DENIAL_WAITING_BUCKETS,
+  passesSegmentFilter,
   passesWaitingBucket,
   sortDenialCallsByDeniedAt,
   waitingBucketFilterSpec,
@@ -24,6 +25,7 @@ function item(
     noticeId: overrides.noticeId ?? "notice-1",
     applicationId: overrides.applicationId,
     applicationNo: overrides.applicationNo ?? null,
+    segment: overrides.segment === undefined ? "seafarer" : overrides.segment,
     deniedAt: overrides.deniedAt,
     borrower:
       overrides.borrower === undefined
@@ -262,6 +264,39 @@ describe("passesWaitingBucket ↔ waitingBucketFilterSpec", () => {
         );
       }
     }
+  });
+});
+
+describe("passesSegmentFilter", () => {
+  const seafarer = item({
+    applicationId: "a",
+    deniedAt: "2026-08-01T00:00:00.000Z",
+    segment: "seafarer",
+  });
+  const sme = item({
+    applicationId: "b",
+    deniedAt: "2026-08-01T00:00:00.000Z",
+    segment: "sme",
+  });
+  const unknown = item({
+    applicationId: "c",
+    deniedAt: "2026-08-01T00:00:00.000Z",
+    segment: null,
+  });
+
+  it("lets every row through when segment is all", () => {
+    assert.equal(passesSegmentFilter(seafarer, "all"), true);
+    assert.equal(passesSegmentFilter(sme, "all"), true);
+    assert.equal(passesSegmentFilter(unknown, "all"), true);
+  });
+
+  it("matches only the requested segment", () => {
+    assert.equal(passesSegmentFilter(seafarer, "seafarer"), true);
+    assert.equal(passesSegmentFilter(sme, "seafarer"), false);
+    assert.equal(passesSegmentFilter(unknown, "seafarer"), false);
+    assert.equal(passesSegmentFilter(sme, "sme"), true);
+    assert.equal(passesSegmentFilter(seafarer, "sme"), false);
+    assert.equal(passesSegmentFilter(unknown, "sme"), false);
   });
 });
 

@@ -248,6 +248,11 @@ export async function GET(_request: Request, { params }: RouteParams) {
         blocker: application.blocker,
         editable: application.status === "for_verification",
         segment: scope.segment,
+        entityType:
+          application.entity_type === "individual" ||
+          application.entity_type === "corporate"
+            ? application.entity_type
+            : null,
         isReloan: scope.isReloan,
       },
       borrower,

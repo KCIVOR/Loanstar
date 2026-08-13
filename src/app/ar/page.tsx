@@ -80,6 +80,7 @@ type QueueRow = {
 type SortKey = "priority" | "balance" | "borrower" | "status";
 type StatusFilter = "all" | "active" | "paid" | "default" | "remedial";
 type AgingFilter = "all" | "current" | "1-30" | "31-60" | "61-90" | "91+";
+type SegmentFilter = "all" | "seafarer" | "sme";
 
 const PAGE_SIZE_OPTIONS = MASTERLIST_QUEUE_PAGE_SIZES;
 
@@ -111,6 +112,12 @@ const AGING_CHIPS: Array<{ id: AgingFilter; label: string }> = [
   { id: "31-60", label: "31–60" },
   { id: "61-90", label: "61–90" },
   { id: "91+", label: "91+" },
+];
+
+const SEGMENT_CHIPS: Array<{ id: SegmentFilter; label: string }> = [
+  { id: "all", label: "All" },
+  { id: "seafarer", label: "Seafarer" },
+  { id: "sme", label: "SME" },
 ];
 
 function accountStatusVariant(
@@ -233,10 +240,20 @@ function agingFilterLabel(filter: AgingFilter): string {
   return AGING_CHIPS.find((chip) => chip.id === filter)?.label ?? filter;
 }
 
+function segmentBadge(segment: string | null | undefined) {
+  const isSme = segment === "sme";
+  return (
+    <Badge variant={isSme ? "navy" : "teal"} dot>
+      {isSme ? "SME" : "Seafarer"}
+    </Badge>
+  );
+}
+
 function buildQueueQuery(params: {
   search: string;
   statusFilter: StatusFilter;
   agingFilter: AgingFilter;
+  segmentFilter: SegmentFilter;
   dateRange: DateRangeValue;
   sortKey: SortKey;
   sortDir: "asc" | "desc";
@@ -247,6 +264,7 @@ function buildQueueQuery(params: {
   if (params.search.trim()) qs.set("search", params.search.trim());
   qs.set("status", params.statusFilter);
   qs.set("aging", params.agingFilter);
+  qs.set("segment", params.segmentFilter);
   qs.set("range", params.dateRange.preset);
   if (params.dateRange.preset === "custom") {
     if (params.dateRange.from) qs.set("from", params.dateRange.from);
@@ -277,6 +295,7 @@ export default function ArDashboardPage() {
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [agingFilter, setAgingFilter] = useState<AgingFilter>("all");
+  const [segmentFilter, setSegmentFilter] = useState<SegmentFilter>("all");
   const [dateRange, setDateRange] = useState<DateRangeValue>(DEFAULT_DATE_RANGE);
   const [viewMode, setViewMode] = useState<HistoryViewMode>("list");
   const [pageSize, setPageSize] =
@@ -297,6 +316,7 @@ export default function ArDashboardPage() {
     debouncedSearch,
     statusFilter,
     agingFilter,
+    segmentFilter,
     dateRange,
     pageSize,
     sortKey,
@@ -318,6 +338,7 @@ export default function ArDashboardPage() {
         search: debouncedSearch,
         statusFilter,
         agingFilter,
+        segmentFilter,
         dateRange,
         sortKey,
         sortDir,
@@ -343,6 +364,7 @@ export default function ArDashboardPage() {
     debouncedSearch,
     statusFilter,
     agingFilter,
+    segmentFilter,
     dateRange,
     sortKey,
     sortDir,
@@ -427,6 +449,7 @@ export default function ArDashboardPage() {
   const activeFilterCount =
     (statusFilter !== "all" ? 1 : 0) +
     (agingFilter !== "all" ? 1 : 0) +
+    (segmentFilter !== "all" ? 1 : 0) +
     (dateIsDefault ? 0 : 1);
 
   const summaryStart = displayRows.length
@@ -450,7 +473,6 @@ export default function ArDashboardPage() {
       <>
         <div className="flex flex-wrap items-center gap-1.5">
           <span className="font-medium text-ink-900">{row.borrower_name}</span>
-          {row.segment === "sme" ? <Badge variant="navy">SME</Badge> : null}
         </div>
         {secondary ? (
           <div className="text-xs text-ink-500">{secondary}</div>
@@ -654,6 +676,18 @@ export default function ArDashboardPage() {
                 </button>
               </span>
             ) : null}
+            {segmentFilter !== "all" ? (
+              <span className="active-pill">
+                Segment: {segmentFilter === "sme" ? "SME" : "Seafarer"}
+                <button
+                  type="button"
+                  aria-label="Clear segment filter"
+                  onClick={() => setSegmentFilter("all")}
+                >
+                  ×
+                </button>
+              </span>
+            ) : null}
             {!dateIsDefault ? (
               <span className="active-pill">
                 {dateRangePillLabel(dateRange)}
@@ -673,6 +707,7 @@ export default function ArDashboardPage() {
                 onClick={() => {
                   setStatusFilter("all");
                   setAgingFilter("all");
+                  setSegmentFilter("all");
                   setDateRange(DEFAULT_DATE_RANGE);
                 }}
               >
@@ -758,6 +793,21 @@ export default function ArDashboardPage() {
             </div>
           </div>
           <div className="filter-group">
+            <span className="filter-group-label">Segment</span>
+            <div className="filter-bar">
+              {SEGMENT_CHIPS.map((chip) => (
+                <button
+                  key={chip.id}
+                  type="button"
+                  className={cn("fchip", segmentFilter === chip.id && "is-on")}
+                  onClick={() => setSegmentFilter(chip.id)}
+                >
+                  {chip.label}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className="filter-group">
             <span className="filter-group-label">Created date</span>
             <DateRangeFilter value={dateRange} onChange={setDateRange} />
           </div>
@@ -770,6 +820,7 @@ export default function ArDashboardPage() {
             <thead>
               <tr>
                 <Th>Borrower</Th>
+                <Th>Segment</Th>
                 <Th>Loan account</Th>
                 <Th>Portfolio</Th>
                 <Th className="num">Outstanding</Th>
@@ -783,7 +834,7 @@ export default function ArDashboardPage() {
             <tbody>
               {Array.from({ length: 6 }, (_, i) => (
                 <tr key={i}>
-                  <Td colSpan={9}>
+                  <Td colSpan={10}>
                     <Skeleton variant="line" />
                   </Td>
                 </tr>
@@ -821,6 +872,10 @@ export default function ArDashboardPage() {
                 </div>
                 <div className="gcard-name">{row.borrower_name}</div>
                 <div className="gcard-meta">
+                  <div className="row">
+                    <span className="k">Segment</span>
+                    <span className="v">{segmentBadge(row.segment)}</span>
+                  </div>
                   <div className="row">
                     <span className="k">Outstanding</span>
                     <span className="v mono text-teal-600">
@@ -861,6 +916,7 @@ export default function ArDashboardPage() {
                   Borrower
                   {sortArrow("borrower")}
                 </Th>
+                <Th>Segment</Th>
                 <Th>Loan account</Th>
                 <Th>Portfolio</Th>
                 <Th
@@ -892,6 +948,7 @@ export default function ArDashboardPage() {
                 return (
                   <tr key={row.id}>
                     <Td>{renderBorrowerCell(row)}</Td>
+                    <Td>{segmentBadge(row.segment)}</Td>
                     <Td>
                       <span className="id">
                         {row.loan_account_no ?? "—"}

@@ -45,6 +45,7 @@ export type AgentLeadQueueRow = {
   businessName: string | null;
   borrowerId: string | null;
   applicationId: string | null;
+  segment: "sme" | "seafarer" | null;
   status: string;
   createdAt: string;
   updatedAt: string;
@@ -58,6 +59,7 @@ export type AgentLeadsQueueParams = {
   search?: string;
   stageFilter?: AgentLeadStageFilter | string;
   statusFilter?: AgentLeadStatusFilter | string;
+  segmentFilter?: "all" | "seafarer" | "sme" | string;
   from?: string | null;
   to?: string | null;
   sortKey?: AgentLeadsSortKey;
@@ -83,8 +85,17 @@ const STAGE_RANK: Record<LeadPipelineStage, number> = {
   docs_ready: 2,
 };
 
-const LEAD_SELECT =
-  "id, borrower_name, business_name, borrower_id, application_id, status, created_at, updated_at";
+const LEAD_SELECT = `
+  id,
+  borrower_name,
+  business_name,
+  borrower_id,
+  application_id,
+  status,
+  created_at,
+  updated_at,
+  loan_applications ( segment )
+`;
 
 type FlagRow = {
   is_required: boolean;
@@ -100,6 +111,10 @@ type RawLeadRow = {
   status: string;
   created_at: string;
   updated_at: string;
+  loan_applications?:
+    | { segment: string | null }
+    | { segment: string | null }[]
+    | null;
 };
 
 /** Clamp page size to the allowlist; invalid values fall back to 10. */
@@ -148,6 +163,15 @@ export function passesStage(
   return stage === spec.stage;
 }
 
+/** Segment membership — unconverted (null) never match a non-"all" filter. */
+export function passesSegmentFilter(
+  row: Pick<AgentLeadQueueRow, "segment">,
+  segment: "all" | "seafarer" | "sme",
+): boolean {
+  if (segment === "all") return true;
+  return row.segment === segment;
+}
+
 function sanitizeSearchTerm(term: string): string {
   return term
     .trim()
@@ -193,6 +217,11 @@ function mapEnrichedLead(
     applicationId,
     checklistPercent: summary.percent,
   });
+  const appRaw = row.loan_applications;
+  const app = Array.isArray(appRaw) ? appRaw[0] : appRaw;
+  const segmentRaw = app?.segment;
+  const segment: "sme" | "seafarer" | null =
+    segmentRaw === "sme" || segmentRaw === "seafarer" ? segmentRaw : null;
 
   return {
     id: row.id,
@@ -200,6 +229,7 @@ function mapEnrichedLead(
     businessName: row.business_name,
     borrowerId: row.borrower_id,
     applicationId,
+    segment,
     status: row.status,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
@@ -330,6 +360,7 @@ export async function getAgentLeadsQueue(
     search = "",
     stageFilter = "all",
     statusFilter = "all",
+    segmentFilter = "all",
     from = null,
     to = null,
     sortKey = "priority",
@@ -343,6 +374,10 @@ export async function getAgentLeadsQueue(
   const term = sanitizeSearchTerm(search);
   const statusSpec = statusFilterSpec(statusFilter);
   const stageSpec = stageFilterSpec(stageFilter);
+  const segmentSpec: "all" | "seafarer" | "sme" =
+    segmentFilter === "seafarer" || segmentFilter === "sme"
+      ? segmentFilter
+      : "all";
 
   const raw = await fetchLeadSuperset(supabase, userId, {
     term,
@@ -352,7 +387,11 @@ export async function getAgentLeadsQueue(
   });
 
   const enriched = await enrichLeads(supabase, raw);
-  const filtered = enriched.filter((row) => passesStage(row.stage, stageSpec));
+  const filtered = enriched.filter(
+    (row) =>
+      passesStage(row.stage, stageSpec) &&
+      passesSegmentFilter(row, segmentSpec),
+  );
   filtered.sort((a, b) => compareLeads(a, b, sortKey, sortDir));
 
   const totalCount = filtered.length;

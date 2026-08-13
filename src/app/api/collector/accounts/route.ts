@@ -10,6 +10,8 @@ import {
   computeCollectorQueueKpis,
   inFirstPaymentBounds,
   passesAgingFilter,
+  passesSegmentFilter,
+  segmentFilterSpec,
   sortCollectorQueue,
   type CollectorLastContact,
   type CollectorQueueKpis,
@@ -20,6 +22,7 @@ import { requireModulePermission } from "@/lib/permissions/server";
 import { createClient, createServiceClient } from "@/lib/supabase/server";
 
 const RANGE_PRESETS = new Set(["30d", "90d", "all", "custom"]);
+const SEGMENT_FILTERS = new Set(["all", "seafarer", "sme"]);
 const SORT_KEYS = new Set<CollectorQueueSortKey>([
   "priority",
   "balance",
@@ -56,6 +59,10 @@ export async function GET(request: Request) {
 
     const search = searchParams.get("search") ?? "";
     const agingSpec = agingFilterSpec(searchParams.get("aging") ?? "all");
+    const segmentRaw = searchParams.get("segment") ?? "all";
+    const segmentFilter = segmentFilterSpec(
+      SEGMENT_FILTERS.has(segmentRaw) ? segmentRaw : "all",
+    );
 
     const rangeRaw = searchParams.get("range") ?? "all";
     const preset = (
@@ -109,11 +116,12 @@ export async function GET(request: Request) {
     // in the handler: priority/callback/agingNeedsAttention are computed (not
     // SQL columns) and volume is per-officer bounded.
     // Paid-off exclusion: account_status='active' (not closed_at IS NULL).
-    const { data, error } = await supabase
+    let query = supabase
       .from("masterlist")
       .select(
         `
         id,
+        borrower_id,
         borrower_name,
         borrower_no,
         loan_account_no,
@@ -134,8 +142,13 @@ export async function GET(request: Request) {
       )
       .in("id", ids)
       .eq("remedial_flag", false)
-      .eq("account_status", COLLECTOR_QUEUE_ACCOUNT_STATUS)
-      .order("first_payment_date");
+      .eq("account_status", COLLECTOR_QUEUE_ACCOUNT_STATUS);
+
+    if (segmentFilter !== "all") {
+      query = query.eq("segment", segmentFilter);
+    }
+
+    const { data, error } = await query.order("first_payment_date");
 
     if (error) throw new Error(error.message);
 
@@ -166,6 +179,7 @@ export async function GET(request: Request) {
       const next = nextOpenInstallment(schedules);
       return {
         id: row.id,
+        borrowerId: row.borrower_id as string,
         borrowerName: row.borrower_name,
         borrowerNo: row.borrower_no,
         loanAccountNo: row.loan_account_no,
@@ -189,6 +203,7 @@ export async function GET(request: Request) {
       (row) =>
         inFirstPaymentBounds(row.firstPaymentDate, from, to) &&
         passesAgingFilter(row.agingBucket, agingSpec) &&
+        passesSegmentFilter(row.segment, segmentFilter) &&
         collectorSearchPredicate(row, search),
     );
     const sorted = sortCollectorQueue(filtered, sortKey, sortDir);

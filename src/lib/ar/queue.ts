@@ -26,6 +26,7 @@ export type MasterlistQueueQueryParams = {
   search?: string;
   statusFilter?: string;
   agingFilter?: string;
+  segmentFilter?: "all" | "seafarer" | "sme";
   from?: string | null;
   to?: string | null;
   sortKey?: MasterlistQueueSortKey;
@@ -161,6 +162,7 @@ export async function getMasterlistQueue(
     search = "",
     statusFilter = "all",
     agingFilter = "all",
+    segmentFilter = "all",
     from = null,
     to = null,
     sortKey,
@@ -187,6 +189,10 @@ export async function getMasterlistQueue(
   const agingSpec = agingFilterSpec(agingFilter);
   if (agingSpec.mode === "eq") {
     query = query.eq("aging_bucket", agingSpec.aging);
+  }
+
+  if (segmentFilter !== "all") {
+    query = query.eq("segment", segmentFilter);
   }
 
   if (from) {

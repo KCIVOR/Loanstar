@@ -184,8 +184,8 @@ test("resolveReloanSegment: missing parent (no prior app) is Seafarer", () => {
   );
 });
 
-// resolveBorrowerCreateSegment — borrower self-serve create (P1). Reloan
-// branch must stay byte-identical to resolveReloanSegment (body ignored, P2).
+// resolveBorrowerCreateSegment — borrower self-serve create. Explicit
+// bodySegment is honored for first and reloan; omit/null falls back by kind.
 
 test("resolveBorrowerCreateSegment: first with no body is Seafarer (byte-compatible with old clients)", () => {
   assert.deepEqual(resolveBorrowerCreateSegment({ kind: "first" }), {
@@ -255,7 +255,7 @@ test("resolveBorrowerCreateSegment: first with invalid segment is rejected", () 
   assert.equal(result.ok, false);
 });
 
-test("resolveBorrowerCreateSegment: reloan ignores body segment and inherits parent (SME)", () => {
+test("resolveBorrowerCreateSegment: reloan with explicit seafarer overrides parent SME", () => {
   assert.deepEqual(
     resolveBorrowerCreateSegment({
       kind: "reloan",
@@ -263,11 +263,11 @@ test("resolveBorrowerCreateSegment: reloan ignores body segment and inherits par
       parentSegment: "sme",
       parentEntityType: "corporate",
     }),
-    { ok: true, scope: { segment: "sme", entityType: "corporate" } },
+    { ok: true, scope: { segment: "seafarer", entityType: null } },
   );
 });
 
-test("resolveBorrowerCreateSegment: reloan ignores body segment and inherits parent (Seafarer)", () => {
+test("resolveBorrowerCreateSegment: reloan with explicit sme overrides parent Seafarer", () => {
   assert.deepEqual(
     resolveBorrowerCreateSegment({
       kind: "reloan",
@@ -276,6 +276,40 @@ test("resolveBorrowerCreateSegment: reloan ignores body segment and inherits par
       parentSegment: "seafarer",
       parentEntityType: null,
     }),
+    { ok: true, scope: { segment: "sme", entityType: "individual" } },
+  );
+});
+
+test("resolveBorrowerCreateSegment: reloan with no body inherits parent (SME)", () => {
+  assert.deepEqual(
+    resolveBorrowerCreateSegment({
+      kind: "reloan",
+      parentSegment: "sme",
+      parentEntityType: "corporate",
+    }),
+    { ok: true, scope: { segment: "sme", entityType: "corporate" } },
+  );
+});
+
+test("resolveBorrowerCreateSegment: reloan with no body inherits parent (Seafarer)", () => {
+  assert.deepEqual(
+    resolveBorrowerCreateSegment({
+      kind: "reloan",
+      parentSegment: "seafarer",
+      parentEntityType: null,
+    }),
     { ok: true, scope: { segment: "seafarer", entityType: null } },
   );
+});
+
+test("resolveBorrowerCreateSegment: reloan + sme without entityType is rejected", () => {
+  const result = resolveBorrowerCreateSegment({
+    kind: "reloan",
+    bodySegment: "sme",
+    parentSegment: "seafarer",
+  });
+  assert.equal(result.ok, false);
+  if (!result.ok) {
+    assert.match(result.error, /entityType/i);
+  }
 });

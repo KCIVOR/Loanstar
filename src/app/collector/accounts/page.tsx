@@ -8,6 +8,7 @@ import {
 } from "@/components/collector/CollectorKpi";
 import { ContactLogModal } from "@/components/collector/ContactLogModal";
 import { DemandLetterModal } from "@/components/collector/DemandLetterModal";
+import { RecordPaymentModal } from "@/components/collector/RecordPaymentModal";
 import {
   DateRangeFilter,
   ViewModeToggle,
@@ -41,6 +42,7 @@ import {
   type CollectorQueueKpis,
   type CollectorQueueMappedRow,
   type CollectorQueueSortKey,
+  type CollectorSegmentFilter,
 } from "@/lib/collector/queue";
 
 type SortKey = CollectorQueueSortKey;
@@ -67,6 +69,12 @@ const AGING_CHIPS: Array<{ id: CollectorAgingFilter; label: string }> = [
   { id: "31-60", label: "31-60" },
   { id: "61-90", label: "61-90" },
   { id: "91+", label: "91+" },
+];
+
+const SEGMENT_CHIPS: Array<{ id: CollectorSegmentFilter; label: string }> = [
+  { id: "all", label: "All" },
+  { id: "seafarer", label: "Seafarer" },
+  { id: "sme", label: "SME" },
 ];
 
 const IconLayers = (
@@ -106,9 +114,19 @@ function agingChipLabel(filter: CollectorAgingFilter): string {
   return AGING_CHIPS.find((chip) => chip.id === filter)?.label ?? filter;
 }
 
+function segmentBadge(segment: "sme" | "seafarer") {
+  const isSme = segment === "sme";
+  return (
+    <Badge variant={isSme ? "navy" : "teal"} dot>
+      {isSme ? "SME" : "Seafarer"}
+    </Badge>
+  );
+}
+
 function buildQueueQuery(params: {
   search: string;
   aging: CollectorAgingFilter;
+  segment: CollectorSegmentFilter;
   dateRange: DateRangeValue;
   sortKey: SortKey;
   sortDir: "asc" | "desc";
@@ -118,6 +136,7 @@ function buildQueueQuery(params: {
   const qs = new URLSearchParams();
   if (params.search.trim()) qs.set("search", params.search.trim());
   qs.set("aging", params.aging);
+  qs.set("segment", params.segment);
   qs.set("range", params.dateRange.preset);
   if (params.dateRange.preset === "custom") {
     if (params.dateRange.from) qs.set("from", params.dateRange.from);
@@ -147,6 +166,8 @@ export default function CollectorAccountsPage() {
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [agingFilter, setAgingFilter] = useState<CollectorAgingFilter>("all");
+  const [segmentFilter, setSegmentFilter] =
+    useState<CollectorSegmentFilter>("all");
   const [dateRange, setDateRange] = useState<DateRangeValue>(DEFAULT_DATE_RANGE);
   const [viewMode, setViewMode] = useState<HistoryViewMode>("list");
   const [pageSize, setPageSize] =
@@ -159,6 +180,8 @@ export default function CollectorAccountsPage() {
     useState<CollectorQueueMappedRow | null>(null);
   const [demandModalFor, setDemandModalFor] =
     useState<CollectorQueueMappedRow | null>(null);
+  const [recordPaymentModalFor, setRecordPaymentModalFor] =
+    useState<CollectorQueueMappedRow | null>(null);
 
   useEffect(() => {
     const timer = setTimeout(() => setDebouncedSearch(search), 300);
@@ -167,7 +190,15 @@ export default function CollectorAccountsPage() {
 
   useEffect(() => {
     setPage(1);
-  }, [debouncedSearch, agingFilter, dateRange, pageSize, sortKey, sortDir]);
+  }, [
+    debouncedSearch,
+    agingFilter,
+    segmentFilter,
+    dateRange,
+    pageSize,
+    sortKey,
+    sortDir,
+  ]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -176,6 +207,7 @@ export default function CollectorAccountsPage() {
       const query = buildQueueQuery({
         search: debouncedSearch,
         aging: agingFilter,
+        segment: segmentFilter,
         dateRange,
         sortKey,
         sortDir,
@@ -200,6 +232,7 @@ export default function CollectorAccountsPage() {
   }, [
     debouncedSearch,
     agingFilter,
+    segmentFilter,
     dateRange,
     sortKey,
     sortDir,
@@ -230,14 +263,16 @@ export default function CollectorAccountsPage() {
 
   const dateIsDefault = dateRange.preset === "all";
   const activeFilterCount =
-    (agingFilter !== "all" ? 1 : 0) + (dateIsDefault ? 0 : 1);
+    (agingFilter !== "all" ? 1 : 0) +
+    (segmentFilter !== "all" ? 1 : 0) +
+    (dateIsDefault ? 0 : 1);
 
   const summaryStart = rows.length ? (safePage - 1) * pageSize + 1 : 0;
   const summaryEnd = (safePage - 1) * pageSize + rows.length;
 
   function renderActionButtons(acc: CollectorQueueMappedRow) {
     return (
-      <div className="flex flex-wrap justify-end gap-1.5">
+      <div className="flex flex-nowrap items-center justify-end gap-1.5 whitespace-nowrap">
         <Button
           variant="secondary"
           size="sm"
@@ -252,6 +287,13 @@ export default function CollectorAccountsPage() {
         >
           Log contact
         </Button>
+        <Button
+          variant="secondary"
+          size="sm"
+          onClick={() => setRecordPaymentModalFor(acc)}
+        >
+          Record payment
+        </Button>
       </div>
     );
   }
@@ -260,10 +302,7 @@ export default function CollectorAccountsPage() {
     const secondary = secondaryOf(acc);
     return (
       <>
-        <div className="flex flex-wrap items-center gap-1.5">
-          <span className="font-medium text-ink-900">{acc.borrowerName}</span>
-          {acc.segment === "sme" ? <Badge variant="navy">SME</Badge> : null}
-        </div>
+        <div className="font-medium text-ink-900">{acc.borrowerName}</div>
         {secondary ? (
           <div className="text-xs text-ink-500">{secondary}</div>
         ) : null}
@@ -397,6 +436,19 @@ export default function CollectorAccountsPage() {
             ))}
           </div>
 
+          <div className="flex flex-wrap gap-1.5">
+            {SEGMENT_CHIPS.map((chip) => (
+              <button
+                key={chip.id}
+                type="button"
+                className={cn("fchip", segmentFilter === chip.id && "is-on")}
+                onClick={() => setSegmentFilter(chip.id)}
+              >
+                {chip.label}
+              </button>
+            ))}
+          </div>
+
           <div className="active-pill-row">
             {agingFilter !== "all" ? (
               <span className="active-pill">
@@ -405,6 +457,18 @@ export default function CollectorAccountsPage() {
                   type="button"
                   aria-label="Clear aging filter"
                   onClick={() => setAgingFilter("all")}
+                >
+                  ×
+                </button>
+              </span>
+            ) : null}
+            {segmentFilter !== "all" ? (
+              <span className="active-pill">
+                Segment: {segmentFilter === "sme" ? "SME" : "Seafarer"}
+                <button
+                  type="button"
+                  aria-label="Clear segment filter"
+                  onClick={() => setSegmentFilter("all")}
                 >
                   ×
                 </button>
@@ -428,6 +492,7 @@ export default function CollectorAccountsPage() {
                 className="clear-link"
                 onClick={() => {
                   setAgingFilter("all");
+                  setSegmentFilter("all");
                   setDateRange(DEFAULT_DATE_RANGE);
                 }}
               >
@@ -495,6 +560,7 @@ export default function CollectorAccountsPage() {
             <thead>
               <tr>
                 <Th>Borrower</Th>
+                <Th>Segment</Th>
                 <Th>Account</Th>
                 <Th num>Balance</Th>
                 <Th>Aging</Th>
@@ -506,7 +572,7 @@ export default function CollectorAccountsPage() {
             <tbody>
               {Array.from({ length: 6 }, (_, i) => (
                 <tr key={i}>
-                  <Td colSpan={7}>
+                  <Td colSpan={8}>
                     <Skeleton variant="line" />
                   </Td>
                 </tr>
@@ -523,7 +589,7 @@ export default function CollectorAccountsPage() {
       ) : totalCount === 0 ? (
         <EmptyState
           title="No matching accounts"
-          description="Try a different search, aging, or date range."
+          description="Try a different search, aging, segment, or date range."
           showMark={false}
         />
       ) : viewMode === "grid" ? (
@@ -540,15 +606,12 @@ export default function CollectorAccountsPage() {
                     {acc.agingBucket}
                   </Badge>
                 </div>
-                <div className="gcard-name">
-                  <span className="flex flex-wrap items-center gap-1.5">
-                    {acc.borrowerName}
-                    {acc.segment === "sme" ? (
-                      <Badge variant="navy">SME</Badge>
-                    ) : null}
-                  </span>
-                </div>
+                <div className="gcard-name">{acc.borrowerName}</div>
                 <div className="gcard-meta">
+                  <div className="row">
+                    <span className="k">Segment</span>
+                    <span className="v">{segmentBadge(acc.segment)}</span>
+                  </div>
                   {secondary ? (
                     <div className="row">
                       <span className="k">Identity</span>
@@ -587,6 +650,7 @@ export default function CollectorAccountsPage() {
                   Borrower
                   {sortArrow("borrower")}
                 </Th>
+                <Th>Segment</Th>
                 <Th>Account</Th>
                 <Th
                   num
@@ -615,6 +679,7 @@ export default function CollectorAccountsPage() {
               {rows.map((acc) => (
                 <tr key={acc.id}>
                   <Td>{renderBorrowerCell(acc)}</Td>
+                  <Td>{segmentBadge(acc.segment)}</Td>
                   <Td className="mono">{acc.loanAccountNo ?? "—"}</Td>
                   <Td num className="mono text-teal-600">
                     {formatMoney(acc.outstandingBalance)}
@@ -678,6 +743,17 @@ export default function CollectorAccountsPage() {
           borrowerName={demandModalFor.borrowerName}
           masterlistId={demandModalFor.id}
           onClose={() => setDemandModalFor(null)}
+        />
+      ) : null}
+
+      {recordPaymentModalFor ? (
+        <RecordPaymentModal
+          open={recordPaymentModalFor !== null}
+          borrowerName={recordPaymentModalFor.borrowerName}
+          masterlistId={recordPaymentModalFor.id}
+          borrowerId={recordPaymentModalFor.borrowerId}
+          onClose={() => setRecordPaymentModalFor(null)}
+          onRecorded={() => void load()}
         />
       ) : null}
     </div>

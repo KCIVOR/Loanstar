@@ -11,6 +11,7 @@ import {
 } from "@/components/history";
 import {
   Alert,
+  Badge,
   Button,
   EmptyState,
   PageHeader,
@@ -34,6 +35,7 @@ import type {
 } from "@/lib/ar/history";
 
 type HistoryTab = "accounts" | "dcr";
+type SegmentFilter = "all" | "seafarer" | "sme";
 
 const PAGE_SIZE_OPTIONS = [10, 20, 30, 50, 100] as const;
 
@@ -51,6 +53,21 @@ const TAB_OPTIONS: Array<{ value: HistoryTab; label: string }> = [
   { value: "dcr", label: "Reconciled DCRs" },
 ];
 
+const SEGMENT_CHIPS: Array<{ id: SegmentFilter; label: string }> = [
+  { id: "all", label: "All" },
+  { id: "seafarer", label: "Seafarer" },
+  { id: "sme", label: "SME" },
+];
+
+function segmentBadge(segment: "sme" | "seafarer" | null | undefined) {
+  const isSme = segment === "sme";
+  return (
+    <Badge variant={isSme ? "navy" : "teal"} dot>
+      {isSme ? "SME" : "Seafarer"}
+    </Badge>
+  );
+}
+
 function dateRangePillLabel(value: DateRangeValue): string {
   if (value.preset === "30d") return "Last 30 days";
   if (value.preset === "90d") return "Last 90 days";
@@ -62,6 +79,7 @@ function dateRangePillLabel(value: DateRangeValue): string {
 
 function buildHistoryQuery(params: {
   search: string;
+  segment: SegmentFilter;
   dateRange: DateRangeValue;
   sortKey: string;
   sortDir: "asc" | "desc";
@@ -70,6 +88,7 @@ function buildHistoryQuery(params: {
 }): string {
   const qs = new URLSearchParams();
   if (params.search.trim()) qs.set("search", params.search.trim());
+  qs.set("segment", params.segment);
   qs.set("range", params.dateRange.preset);
   if (params.dateRange.preset === "custom") {
     if (params.dateRange.from) qs.set("from", params.dateRange.from);
@@ -91,6 +110,7 @@ function AccountsHistoryPanel() {
 
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
+  const [segmentFilter, setSegmentFilter] = useState<SegmentFilter>("all");
   const [dateRange, setDateRange] = useState<DateRangeValue>(DEFAULT_DATE_RANGE);
   const [viewMode, setViewMode] = useState<HistoryViewMode>("list");
   const [pageSize, setPageSize] =
@@ -107,7 +127,7 @@ function AccountsHistoryPanel() {
 
   useEffect(() => {
     setPage(1);
-  }, [debouncedSearch, dateRange, pageSize, sortKey, sortDir]);
+  }, [debouncedSearch, segmentFilter, dateRange, pageSize, sortKey, sortDir]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -115,6 +135,7 @@ function AccountsHistoryPanel() {
     try {
       const query = buildHistoryQuery({
         search: debouncedSearch,
+        segment: segmentFilter,
         dateRange,
         sortKey,
         sortDir,
@@ -136,7 +157,15 @@ function AccountsHistoryPanel() {
     } finally {
       setLoading(false);
     }
-  }, [debouncedSearch, dateRange, sortKey, sortDir, page, pageSize]);
+  }, [
+    debouncedSearch,
+    segmentFilter,
+    dateRange,
+    sortKey,
+    sortDir,
+    page,
+    pageSize,
+  ]);
 
   useEffect(() => {
     void load();
@@ -160,7 +189,8 @@ function AccountsHistoryPanel() {
   }
 
   const dateIsDefault = dateRange.preset === "30d";
-  const activeFilterCount = dateIsDefault ? 0 : 1;
+  const activeFilterCount =
+    (segmentFilter !== "all" ? 1 : 0) + (dateIsDefault ? 0 : 1);
 
   const summaryStart = rows.length ? (safePage - 1) * pageSize + 1 : 0;
   const summaryEnd = (safePage - 1) * pageSize + rows.length;
@@ -209,6 +239,18 @@ function AccountsHistoryPanel() {
           </div>
 
           <div className="active-pill-row">
+            {segmentFilter !== "all" ? (
+              <span className="active-pill">
+                Segment: {segmentFilter === "sme" ? "SME" : "Seafarer"}
+                <button
+                  type="button"
+                  aria-label="Clear segment filter"
+                  onClick={() => setSegmentFilter("all")}
+                >
+                  ×
+                </button>
+              </span>
+            ) : null}
             {!dateIsDefault ? (
               <span className="active-pill">
                 {dateRangePillLabel(dateRange)}
@@ -225,7 +267,10 @@ function AccountsHistoryPanel() {
               <button
                 type="button"
                 className="clear-link"
-                onClick={() => setDateRange(DEFAULT_DATE_RANGE)}
+                onClick={() => {
+                  setSegmentFilter("all");
+                  setDateRange(DEFAULT_DATE_RANGE);
+                }}
               >
                 Clear all
               </button>
@@ -279,6 +324,21 @@ function AccountsHistoryPanel() {
 
         <div className={cn("filter-panel", filterPanelOpen && "is-open")}>
           <div className="filter-group">
+            <span className="filter-group-label">Segment</span>
+            <div className="filter-bar">
+              {SEGMENT_CHIPS.map((chip) => (
+                <button
+                  key={chip.id}
+                  type="button"
+                  className={cn("fchip", segmentFilter === chip.id && "is-on")}
+                  onClick={() => setSegmentFilter(chip.id)}
+                >
+                  {chip.label}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className="filter-group">
             <span className="filter-group-label">Closed date</span>
             <DateRangeFilter value={dateRange} onChange={setDateRange} />
           </div>
@@ -292,6 +352,7 @@ function AccountsHistoryPanel() {
               <tr>
                 <Th>Account No.</Th>
                 <Th>Borrower</Th>
+                <Th>Segment</Th>
                 <Th num>Outstanding</Th>
                 <Th>Portfolio</Th>
                 <Th>Closed On</Th>
@@ -301,7 +362,7 @@ function AccountsHistoryPanel() {
             <tbody>
               {Array.from({ length: 6 }, (_, i) => (
                 <tr key={i}>
-                  <Td colSpan={6}>
+                  <Td colSpan={7}>
                     <Skeleton variant="line" />
                   </Td>
                 </tr>
@@ -326,6 +387,10 @@ function AccountsHistoryPanel() {
               </div>
               <div className="gcard-name">{row.borrowerName}</div>
               <div className="gcard-meta">
+                <div className="row">
+                  <span className="k">Segment</span>
+                  <span className="v">{segmentBadge(row.segment)}</span>
+                </div>
                 <div className="row">
                   <span className="k">Outstanding</span>
                   <span className="v mono">
@@ -370,6 +435,7 @@ function AccountsHistoryPanel() {
                   Borrower
                   {sortArrow("borrower")}
                 </Th>
+                <Th>Segment</Th>
                 <Th num>Outstanding</Th>
                 <Th>Portfolio</Th>
                 <Th
@@ -398,6 +464,7 @@ function AccountsHistoryPanel() {
                       </div>
                     ) : null}
                   </Td>
+                  <Td>{segmentBadge(row.segment)}</Td>
                   <Td num className="mono">
                     {formatMoney(row.outstandingBalance)}
                   </Td>
@@ -457,6 +524,7 @@ function DcrHistoryPanel() {
 
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
+  const [segmentFilter, setSegmentFilter] = useState<SegmentFilter>("all");
   const [dateRange, setDateRange] = useState<DateRangeValue>(DEFAULT_DATE_RANGE);
   const [viewMode, setViewMode] = useState<HistoryViewMode>("list");
   const [pageSize, setPageSize] =
@@ -473,7 +541,7 @@ function DcrHistoryPanel() {
 
   useEffect(() => {
     setPage(1);
-  }, [debouncedSearch, dateRange, pageSize, sortKey, sortDir]);
+  }, [debouncedSearch, segmentFilter, dateRange, pageSize, sortKey, sortDir]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -481,6 +549,7 @@ function DcrHistoryPanel() {
     try {
       const query = buildHistoryQuery({
         search: debouncedSearch,
+        segment: segmentFilter,
         dateRange,
         sortKey,
         sortDir,
@@ -502,7 +571,15 @@ function DcrHistoryPanel() {
     } finally {
       setLoading(false);
     }
-  }, [debouncedSearch, dateRange, sortKey, sortDir, page, pageSize]);
+  }, [
+    debouncedSearch,
+    segmentFilter,
+    dateRange,
+    sortKey,
+    sortDir,
+    page,
+    pageSize,
+  ]);
 
   useEffect(() => {
     void load();
@@ -526,7 +603,8 @@ function DcrHistoryPanel() {
   }
 
   const dateIsDefault = dateRange.preset === "30d";
-  const activeFilterCount = dateIsDefault ? 0 : 1;
+  const activeFilterCount =
+    (segmentFilter !== "all" ? 1 : 0) + (dateIsDefault ? 0 : 1);
 
   const summaryStart = rows.length ? (safePage - 1) * pageSize + 1 : 0;
   const summaryEnd = (safePage - 1) * pageSize + rows.length;
@@ -584,6 +662,18 @@ function DcrHistoryPanel() {
           </div>
 
           <div className="active-pill-row">
+            {segmentFilter !== "all" ? (
+              <span className="active-pill">
+                Segment: {segmentFilter === "sme" ? "SME" : "Seafarer"}
+                <button
+                  type="button"
+                  aria-label="Clear segment filter"
+                  onClick={() => setSegmentFilter("all")}
+                >
+                  ×
+                </button>
+              </span>
+            ) : null}
             {!dateIsDefault ? (
               <span className="active-pill">
                 {dateRangePillLabel(dateRange)}
@@ -600,7 +690,10 @@ function DcrHistoryPanel() {
               <button
                 type="button"
                 className="clear-link"
-                onClick={() => setDateRange(DEFAULT_DATE_RANGE)}
+                onClick={() => {
+                  setSegmentFilter("all");
+                  setDateRange(DEFAULT_DATE_RANGE);
+                }}
               >
                 Clear all
               </button>
@@ -654,6 +747,21 @@ function DcrHistoryPanel() {
 
         <div className={cn("filter-panel", filterPanelOpen && "is-open")}>
           <div className="filter-group">
+            <span className="filter-group-label">Segment</span>
+            <div className="filter-bar">
+              {SEGMENT_CHIPS.map((chip) => (
+                <button
+                  key={chip.id}
+                  type="button"
+                  className={cn("fchip", segmentFilter === chip.id && "is-on")}
+                  onClick={() => setSegmentFilter(chip.id)}
+                >
+                  {chip.label}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className="filter-group">
             <span className="filter-group-label">Posted date</span>
             <DateRangeFilter value={dateRange} onChange={setDateRange} />
           </div>
@@ -667,6 +775,7 @@ function DcrHistoryPanel() {
               <tr>
                 <Th>Reference</Th>
                 <Th>Borrower / Account</Th>
+                <Th>Segment</Th>
                 <Th num>Amount</Th>
                 <Th>Posted On</Th>
                 <Th className="w-1">{""}</Th>
@@ -675,7 +784,7 @@ function DcrHistoryPanel() {
             <tbody>
               {Array.from({ length: 6 }, (_, i) => (
                 <tr key={i}>
-                  <Td colSpan={5}>
+                  <Td colSpan={6}>
                     <Skeleton variant="line" />
                   </Td>
                 </tr>
@@ -700,6 +809,10 @@ function DcrHistoryPanel() {
               </div>
               <div className="gcard-name">{row.borrowerName}</div>
               <div className="gcard-meta">
+                <div className="row">
+                  <span className="k">Segment</span>
+                  <span className="v">{segmentBadge(row.segment)}</span>
+                </div>
                 <div className="row">
                   <span className="k">Account</span>
                   <span className="v mono">{row.loanAccountNo ?? "—"}</span>
@@ -743,6 +856,7 @@ function DcrHistoryPanel() {
                   Borrower / Account
                   {sortArrow("borrower")}
                 </Th>
+                <Th>Segment</Th>
                 <Th
                   className="sortable"
                   num
@@ -775,6 +889,7 @@ function DcrHistoryPanel() {
                       {row.loanAccountNo ?? row.borrowerNo ?? "—"}
                     </div>
                   </Td>
+                  <Td>{segmentBadge(row.segment)}</Td>
                   <Td num className="mono">
                     <span
                       style={

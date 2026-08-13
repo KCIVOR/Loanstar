@@ -34,6 +34,7 @@ import {
   type RemedialQueueKpis,
   type RemedialQueueMappedRow,
   type RemedialQueueSortKey,
+  type RemedialSegmentFilter,
 } from "@/lib/remedial/queue";
 
 type SortKey = RemedialQueueSortKey;
@@ -59,6 +60,12 @@ const SEVERITY_CHIPS: Array<{ id: SeverityFilter; label: string }> = [
   { id: "critical", label: "Critical" },
   { id: "elevated", label: "Elevated" },
   { id: "watch", label: "Watch" },
+];
+
+const SEGMENT_CHIPS: Array<{ id: RemedialSegmentFilter; label: string }> = [
+  { id: "all", label: "All" },
+  { id: "seafarer", label: "Seafarer" },
+  { id: "sme", label: "SME" },
 ];
 
 const iconProps = {
@@ -152,9 +159,19 @@ function severityChipLabel(filter: SeverityFilter): string {
   return SEVERITY_CHIPS.find((chip) => chip.id === filter)?.label ?? filter;
 }
 
+function segmentBadge(segment: "sme" | "seafarer") {
+  const isSme = segment === "sme";
+  return (
+    <Badge variant={isSme ? "navy" : "teal"} dot>
+      {isSme ? "SME" : "Seafarer"}
+    </Badge>
+  );
+}
+
 function buildQueueQuery(params: {
   search: string;
   severity: SeverityFilter;
+  segment: RemedialSegmentFilter;
   dateRange: DateRangeValue;
   sortKey: SortKey;
   sortDir: "asc" | "desc";
@@ -164,6 +181,7 @@ function buildQueueQuery(params: {
   const qs = new URLSearchParams();
   if (params.search.trim()) qs.set("search", params.search.trim());
   qs.set("severity", params.severity);
+  qs.set("segment", params.segment);
   qs.set("range", params.dateRange.preset);
   if (params.dateRange.preset === "custom") {
     if (params.dateRange.from) qs.set("from", params.dateRange.from);
@@ -193,6 +211,8 @@ export default function RemedialQueuePage() {
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [severityFilter, setSeverityFilter] = useState<SeverityFilter>("all");
+  const [segmentFilter, setSegmentFilter] =
+    useState<RemedialSegmentFilter>("all");
   const [dateRange, setDateRange] = useState<DateRangeValue>(DEFAULT_DATE_RANGE);
   const [viewMode, setViewMode] = useState<HistoryViewMode>("list");
   const [pageSize, setPageSize] =
@@ -209,7 +229,15 @@ export default function RemedialQueuePage() {
 
   useEffect(() => {
     setPage(1);
-  }, [debouncedSearch, severityFilter, dateRange, pageSize, sortKey, sortDir]);
+  }, [
+    debouncedSearch,
+    severityFilter,
+    segmentFilter,
+    dateRange,
+    pageSize,
+    sortKey,
+    sortDir,
+  ]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -218,6 +246,7 @@ export default function RemedialQueuePage() {
       const query = buildQueueQuery({
         search: debouncedSearch,
         severity: severityFilter,
+        segment: segmentFilter,
         dateRange,
         sortKey,
         sortDir,
@@ -242,6 +271,7 @@ export default function RemedialQueuePage() {
   }, [
     debouncedSearch,
     severityFilter,
+    segmentFilter,
     dateRange,
     sortKey,
     sortDir,
@@ -274,7 +304,9 @@ export default function RemedialQueuePage() {
 
   const dateIsDefault = dateRange.preset === "all";
   const activeFilterCount =
-    (severityFilter !== "all" ? 1 : 0) + (dateIsDefault ? 0 : 1);
+    (severityFilter !== "all" ? 1 : 0) +
+    (segmentFilter !== "all" ? 1 : 0) +
+    (dateIsDefault ? 0 : 1);
 
   const summaryStart = rows.length ? (safePage - 1) * pageSize + 1 : 0;
   const summaryEnd = (safePage - 1) * pageSize + rows.length;
@@ -300,7 +332,6 @@ export default function RemedialQueuePage() {
           >
             {acc.borrowerName}
           </Link>
-          {acc.segment === "sme" ? <Badge variant="navy">SME</Badge> : null}
         </div>
         {secondary ? (
           <div className="text-xs text-ink-500">{secondary}</div>
@@ -444,6 +475,19 @@ export default function RemedialQueuePage() {
             ))}
           </div>
 
+          <div className="flex flex-wrap gap-1.5">
+            {SEGMENT_CHIPS.map((chip) => (
+              <button
+                key={chip.id}
+                type="button"
+                className={cn("fchip", segmentFilter === chip.id && "is-on")}
+                onClick={() => setSegmentFilter(chip.id)}
+              >
+                {chip.label}
+              </button>
+            ))}
+          </div>
+
           <div className="active-pill-row">
             {severityFilter !== "all" ? (
               <span className="active-pill">
@@ -452,6 +496,18 @@ export default function RemedialQueuePage() {
                   type="button"
                   aria-label="Clear severity filter"
                   onClick={() => setSeverityFilter("all")}
+                >
+                  ×
+                </button>
+              </span>
+            ) : null}
+            {segmentFilter !== "all" ? (
+              <span className="active-pill">
+                Segment: {segmentFilter === "sme" ? "SME" : "Seafarer"}
+                <button
+                  type="button"
+                  aria-label="Clear segment filter"
+                  onClick={() => setSegmentFilter("all")}
                 >
                   ×
                 </button>
@@ -475,6 +531,7 @@ export default function RemedialQueuePage() {
                 className="clear-link"
                 onClick={() => {
                   setSeverityFilter("all");
+                  setSegmentFilter("all");
                   setDateRange(DEFAULT_DATE_RANGE);
                 }}
               >
@@ -542,6 +599,7 @@ export default function RemedialQueuePage() {
             <thead>
               <tr>
                 <Th>Borrower</Th>
+                <Th>Segment</Th>
                 <Th>Account</Th>
                 <Th>Severity</Th>
                 <Th num>Outstanding</Th>
@@ -554,7 +612,7 @@ export default function RemedialQueuePage() {
             <tbody>
               {Array.from({ length: 6 }, (_, i) => (
                 <tr key={i}>
-                  <Td colSpan={8}>
+                  <Td colSpan={9}>
                     <Skeleton variant="line" />
                   </Td>
                 </tr>
@@ -571,7 +629,7 @@ export default function RemedialQueuePage() {
       ) : totalCount === 0 ? (
         <EmptyState
           title="No matching accounts"
-          description="Try a different search, severity, or date range."
+          description="Try a different search, severity, segment, or date range."
           showMark={false}
         />
       ) : viewMode === "grid" ? (
@@ -591,12 +649,13 @@ export default function RemedialQueuePage() {
                 <div className="gcard-name">
                   <span className="flex flex-wrap items-center gap-1.5">
                     {acc.borrowerName}
-                    {acc.segment === "sme" ? (
-                      <Badge variant="navy">SME</Badge>
-                    ) : null}
                   </span>
                 </div>
                 <div className="gcard-meta">
+                  <div className="row">
+                    <span className="k">Segment</span>
+                    <span className="v">{segmentBadge(acc.segment)}</span>
+                  </div>
                   {secondary ? (
                     <div className="row">
                       <span className="k">Identity</span>
@@ -644,6 +703,7 @@ export default function RemedialQueuePage() {
                   Borrower
                   {sortArrow("borrower")}
                 </Th>
+                <Th>Segment</Th>
                 <Th>Account</Th>
                 <Th
                   className="sortable"
@@ -676,6 +736,7 @@ export default function RemedialQueuePage() {
               {rows.map((acc) => (
                 <tr key={acc.id}>
                   <Td>{renderBorrowerCell(acc)}</Td>
+                  <Td>{segmentBadge(acc.segment)}</Td>
                   <Td className="mono">{acc.loanAccountNo ?? "—"}</Td>
                   <Td>
                     <Badge variant={severityVariant(acc.severity)}>

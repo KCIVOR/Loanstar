@@ -32,6 +32,8 @@ import {
   type ArDcrWaitingBucket,
 } from "@/lib/ar/dcr-list";
 
+type SegmentFilter = "all" | "seafarer" | "sme";
+
 type DcrRow = {
   id: string;
   submitted_at: string | null;
@@ -49,6 +51,7 @@ type DcrRow = {
       masterlist: {
         borrower_name: string;
         loan_account_no: string | null;
+        segment: "sme" | "seafarer" | null;
       } | null;
     } | null;
   }>;
@@ -62,6 +65,41 @@ const WAITING_CHIPS: Array<{ id: ArDcrWaitingBucket; label: string }> = [
   { id: "4-7", label: "4–7 days" },
   { id: "8+", label: "8+ days" },
 ];
+
+const SEGMENT_CHIPS: Array<{ id: SegmentFilter; label: string }> = [
+  { id: "all", label: "All" },
+  { id: "seafarer", label: "Seafarer" },
+  { id: "sme", label: "SME" },
+];
+
+function segmentBadge(segment: string | null | undefined) {
+  const isSme = segment === "sme";
+  return (
+    <Badge variant={isSme ? "navy" : "teal"} dot>
+      {isSme ? "SME" : "Seafarer"}
+    </Badge>
+  );
+}
+
+function dcrPassesSegmentFilter(
+  dcr: DcrRow,
+  segmentFilter: SegmentFilter,
+): boolean {
+  if (segmentFilter === "all") return true;
+  return (dcr.dcr_items ?? []).some(
+    (item) => item.payments?.masterlist?.segment === segmentFilter,
+  );
+}
+
+function lineItemsForSegment(
+  items: DcrRow["dcr_items"],
+  segmentFilter: SegmentFilter,
+) {
+  if (segmentFilter === "all") return items ?? [];
+  return (items ?? []).filter(
+    (item) => item.payments?.masterlist?.segment === segmentFilter,
+  );
+}
 
 function formatMoney(value: number) {
   return value.toLocaleString("en-PH", {
@@ -158,6 +196,7 @@ export default function ArDcrPage() {
   const [search, setSearch] = useState("");
   const [waitingFilter, setWaitingFilter] =
     useState<ArDcrWaitingBucket>("all");
+  const [segmentFilter, setSegmentFilter] = useState<SegmentFilter>("all");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
   const [filterPanelOpen, setFilterPanelOpen] = useState(false);
   const [page, setPage] = useState(1);
@@ -187,7 +226,7 @@ export default function ArDcrPage() {
 
   useEffect(() => {
     setPage(1);
-  }, [search, waitingFilter, sortDir, pageSize]);
+  }, [search, waitingFilter, segmentFilter, sortDir, pageSize]);
 
   async function viewProof(paymentId: string) {
     setError(null);
@@ -271,8 +310,11 @@ export default function ArDcrPage() {
     const bucketed = searched.filter((dcr) =>
       passesWaitingBucket(daysWaiting(dcr.submitted_at), waitingFilter),
     );
-    return sortDcrsBySubmittedAt(bucketed, sortDir);
-  }, [queue, search, waitingFilter, sortDir]);
+    const segmented = bucketed.filter((dcr) =>
+      dcrPassesSegmentFilter(dcr, segmentFilter),
+    );
+    return sortDcrsBySubmittedAt(segmented, sortDir);
+  }, [queue, search, waitingFilter, segmentFilter, sortDir]);
 
   const safePageSize = clampArDcrListPageSize(pageSize);
   const totalCount = filtered.length;
@@ -283,7 +325,8 @@ export default function ArDcrPage() {
   const summaryStart = rows.length ? pageStart + 1 : 0;
   const summaryEnd = pageStart + rows.length;
 
-  const activeFilterCount = waitingFilter !== "all" ? 1 : 0;
+  const activeFilterCount =
+    (waitingFilter !== "all" ? 1 : 0) + (segmentFilter !== "all" ? 1 : 0);
 
   const confirmDcr = confirmId
     ? queue.find((d) => d.id === confirmId) ?? null
@@ -388,11 +431,26 @@ export default function ArDcrPage() {
                 </button>
               </span>
             ) : null}
+            {segmentFilter !== "all" ? (
+              <span className="active-pill">
+                Segment: {segmentFilter === "sme" ? "SME" : "Seafarer"}
+                <button
+                  type="button"
+                  aria-label="Clear segment filter"
+                  onClick={() => setSegmentFilter("all")}
+                >
+                  ×
+                </button>
+              </span>
+            ) : null}
             {activeFilterCount > 0 ? (
               <button
                 type="button"
                 className="clear-link"
-                onClick={() => setWaiting("all")}
+                onClick={() => {
+                  setWaiting("all");
+                  setSegmentFilter("all");
+                }}
               >
                 Clear
               </button>
@@ -470,6 +528,21 @@ export default function ArDcrPage() {
               ))}
             </div>
           </div>
+          <div className="filter-group">
+            <span className="filter-group-label">Segment</span>
+            <div className="flex flex-wrap gap-1.5">
+              {SEGMENT_CHIPS.map((chip) => (
+                <button
+                  key={chip.id}
+                  type="button"
+                  className={cn("fchip", segmentFilter === chip.id && "is-on")}
+                  onClick={() => setSegmentFilter(chip.id)}
+                >
+                  {chip.label}
+                </button>
+              ))}
+            </div>
+          </div>
         </div>
       </div>
 
@@ -492,14 +565,15 @@ export default function ArDcrPage() {
       ) : totalCount === 0 ? (
         <EmptyState
           title="No matching DCRs"
-          description="Try a different search term or waiting filter."
+          description="Try a different search term, waiting filter, or segment."
           showMark={false}
         />
       ) : (
         <div className="mb-4 flex flex-col gap-3.5">
           {rows.map((dcr) => {
-            const items = dcr.dcr_items ?? [];
-            const batchTotal = items.reduce(
+            const allItems = dcr.dcr_items ?? [];
+            const items = lineItemsForSegment(allItems, segmentFilter);
+            const batchTotal = allItems.reduce(
               (sum, item) => sum + Number(item.amount ?? 0),
               0,
             );
@@ -530,7 +604,8 @@ export default function ArDcrPage() {
                         ₱{formatMoney(batchTotal)}
                       </span>
                       {" · "}
-                      {items.length} item{items.length === 1 ? "" : "s"}
+                      {allItems.length} item
+                      {allItems.length === 1 ? "" : "s"}
                     </p>
                   </div>
                 </div>
@@ -541,6 +616,7 @@ export default function ArDcrPage() {
                       <tr>
                         <Th>Borrower</Th>
                         <Th>Account</Th>
+                        <Th>Segment</Th>
                         <Th className="num">Amount</Th>
                         <Th>Payment ref</Th>
                         <Th>Date</Th>
@@ -573,6 +649,9 @@ export default function ArDcrPage() {
                             </Td>
                             <Td>
                               <span className="id">{acct}</span>
+                            </Td>
+                            <Td>
+                              {segmentBadge(item.payments?.masterlist?.segment)}
                             </Td>
                             <Td className="num mono text-teal-600">
                               {formatMoney(Number(item.amount))}

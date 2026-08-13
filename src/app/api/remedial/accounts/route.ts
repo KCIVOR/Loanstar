@@ -10,8 +10,10 @@ import {
   clampRemedialQueuePageSize,
   computeRemedialQueueKpis,
   inTurnedOverBounds,
+  passesSegmentFilter,
   passesSeverity,
   remedialSearchPredicate,
+  segmentFilterSpec,
   severityFilterSpec,
   sortRemedialQueue,
   type RemedialQueueMappedRow,
@@ -20,6 +22,7 @@ import {
 import { createClient, createServiceClient } from "@/lib/supabase/server";
 
 const RANGE_PRESETS = new Set(["30d", "90d", "all", "custom"]);
+const SEGMENT_FILTERS = new Set(["all", "seafarer", "sme"]);
 const SORT_KEYS = new Set<RemedialQueueSortKey>([
   "priority",
   "balance",
@@ -52,6 +55,10 @@ export async function GET(request: Request) {
     const severitySpec = severityFilterSpec(
       searchParams.get("severity") ?? "all",
     );
+    const segmentRaw = searchParams.get("segment") ?? "all";
+    const segmentFilter = segmentFilterSpec(
+      SEGMENT_FILTERS.has(segmentRaw) ? segmentRaw : "all",
+    );
 
     const rangeRaw = searchParams.get("range") ?? "all";
     const preset = (
@@ -83,7 +90,7 @@ export async function GET(request: Request) {
     // Fetch the officer's assigned+flagged superset, then filter/sort/paginate
     // in the handler: severity/dpd are computed (not SQL columns) and volume is
     // per-officer bounded.
-    const { data, error } = await supabase
+    let query = supabase
       .from("masterlist")
       .select(
         `
@@ -124,8 +131,15 @@ export async function GET(request: Request) {
       `,
       )
       .eq("assignments.remedial_user_id", user.id)
-      .eq("remedial_flag", true)
-      .order("updated_at", { ascending: false });
+      .eq("remedial_flag", true);
+
+    if (segmentFilter !== "all") {
+      query = query.eq("segment", segmentFilter);
+    }
+
+    const { data, error } = await query.order("updated_at", {
+      ascending: false,
+    });
 
     if (error) throw new Error(error.message);
 
@@ -249,6 +263,7 @@ export async function GET(request: Request) {
       (row) =>
         inTurnedOverBounds(row.turnedOverAt, from, to) &&
         passesSeverity(row.severity, severitySpec) &&
+        passesSegmentFilter(row.segment, segmentFilter) &&
         remedialSearchPredicate(row, search),
     );
     const sorted = sortRemedialQueue(filtered, sortKey, sortDir);

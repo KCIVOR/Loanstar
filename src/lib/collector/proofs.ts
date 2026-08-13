@@ -14,6 +14,8 @@ export type ProofQueueItem = {
   status: string;
   storage_path: string | null;
   file_name: string | null;
+  uploaded_by?: string | null;
+  uploadedByName?: string | null;
   masterlist?: ProofMasterlistJoin | ProofMasterlistJoin[] | null;
 };
 

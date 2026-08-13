@@ -29,6 +29,7 @@ import {
   statusBadgeVariant,
 } from "@/lib/applications/status";
 import type { ChecklistItem } from "@/lib/documents/checklist";
+import { CSA_ONLY_INTAKE_SLUGS } from "@/lib/documents/csa-only-intake";
 import { isCsaEditableStatus } from "@/lib/csa/status";
 import { assessApplicationFormCompleteness } from "@/lib/csa/application-form-completeness";
 import {
@@ -1152,24 +1153,48 @@ export default function CsaApplicationPage() {
         </Card>
 
         {data.borrower ? (
-          <DocumentChecklist
-            applicationId={applicationId}
-            borrowerId={data.borrower.id}
-            stage="intake"
-            description="Upload on the borrower's behalf and confirm each file — confirmed documents count toward endorsement. Clearance Form is optional."
-            checklistApiPath={`/api/csa/applications/${applicationId}/checklist?stage=intake`}
-            uploadApiPath={`/api/csa/applications/${applicationId}/documents`}
-            confirmApiPath={(documentId) =>
-              `/api/documents/${documentId}/confirm`
-            }
-            requestRevisionApiPath={(documentId) =>
-              `/api/documents/${documentId}/request-revision`
-            }
-            viewApiPath={(documentId) =>
-              `/api/documents/${documentId}/download`
-            }
-            onUploadComplete={() => void load({ silent: true })}
-          />
+          <>
+            <DocumentChecklist
+              applicationId={applicationId}
+              borrowerId={data.borrower.id}
+              stage="intake"
+              title="Borrower documents"
+              description="Documents the borrower is responsible for uploading. Confirmed documents count toward endorsement."
+              excludeSlugs={CSA_ONLY_INTAKE_SLUGS}
+              checklistApiPath={`/api/csa/applications/${applicationId}/checklist?stage=intake`}
+              uploadApiPath={`/api/csa/applications/${applicationId}/documents`}
+              confirmApiPath={(documentId) =>
+                `/api/documents/${documentId}/confirm`
+              }
+              requestRevisionApiPath={(documentId) =>
+                `/api/documents/${documentId}/request-revision`
+              }
+              viewApiPath={(documentId) =>
+                `/api/documents/${documentId}/download`
+              }
+              onUploadComplete={() => void load({ silent: true })}
+            />
+            <DocumentChecklist
+              applicationId={applicationId}
+              borrowerId={data.borrower.id}
+              stage="intake"
+              title="CSA documents"
+              description="Signed in person at the branch — CSA uploads these on the borrower's behalf. Clearance Form is optional."
+              includeSlugs={CSA_ONLY_INTAKE_SLUGS}
+              checklistApiPath={`/api/csa/applications/${applicationId}/checklist?stage=intake`}
+              uploadApiPath={`/api/csa/applications/${applicationId}/documents`}
+              confirmApiPath={(documentId) =>
+                `/api/documents/${documentId}/confirm`
+              }
+              requestRevisionApiPath={(documentId) =>
+                `/api/documents/${documentId}/request-revision`
+              }
+              viewApiPath={(documentId) =>
+                `/api/documents/${documentId}/download`
+              }
+              onUploadComplete={() => void load({ silent: true })}
+            />
+          </>
         ) : null}
 
         <ComputationPanel

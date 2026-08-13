@@ -15,6 +15,7 @@ export type CommitteeQueueItem = {
   applicationNo: string | null;
   status: string;
   isReloan: boolean;
+  segment: "sme" | "seafarer" | null;
   createdAt: string;
   updatedAt: string;
   tatDays: number | null;
@@ -34,6 +35,7 @@ export type CommitteeQueueItem = {
 export type CommitteeQueueQueryParams = {
   search?: string;
   statusFilter?: CommitteeStatusFilter;
+  segment?: "all" | "seafarer" | "sme";
   from?: string | null;
   to?: string | null;
   sortKey?: CommitteeQueueSortKey;
@@ -132,6 +134,7 @@ export async function getCommitteeQueue(
   const {
     search = "",
     statusFilter = "all",
+    segment: segmentFilter = "all",
     from = null,
     to = null,
     sortKey,
@@ -176,6 +179,7 @@ export async function getCommitteeQueue(
       application_no,
       status,
       is_reloan,
+      segment,
       created_at,
       updated_at,
       borrowers (
@@ -193,6 +197,10 @@ export async function getCommitteeQueue(
   const filterSpec = statusFilterSpec(statusFilter);
   if (filterSpec.mode === "eq") {
     query = query.eq("status", filterSpec.status);
+  }
+
+  if (segmentFilter !== "all") {
+    query = query.eq("segment", segmentFilter);
   }
 
   if (from) {
@@ -243,11 +251,16 @@ export async function getCommitteeQueue(
     const forwardedAt =
       (verification?.forwarded_at as string | null | undefined) ?? null;
 
+    const segmentRaw = row.segment as string | null;
+    const segment: "sme" | "seafarer" | null =
+      segmentRaw === "sme" || segmentRaw === "seafarer" ? segmentRaw : null;
+
     return {
       id: row.id as string,
       applicationNo: (row.application_no as string | null) ?? null,
       status: row.status as string,
       isReloan: Boolean(row.is_reloan),
+      segment,
       createdAt: row.created_at as string,
       updatedAt: row.updated_at as string,
       tatDays: computeTatDays(forwardedAt, null),

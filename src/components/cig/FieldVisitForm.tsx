@@ -23,6 +23,7 @@ type Props = {
   onSave: (next: FieldVisit) => void;
   saving?: boolean;
   readOnly?: boolean;
+  verifierName: string;
 };
 
 function ensureVisit(value: FieldVisit | null): FieldVisit {
@@ -102,6 +103,7 @@ export function FieldVisitForm({
   onSave,
   saving,
   readOnly,
+  verifierName,
 }: Props) {
   const visit = ensureVisit(value);
   const houseTotal = sumHouseExpenses(visit.recommendation?.houseExpenses);
@@ -803,17 +805,9 @@ export function FieldVisitForm({
           <div>
             <Label required>Prepared by</Label>
             <Input
-              disabled={readOnly}
-              value={visit.recommendation?.preparedBy ?? ""}
-              onChange={(e) =>
-                patch({
-                  ...visit,
-                  recommendation: {
-                    ...visit.recommendation,
-                    preparedBy: e.target.value,
-                  },
-                })
-              }
+              disabled
+              value={readOnly ? (visit.recommendation?.preparedBy ?? "") : verifierName}
+              onChange={() => {}}
             />
           </div>
           <div>
@@ -873,7 +867,15 @@ export function FieldVisitForm({
         <Button
           type="button"
           loading={saving}
-          onClick={() => onSave(visit)}
+          onClick={() =>
+            onSave({
+              ...visit,
+              recommendation: {
+                ...visit.recommendation,
+                preparedBy: verifierName,
+              },
+            })
+          }
         >
           Save field visit
         </Button>

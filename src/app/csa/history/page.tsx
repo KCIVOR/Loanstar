@@ -33,6 +33,7 @@ type HistoryRow = {
   applicationNo: string | null;
   status: string;
   statusGroup: CsaHistoryStatusGroup;
+  segment: "sme" | "seafarer" | null;
   borrower: {
     borrowerNo: string;
     firstName: string;
@@ -66,6 +67,15 @@ const STATUS_CHIPS: Array<{ id: StatusFilter; label: string }> = [
   { id: "in_progress", label: "In Progress" },
   { id: "denied", label: "Denied" },
   { id: "released", label: "Released" },
+];
+
+const SEGMENT_CHIPS: Array<{
+  id: "all" | "seafarer" | "sme";
+  label: string;
+}> = [
+  { id: "all", label: "All" },
+  { id: "seafarer", label: "Seafarer" },
+  { id: "sme", label: "SME" },
 ];
 
 const DEFAULT_DATE_RANGE: DateRangeValue = {
@@ -103,6 +113,15 @@ function borrowerName(row: HistoryRow): string {
   return `${row.borrower.firstName} ${row.borrower.lastName}`;
 }
 
+function segmentBadge(segment: "sme" | "seafarer" | null) {
+  const isSme = segment === "sme";
+  return (
+    <Badge variant={isSme ? "navy" : "teal"} dot>
+      {isSme ? "SME" : "Seafarer"}
+    </Badge>
+  );
+}
+
 function dateRangePillLabel(value: DateRangeValue): string {
   if (value.preset === "30d") return "Last 30 days";
   if (value.preset === "90d") return "Last 90 days";
@@ -121,6 +140,7 @@ function statusGroupLabel(group: CsaHistoryStatusGroup): string {
 function buildHistoryQuery(params: {
   search: string;
   statusGroup: StatusFilter;
+  segment: "all" | "seafarer" | "sme";
   dateRange: DateRangeValue;
   sortKey: SortKey;
   sortDir: "asc" | "desc";
@@ -130,6 +150,7 @@ function buildHistoryQuery(params: {
   const qs = new URLSearchParams();
   if (params.search.trim()) qs.set("search", params.search.trim());
   qs.set("status", params.statusGroup);
+  qs.set("segment", params.segment);
   qs.set("range", params.dateRange.preset);
   if (params.dateRange.preset === "custom") {
     if (params.dateRange.from) qs.set("from", params.dateRange.from);
@@ -156,6 +177,9 @@ export default function CsaHistoryPage() {
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [statusGroup, setStatusGroup] = useState<StatusFilter>("all");
+  const [segmentFilter, setSegmentFilter] = useState<
+    "all" | "seafarer" | "sme"
+  >("all");
   const [dateRange, setDateRange] = useState<DateRangeValue>(DEFAULT_DATE_RANGE);
   const [viewMode, setViewMode] = useState<HistoryViewMode>("list");
   const [pageSize, setPageSize] = useState<(typeof PAGE_SIZE_OPTIONS)[number]>(10);
@@ -171,7 +195,15 @@ export default function CsaHistoryPage() {
 
   useEffect(() => {
     setPage(1);
-  }, [debouncedSearch, statusGroup, dateRange, pageSize, sortKey, sortDir]);
+  }, [
+    debouncedSearch,
+    statusGroup,
+    segmentFilter,
+    dateRange,
+    pageSize,
+    sortKey,
+    sortDir,
+  ]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -180,6 +212,7 @@ export default function CsaHistoryPage() {
       const query = buildHistoryQuery({
         search: debouncedSearch,
         statusGroup,
+        segment: segmentFilter,
         dateRange,
         sortKey,
         sortDir,
@@ -204,6 +237,7 @@ export default function CsaHistoryPage() {
   }, [
     debouncedSearch,
     statusGroup,
+    segmentFilter,
     dateRange,
     sortKey,
     sortDir,
@@ -449,6 +483,21 @@ export default function CsaHistoryPage() {
             </div>
           </div>
           <div className="filter-group">
+            <span className="filter-group-label">Segment</span>
+            <div className="filter-bar">
+              {SEGMENT_CHIPS.map((chip) => (
+                <button
+                  key={chip.id}
+                  type="button"
+                  className={cn("fchip", segmentFilter === chip.id && "is-on")}
+                  onClick={() => setSegmentFilter(chip.id)}
+                >
+                  {chip.label}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className="filter-group">
             <span className="filter-group-label">Date range</span>
             <DateRangeFilter value={dateRange} onChange={setDateRange} />
           </div>
@@ -463,6 +512,7 @@ export default function CsaHistoryPage() {
                 <Th>Application No.</Th>
                 <Th>Borrower</Th>
                 <Th>Loan Type</Th>
+                <Th>Segment</Th>
                 <Th num>Amount</Th>
                 <Th>Status</Th>
                 <Th>Endorsed On</Th>
@@ -472,7 +522,7 @@ export default function CsaHistoryPage() {
             <tbody>
               {Array.from({ length: 6 }, (_, i) => (
                 <tr key={i}>
-                  <Td colSpan={7}>
+                  <Td colSpan={8}>
                     <Skeleton variant="line" />
                   </Td>
                 </tr>
@@ -552,6 +602,7 @@ export default function CsaHistoryPage() {
                   {sortArrow("borrower")}
                 </Th>
                 <Th>Loan Type</Th>
+                <Th>Segment</Th>
                 <Th
                   className="sortable"
                   num
@@ -587,6 +638,7 @@ export default function CsaHistoryPage() {
                   </Td>
                   <Td>{borrowerName(row)}</Td>
                   <Td>{row.loanTypeName ?? "—"}</Td>
+                  <Td>{segmentBadge(row.segment)}</Td>
                   <Td num className="mono">
                     <span
                       style={

@@ -33,6 +33,7 @@ export default function ConfigPage() {
   const [penaltyRateSme, setPenaltyRateSme] = useState("");
   const [coverageRatio, setCoverageRatio] = useState("");
   const [committeeSize, setCommitteeSize] = useState("");
+  const [committeeSizeSme, setCommitteeSizeSme] = useState("");
   const [aging30, setAging30] = useState("");
   const [aging60, setAging60] = useState("");
   const [aging90, setAging90] = useState("");
@@ -67,6 +68,7 @@ export default function ConfigPage() {
         if (s.key === "penalty_rate_sme") setPenaltyRateSme(String(s.value));
         if (s.key === "coverage_ratio") setCoverageRatio(String(s.value));
         if (s.key === "committee_size") setCommitteeSize(String(s.value));
+        if (s.key === "committee_size_sme") setCommitteeSizeSme(String(s.value));
         if (s.key === "aging_thresholds" && typeof s.value === "object") {
           const v = s.value as Record<string, number>;
           setAging30(String(v["30"] ?? ""));
@@ -112,6 +114,7 @@ export default function ConfigPage() {
           penalty_rate_sme: Number(penaltyRateSme),
           coverage_ratio: Number(coverageRatio),
           committee_size: Number(committeeSize),
+          committee_size_sme: Number(committeeSizeSme),
           aging_thresholds: {
             "30": Number(aging30),
             "60": Number(aging60),
@@ -257,7 +260,7 @@ export default function ConfigPage() {
             </div>
             <div>
               <Label htmlFor="committee-size" required>
-                Committee size (approvers required)
+                Committee size — Seafarer (approvers required)
               </Label>
               <Input
                 id="committee-size"
@@ -272,6 +275,27 @@ export default function ConfigPage() {
               />
               <p className="mt-1 text-xs text-ink-400">
                 {settings.find((s) => s.key === "committee_size")?.description}
+              </p>
+            </div>
+            <div>
+              <Label htmlFor="committee-size-sme" required>
+                Committee size — SME (approvers required)
+              </Label>
+              <Input
+                id="committee-size-sme"
+                type="number"
+                step="1"
+                min="1"
+                max="15"
+                required
+                value={committeeSizeSme}
+                onChange={(e) => setCommitteeSizeSme(e.target.value)}
+                className="mono"
+              />
+              <p className="mt-1 text-xs text-ink-400">
+                {settings.find((s) => s.key === "committee_size_sme")
+                  ?.description ??
+                  "Number of committee members required to cast a vote before a final decision can be made (SME)"}
               </p>
             </div>
             <div>

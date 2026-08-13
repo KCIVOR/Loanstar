@@ -6,7 +6,10 @@ import { handleApiError, jsonOk } from "@/lib/api/handler";
 import { castCommitteeVote, getCommitteeVotes } from "@/lib/committee/actions";
 import { getCommitteeSize } from "@/lib/committee/committee-size";
 import { computeVoteTally } from "@/lib/committee/votes";
-import { requireModulePermission } from "@/lib/permissions/server";
+import {
+  ForbiddenError,
+  requireModulePermission,
+} from "@/lib/permissions/server";
 import { createClient } from "@/lib/supabase/server";
 
 type RouteParams = { params: Promise<{ id: string }> };
@@ -22,7 +25,17 @@ export async function POST(request: Request, { params }: RouteParams) {
     const { id } = await params;
     const body = voteSchema.parse(await request.json());
     const supabase = await createClient();
-    const committeeSize = await getCommitteeSize();
+    const { data: application, error: appError } = await supabase
+      .from("loan_applications")
+      .select("segment")
+      .eq("id", id)
+      .single();
+    if (appError || !application) {
+      throw new ForbiddenError("Application not found");
+    }
+    const committeeSize = await getCommitteeSize(
+      application.segment as string | null,
+    );
 
     const votes = await castCommitteeVote(
       supabase,
@@ -56,7 +69,17 @@ export async function GET(_request: Request, { params }: RouteParams) {
     await requireModulePermission("committee", "view");
     const { id } = await params;
     const supabase = await createClient();
-    const committeeSize = await getCommitteeSize();
+    const { data: application, error: appError } = await supabase
+      .from("loan_applications")
+      .select("segment")
+      .eq("id", id)
+      .single();
+    if (appError || !application) {
+      throw new ForbiddenError("Application not found");
+    }
+    const committeeSize = await getCommitteeSize(
+      application.segment as string | null,
+    );
     const votes = await getCommitteeVotes(supabase, id);
     return jsonOk({ votes, tally: computeVoteTally(votes, committeeSize) });
   } catch (error) {

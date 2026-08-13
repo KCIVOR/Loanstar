@@ -43,6 +43,15 @@ const STATUS_CHIPS: Array<{ id: CallbackStatusFilter; label: string }> = [
   { id: "overdue", label: "Overdue" },
 ];
 
+const SEGMENT_CHIPS: Array<{
+  id: "all" | "seafarer" | "sme";
+  label: string;
+}> = [
+  { id: "all", label: "All" },
+  { id: "seafarer", label: "Seafarer" },
+  { id: "sme", label: "SME" },
+];
+
 const iconProps = {
   viewBox: "0 0 24 24",
   fill: "none",
@@ -115,6 +124,15 @@ function StatusBadgeForCallback({ isOverdue }: { isOverdue: boolean }) {
   );
 }
 
+function segmentBadge(segment: "sme" | "seafarer" | null) {
+  const isSme = segment === "sme";
+  return (
+    <Badge variant={isSme ? "navy" : "teal"} dot>
+      {isSme ? "SME" : "Seafarer"}
+    </Badge>
+  );
+}
+
 export default function CigCallbacksPage() {
   const [scheduledCallbacks, setScheduledCallbacks] = useState<
     CigScheduledCallback[]
@@ -124,6 +142,9 @@ export default function CigCallbacksPage() {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] =
     useState<CallbackStatusFilter>("all");
+  const [segmentFilter, setSegmentFilter] = useState<
+    "all" | "seafarer" | "sme"
+  >("all");
   const [dueSortDir, setDueSortDir] = useState<"asc" | "desc" | null>(null);
   const [viewMode, setViewMode] = useState<HistoryViewMode>("list");
   const [filterPanelOpen, setFilterPanelOpen] = useState(false);
@@ -138,7 +159,9 @@ export default function CigCallbacksPage() {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch("/api/cig/callbacks");
+      const qs = new URLSearchParams();
+      qs.set("segment", segmentFilter);
+      const res = await fetch(`/api/cig/callbacks?${qs.toString()}`);
       if (!res.ok) throw new Error("Failed to load scheduled callbacks");
       const data = (await res.json()) as {
         scheduledCallbacks: CigScheduledCallback[];
@@ -149,7 +172,7 @@ export default function CigCallbacksPage() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [segmentFilter]);
 
   async function handleResolveConfirm() {
     if (!resolveTarget) return;
@@ -181,7 +204,7 @@ export default function CigCallbacksPage() {
 
   useEffect(() => {
     setPage(1);
-  }, [search, statusFilter, pageSize, dueSortDir]);
+  }, [search, statusFilter, segmentFilter, pageSize, dueSortDir]);
 
   function toggleDueSort() {
     setDueSortDir((prev) => {
@@ -227,7 +250,8 @@ export default function CigCallbacksPage() {
   const summaryStart = rows.length ? pageStart + 1 : 0;
   const summaryEnd = pageStart + rows.length;
 
-  const activeFilterCount = statusFilter !== "all" ? 1 : 0;
+  const activeFilterCount =
+    (statusFilter !== "all" ? 1 : 0) + (segmentFilter !== "all" ? 1 : 0);
 
   function renderActions(cb: CigScheduledCallback) {
     return (
@@ -317,6 +341,18 @@ export default function CigCallbacksPage() {
           </div>
 
           <div className="active-pill-row">
+            {segmentFilter !== "all" ? (
+              <span className="active-pill">
+                {segmentFilter === "sme" ? "SME" : "Seafarer"}
+                <button
+                  type="button"
+                  aria-label="Clear segment filter"
+                  onClick={() => setSegmentFilter("all")}
+                >
+                  ×
+                </button>
+              </span>
+            ) : null}
             {statusFilter !== "all" ? (
               <span className="active-pill">
                 Status: {statusChipLabel(statusFilter)}
@@ -333,7 +369,10 @@ export default function CigCallbacksPage() {
               <button
                 type="button"
                 className="clear-link"
-                onClick={() => setStatus("all")}
+                onClick={() => {
+                  setSegmentFilter("all");
+                  setStatus("all");
+                }}
               >
                 Clear
               </button>
@@ -387,6 +426,21 @@ export default function CigCallbacksPage() {
 
         <div className={cn("filter-panel", filterPanelOpen && "is-open")}>
           <div className="filter-group">
+            <span className="filter-group-label">Segment</span>
+            <div className="flex flex-wrap gap-1.5">
+              {SEGMENT_CHIPS.map((chip) => (
+                <button
+                  key={chip.id}
+                  type="button"
+                  className={cn("fchip", segmentFilter === chip.id && "is-on")}
+                  onClick={() => setSegmentFilter(chip.id)}
+                >
+                  {chip.label}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className="filter-group">
             <span className="filter-group-label">Status</span>
             <div className="flex flex-wrap gap-1.5">
               {STATUS_CHIPS.map((chip) => (
@@ -410,6 +464,7 @@ export default function CigCallbacksPage() {
             <thead>
               <tr>
                 <Th>Borrower</Th>
+                <Th>Segment</Th>
                 <Th>Due</Th>
                 <Th>Status</Th>
                 <Th>Notes</Th>
@@ -419,7 +474,7 @@ export default function CigCallbacksPage() {
             <tbody>
               {Array.from({ length: 6 }, (_, i) => (
                 <tr key={i}>
-                  <Td colSpan={5}>
+                  <Td colSpan={6}>
                     <Skeleton variant="line" />
                   </Td>
                 </tr>
@@ -453,6 +508,10 @@ export default function CigCallbacksPage() {
               <div className="gcard-name">{borrowerName(cb)}</div>
               <div className="gcard-meta">
                 <div className="row">
+                  <span className="k">Segment</span>
+                  <span className="v">{segmentBadge(cb.segment)}</span>
+                </div>
+                <div className="row">
                   <span className="k">Due</span>
                   <span className="v mono">{formatDateTime(cb.scheduledAt)}</span>
                 </div>
@@ -473,6 +532,7 @@ export default function CigCallbacksPage() {
             <thead>
               <tr>
                 <Th>Borrower</Th>
+                <Th>Segment</Th>
                 <Th className="sortable" onClick={toggleDueSort}>
                   Due
                   {dueSortDir ? (
@@ -501,6 +561,7 @@ export default function CigCallbacksPage() {
                       </span>
                     </div>
                   </Td>
+                  <Td>{segmentBadge(cb.segment)}</Td>
                   <Td className="mono">{formatDateTime(cb.scheduledAt)}</Td>
                   <Td>
                     <StatusBadgeForCallback isOverdue={cb.isOverdue} />

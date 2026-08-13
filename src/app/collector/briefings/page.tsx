@@ -35,6 +35,15 @@ import {
 } from "@/lib/collector/briefings";
 import { formatDateTime } from "@/lib/collector/format";
 
+type SegmentFilter = "all" | "seafarer" | "sme";
+
+/** API row with `application.segment` from briefings select (Phase 22). */
+type BriefingItem = Omit<BriefingQueueItem, "application"> & {
+  application: (NonNullable<BriefingQueueItem["application"]> & {
+    segment: "sme" | "seafarer" | null;
+  }) | null;
+};
+
 const PAGE_SIZE_OPTIONS = BRIEFING_LIST_PAGE_SIZES;
 
 const WAITING_CHIPS: Array<{ id: BriefingWaitingBucket; label: string }> = [
@@ -43,6 +52,21 @@ const WAITING_CHIPS: Array<{ id: BriefingWaitingBucket; label: string }> = [
   { id: "4-7", label: "4–7 days" },
   { id: "8+", label: "8+ days" },
 ];
+
+const SEGMENT_CHIPS: Array<{ id: SegmentFilter; label: string }> = [
+  { id: "all", label: "All" },
+  { id: "seafarer", label: "Seafarer" },
+  { id: "sme", label: "SME" },
+];
+
+function segmentBadge(segment: string | null | undefined) {
+  const isSme = segment === "sme";
+  return (
+    <Badge variant={isSme ? "navy" : "teal"} dot>
+      {isSme ? "SME" : "Seafarer"}
+    </Badge>
+  );
+}
 
 const iconProps = {
   viewBox: "0 0 24 24",
@@ -105,7 +129,7 @@ function formatWaitingDays(days: number | null): string {
   return `${days}d`;
 }
 
-function borrowerName(item: BriefingQueueItem): string {
+function borrowerName(item: BriefingItem): string {
   return item.borrower
     ? `${item.borrower.firstName} ${item.borrower.lastName}`
     : "Unknown borrower";
@@ -117,7 +141,7 @@ function pathLabel(releasePath: string | null): string {
   return "—";
 }
 
-function rowId(item: BriefingQueueItem): string {
+function rowId(item: BriefingItem): string {
   return (
     item.application?.applicationNo ??
     item.borrower?.borrowerNo ??
@@ -126,17 +150,18 @@ function rowId(item: BriefingQueueItem): string {
 }
 
 export default function CollectorBriefingsPage() {
-  const [items, setItems] = useState<BriefingQueueItem[]>([]);
+  const [items, setItems] = useState<BriefingItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [acting, setActing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
-  const [confirmItem, setConfirmItem] = useState<BriefingQueueItem | null>(
+  const [confirmItem, setConfirmItem] = useState<BriefingItem | null>(
     null,
   );
   const [search, setSearch] = useState("");
   const [waitingFilter, setWaitingFilter] =
     useState<BriefingWaitingBucket>("all");
+  const [segmentFilter, setSegmentFilter] = useState<SegmentFilter>("all");
   const [signedSortDir, setSignedSortDir] = useState<"asc" | "desc" | null>(
     null,
   );
@@ -151,7 +176,7 @@ export default function CollectorBriefingsPage() {
     try {
       const res = await fetch("/api/collector/briefings");
       if (!res.ok) throw new Error("Failed to load briefing queue");
-      const data = (await res.json()) as { items: BriefingQueueItem[] };
+      const data = (await res.json()) as { items: BriefingItem[] };
       setItems(data.items);
       if (!opts?.silent) setError(null);
     } catch (err) {
@@ -167,7 +192,7 @@ export default function CollectorBriefingsPage() {
 
   useEffect(() => {
     setPage(1);
-  }, [search, waitingFilter, pageSize, signedSortDir]);
+  }, [search, waitingFilter, segmentFilter, pageSize, signedSortDir]);
 
   async function acknowledge(releaseFileId: string) {
     setActing(true);
@@ -215,10 +240,16 @@ export default function CollectorBriefingsPage() {
     const bucketed = searched.filter((item) =>
       passesWaitingBucket(daysWaiting(item.updatedAt), waitingFilter),
     );
+    const segmented =
+      segmentFilter === "all"
+        ? bucketed
+        : bucketed.filter(
+            (item) => item.application?.segment === segmentFilter,
+          );
     return signedSortDir === null
-      ? bucketed
-      : sortBriefingsByUpdatedAt(bucketed, signedSortDir);
-  }, [items, search, waitingFilter, signedSortDir]);
+      ? segmented
+      : sortBriefingsByUpdatedAt(segmented, signedSortDir);
+  }, [items, search, waitingFilter, segmentFilter, signedSortDir]);
 
   const safePageSize = clampBriefingListPageSize(pageSize);
   const totalCount = filtered.length;
@@ -229,9 +260,15 @@ export default function CollectorBriefingsPage() {
   const summaryStart = rows.length ? pageStart + 1 : 0;
   const summaryEnd = pageStart + rows.length;
 
-  const activeFilterCount = waitingFilter !== "all" ? 1 : 0;
+  const activeFilterCount =
+    (waitingFilter !== "all" ? 1 : 0) + (segmentFilter !== "all" ? 1 : 0);
 
-  function renderConductButton(item: BriefingQueueItem) {
+  function clearFilters() {
+    setWaiting("all");
+    setSegmentFilter("all");
+  }
+
+  function renderConductButton(item: BriefingItem) {
     return (
       <Button
         variant="secondary"
@@ -331,11 +368,23 @@ export default function CollectorBriefingsPage() {
                 </button>
               </span>
             ) : null}
+            {segmentFilter !== "all" ? (
+              <span className="active-pill">
+                Segment: {segmentFilter === "sme" ? "SME" : "Seafarer"}
+                <button
+                  type="button"
+                  aria-label="Clear segment filter"
+                  onClick={() => setSegmentFilter("all")}
+                >
+                  ×
+                </button>
+              </span>
+            ) : null}
             {activeFilterCount > 0 ? (
               <button
                 type="button"
                 className="clear-link"
-                onClick={() => setWaiting("all")}
+                onClick={clearFilters}
               >
                 Clear
               </button>
@@ -403,6 +452,21 @@ export default function CollectorBriefingsPage() {
               ))}
             </div>
           </div>
+          <div className="filter-group">
+            <span className="filter-group-label">Segment</span>
+            <div className="flex flex-wrap gap-1.5">
+              {SEGMENT_CHIPS.map((chip) => (
+                <button
+                  key={chip.id}
+                  type="button"
+                  className={cn("fchip", segmentFilter === chip.id && "is-on")}
+                  onClick={() => setSegmentFilter(chip.id)}
+                >
+                  {chip.label}
+                </button>
+              ))}
+            </div>
+          </div>
         </div>
       </div>
 
@@ -412,6 +476,7 @@ export default function CollectorBriefingsPage() {
             <thead>
               <tr>
                 <Th>Borrower</Th>
+                <Th>Segment</Th>
                 <Th>Path</Th>
                 <Th>Signed since</Th>
                 <Th>Waiting</Th>
@@ -421,7 +486,7 @@ export default function CollectorBriefingsPage() {
             <tbody>
               {Array.from({ length: 6 }, (_, i) => (
                 <tr key={i}>
-                  <Td colSpan={5}>
+                  <Td colSpan={6}>
                     <Skeleton variant="line" />
                   </Td>
                 </tr>
@@ -455,6 +520,12 @@ export default function CollectorBriefingsPage() {
                 <div className="gcard-name">{borrowerName(item)}</div>
                 <div className="gcard-meta">
                   <div className="row">
+                    <span className="k">Segment</span>
+                    <span className="v">
+                      {segmentBadge(item.application?.segment)}
+                    </span>
+                  </div>
+                  <div className="row">
                     <span className="k">Signed since</span>
                     <span className="v mono">
                       {formatDateTime(item.updatedAt)}
@@ -476,6 +547,7 @@ export default function CollectorBriefingsPage() {
             <thead>
               <tr>
                 <Th>Borrower</Th>
+                <Th>Segment</Th>
                 <Th>Path</Th>
                 <Th className="sortable" onClick={toggleSignedSort}>
                   Signed since
@@ -502,6 +574,7 @@ export default function CollectorBriefingsPage() {
                         <span className="id">{rowId(item)}</span>
                       </div>
                     </Td>
+                    <Td>{segmentBadge(item.application?.segment)}</Td>
                     <Td>
                       <Badge variant="navy" dot>
                         {pathLabel(item.releasePath)}

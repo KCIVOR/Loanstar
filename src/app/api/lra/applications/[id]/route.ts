@@ -26,7 +26,9 @@ export async function GET(_request: Request, { params }: RouteParams) {
         application_no,
         status,
         blocker,
-        borrowers ( id, borrower_no, first_name, last_name, email )
+        segment,
+        entity_type,
+        borrowers ( id, borrower_no, first_name, last_name, email, business_info )
       `,
       )
       .eq("id", id)
@@ -110,6 +112,11 @@ export async function GET(_request: Request, { params }: RouteParams) {
         status: app.status,
         statusLabel: formatStatusLabel(app.status),
         blocker: app.blocker,
+        segment: app.segment === "sme" ? "sme" : "seafarer",
+        entityType:
+          app.entity_type === "individual" || app.entity_type === "corporate"
+            ? app.entity_type
+            : null,
       },
       borrower,
       releaseFile: releaseRow,

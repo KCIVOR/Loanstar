@@ -14,6 +14,7 @@ type Props = {
   onSave: (next: SmeReloanVerification) => void;
   saving?: boolean;
   readOnly?: boolean;
+  verifierName: string;
 };
 
 export function SmeReloanVerificationForm({
@@ -22,6 +23,7 @@ export function SmeReloanVerificationForm({
   onSave,
   saving,
   readOnly,
+  verifierName,
 }: Props) {
   const form: SmeReloanVerification = value ?? {};
   const householdTotal = sumReloanHouseholdExpenses(
@@ -339,11 +341,9 @@ export function SmeReloanVerificationForm({
           <div>
             <Label required>Verified by (Field Investigator)</Label>
             <Input
-              disabled={readOnly}
-              value={form.verifiedBy ?? ""}
-              onChange={(e) =>
-                onChange({ ...form, verifiedBy: e.target.value })
-              }
+              disabled
+              value={readOnly ? (form.verifiedBy ?? "") : verifierName}
+              onChange={() => {}}
             />
           </div>
           <div>
@@ -365,7 +365,7 @@ export function SmeReloanVerificationForm({
         <Button
           type="button"
           loading={saving}
-          onClick={() => onSave(form)}
+          onClick={() => onSave({ ...form, verifiedBy: verifierName })}
         >
           Save re-loan verification
         </Button>

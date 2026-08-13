@@ -32,8 +32,9 @@ async function getOwnBorrower(userId: string) {
 }
 
 /**
- * Body is only consulted for a brand-new ("first") application — resume and
- * reloan ignore it entirely (see resolveBorrowerCreateSegment / plan P2, P3).
+ * Body segment/entityType is honored for both first and reloan application
+ * creation (see resolveBorrowerCreateSegment). Resuming an existing draft
+ * still ignores it — that path returns before this is consulted.
  * Loosely typed on purpose: invalid values fall through to the resolver,
  * which returns a clear ok:false error rather than a zod stack trace.
  */

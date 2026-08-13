@@ -8,6 +8,7 @@ import {
 } from "@/components/history";
 import {
   Alert,
+  Badge,
   Button,
   ConfirmDialog,
   cn,
@@ -41,6 +42,15 @@ const WAITING_CHIPS: Array<{ id: DenialWaitingBucket; label: string }> = [
   { id: "1-3", label: "1–3 days" },
   { id: "4-7", label: "4–7 days" },
   { id: "8+", label: "8+ days" },
+];
+
+const SEGMENT_CHIPS: Array<{
+  id: "all" | "seafarer" | "sme";
+  label: string;
+}> = [
+  { id: "all", label: "All" },
+  { id: "seafarer", label: "Seafarer" },
+  { id: "sme", label: "SME" },
 ];
 
 const iconProps = {
@@ -110,6 +120,15 @@ function borrowerName(call: DenialCallItem): string {
     : "Unknown borrower";
 }
 
+function segmentBadge(segment: "sme" | "seafarer" | null) {
+  const isSme = segment === "sme";
+  return (
+    <Badge variant={isSme ? "navy" : "teal"} dot>
+      {isSme ? "SME" : "Seafarer"}
+    </Badge>
+  );
+}
+
 export default function CigDenialsPage() {
   const [denials, setDenials] = useState<DenialCallItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -117,6 +136,9 @@ export default function CigDenialsPage() {
   const [search, setSearch] = useState("");
   const [waitingFilter, setWaitingFilter] =
     useState<DenialWaitingBucket>("all");
+  const [segmentFilter, setSegmentFilter] = useState<
+    "all" | "seafarer" | "sme"
+  >("all");
   const [deniedSortDir, setDeniedSortDir] = useState<"asc" | "desc" | null>(
     null,
   );
@@ -132,7 +154,9 @@ export default function CigDenialsPage() {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch("/api/cig/denials");
+      const qs = new URLSearchParams();
+      qs.set("segment", segmentFilter);
+      const res = await fetch(`/api/cig/denials?${qs.toString()}`);
       if (!res.ok) throw new Error("Failed to load denial calls");
       const data = (await res.json()) as { denials: DenialCallItem[] };
       setDenials(data.denials ?? []);
@@ -141,7 +165,7 @@ export default function CigDenialsPage() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [segmentFilter]);
 
   async function handleInformConfirm() {
     if (!informTarget) return;
@@ -169,7 +193,7 @@ export default function CigDenialsPage() {
 
   useEffect(() => {
     setPage(1);
-  }, [search, waitingFilter, pageSize, deniedSortDir]);
+  }, [search, waitingFilter, segmentFilter, pageSize, deniedSortDir]);
 
   function toggleDeniedSort() {
     setDeniedSortDir((prev) => {
@@ -205,7 +229,8 @@ export default function CigDenialsPage() {
   const summaryStart = rows.length ? pageStart + 1 : 0;
   const summaryEnd = pageStart + rows.length;
 
-  const activeFilterCount = waitingFilter !== "all" ? 1 : 0;
+  const activeFilterCount =
+    (waitingFilter !== "all" ? 1 : 0) + (segmentFilter !== "all" ? 1 : 0);
 
   function renderInformButton(call: DenialCallItem) {
     return (
@@ -290,6 +315,18 @@ export default function CigDenialsPage() {
           </div>
 
           <div className="active-pill-row">
+            {segmentFilter !== "all" ? (
+              <span className="active-pill">
+                {segmentFilter === "sme" ? "SME" : "Seafarer"}
+                <button
+                  type="button"
+                  aria-label="Clear segment filter"
+                  onClick={() => setSegmentFilter("all")}
+                >
+                  ×
+                </button>
+              </span>
+            ) : null}
             {waitingFilter !== "all" ? (
               <span className="active-pill">
                 Waiting: {waitingChipLabel(waitingFilter)}
@@ -306,7 +343,10 @@ export default function CigDenialsPage() {
               <button
                 type="button"
                 className="clear-link"
-                onClick={() => setWaiting("all")}
+                onClick={() => {
+                  setSegmentFilter("all");
+                  setWaiting("all");
+                }}
               >
                 Clear
               </button>
@@ -360,6 +400,21 @@ export default function CigDenialsPage() {
 
         <div className={cn("filter-panel", filterPanelOpen && "is-open")}>
           <div className="filter-group">
+            <span className="filter-group-label">Segment</span>
+            <div className="flex flex-wrap gap-1.5">
+              {SEGMENT_CHIPS.map((chip) => (
+                <button
+                  key={chip.id}
+                  type="button"
+                  className={cn("fchip", segmentFilter === chip.id && "is-on")}
+                  onClick={() => setSegmentFilter(chip.id)}
+                >
+                  {chip.label}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className="filter-group">
             <span className="filter-group-label">Waiting</span>
             <div className="flex flex-wrap gap-1.5">
               {WAITING_CHIPS.map((chip) => (
@@ -383,6 +438,7 @@ export default function CigDenialsPage() {
             <thead>
               <tr>
                 <Th>Borrower</Th>
+                <Th>Segment</Th>
                 <Th>Contact</Th>
                 <Th>Denied</Th>
                 <Th>Waiting</Th>
@@ -392,7 +448,7 @@ export default function CigDenialsPage() {
             <tbody>
               {Array.from({ length: 6 }, (_, i) => (
                 <tr key={i}>
-                  <Td colSpan={5}>
+                  <Td colSpan={6}>
                     <Skeleton variant="line" />
                   </Td>
                 </tr>
@@ -425,6 +481,10 @@ export default function CigDenialsPage() {
                 <div className="gcard-name">{borrowerName(call)}</div>
                 <div className="gcard-meta">
                   <div className="row">
+                    <span className="k">Segment</span>
+                    <span className="v">{segmentBadge(call.segment)}</span>
+                  </div>
+                  <div className="row">
                     <span className="k">Contact</span>
                     <span className="v mono">
                       {call.borrower?.mobilePhone ?? "No mobile on file"}
@@ -456,6 +516,7 @@ export default function CigDenialsPage() {
             <thead>
               <tr>
                 <Th>Borrower</Th>
+                <Th>Segment</Th>
                 <Th>Contact</Th>
                 <Th className="sortable" onClick={toggleDeniedSort}>
                   Denied
@@ -484,6 +545,7 @@ export default function CigDenialsPage() {
                         </span>
                       </div>
                     </Td>
+                    <Td>{segmentBadge(call.segment)}</Td>
                     <Td>
                       <div className="mono text-[13px]">
                         {call.borrower?.mobilePhone ?? "No mobile on file"}

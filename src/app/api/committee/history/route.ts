@@ -12,6 +12,7 @@ import { requireModulePermission } from "@/lib/permissions/server";
 import { createClient } from "@/lib/supabase/server";
 
 const ACTIONS = new Set(["all", ...COMMITTEE_DECISION_ACTIONS]);
+const SEGMENT_FILTERS = new Set(["all", "seafarer", "sme"]);
 const RANGE_PRESETS = new Set(["30d", "90d", "all", "custom"]);
 const SORT_KEYS = new Set([
   "applicationNo",
@@ -31,6 +32,11 @@ export async function GET(request: Request) {
     const action = (
       ACTIONS.has(actionRaw) ? actionRaw : "all"
     ) as CommitteeDecisionAction | "all";
+
+    const segmentRaw = searchParams.get("segment") ?? "all";
+    const segmentFilter = (
+      SEGMENT_FILTERS.has(segmentRaw) ? segmentRaw : "all"
+    ) as "all" | "seafarer" | "sme";
 
     const rangeRaw = searchParams.get("range") ?? "30d";
     const preset = (
@@ -63,6 +69,7 @@ export async function GET(request: Request) {
       getCommitteeDecisionHistory(supabase, user.id, {
         search,
         action,
+        segment: segmentFilter,
         from,
         to,
         sortKey,

@@ -72,6 +72,26 @@ const STATUS_CHIPS: Array<{ id: StatusFilter; label: string }> = [
   { id: "converted", label: "Converted" },
 ];
 
+type SegmentFilter = "all" | "seafarer" | "sme";
+
+const SEGMENT_CHIPS: Array<{ id: SegmentFilter; label: string }> = [
+  { id: "all", label: "All" },
+  { id: "seafarer", label: "Seafarer" },
+  { id: "sme", label: "SME" },
+];
+
+function segmentCell(segment: "sme" | "seafarer" | null | undefined) {
+  if (segment !== "sme" && segment !== "seafarer") {
+    return <span className="text-ink-400">—</span>;
+  }
+  const isSme = segment === "sme";
+  return (
+    <Badge variant={isSme ? "navy" : "teal"} dot>
+      {isSme ? "SME" : "Seafarer"}
+    </Badge>
+  );
+}
+
 const STAGE_RANK: Record<LeadPipelineStage, number> = {
   awaiting_link: 0,
   gathering_docs: 1,
@@ -196,6 +216,7 @@ function buildQueueQuery(params: {
   search: string;
   stageFilter: StageFilter;
   statusFilter: StatusFilter;
+  segmentFilter: SegmentFilter;
   dateRange: DateRangeValue;
   sortKey: SortKey;
   sortDir: "asc" | "desc";
@@ -206,6 +227,7 @@ function buildQueueQuery(params: {
   if (params.search.trim()) qs.set("search", params.search.trim());
   qs.set("stage", params.stageFilter);
   qs.set("status", params.statusFilter);
+  qs.set("segment", params.segmentFilter);
   qs.set("range", params.dateRange.preset);
   if (params.dateRange.preset === "custom") {
     if (params.dateRange.from) qs.set("from", params.dateRange.from);
@@ -234,6 +256,7 @@ export default function AgentPipelinePage() {
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [stageFilter, setStageFilter] = useState<StageFilter>("all");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
+  const [segmentFilter, setSegmentFilter] = useState<SegmentFilter>("all");
   const [dateRange, setDateRange] = useState<DateRangeValue>(DEFAULT_DATE_RANGE);
   const [viewMode, setViewMode] = useState<HistoryViewMode>("list");
   const [pageSize, setPageSize] =
@@ -255,6 +278,7 @@ export default function AgentPipelinePage() {
     debouncedSearch,
     stageFilter,
     statusFilter,
+    segmentFilter,
     dateRange,
     pageSize,
     sortKey,
@@ -269,6 +293,7 @@ export default function AgentPipelinePage() {
         search: debouncedSearch,
         stageFilter,
         statusFilter,
+        segmentFilter,
         dateRange,
         sortKey,
         sortDir,
@@ -294,6 +319,7 @@ export default function AgentPipelinePage() {
     debouncedSearch,
     stageFilter,
     statusFilter,
+    segmentFilter,
     dateRange,
     sortKey,
     sortDir,
@@ -341,12 +367,14 @@ export default function AgentPipelinePage() {
   const activeFilterCount =
     (stageFilter !== "all" ? 1 : 0) +
     (statusFilter !== "all" ? 1 : 0) +
+    (segmentFilter !== "all" ? 1 : 0) +
     (dateIsDefault ? 0 : 1);
 
   const pipelineIsClear =
     leadsTotal === 0 &&
     stageFilter === "all" &&
     statusFilter === "all" &&
+    segmentFilter === "all" &&
     dateIsDefault &&
     !debouncedSearch.trim();
 
@@ -494,6 +522,18 @@ export default function AgentPipelinePage() {
                 </button>
               </span>
             ) : null}
+            {segmentFilter !== "all" ? (
+              <span className="active-pill">
+                Segment: {segmentFilter === "sme" ? "SME" : "Seafarer"}
+                <button
+                  type="button"
+                  aria-label="Clear segment filter"
+                  onClick={() => setSegmentFilter("all")}
+                >
+                  ×
+                </button>
+              </span>
+            ) : null}
             {!dateIsDefault ? (
               <span className="active-pill">
                 {dateRangePillLabel(dateRange)}
@@ -513,6 +553,7 @@ export default function AgentPipelinePage() {
                 onClick={() => {
                   setStageFilter("all");
                   setStatusFilter("all");
+                  setSegmentFilter("all");
                   setDateRange(DEFAULT_DATE_RANGE);
                 }}
               >
@@ -598,6 +639,21 @@ export default function AgentPipelinePage() {
             </div>
           </div>
           <div className="filter-group">
+            <span className="filter-group-label">Segment</span>
+            <div className="filter-bar">
+              {SEGMENT_CHIPS.map((chip) => (
+                <button
+                  key={chip.id}
+                  type="button"
+                  className={cn("fchip", segmentFilter === chip.id && "is-on")}
+                  onClick={() => setSegmentFilter(chip.id)}
+                >
+                  {chip.label}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className="filter-group">
             <span className="filter-group-label">Created date</span>
             <DateRangeFilter value={dateRange} onChange={setDateRange} />
           </div>
@@ -610,6 +666,7 @@ export default function AgentPipelinePage() {
             <thead>
               <tr>
                 <Th>Borrower</Th>
+                <Th>Segment</Th>
                 <Th>Business</Th>
                 <Th>Pipeline</Th>
                 <Th>Checklist</Th>
@@ -621,7 +678,7 @@ export default function AgentPipelinePage() {
             <tbody>
               {Array.from({ length: 6 }, (_, i) => (
                 <tr key={i}>
-                  <Td colSpan={7}>
+                  <Td colSpan={8}>
                     <Skeleton variant="line" />
                   </Td>
                 </tr>
@@ -657,6 +714,10 @@ export default function AgentPipelinePage() {
                 </div>
                 <div className="gcard-name">{lead.borrowerName}</div>
                 <div className="gcard-meta">
+                  <div className="row">
+                    <span className="k">Segment</span>
+                    <span className="v">{segmentCell(lead.segment)}</span>
+                  </div>
                   <div className="row">
                     <span className="k">Business</span>
                     <span className="v">{lead.businessName ?? "—"}</span>
@@ -697,6 +758,7 @@ export default function AgentPipelinePage() {
                   Borrower
                   {sortArrow("borrower")}
                 </Th>
+                <Th>Segment</Th>
                 <Th>Business</Th>
                 <Th
                   className="sortable"
@@ -736,6 +798,7 @@ export default function AgentPipelinePage() {
                         {lead.borrowerName}
                       </Link>
                     </Td>
+                    <Td>{segmentCell(lead.segment)}</Td>
                     <Td>{lead.businessName ?? "—"}</Td>
                     <Td>
                       <Badge variant={pipelineStageVariant(stage)}>

@@ -8,7 +8,10 @@ import {
   Badge,
   Button,
   ConfirmDialog,
+  cn,
   EmptyState,
+  Input,
+  Modal,
   PageHeader,
   Spinner,
   Table,
@@ -22,10 +25,14 @@ import {
   formatMoney,
   paymentStatusVariant,
 } from "@/lib/collector/format";
+import { halfUp } from "@/lib/computation/money";
+
+type SegmentFilter = "all" | "seafarer" | "sme";
 
 type MasterlistJoin = {
   borrower_name: string;
   loan_account_no: string | null;
+  segment: "sme" | "seafarer" | null;
 };
 
 type Payment = {
@@ -51,6 +58,49 @@ type DcrRow = {
   dcr_items: DcrItem[] | null;
 };
 
+type PreviewInstallment = {
+  id: string;
+  installmentNo: number;
+  dueDate: string;
+  amountDue: number;
+  penaltyAmount: number;
+  amountPaid: number;
+  status: string;
+};
+
+type AllocationRow = PreviewInstallment & {
+  checked: boolean;
+  amount: number;
+};
+
+type AllocationModalState = {
+  paymentId: string;
+  paymentAmount: number;
+  borrowerName: string;
+  rows: AllocationRow[];
+};
+
+const SEGMENT_CHIPS: Array<{ id: SegmentFilter; label: string }> = [
+  { id: "all", label: "All" },
+  { id: "seafarer", label: "Seafarer" },
+  { id: "sme", label: "SME" },
+];
+
+function segmentBadge(segment: string | null | undefined) {
+  const isSme = segment === "sme";
+  return (
+    <Badge variant={isSme ? "navy" : "teal"} dot>
+      {isSme ? "SME" : "Seafarer"}
+    </Badge>
+  );
+}
+
+function installmentRemainingDue(inst: PreviewInstallment): number {
+  return halfUp(
+    inst.amountDue + inst.penaltyAmount - inst.amountPaid,
+  );
+}
+
 export default function CollectorDcrPage() {
   const [payments, setPayments] = useState<Payment[]>([]);
   const [draftPaymentIds, setDraftPaymentIds] = useState<string[]>([]);
@@ -61,6 +111,9 @@ export default function CollectorDcrPage() {
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [confirmSubmit, setConfirmSubmit] = useState(false);
+  const [segmentFilter, setSegmentFilter] = useState<SegmentFilter>("all");
+  const [allocationModal, setAllocationModal] =
+    useState<AllocationModalState | null>(null);
 
   const load = useCallback(async (opts?: { silent?: boolean }) => {
     if (!opts?.silent) setLoading(true);
@@ -114,6 +167,22 @@ export default function CollectorDcrPage() {
     [draftPaymentIds],
   );
 
+  const allocationCheckedTotal = useMemo(() => {
+    if (!allocationModal) return 0;
+    return halfUp(
+      allocationModal.rows
+        .filter((row) => row.checked)
+        .reduce((sum, row) => sum + row.amount, 0),
+    );
+  }, [allocationModal]);
+
+  const allocationLeftover = useMemo(() => {
+    if (!allocationModal) return 0;
+    return halfUp(allocationModal.paymentAmount - allocationCheckedTotal);
+  }, [allocationModal, allocationCheckedTotal]);
+
+  const allocationMismatch = allocationLeftover < 0;
+
   async function startDcr() {
     setActing(true);
     setError(null);
@@ -151,8 +220,112 @@ export default function CollectorDcrPage() {
     }
   }
 
-  async function addToDcr(paymentId: string) {
+  async function openAllocationModal(paymentId: string) {
     if (!draftDcrId) return;
+    setActing(true);
+    setError(null);
+    try {
+      const pay = payments.find((p) => p.id === paymentId);
+      const previewRes = await fetch(
+        `/api/collector/dcr/allocation-preview?paymentId=${encodeURIComponent(paymentId)}`,
+      );
+      if (!previewRes.ok) {
+        const body = (await previewRes.json().catch(() => null)) as {
+          error?: string;
+        } | null;
+        throw new Error(body?.error ?? "Could not load allocation preview");
+      }
+      const preview = (await previewRes.json()) as {
+        installments: PreviewInstallment[];
+        allocation: {
+          amortizationScheduleId: string | null;
+          amount: number;
+        }[];
+      };
+
+      const allocBySchedule = new Map(
+        preview.allocation
+          .filter((line) => line.amortizationScheduleId)
+          .map((line) => [line.amortizationScheduleId!, line.amount]),
+      );
+
+      const rows: AllocationRow[] = preview.installments.map((inst) => {
+        const allocated = allocBySchedule.get(inst.id);
+        return {
+          ...inst,
+          checked: allocated !== undefined,
+          amount: allocated ?? installmentRemainingDue(inst),
+        };
+      });
+
+      setAllocationModal({
+        paymentId,
+        paymentAmount: Number(pay?.amount ?? 0),
+        borrowerName: firstJoin(pay?.masterlist)?.borrower_name ?? "—",
+        rows,
+      });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed");
+    } finally {
+      setActing(false);
+    }
+  }
+
+  function updateAllocationRow(
+    scheduleId: string,
+    patch: Partial<Pick<AllocationRow, "checked" | "amount">>,
+  ) {
+    setAllocationModal((prev) => {
+      if (!prev) return prev;
+      return {
+        ...prev,
+        rows: prev.rows.map((row) => {
+          if (row.id !== scheduleId) return row;
+          const next = { ...row, ...patch };
+          if (patch.checked === true && patch.amount === undefined) {
+            // Cap at what's left of the payment after other checked rows —
+            // not the full amount due — so re-checking a row after
+            // unchecking it reproduces the same auto-allocation split
+            // instead of over-applying past the payment amount.
+            const othersTotal = prev.rows
+              .filter((r) => r.id !== scheduleId && r.checked)
+              .reduce((sum, r) => sum + r.amount, 0);
+            const available = halfUp(prev.paymentAmount - othersTotal);
+            next.amount = Math.max(
+              0,
+              Math.min(installmentRemainingDue(row), available),
+            );
+          }
+          return next;
+        }),
+      };
+    });
+  }
+
+  async function confirmAddToDcr() {
+    if (!draftDcrId || !allocationModal) return;
+
+    const checkedRows = allocationModal.rows.filter((row) => row.checked);
+    const checkedTotal = halfUp(
+      checkedRows.reduce((sum, row) => sum + row.amount, 0),
+    );
+    const leftover = halfUp(allocationModal.paymentAmount - checkedTotal);
+    if (leftover < 0) return;
+
+    const allocations: {
+      amortizationScheduleId: string | null;
+      amount: number;
+    }[] = checkedRows.map((row) => ({
+      amortizationScheduleId: row.id,
+      amount: halfUp(row.amount),
+    }));
+    if (leftover > 0) {
+      allocations.push({
+        amortizationScheduleId: null,
+        amount: leftover,
+      });
+    }
+
     setActing(true);
     setError(null);
     try {
@@ -162,7 +335,8 @@ export default function CollectorDcrPage() {
         body: JSON.stringify({
           action: "add_item",
           dcrId: draftDcrId,
-          paymentId,
+          paymentId: allocationModal.paymentId,
+          allocations,
         }),
       });
       if (!res.ok) {
@@ -171,6 +345,7 @@ export default function CollectorDcrPage() {
         } | null;
         throw new Error(body?.error ?? "Could not add to DCR");
       }
+      setAllocationModal(null);
       setMessage("Payment added to DCR.");
       await load({ silent: true });
     } catch (err) {
@@ -211,7 +386,20 @@ export default function CollectorDcrPage() {
 
   if (loading) return <Spinner />;
 
-  const available = payments.filter((p) => !inDraft.has(p.id));
+  const filteredPayments =
+    segmentFilter === "all"
+      ? payments
+      : payments.filter(
+          (p) => firstJoin(p.masterlist)?.segment === segmentFilter,
+        );
+  const filteredDraftItems =
+    segmentFilter === "all"
+      ? draftItems
+      : draftItems.filter((item) => {
+          const pay = payments.find((p) => p.id === item.payment_id);
+          return firstJoin(pay?.masterlist)?.segment === segmentFilter;
+        });
+  const available = filteredPayments.filter((p) => !inDraft.has(p.id));
 
   return (
     <div>
@@ -278,6 +466,20 @@ export default function CollectorDcrPage() {
         </div>
       )}
 
+      <div className="mb-6 flex flex-wrap items-center gap-2">
+        <span className="filter-group-label">Segment</span>
+        {SEGMENT_CHIPS.map((chip) => (
+          <button
+            key={chip.id}
+            type="button"
+            className={cn("fchip", segmentFilter === chip.id && "is-on")}
+            onClick={() => setSegmentFilter(chip.id)}
+          >
+            {chip.label}
+          </button>
+        ))}
+      </div>
+
       <section className="mb-8">
         <h2 className="mb-3 font-display text-lg font-semibold text-navy-900">
           Draft line items
@@ -292,17 +494,24 @@ export default function CollectorDcrPage() {
             }
             showMark={false}
           />
+        ) : filteredDraftItems.length === 0 ? (
+          <EmptyState
+            title="No matching draft items"
+            description="Try a different segment filter."
+            showMark={false}
+          />
         ) : (
           <div className="tbl-wrap">
             <Table>
               <thead>
                 <tr>
                   <Th>Payment</Th>
+                  <Th>Segment</Th>
                   <Th num>Amount</Th>
                 </tr>
               </thead>
               <tbody>
-                {draftItems.map((item) => {
+                {filteredDraftItems.map((item) => {
                   const pay = payments.find((p) => p.id === item.payment_id);
                   const ml = pay ? firstJoin(pay.masterlist) : null;
                   return (
@@ -315,6 +524,7 @@ export default function CollectorDcrPage() {
                           {pay?.reference_no ?? item.payment_id.slice(0, 8)}
                         </div>
                       </Td>
+                      <Td>{segmentBadge(ml?.segment)}</Td>
                       <Td num className="mono text-teal-600">
                         {formatMoney(Number(item.amount))}
                       </Td>
@@ -337,12 +547,19 @@ export default function CollectorDcrPage() {
             description="Confirm payment proofs first, then return here."
             showMark={false}
           />
+        ) : filteredPayments.length === 0 ? (
+          <EmptyState
+            title="No matching payments"
+            description="Try a different segment filter."
+            showMark={false}
+          />
         ) : (
           <div className="tbl-wrap">
             <Table>
               <thead>
                 <tr>
                   <Th>Borrower</Th>
+                  <Th>Segment</Th>
                   <Th>Reference</Th>
                   <Th>Date</Th>
                   <Th num>Amount</Th>
@@ -351,7 +568,7 @@ export default function CollectorDcrPage() {
                 </tr>
               </thead>
               <tbody>
-                {payments.map((pay) => {
+                {filteredPayments.map((pay) => {
                   const ml = firstJoin(pay.masterlist);
                   const already = inDraft.has(pay.id);
                   return (
@@ -364,6 +581,7 @@ export default function CollectorDcrPage() {
                           {ml?.loan_account_no ?? "—"}
                         </div>
                       </Td>
+                      <Td>{segmentBadge(ml?.segment)}</Td>
                       <Td className="mono">{pay.reference_no ?? "—"}</Td>
                       <Td className="mono">{formatDate(pay.payment_date)}</Td>
                       <Td num className="mono text-teal-600">
@@ -384,7 +602,7 @@ export default function CollectorDcrPage() {
                           <Button
                             size="sm"
                             loading={acting}
-                            onClick={() => void addToDcr(pay.id)}
+                            onClick={() => void openAllocationModal(pay.id)}
                           >
                             Add to DCR
                           </Button>
@@ -403,7 +621,7 @@ export default function CollectorDcrPage() {
             </Table>
           </div>
         )}
-        {draftDcrId && available.length === 0 && payments.length > 0 ? (
+        {draftDcrId && available.length === 0 && filteredPayments.length > 0 ? (
           <p className="mt-3 text-sm text-ink-500">
             All confirmed payments are already on this draft.
           </p>
@@ -419,6 +637,146 @@ export default function CollectorDcrPage() {
         onConfirm={() => void submitDcr()}
         onCancel={() => setConfirmSubmit(false)}
       />
+
+      <Modal
+        open={allocationModal !== null}
+        title={
+          allocationModal
+            ? `Allocate payment — ${allocationModal.borrowerName}`
+            : "Allocate payment to installments"
+        }
+        onClose={() => setAllocationModal(null)}
+        className="!max-w-3xl"
+        footer={
+          <>
+            <Button
+              variant="ghost"
+              onClick={() => setAllocationModal(null)}
+              disabled={acting}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={() => void confirmAddToDcr()}
+              loading={acting}
+              disabled={allocationMismatch}
+            >
+              Add to DCR
+            </Button>
+          </>
+        }
+      >
+        {allocationModal ? (
+          <div className="space-y-5">
+            <div className="grid gap-3 sm:grid-cols-3">
+              <div className="rounded-[var(--r-md)] border border-line-soft bg-surface-2 px-4 py-3">
+                <p className="text-xs font-semibold uppercase tracking-wide text-ink-500">
+                  Payment amount
+                </p>
+                <p className="mono mt-1 text-lg font-semibold text-navy-900">
+                  ₱{formatMoney(allocationModal.paymentAmount)}
+                </p>
+              </div>
+              <div className="rounded-[var(--r-md)] border border-line-soft bg-surface-2 px-4 py-3">
+                <p className="text-xs font-semibold uppercase tracking-wide text-ink-500">
+                  Checked total
+                </p>
+                <p
+                  className={`mono mt-1 text-lg font-semibold ${allocationMismatch ? "text-red-600" : "text-navy-900"}`}
+                >
+                  ₱{formatMoney(allocationCheckedTotal)}
+                </p>
+              </div>
+              <div className="rounded-[var(--r-md)] border border-line-soft bg-surface-2 px-4 py-3">
+                <p className="text-xs font-semibold uppercase tracking-wide text-ink-500">
+                  {allocationLeftover >= 0 ? "Advance (leftover)" : "Over-applied"}
+                </p>
+                <p
+                  className={`mono mt-1 text-lg font-semibold ${allocationMismatch ? "text-red-600" : "text-navy-900"}`}
+                >
+                  ₱{formatMoney(Math.abs(allocationLeftover))}
+                </p>
+              </div>
+            </div>
+
+            {allocationMismatch ? (
+              <Alert variant="danger">
+                Checked amounts exceed the payment by ₱
+                {formatMoney(Math.abs(allocationLeftover))}. Reduce applied
+                amounts before confirming.
+              </Alert>
+            ) : null}
+
+            {allocationModal.rows.length === 0 ? (
+              <p className="text-sm text-ink-500">
+                No open installments — the full amount will be recorded as an
+                advance.
+              </p>
+            ) : (
+              <section>
+                <h3 className="mb-3 font-display text-base font-semibold text-navy-900">
+                  Open installments
+                </h3>
+                <div className="tbl-wrap max-h-96 overflow-y-auto">
+                  <Table>
+                    <thead>
+                      <tr>
+                        <Th className="w-10"> </Th>
+                        <Th>#</Th>
+                        <Th>Due date</Th>
+                        <Th num>Amount due</Th>
+                        <Th num>Apply</Th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {allocationModal.rows.map((row) => (
+                        <tr key={row.id}>
+                          <Td>
+                            <input
+                              type="checkbox"
+                              checked={row.checked}
+                              onChange={(event) =>
+                                updateAllocationRow(row.id, {
+                                  checked: event.target.checked,
+                                })
+                              }
+                              aria-label={`Apply to installment ${row.installmentNo}`}
+                            />
+                          </Td>
+                          <Td className="mono">{row.installmentNo}</Td>
+                          <Td className="mono">{formatDate(row.dueDate)}</Td>
+                          <Td num className="mono">
+                            {formatMoney(installmentRemainingDue(row))}
+                          </Td>
+                          <Td num>
+                            <div className="affix ml-auto w-36">
+                              <span className="add">PHP</span>
+                              <Input
+                                type="number"
+                                min={0}
+                                step="0.01"
+                                className="text-right"
+                                mono
+                                value={row.amount}
+                                disabled={!row.checked}
+                                onChange={(event) =>
+                                  updateAllocationRow(row.id, {
+                                    amount: Number(event.target.value),
+                                  })
+                                }
+                              />
+                            </div>
+                          </Td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </Table>
+                </div>
+              </section>
+            )}
+          </div>
+        ) : null}
+      </Modal>
     </div>
   );
 }

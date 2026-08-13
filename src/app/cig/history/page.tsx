@@ -67,6 +67,24 @@ const FINDING_CHIPS: Array<{ id: CigRecentFindingFilter; label: string }> = [
   { id: "negative", label: "Negative" },
 ];
 
+const SEGMENT_CHIPS: Array<{
+  id: "all" | "seafarer" | "sme";
+  label: string;
+}> = [
+  { id: "all", label: "All" },
+  { id: "seafarer", label: "Seafarer" },
+  { id: "sme", label: "SME" },
+];
+
+function segmentBadge(segment: "sme" | "seafarer" | null) {
+  const isSme = segment === "sme";
+  return (
+    <Badge variant={isSme ? "navy" : "teal"} dot>
+      {isSme ? "SME" : "Seafarer"}
+    </Badge>
+  );
+}
+
 function borrowerName(borrower: CigHistoryBorrower | null): string {
   if (!borrower) return "Unknown borrower";
   const name = `${borrower.firstName} ${borrower.lastName}`.trim();
@@ -114,6 +132,7 @@ function buildHistoryQuery(params: {
   page: number;
   pageSize: number;
   finding?: CigRecentFindingFilter;
+  segment?: "all" | "seafarer" | "sme";
 }): string {
   const qs = new URLSearchParams();
   if (params.search.trim()) qs.set("search", params.search.trim());
@@ -127,6 +146,7 @@ function buildHistoryQuery(params: {
   qs.set("page", String(params.page));
   qs.set("pageSize", String(params.pageSize));
   if (params.finding) qs.set("finding", params.finding);
+  if (params.segment) qs.set("segment", params.segment);
   return qs.toString();
 }
 
@@ -393,6 +413,9 @@ function ForwardedHistoryPanel() {
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [finding, setFinding] = useState<CigRecentFindingFilter>("all");
+  const [segmentFilter, setSegmentFilter] = useState<
+    "all" | "seafarer" | "sme"
+  >("all");
   const [dateRange, setDateRange] = useState<DateRangeValue>(DEFAULT_DATE_RANGE);
   const [viewMode, setViewMode] = useState<HistoryViewMode>("list");
   const [pageSize, setPageSize] =
@@ -409,7 +432,15 @@ function ForwardedHistoryPanel() {
 
   useEffect(() => {
     setPage(1);
-  }, [debouncedSearch, finding, dateRange, pageSize, sortKey, sortDir]);
+  }, [
+    debouncedSearch,
+    finding,
+    segmentFilter,
+    dateRange,
+    pageSize,
+    sortKey,
+    sortDir,
+  ]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -423,6 +454,7 @@ function ForwardedHistoryPanel() {
         page,
         pageSize,
         finding,
+        segment: segmentFilter,
       });
       const res = await fetch(`/api/cig/history/forwarded?${query}`);
       if (!res.ok) throw new Error("Failed to load forwarded history");
@@ -439,7 +471,16 @@ function ForwardedHistoryPanel() {
     } finally {
       setLoading(false);
     }
-  }, [debouncedSearch, finding, dateRange, sortKey, sortDir, page, pageSize]);
+  }, [
+    debouncedSearch,
+    finding,
+    segmentFilter,
+    dateRange,
+    sortKey,
+    sortDir,
+    page,
+    pageSize,
+  ]);
 
   useEffect(() => {
     void load();
@@ -469,7 +510,9 @@ function ForwardedHistoryPanel() {
 
   const dateIsDefault = dateRange.preset === "30d";
   const activeFilterCount =
-    (finding !== "all" ? 1 : 0) + (dateIsDefault ? 0 : 1);
+    (finding !== "all" ? 1 : 0) +
+    (segmentFilter !== "all" ? 1 : 0) +
+    (dateIsDefault ? 0 : 1);
   const summaryStart = displayRows.length ? (safePage - 1) * pageSize + 1 : 0;
   const summaryEnd = (safePage - 1) * pageSize + displayRows.length;
 
@@ -510,6 +553,18 @@ function ForwardedHistoryPanel() {
                 </button>
               </span>
             ) : null}
+            {segmentFilter !== "all" ? (
+              <span className="active-pill">
+                {segmentFilter === "sme" ? "SME" : "Seafarer"}
+                <button
+                  type="button"
+                  aria-label="Clear segment filter"
+                  onClick={() => setSegmentFilter("all")}
+                >
+                  ×
+                </button>
+              </span>
+            ) : null}
             <DatePill
               dateRange={dateRange}
               onClear={() => setDateRange(DEFAULT_DATE_RANGE)}
@@ -519,6 +574,7 @@ function ForwardedHistoryPanel() {
         activeFilterCount={activeFilterCount}
         onClearAll={() => {
           setFinding("all");
+          setSegmentFilter("all");
           setDateRange(DEFAULT_DATE_RANGE);
         }}
         viewMode={viewMode}
@@ -543,6 +599,24 @@ function ForwardedHistoryPanel() {
               </div>
             </div>
             <div className="filter-group">
+              <span className="filter-group-label">Segment</span>
+              <div className="flex flex-wrap gap-1.5">
+                {SEGMENT_CHIPS.map((chip) => (
+                  <button
+                    key={chip.id}
+                    type="button"
+                    className={cn(
+                      "fchip",
+                      segmentFilter === chip.id && "is-on",
+                    )}
+                    onClick={() => setSegmentFilter(chip.id)}
+                  >
+                    {chip.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="filter-group">
               <span className="filter-group-label">Forwarded date</span>
               <DateRangeFilter value={dateRange} onChange={setDateRange} />
             </div>
@@ -555,12 +629,13 @@ function ForwardedHistoryPanel() {
           columns={[
             "Borrower",
             "App no",
+            "Segment",
             "Finding",
             "Forwarded date",
             "Status",
             "",
           ]}
-          colSpan={6}
+          colSpan={7}
         />
       ) : kpi.total === 0 ? (
         <EmptyState
@@ -586,6 +661,10 @@ function ForwardedHistoryPanel() {
               </div>
               <div className="gcard-name">{borrowerName(row.borrower)}</div>
               <div className="gcard-meta">
+                <div className="row">
+                  <span className="k">Segment</span>
+                  <span className="v">{segmentBadge(row.segment)}</span>
+                </div>
                 <div className="row">
                   <span className="k">Forwarded</span>
                   <span className="v mono">
@@ -621,6 +700,7 @@ function ForwardedHistoryPanel() {
                   App no
                   {sortArrow("applicationNo")}
                 </Th>
+                <Th>Segment</Th>
                 <Th>Finding</Th>
                 <Th
                   className="sortable"
@@ -647,6 +727,7 @@ function ForwardedHistoryPanel() {
                     ) : null}
                   </Td>
                   <Td className="mono">{row.applicationNo ?? "—"}</Td>
+                  <Td>{segmentBadge(row.segment)}</Td>
                   <Td>
                     <FindingBadge finding={row.finding} />
                   </Td>
@@ -691,6 +772,9 @@ function ReturnedHistoryPanel() {
 
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
+  const [segmentFilter, setSegmentFilter] = useState<
+    "all" | "seafarer" | "sme"
+  >("all");
   const [dateRange, setDateRange] = useState<DateRangeValue>(DEFAULT_DATE_RANGE);
   const [viewMode, setViewMode] = useState<HistoryViewMode>("list");
   const [pageSize, setPageSize] =
@@ -707,7 +791,7 @@ function ReturnedHistoryPanel() {
 
   useEffect(() => {
     setPage(1);
-  }, [debouncedSearch, dateRange, pageSize, sortKey, sortDir]);
+  }, [debouncedSearch, segmentFilter, dateRange, pageSize, sortKey, sortDir]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -720,6 +804,7 @@ function ReturnedHistoryPanel() {
         sortDir,
         page,
         pageSize,
+        segment: segmentFilter,
       });
       const res = await fetch(`/api/cig/history/returned?${query}`);
       if (!res.ok) throw new Error("Failed to load returned-to-CSA history");
@@ -736,7 +821,15 @@ function ReturnedHistoryPanel() {
     } finally {
       setLoading(false);
     }
-  }, [debouncedSearch, dateRange, sortKey, sortDir, page, pageSize]);
+  }, [
+    debouncedSearch,
+    segmentFilter,
+    dateRange,
+    sortKey,
+    sortDir,
+    page,
+    pageSize,
+  ]);
 
   useEffect(() => {
     void load();
@@ -760,7 +853,8 @@ function ReturnedHistoryPanel() {
   }
 
   const dateIsDefault = dateRange.preset === "30d";
-  const activeFilterCount = dateIsDefault ? 0 : 1;
+  const activeFilterCount =
+    (segmentFilter !== "all" ? 1 : 0) + (dateIsDefault ? 0 : 1);
   const summaryStart = rows.length ? (safePage - 1) * pageSize + 1 : 0;
   const summaryEnd = (safePage - 1) * pageSize + rows.length;
 
@@ -788,29 +882,66 @@ function ReturnedHistoryPanel() {
         onSearchChange={setSearch}
         placeholder="Search borrower, application no, note…"
         pills={
-          <DatePill
-            dateRange={dateRange}
-            onClear={() => setDateRange(DEFAULT_DATE_RANGE)}
-          />
+          <>
+            {segmentFilter !== "all" ? (
+              <span className="active-pill">
+                {segmentFilter === "sme" ? "SME" : "Seafarer"}
+                <button
+                  type="button"
+                  aria-label="Clear segment filter"
+                  onClick={() => setSegmentFilter("all")}
+                >
+                  ×
+                </button>
+              </span>
+            ) : null}
+            <DatePill
+              dateRange={dateRange}
+              onClear={() => setDateRange(DEFAULT_DATE_RANGE)}
+            />
+          </>
         }
         activeFilterCount={activeFilterCount}
-        onClearAll={() => setDateRange(DEFAULT_DATE_RANGE)}
+        onClearAll={() => {
+          setSegmentFilter("all");
+          setDateRange(DEFAULT_DATE_RANGE);
+        }}
         viewMode={viewMode}
         onViewModeChange={setViewMode}
         filterPanelOpen={filterPanelOpen}
         onToggleFilters={() => setFilterPanelOpen((open) => !open)}
         filterPanel={
-          <div className="filter-group">
-            <span className="filter-group-label">Returned date</span>
-            <DateRangeFilter value={dateRange} onChange={setDateRange} />
-          </div>
+          <>
+            <div className="filter-group">
+              <span className="filter-group-label">Segment</span>
+              <div className="flex flex-wrap gap-1.5">
+                {SEGMENT_CHIPS.map((chip) => (
+                  <button
+                    key={chip.id}
+                    type="button"
+                    className={cn(
+                      "fchip",
+                      segmentFilter === chip.id && "is-on",
+                    )}
+                    onClick={() => setSegmentFilter(chip.id)}
+                  >
+                    {chip.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="filter-group">
+              <span className="filter-group-label">Returned date</span>
+              <DateRangeFilter value={dateRange} onChange={setDateRange} />
+            </div>
+          </>
         }
       />
 
       {loading ? (
         <TableSkeleton
-          columns={["Borrower", "App no", "Returned date", "Note", ""]}
-          colSpan={5}
+          columns={["Borrower", "App no", "Segment", "Returned date", "Note", ""]}
+          colSpan={6}
         />
       ) : kpi.total === 0 ? (
         <EmptyState
@@ -835,6 +966,10 @@ function ReturnedHistoryPanel() {
               </div>
               <div className="gcard-name">{borrowerName(row.borrower)}</div>
               <div className="gcard-meta">
+                <div className="row">
+                  <span className="k">Segment</span>
+                  <span className="v">{segmentBadge(row.segment)}</span>
+                </div>
                 <div className="row">
                   <span className="k">Returned</span>
                   <span className="v mono">{formatDate(row.returnedAt)}</span>
@@ -864,6 +999,7 @@ function ReturnedHistoryPanel() {
                   App no
                   {sortArrow("applicationNo")}
                 </Th>
+                <Th>Segment</Th>
                 <Th
                   className="sortable"
                   onClick={() => toggleSort("returnedAt")}
@@ -889,6 +1025,7 @@ function ReturnedHistoryPanel() {
                     ) : null}
                   </Td>
                   <Td className="mono">{row.applicationNo ?? "—"}</Td>
+                  <Td>{segmentBadge(row.segment)}</Td>
                   <Td className="mono">{formatDate(row.returnedAt)}</Td>
                   <Td>
                     <span className="line-clamp-2">{row.note ?? "—"}</span>

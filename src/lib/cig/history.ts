@@ -19,6 +19,7 @@ export type CigScheduledCallback = {
   id: string;
   applicationId: string;
   applicationNo: string | null;
+  segment: "sme" | "seafarer" | null;
   scheduledAt: string;
   notes: string | null;
   /** True when `scheduledAt <= now` (still unresolved). */
@@ -29,6 +30,10 @@ export type CigScheduledCallback = {
     lastName: string;
     email: string;
   } | null;
+};
+
+export type CigScheduledCallbacksQueryParams = {
+  segment?: "all" | "seafarer" | "sme";
 };
 
 const RECENT_LIMIT = 100;
@@ -47,6 +52,7 @@ export type CigForwardedHistoryRow = {
   verificationId: string;
   applicationNo: string | null;
   status: string;
+  segment: "sme" | "seafarer" | null;
   finding: "positive" | "negative" | null;
   forwardedAt: string | null;
   completedAt: string | null;
@@ -61,6 +67,7 @@ export type CigForwardedSortKey =
 export type CigForwardedQueryParams = {
   search?: string;
   finding?: CigRecentFindingFilter;
+  segment?: "all" | "seafarer" | "sme";
   from?: string | null;
   to?: string | null;
   sortKey?: CigForwardedSortKey;
@@ -73,6 +80,7 @@ export type CigReturnedHistoryRow = {
   id: string;
   applicationId: string;
   applicationNo: string | null;
+  segment: "sme" | "seafarer" | null;
   returnedAt: string;
   note: string | null;
   borrower: CigHistoryBorrower | null;
@@ -82,6 +90,7 @@ export type CigReturnedSortKey = "returnedAt" | "applicationNo" | "borrower";
 
 export type CigReturnedQueryParams = {
   search?: string;
+  segment?: "all" | "seafarer" | "sme";
   from?: string | null;
   to?: string | null;
   sortKey?: CigReturnedSortKey;
@@ -169,6 +178,7 @@ const APPLICATION_BORROWER_EMBED = `
     id,
     application_no,
     status,
+    segment,
     borrowers (
       borrower_no,
       first_name,
@@ -177,6 +187,12 @@ const APPLICATION_BORROWER_EMBED = `
     )
   )
 `;
+
+function mapSegment(
+  raw: unknown,
+): "sme" | "seafarer" | null {
+  return raw === "sme" || raw === "seafarer" ? raw : null;
+}
 
 export function cigRecentMatchesSearch(
   item: {
@@ -464,10 +480,12 @@ export function computeCallbackListKpis(rows: { isOverdue: boolean }[]): {
  */
 export async function getCigScheduledCallbacks(
   supabase: SupabaseClient,
+  params: CigScheduledCallbacksQueryParams = {},
 ): Promise<CigScheduledCallback[]> {
+  const { segment: segmentFilter = "all" } = params;
   const asOf = new Date();
 
-  const { data, error } = await supabase
+  let query = supabase
     .from("callbacks")
     .select(
       `
@@ -479,6 +497,7 @@ export async function getCigScheduledCallbacks(
         id,
         application_no,
         status,
+        segment,
         borrowers (
           borrower_no,
           first_name,
@@ -488,8 +507,15 @@ export async function getCigScheduledCallbacks(
       )
     `,
     )
-    .is("resolved_at", null)
-    .order("scheduled_at", { ascending: true });
+    .is("resolved_at", null);
+
+  if (segmentFilter !== "all") {
+    query = query.eq("loan_applications.segment", segmentFilter);
+  }
+
+  const { data, error } = await query.order("scheduled_at", {
+    ascending: true,
+  });
 
   if (error) {
     throw new Error(error.message);
@@ -516,6 +542,7 @@ export async function getCigScheduledCallbacks(
         id: row.id as string,
         applicationId: application.id as string,
         applicationNo: (application.application_no as string | null) ?? null,
+        segment: mapSegment(application.segment),
         scheduledAt,
         notes: (row.notes as string | null) ?? null,
         isOverdue: callbackIsOverdue(scheduledAt, asOf),
@@ -583,6 +610,7 @@ export async function getCigForwardedHistory(
   const {
     search = "",
     finding = "all",
+    segment: segmentFilter = "all",
     from = null,
     to = null,
     sortKey = "forwardedAt",
@@ -622,6 +650,10 @@ export async function getCigForwardedHistory(
 
   if (finding === "positive" || finding === "negative") {
     query = query.eq("finding", finding);
+  }
+
+  if (segmentFilter !== "all") {
+    query = query.eq("loan_applications.segment", segmentFilter);
   }
 
   if (from) {
@@ -668,6 +700,7 @@ export async function getCigForwardedHistory(
         verificationId: row.id as string,
         applicationNo: (application.application_no as string | null) ?? null,
         status: application.status as string,
+        segment: mapSegment(application.segment),
         finding: (row.finding as CigForwardedHistoryRow["finding"]) ?? null,
         forwardedAt: (row.forwarded_at as string | null) ?? null,
         completedAt: (row.completed_at as string | null) ?? null,
@@ -720,6 +753,7 @@ export async function getCigReturnedHistory(
 ): Promise<{ rows: CigReturnedHistoryRow[]; totalCount: number }> {
   const {
     search = "",
+    segment: segmentFilter = "all",
     from = null,
     to = null,
     sortKey = "returnedAt",
@@ -741,6 +775,7 @@ export async function getCigReturnedHistory(
       id,
       application_id,
       application_no,
+      segment,
       borrower_no,
       first_name,
       last_name,
@@ -756,6 +791,10 @@ export async function getCigReturnedHistory(
   }
   if (to) {
     query = query.lte("returned_at", toInclusiveEnd(to));
+  }
+
+  if (segmentFilter !== "all") {
+    query = query.eq("segment", segmentFilter);
   }
 
   if (term) {
@@ -797,6 +836,7 @@ export async function getCigReturnedHistory(
         id: row.id as string,
         applicationId: row.application_id as string,
         applicationNo: (row.application_no as string | null) ?? null,
+        segment: mapSegment(row.segment),
         returnedAt,
         note: (row.note as string | null) ?? null,
         borrower: hasBorrower

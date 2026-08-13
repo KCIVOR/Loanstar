@@ -33,7 +33,7 @@ export async function GET() {
     const { data, error } = await supabase
       .from("loan_applications")
       .select(
-        "id, application_no, status, status_history, blocker, is_reloan, parent_application_id, created_at, updated_at",
+        "id, application_no, status, status_history, blocker, is_reloan, parent_application_id, created_at, updated_at, segment, entity_type",
       )
       .eq("borrower_id", borrowerId)
       .order("created_at", { ascending: false });
@@ -68,6 +68,8 @@ export async function GET() {
         parentApplicationId: app.parent_application_id,
         createdAt: app.created_at,
         updatedAt: app.updated_at,
+        segment: app.segment,
+        entityType: app.entity_type,
         loanAmount: computation ? Number(computation.principal) : null,
         loanTypeName: computation?.loan_type_name ?? null,
         termMonths: computation?.terms ?? null,

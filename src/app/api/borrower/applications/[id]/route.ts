@@ -1,7 +1,10 @@
+import { NextResponse } from "next/server";
+
 import {
   formatStatusLabel,
   type StatusHistoryEntry,
 } from "@/lib/applications/status";
+import { writeAuditEvent } from "@/lib/audit/writer";
 import { handleApiError, jsonOk } from "@/lib/api/handler";
 import {
   ForbiddenError,
@@ -82,6 +85,43 @@ export async function GET(_request: Request, { params }: RouteParams) {
             : null,
       },
     });
+  } catch (error) {
+    return handleApiError(error);
+  }
+}
+
+/** Borrower deletes their own draft application. Child rows cascade at the DB. */
+export async function DELETE(_request: Request, { params }: RouteParams) {
+  try {
+    const user = await requireModulePermission("borrower_portal", "edit");
+    const { id } = await params;
+    const supabase = await createClient();
+    const application = await assertOwnApplication(user.id, id);
+
+    if (application.status !== "draft") {
+      return NextResponse.json(
+        { error: "Only a draft application can be deleted" },
+        { status: 400 },
+      );
+    }
+
+    const { error } = await supabase
+      .from("loan_applications")
+      .delete()
+      .eq("id", id);
+
+    if (error) throw new Error(error.message);
+
+    await writeAuditEvent({
+      actorId: user.id,
+      moduleSlug: "borrower_portal",
+      action: "delete",
+      entityType: "loan_application",
+      entityId: id,
+      beforeData: { status: "draft" },
+    });
+
+    return jsonOk({ id });
   } catch (error) {
     return handleApiError(error);
   }

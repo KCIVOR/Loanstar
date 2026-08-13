@@ -14,6 +14,7 @@ import { createClient } from "@/lib/supabase/server";
 
 const RANGE_PRESETS = new Set(["30d", "90d", "all", "custom"]);
 const SORT_KEYS = new Set(["status", "borrower", "balance"]);
+const SEGMENT_FILTERS = new Set(["all", "seafarer", "sme"]);
 
 export async function GET(request: Request) {
   try {
@@ -23,6 +24,10 @@ export async function GET(request: Request) {
     const search = searchParams.get("search") ?? "";
     const statusFilter = searchParams.get("status") ?? "all";
     const agingFilter = searchParams.get("aging") ?? "all";
+    const segmentRaw = searchParams.get("segment") ?? "all";
+    const segmentFilter = (
+      SEGMENT_FILTERS.has(segmentRaw) ? segmentRaw : "all"
+    ) as "all" | "seafarer" | "sme";
 
     // Active queue defaults to All time (must not hide old-but-still-open items).
     const rangeRaw = searchParams.get("range") ?? "all";
@@ -57,6 +62,7 @@ export async function GET(request: Request) {
         search,
         statusFilter,
         agingFilter,
+        segmentFilter,
         from,
         to,
         sortKey,

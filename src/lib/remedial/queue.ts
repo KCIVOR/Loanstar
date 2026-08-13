@@ -68,6 +68,26 @@ export function passesSeverity(
   return severity === spec.severity;
 }
 
+export const REMEDIAL_SEGMENT_FILTERS = ["all", "seafarer", "sme"] as const;
+
+export type RemedialSegmentFilter =
+  (typeof REMEDIAL_SEGMENT_FILTERS)[number];
+
+/** Map a raw segment query param to Seafarer/SME, else `"all"`. */
+export function segmentFilterSpec(raw: string): RemedialSegmentFilter {
+  if (raw === "seafarer" || raw === "sme") return raw;
+  return "all";
+}
+
+/** Exact segment match; `"all"` always passes. */
+export function passesSegmentFilter(
+  segment: string,
+  spec: RemedialSegmentFilter,
+): boolean {
+  if (spec === "all") return true;
+  return segment === spec;
+}
+
 export function sanitizeSearchTerm(term: string): string {
   return term
     .trim()

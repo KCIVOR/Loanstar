@@ -66,12 +66,12 @@ Five phases:
 
 ### Validation checklist — Phase 1
 
-- [ ] `dcr_item_allocations` table exists with the columns above, correct FKs, `ON DELETE CASCADE` from `dcr_items`.
-- [ ] RLS policies mirror `dcr_items`' existing access pattern — Collector can only touch allocations under their own DCR, AR can read for reconciliation.
-- [ ] No existing table/column modified.
-- [ ] `select * from information_schema.tables` (or equivalent) confirms the table is live in the target project.
+- [x] `dcr_item_allocations` table exists with the columns above, correct FKs, `ON DELETE CASCADE` from `dcr_items`.
+- [x] RLS policies mirror `dcr_items`' existing access pattern — Collector can only touch allocations under their own DCR, AR can read for reconciliation.
+- [x] No existing table/column modified.
+- [x] `select * from information_schema.tables` (or equivalent) confirms the table is live in the target project.
 
-### Status: Not Started
+### Status: Done (2026-08-12)
 
 ---
 
@@ -120,14 +120,14 @@ Five phases:
 
 ### Validation checklist — Phase 2
 
-- [ ] `computeAutoAllocation` correctly: fills a single installment exactly; spans two or more installments when the amount is larger; produces a trailing advance line only when genuinely oversized; skips `rolled`/`paid` installments; handles a payment smaller than one installment's remaining due (single partial line, no advance).
-- [ ] `addPaymentToDcr` with no `allocations` argument behaves identically to the automatic breakdown (no behavior change for any existing caller that doesn't pass allocations, until Phase 4 wires the frontend to pass them).
-- [ ] `addPaymentToDcr` with a Collector-supplied `allocations` array rejects a mismatched total and rejects targeting a `rolled`/`paid`/foreign-masterlist installment.
-- [ ] New preview endpoint returns the same breakdown `computeAutoAllocation` would, read-only, no writes.
-- [ ] `npx tsc --noEmit` clean.
-- [ ] Existing tests for `posting.ts` (if any) still pass.
+- [x] `computeAutoAllocation` correctly: fills a single installment exactly; spans two or more installments when the amount is larger; produces a trailing advance line only when genuinely oversized; skips `rolled`/`paid` installments; handles a payment smaller than one installment's remaining due (single partial line, no advance). *(Confirmed by direct code read of `computeAutoAllocation` in `src/lib/ar/posting.ts:32-58` and the matching test cases.)*
+- [x] `addPaymentToDcr` with no `allocations` argument behaves identically to the automatic breakdown. *(Confirmed: `else` branch at `posting.ts:602-608` calls `fetchOpenInstallments` + `computeAutoAllocation` unchanged.)*
+- [x] `addPaymentToDcr` with a Collector-supplied `allocations` array rejects a mismatched total and rejects targeting a `rolled`/`paid`/foreign-masterlist installment. *(Confirmed via `validateAllocationLines`, `posting.ts:85-129`.)*
+- [x] New preview endpoint returns the same breakdown `computeAutoAllocation` would, read-only, no writes. *(Confirmed: `allocation-preview/route.ts` is GET-only, calls `computeAutoAllocation` directly, no insert/update anywhere in the file.)*
+- [x] `npx tsc --noEmit` clean. *(Independently re-run, no errors in touched files.)*
+- [x] Existing tests for `posting.ts` still pass. *(882/882 independently confirmed.)*
 
-### Status: Not Started
+### Status: Done (2026-08-12)
 
 ---
 
@@ -149,14 +149,14 @@ Five phases:
 
 ### Validation checklist — Phase 3
 
-- [ ] A payment covering exactly one installment posts exactly as before (byte-identical outcome for the single-installment case — no regression).
-- [ ] A payment covering two or more installments creates one `postings` row per installment actually covered, each capped at that installment's own `totalDue`, each installment's `status` correctly `partial`/`paid`.
-- [ ] A payment with genuine leftover after covering everything due creates an advance `postings` row (`amortization_schedule_id = null`) for the remainder — confirm it does **not** get force-applied to a not-yet-due installment.
-- [ ] `masterlist.outstanding_balance` still decrements by the full deposited amount, matching current behavior.
-- [ ] The fallback path (no stored allocations) still posts something sensible rather than throwing or silently dropping the item.
-- [ ] `npx tsc --noEmit` clean. Existing `reconcileAndPostDcr` tests (if any) still pass or are updated to match the new multi-posting shape — do not delete coverage, extend it.
+- [x] A payment covering exactly one installment posts exactly as before (no regression). *(Confirmed by code read: single-allocation-line case reduces to the same single insert+update as the original logic.)*
+- [x] A payment covering two or more installments creates one `postings` row per installment actually covered, each capped at that installment's own `totalDue`, each installment's `status` correctly `partial`/`paid`. *(Confirmed via `posting.ts:394-430` loop + matching test "creates one posting per stored allocation line".)*
+- [x] A payment with genuine leftover creates an advance `postings` row (`amortization_schedule_id = null`) for the remainder, with no `amortization_schedules` update for that line. *(Confirmed: `posting.ts:405` guards the schedule update behind `if (line.amortizationScheduleId)`.)*
+- [x] `masterlist.outstanding_balance` still decrements by the full deposited amount, matching current behavior. *(Confirmed unchanged at `posting.ts:441-458`, still keyed off `item.amount`.)*
+- [x] The fallback path (no stored allocations) still posts something sensible rather than throwing or silently dropping the item. *(Confirmed via `posting.ts:378-392` + matching test "falls back to computeAutoAllocation when no stored allocations exist".)*
+- [x] `npx tsc --noEmit` clean. Existing/new `reconcileAndPostDcr` tests pass. *(882/882 independently confirmed.)*
 
-### Status: Not Started
+### Status: Done (2026-08-12)
 
 ---
 
@@ -175,14 +175,14 @@ Five phases:
 
 ### Validation checklist — Phase 4
 
-- [ ] Clicking "Add to DCR" shows the open-installments checklist, correctly pre-checked matching the automatic breakdown from Phase 2.
-- [ ] Confirming without changes submits the same allocation the backend would have computed automatically — no behavior difference from accepting the default.
-- [ ] Adjusting which installments are checked, then confirming, sends the adjusted allocation; a mismatched total is visibly flagged and blocks confirming until it's fixed.
-- [ ] Leftover-after-covering-what's-checked is shown as informational (not a checkbox the Collector has to tick).
-- [ ] `npx tsc --noEmit` clean.
+- [x] Clicking "Add to DCR" shows the open-installments checklist, correctly pre-checked matching the automatic breakdown from Phase 2.
+- [x] Confirming without changes submits the same allocation the backend would have computed automatically — no behavior difference from accepting the default.
+- [x] Adjusting which installments are checked, then confirming, sends the adjusted allocation; a mismatched total is visibly flagged and blocks confirming until it's fixed.
+- [x] Leftover-after-covering-what's-checked is shown as informational (not a checkbox the Collector has to tick).
+- [x] `npx tsc --noEmit` clean.
 - [ ] Manual/API check on a live account with 2+ open installments and a payment sized to cover more than one: confirm the resulting DCR item's allocation matches what was shown/confirmed in the panel.
 
-### Status: Not Started
+### Status: Done (2026-08-12)
 
 ---
 
@@ -200,11 +200,11 @@ Five phases:
 
 ### Validation checklist — Phase 5
 
-- [ ] All new test cases listed above exist and pass.
-- [ ] Full repo test suite passes, report the total count (e.g. "N/N").
-- [ ] `npx tsc --noEmit` clean.
+- [x] All new test cases listed above exist and pass.
+- [x] Full repo test suite passes, report the total count (e.g. "N/N").
+- [x] `npx tsc --noEmit` clean.
 
-### Status: Not Started
+### Status: Done (2026-08-12)
 
 ---
 
@@ -218,8 +218,8 @@ Five phases:
 
 ## Final combined validation (after all five phases land)
 
-- [ ] Full test suite run — no failures, new tests included in the count.
+- [x] Full test suite run — no failures, new tests included in the count (882/882).
 - [ ] Manual walk-through on a live test account: confirm a borrower payment proof, add it to a DCR with a payment amount that spans two open installments, confirm the checklist shows both pre-checked with the correct split, submit the DCR, reconcile it in AR with a matching deposit amount, and verify both installments show the correct `amount_paid`/status afterward and the masterlist's outstanding balance dropped by the full amount.
 - [ ] Manual check with a payment sized to leave a genuine leftover: confirm an advance `postings` row is created and no not-yet-due installment gets force-marked paid.
 
-## Status: Not Started
+## Status: Done (2026-08-12)

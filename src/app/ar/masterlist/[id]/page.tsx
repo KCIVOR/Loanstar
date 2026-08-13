@@ -25,6 +25,7 @@ import {
 } from "@/lib/ar/masterlist-display";
 import { canMarkPaidOff } from "@/lib/ar/paid-off";
 import { formatStatusLabel } from "@/lib/applications/status";
+import { halfUp } from "@/lib/computation/money";
 
 /** UI-only toggle — the accounting checklist card isn't wired to any workflow gate. */
 const SHOW_ACCOUNTING_CHECKLIST = false;
@@ -53,8 +54,26 @@ type ScheduleRow = {
   due_date: string;
   amount_due: number;
   amount_paid?: number;
+  penalty_amount?: number;
   status: string;
   rolled_into_installment_no?: number | null;
+};
+
+type RoundingWriteoffRow = {
+  id: string;
+  amount: number;
+  amortization_schedule_id: string | null;
+  performed_at: string;
+  notes: string | null;
+  performedByName: string | null;
+  installmentNo: number | null;
+};
+
+type PostingRow = {
+  id: string;
+  amortization_schedule_id: string;
+  amount: number;
+  payments: { payment_date: string } | { payment_date: string }[] | null;
 };
 
 function formatMoney(value: number) {
@@ -70,6 +89,41 @@ function formatDate(value: string) {
     month: "short",
     day: "numeric",
   });
+}
+
+/** Groups postings by installment; each value is sorted payment dates (asc). */
+function paymentDatesByScheduleId(
+  postings: PostingRow[],
+): Map<string, string[]> {
+  const map = new Map<string, string[]>();
+  for (const posting of postings) {
+    const scheduleId = posting.amortization_schedule_id;
+    if (!scheduleId) continue;
+    const raw = posting.payments;
+    const payment = Array.isArray(raw) ? raw[0] : raw;
+    const date = payment?.payment_date;
+    if (!date) continue;
+    const list = map.get(scheduleId) ?? [];
+    list.push(date);
+    map.set(scheduleId, list);
+  }
+  for (const [id, dates] of map) {
+    map.set(
+      id,
+      [...dates].sort((a, b) => a.localeCompare(b)),
+    );
+  }
+  return map;
+}
+
+function formatInstallmentPaymentDate(dates: string[] | undefined): string {
+  if (!dates || dates.length === 0) return "—";
+  const mostRecent = dates[dates.length - 1];
+  const label = formatDate(mostRecent);
+  if (dates.length > 1) {
+    return `${label} (+${dates.length - 1} more)`;
+  }
+  return label;
 }
 
 function accountStatusVariant(
@@ -131,6 +185,12 @@ export default function ArMasterlistDetailPage() {
 
   const [record, setRecord] = useState<Record<string, unknown> | null>(null);
   const [payments, setPayments] = useState<PaymentRow[]>([]);
+  const [postings, setPostings] = useState<PostingRow[]>([]);
+  const [roundingWriteoffs, setRoundingWriteoffs] = useState<
+    RoundingWriteoffRow[]
+  >([]);
+  const [roundingWriteoffThreshold, setRoundingWriteoffThreshold] =
+    useState(1);
   const [lookups, setLookups] = useState<Lookup | null>(null);
   const [portfolioId, setPortfolioId] = useState("");
   const [collectorId, setCollectorId] = useState("");
@@ -141,6 +201,11 @@ export default function ArMasterlistDetailPage() {
   const [error, setError] = useState<string | null>(null);
   const [confirmPaidOff, setConfirmPaidOff] = useState(false);
   const [confirmRemedial, setConfirmRemedial] = useState(false);
+  const [writeOffTarget, setWriteOffTarget] = useState<{
+    scheduleId: string;
+    installmentNo: number;
+    amount: number;
+  } | null>(null);
   const [viewingId, setViewingId] = useState<string | null>(null);
 
   const load = useCallback(async (opts?: { silent?: boolean }) => {
@@ -154,9 +219,17 @@ export default function ArMasterlistDetailPage() {
       const recData = (await recRes.json()) as {
         record: Record<string, unknown>;
         payments?: PaymentRow[];
+        postings?: PostingRow[];
+        roundingWriteoffThreshold?: number;
+        roundingWriteoffs?: RoundingWriteoffRow[];
       };
       setRecord(recData.record);
       setPayments(recData.payments ?? []);
+      setPostings(recData.postings ?? []);
+      setRoundingWriteoffThreshold(
+        Number(recData.roundingWriteoffThreshold ?? 1),
+      );
+      setRoundingWriteoffs(recData.roundingWriteoffs ?? []);
       const assignmentsRaw = recData.record.assignments as
         | Record<string, unknown>
         | Record<string, unknown>[]
@@ -271,6 +344,33 @@ export default function ArMasterlistDetailPage() {
     }
   }
 
+  async function confirmWriteOff() {
+    if (!writeOffTarget) return;
+    setSaving(true);
+    setMessage(null);
+    setError(null);
+    try {
+      const res = await fetch(`/api/ar/masterlist/${id}/write-off`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          amortizationScheduleId: writeOffTarget.scheduleId,
+        }),
+      });
+      const body = (await res.json()) as { error?: string };
+      if (!res.ok) throw new Error(body.error ?? "Write-off failed");
+      setWriteOffTarget(null);
+      setMessage(
+        `Rounding difference of ₱${formatMoney(writeOffTarget.amount)} written off for installment #${writeOffTarget.installmentNo}.`,
+      );
+      await load({ silent: true });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed");
+    } finally {
+      setSaving(false);
+    }
+  }
+
   if (loading) return <Spinner />;
   if (!record) return <Alert>Record not found.</Alert>;
 
@@ -281,6 +381,7 @@ export default function ArMasterlistDetailPage() {
     .sort(
       (a, b) => Number(a.installment_no) - Number(b.installment_no),
     );
+  const paymentDatesBySchedule = paymentDatesByScheduleId(postings);
   const borrowerName = (record.borrower_name as string) ?? "Account";
   const borrowerNo = String(record.borrower_no ?? "");
   const accountNo = (record.loan_account_no as string | null) ?? null;
@@ -330,6 +431,26 @@ export default function ArMasterlistDetailPage() {
     null;
   const portfolioLabel =
     lookups?.portfolios.find((p) => p.id === portfolioId)?.name ?? null;
+
+  const assignmentsRaw = record.assignments as
+    | Record<string, unknown>
+    | Record<string, unknown>[]
+    | null
+    | undefined;
+  const assignmentRow = Array.isArray(assignmentsRaw)
+    ? assignmentsRaw[0]
+    : assignmentsRaw;
+  // Persist-sourced id (not the select draft in remedialId) — gate the panel on
+  // actual assignment so the form stays usable until turnover is confirmed.
+  const assignedRemedialId =
+    (assignmentRow?.remedial_user_id as string) ?? "";
+  const remedialAssignedAt =
+    (assignmentRow?.remedial_assigned_at as string | null | undefined) ?? null;
+  const remedialStaffLabel =
+    lookups?.remedialStaff.find((r) => r.id === assignedRemedialId)
+      ?.full_name ??
+    lookups?.remedialStaff.find((r) => r.id === assignedRemedialId)?.email ??
+    null;
 
   const nextActions: string[] = [];
   if (!isPaidOff && !collectorId) {
@@ -603,7 +724,7 @@ export default function ArMasterlistDetailPage() {
         </div>
       ) : null}
 
-      {!remedialFlag ? (
+      {!assignedRemedialId ? (
         <Card className="mb-6">
           <h2 className="mb-1 font-display text-lg font-semibold text-navy-900">
             Remedial turnover
@@ -638,7 +759,21 @@ export default function ArMasterlistDetailPage() {
             </Button>
           </div>
         </Card>
-      ) : null}
+      ) : (
+        <Card className="mb-6">
+          <h2 className="mb-1 font-display text-lg font-semibold text-navy-900">
+            Remedial turnover
+          </h2>
+          <p className="text-sm text-ink-500">
+            Turned over to remedial — assigned to{" "}
+            {remedialStaffLabel ?? "staff"}
+            {remedialAssignedAt
+              ? ` on ${formatDate(String(remedialAssignedAt))}`
+              : ""}
+            .
+          </p>
+        </Card>
+      )}
 
       <Card className="mb-6">
         <h2 className="mb-1 font-display text-lg font-semibold text-navy-900">
@@ -656,6 +791,7 @@ export default function ArMasterlistDetailPage() {
               <tr>
                 <Th className="num">#</Th>
                 <Th>Due date</Th>
+                <Th>Payment date</Th>
                 <Th className="num">Amount due</Th>
                 <Th className="num">Running bal.</Th>
                 <Th>Status</Th>
@@ -665,24 +801,71 @@ export default function ArMasterlistDetailPage() {
               {schedules.map((row) => {
                 const due = Number(row.amount_due);
                 const status = String(row.status ?? "");
-                if (status.toLowerCase() === "paid") {
-                  runningBalance = Math.max(0, runningBalance - due);
-                }
+                const statusLower = status.toLowerCase();
+                // Reduce by what was actually collected on this installment
+                // (amount_paid), not the full amount due gated on "paid" —
+                // a "partial" row still collected money and must show up in
+                // the running balance, or it stays stuck at the prior row's
+                // figure even after the borrower is fully settled.
+                runningBalance = Math.max(
+                  0,
+                  runningBalance - Number(row.amount_paid ?? 0),
+                );
                 const balAfter = runningBalance;
+                const remainingDue = halfUp(
+                  Number(row.amount_due) +
+                    Number(row.penalty_amount ?? 0) -
+                    Number(row.amount_paid ?? 0),
+                );
+                const canWriteOff =
+                  statusLower !== "paid" &&
+                  statusLower !== "rolled" &&
+                  remainingDue > 0 &&
+                  remainingDue <= roundingWriteoffThreshold;
                 return (
                   <tr key={String(row.id)}>
                     <Td className="num mono">{String(row.installment_no)}</Td>
                     <Td className="mono">{formatDate(String(row.due_date))}</Td>
+                    <Td className="mono">
+                      <span
+                        title={paymentDatesBySchedule
+                          .get(String(row.id))
+                          ?.map((d) => formatDate(d))
+                          .join(", ")}
+                      >
+                        {formatInstallmentPaymentDate(
+                          paymentDatesBySchedule.get(String(row.id)),
+                        )}
+                      </span>
+                    </Td>
                     <Td className="num mono text-teal-600">
                       {formatMoney(due)}
                     </Td>
                     <Td className="num mono">{formatMoney(balAfter)}</Td>
                     <Td>
-                      <Badge variant={scheduleStatusVariant(status)} dot>
-                        {status === "rolled" && row.rolled_into_installment_no
-                          ? `Rolled → #${row.rolled_into_installment_no}`
-                          : status}
-                      </Badge>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <Badge variant={scheduleStatusVariant(status)} dot>
+                          {status === "rolled" && row.rolled_into_installment_no
+                            ? `Rolled → #${row.rolled_into_installment_no}`
+                            : status}
+                        </Badge>
+                        {canWriteOff ? (
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={() =>
+                              setWriteOffTarget({
+                                scheduleId: String(row.id),
+                                installmentNo: Number(row.installment_no),
+                                amount: remainingDue,
+                              })
+                            }
+                          >
+                            Write off ₱{formatMoney(remainingDue)}
+                          </Button>
+                        ) : null}
+                      </div>
                     </Td>
                   </tr>
                 );
@@ -747,6 +930,42 @@ export default function ArMasterlistDetailPage() {
         )}
       </Card>
 
+      <Card className="mb-6">
+        <h2 className="mb-1 font-display text-lg font-semibold text-navy-900">
+          Rounding write-offs
+        </h2>
+        <p className="mb-3 text-sm text-ink-500">
+          Small remainders closed as rounding differences — logged with who
+          performed each write-off.
+        </p>
+        {roundingWriteoffs.length === 0 ? (
+          <p className="text-sm text-ink-400">No rounding write-offs yet.</p>
+        ) : (
+          <div className="tl">
+            {roundingWriteoffs.map((row) => (
+              <div key={row.id} className="tl-item done">
+                <span className="pt" />
+                <div className="tl-h">
+                  <b>₱{formatMoney(Number(row.amount))}</b>
+                  {row.installmentNo != null ? (
+                    <span className="text-sm text-ink-500">
+                      Installment #{row.installmentNo}
+                    </span>
+                  ) : null}
+                  <span className="when">
+                    {formatDate(row.performed_at)}
+                  </span>
+                </div>
+                <p>
+                  {row.performedByName ?? "Unknown user"}
+                  {row.notes ? ` · ${row.notes}` : ""}
+                </p>
+              </div>
+            ))}
+          </div>
+        )}
+      </Card>
+
       <ConfirmDialog
         open={confirmPaidOff}
         title="Mark this loan paid off?"
@@ -765,6 +984,20 @@ export default function ArMasterlistDetailPage() {
         loading={saving}
         onCancel={() => setConfirmRemedial(false)}
         onConfirm={() => void turnOverRemedial()}
+      />
+
+      <ConfirmDialog
+        open={writeOffTarget !== null}
+        title="Write off rounding difference?"
+        message={
+          writeOffTarget
+            ? `This will write off ₱${formatMoney(writeOffTarget.amount)} on installment #${writeOffTarget.installmentNo} and mark that installment paid. The write-off will be logged under your account (the acting AR user) — it is not a silent delete.`
+            : ""
+        }
+        confirmLabel="Yes, write off"
+        loading={saving}
+        onCancel={() => setWriteOffTarget(null)}
+        onConfirm={() => void confirmWriteOff()}
       />
     </div>
   );

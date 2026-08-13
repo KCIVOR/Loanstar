@@ -13,6 +13,7 @@ import { createClient } from "@/lib/supabase/server";
 const RANGE_PRESETS = new Set(["30d", "90d", "all", "custom"]);
 const SORT_KEYS = new Set(["forwardedAt", "applicationNo", "borrower"]);
 const FINDINGS = new Set(["all", "positive", "negative"]);
+const SEGMENT_FILTERS = new Set(["all", "seafarer", "sme"]);
 
 /** Forwarded-to-Committee history. Read-only. */
 export async function GET(request: Request) {
@@ -25,6 +26,11 @@ export async function GET(request: Request) {
     const finding = (
       FINDINGS.has(findingRaw) ? findingRaw : "all"
     ) as CigRecentFindingFilter;
+
+    const segmentRaw = searchParams.get("segment") ?? "all";
+    const segment = (
+      SEGMENT_FILTERS.has(segmentRaw) ? segmentRaw : "all"
+    ) as "all" | "seafarer" | "sme";
 
     const rangeRaw = searchParams.get("range") ?? "30d";
     const preset = (
@@ -54,6 +60,7 @@ export async function GET(request: Request) {
       getCigForwardedHistory(supabase, {
         search,
         finding,
+        segment,
         from,
         to,
         sortKey,

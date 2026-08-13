@@ -11,6 +11,7 @@ import {
 } from "@/components/history";
 import {
   Alert,
+  Badge,
   Button,
   EmptyState,
   PageHeader,
@@ -31,6 +32,8 @@ import type {
 
 const PAGE_SIZE_OPTIONS = [10, 20, 30, 50, 100] as const;
 
+type SegmentFilter = "all" | "seafarer" | "sme";
+
 const DEFAULT_DATE_RANGE: DateRangeValue = {
   preset: "30d",
   from: "",
@@ -39,7 +42,22 @@ const DEFAULT_DATE_RANGE: DateRangeValue = {
 
 const EMPTY_KPI: ClosedLeadsKpiCounts = { total: 0 };
 
+const SEGMENT_CHIPS: Array<{ id: SegmentFilter; label: string }> = [
+  { id: "all", label: "All" },
+  { id: "seafarer", label: "Seafarer" },
+  { id: "sme", label: "SME" },
+];
+
 type SortKey = ClosedLeadsSortKey;
+
+function segmentBadge(segment: "sme" | "seafarer" | null | undefined) {
+  const isSme = segment === "sme";
+  return (
+    <Badge variant={isSme ? "navy" : "teal"} dot>
+      {isSme ? "SME" : "Seafarer"}
+    </Badge>
+  );
+}
 
 function dateRangePillLabel(value: DateRangeValue): string {
   if (value.preset === "30d") return "Last 30 days";
@@ -52,6 +70,7 @@ function dateRangePillLabel(value: DateRangeValue): string {
 
 function buildHistoryQuery(params: {
   search: string;
+  segment: SegmentFilter;
   dateRange: DateRangeValue;
   sortKey: SortKey;
   sortDir: "asc" | "desc";
@@ -60,6 +79,7 @@ function buildHistoryQuery(params: {
 }): string {
   const qs = new URLSearchParams();
   if (params.search.trim()) qs.set("search", params.search.trim());
+  qs.set("segment", params.segment);
   qs.set("range", params.dateRange.preset);
   if (params.dateRange.preset === "custom") {
     if (params.dateRange.from) qs.set("from", params.dateRange.from);
@@ -81,6 +101,7 @@ export default function AgentClosedLeadsPage() {
 
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
+  const [segmentFilter, setSegmentFilter] = useState<SegmentFilter>("all");
   const [dateRange, setDateRange] = useState<DateRangeValue>(DEFAULT_DATE_RANGE);
   const [viewMode, setViewMode] = useState<HistoryViewMode>("list");
   const [pageSize, setPageSize] =
@@ -97,7 +118,7 @@ export default function AgentClosedLeadsPage() {
 
   useEffect(() => {
     setPage(1);
-  }, [debouncedSearch, dateRange, pageSize, sortKey, sortDir]);
+  }, [debouncedSearch, segmentFilter, dateRange, pageSize, sortKey, sortDir]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -105,6 +126,7 @@ export default function AgentClosedLeadsPage() {
     try {
       const query = buildHistoryQuery({
         search: debouncedSearch,
+        segment: segmentFilter,
         dateRange,
         sortKey,
         sortDir,
@@ -126,7 +148,7 @@ export default function AgentClosedLeadsPage() {
     } finally {
       setLoading(false);
     }
-  }, [debouncedSearch, dateRange, sortKey, sortDir, page, pageSize]);
+  }, [debouncedSearch, segmentFilter, dateRange, sortKey, sortDir, page, pageSize]);
 
   useEffect(() => {
     void load();
@@ -150,10 +172,16 @@ export default function AgentClosedLeadsPage() {
   }
 
   const dateIsDefault = dateRange.preset === "30d";
-  const activeFilterCount = dateIsDefault ? 0 : 1;
+  const activeFilterCount =
+    (segmentFilter !== "all" ? 1 : 0) + (dateIsDefault ? 0 : 1);
 
   const summaryStart = rows.length ? (safePage - 1) * pageSize + 1 : 0;
   const summaryEnd = (safePage - 1) * pageSize + rows.length;
+
+  function clearFilters() {
+    setSegmentFilter("all");
+    setDateRange(DEFAULT_DATE_RANGE);
+  }
 
   return (
     <div>
@@ -211,6 +239,18 @@ export default function AgentClosedLeadsPage() {
           </div>
 
           <div className="active-pill-row">
+            {segmentFilter !== "all" ? (
+              <span className="active-pill">
+                Segment: {segmentFilter === "sme" ? "SME" : "Seafarer"}
+                <button
+                  type="button"
+                  aria-label="Clear segment filter"
+                  onClick={() => setSegmentFilter("all")}
+                >
+                  ×
+                </button>
+              </span>
+            ) : null}
             {!dateIsDefault ? (
               <span className="active-pill">
                 {dateRangePillLabel(dateRange)}
@@ -227,7 +267,7 @@ export default function AgentClosedLeadsPage() {
               <button
                 type="button"
                 className="clear-link"
-                onClick={() => setDateRange(DEFAULT_DATE_RANGE)}
+                onClick={clearFilters}
               >
                 Clear all
               </button>
@@ -281,6 +321,21 @@ export default function AgentClosedLeadsPage() {
 
         <div className={cn("filter-panel", filterPanelOpen && "is-open")}>
           <div className="filter-group">
+            <span className="filter-group-label">Segment</span>
+            <div className="flex flex-wrap gap-1.5">
+              {SEGMENT_CHIPS.map((chip) => (
+                <button
+                  key={chip.id}
+                  type="button"
+                  className={cn("fchip", segmentFilter === chip.id && "is-on")}
+                  onClick={() => setSegmentFilter(chip.id)}
+                >
+                  {chip.label}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className="filter-group">
             <span className="filter-group-label">Converted date</span>
             <DateRangeFilter value={dateRange} onChange={setDateRange} />
           </div>
@@ -293,6 +348,7 @@ export default function AgentClosedLeadsPage() {
             <thead>
               <tr>
                 <Th>Borrower</Th>
+                <Th>Segment</Th>
                 <Th>Business</Th>
                 <Th>Linked Application</Th>
                 <Th>Converted On</Th>
@@ -302,7 +358,7 @@ export default function AgentClosedLeadsPage() {
             <tbody>
               {Array.from({ length: 6 }, (_, i) => (
                 <tr key={i}>
-                  <Td colSpan={5}>
+                  <Td colSpan={6}>
                     <Skeleton variant="line" />
                   </Td>
                 </tr>
@@ -327,6 +383,10 @@ export default function AgentClosedLeadsPage() {
               </div>
               <div className="gcard-name">{row.borrowerName}</div>
               <div className="gcard-meta">
+                <div className="row">
+                  <span className="k">Segment</span>
+                  <span className="v">{segmentBadge(row.segment)}</span>
+                </div>
                 <div className="row">
                   <span className="k">Business</span>
                   <span className="v">{row.businessName ?? "—"}</span>
@@ -362,6 +422,7 @@ export default function AgentClosedLeadsPage() {
                   Borrower
                   {sortArrow("borrower")}
                 </Th>
+                <Th>Segment</Th>
                 <Th>Business</Th>
                 <Th>Linked Application</Th>
                 <Th
@@ -382,6 +443,7 @@ export default function AgentClosedLeadsPage() {
                       {row.borrowerName}
                     </span>
                   </Td>
+                  <Td>{segmentBadge(row.segment)}</Td>
                   <Td>{row.businessName ?? "—"}</Td>
                   <Td className="mono">{row.applicationNo ?? "—"}</Td>
                   <Td className="mono">{formatDate(row.convertedAt)}</Td>

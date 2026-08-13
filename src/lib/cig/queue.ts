@@ -21,6 +21,7 @@ export type CigQueueItem = {
   } | null;
   isRevision: boolean;
   callbackOverdueAt: string | null;
+  segment: "sme" | "seafarer" | null;
 };
 
 export type CigQueueSortKey = "priority" | "endorsed" | "waiting" | "status";
@@ -72,6 +73,14 @@ export function passesWorkFilter(
   asOf = new Date(),
 ): boolean {
   return cigMatchesWorkFilter(row, filter, asOf);
+}
+
+export function passesSegmentFilter(
+  row: Pick<CigQueueItem, "segment">,
+  segment: "all" | "seafarer" | "sme",
+): boolean {
+  if (segment === "all") return true;
+  return row.segment === segment;
 }
 
 function sanitizeSearchTerm(term: string): string {
@@ -239,6 +248,7 @@ export async function getCigQueue(supabase: SupabaseClient): Promise<CigQueueIte
       status,
       endorsed_at,
       created_at,
+      segment,
       borrowers (
         borrower_no,
         first_name,
@@ -313,6 +323,9 @@ export async function getCigQueue(supabase: SupabaseClient): Promise<CigQueueIte
       const borrower = Array.isArray(row.borrowers)
         ? row.borrowers[0]
         : row.borrowers;
+      const segmentRaw = row.segment as string | null;
+      const segment: "sme" | "seafarer" | null =
+        segmentRaw === "sme" || segmentRaw === "seafarer" ? segmentRaw : null;
       return {
         id: row.id as string,
         applicationNo: row.application_no as string | null,
@@ -329,6 +342,7 @@ export async function getCigQueue(supabase: SupabaseClient): Promise<CigQueueIte
           : null,
         isRevision: row.status === "for_revision",
         callbackOverdueAt: overdueTimes.get(row.id as string) ?? null,
+        segment,
       };
     });
 }

@@ -31,6 +31,7 @@ type HistoryRow = {
   id: string;
   applicationId: string;
   applicationNo: string | null;
+  segment: "sme" | "seafarer" | null;
   borrower: {
     borrowerNo: string;
     firstName: string;
@@ -70,6 +71,15 @@ const ACTION_CHIPS: Array<{ id: ActionFilter; label: string }> = [
   { id: "deny", label: "Rejected" },
   { id: "revisit", label: "Revisit" },
   { id: "hold", label: "Hold" },
+];
+
+const SEGMENT_CHIPS: Array<{
+  id: "all" | "seafarer" | "sme";
+  label: string;
+}> = [
+  { id: "all", label: "All" },
+  { id: "seafarer", label: "Seafarer" },
+  { id: "sme", label: "SME" },
 ];
 
 const DEFAULT_DATE_RANGE: DateRangeValue = {
@@ -113,6 +123,15 @@ function borrowerName(row: HistoryRow): string {
   return `${row.borrower.firstName} ${row.borrower.lastName}`;
 }
 
+function segmentBadge(segment: "sme" | "seafarer" | null) {
+  const isSme = segment === "sme";
+  return (
+    <Badge variant={isSme ? "navy" : "teal"} dot>
+      {isSme ? "SME" : "Seafarer"}
+    </Badge>
+  );
+}
+
 function borrowerSortKey(row: HistoryRow): string {
   if (!row.borrower) return "";
   return `${row.borrower.lastName} ${row.borrower.firstName}`.toLowerCase();
@@ -134,6 +153,7 @@ function actionFilterLabel(action: CommitteeDecisionAction): string {
 function buildHistoryQuery(params: {
   search: string;
   action: ActionFilter;
+  segment: "all" | "seafarer" | "sme";
   dateRange: DateRangeValue;
   sortKey: SortKey;
   sortDir: "asc" | "desc";
@@ -143,6 +163,7 @@ function buildHistoryQuery(params: {
   const qs = new URLSearchParams();
   if (params.search.trim()) qs.set("search", params.search.trim());
   qs.set("action", params.action);
+  qs.set("segment", params.segment);
   qs.set("range", params.dateRange.preset);
   if (params.dateRange.preset === "custom") {
     if (params.dateRange.from) qs.set("from", params.dateRange.from);
@@ -171,6 +192,9 @@ export default function CommitteeHistoryPage() {
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [actionFilter, setActionFilter] = useState<ActionFilter>("all");
+  const [segmentFilter, setSegmentFilter] = useState<
+    "all" | "seafarer" | "sme"
+  >("all");
   const [dateRange, setDateRange] = useState<DateRangeValue>(DEFAULT_DATE_RANGE);
   const [viewMode, setViewMode] = useState<HistoryViewMode>("list");
   const [pageSize, setPageSize] =
@@ -187,7 +211,15 @@ export default function CommitteeHistoryPage() {
 
   useEffect(() => {
     setPage(1);
-  }, [debouncedSearch, actionFilter, dateRange, pageSize, sortKey, sortDir]);
+  }, [
+    debouncedSearch,
+    actionFilter,
+    segmentFilter,
+    dateRange,
+    pageSize,
+    sortKey,
+    sortDir,
+  ]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -196,6 +228,7 @@ export default function CommitteeHistoryPage() {
       const query = buildHistoryQuery({
         search: debouncedSearch,
         action: actionFilter,
+        segment: segmentFilter,
         dateRange,
         sortKey,
         sortDir,
@@ -220,6 +253,7 @@ export default function CommitteeHistoryPage() {
   }, [
     debouncedSearch,
     actionFilter,
+    segmentFilter,
     dateRange,
     sortKey,
     sortDir,
@@ -490,6 +524,21 @@ export default function CommitteeHistoryPage() {
             </div>
           </div>
           <div className="filter-group">
+            <span className="filter-group-label">Segment</span>
+            <div className="filter-bar">
+              {SEGMENT_CHIPS.map((chip) => (
+                <button
+                  key={chip.id}
+                  type="button"
+                  className={cn("fchip", segmentFilter === chip.id && "is-on")}
+                  onClick={() => setSegmentFilter(chip.id)}
+                >
+                  {chip.label}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className="filter-group">
             <span className="filter-group-label">Decided date</span>
             <DateRangeFilter value={dateRange} onChange={setDateRange} />
           </div>
@@ -503,6 +552,7 @@ export default function CommitteeHistoryPage() {
               <tr>
                 <Th>Application No.</Th>
                 <Th>Borrower</Th>
+                <Th>Segment</Th>
                 <Th num>Amount</Th>
                 <Th>Your Vote</Th>
                 <Th>Final Decision</Th>
@@ -514,7 +564,7 @@ export default function CommitteeHistoryPage() {
             <tbody>
               {Array.from({ length: 6 }, (_, i) => (
                 <tr key={i}>
-                  <Td colSpan={8}>
+                  <Td colSpan={9}>
                     <Skeleton variant="line" />
                   </Td>
                 </tr>
@@ -601,6 +651,7 @@ export default function CommitteeHistoryPage() {
                   Borrower
                   {sortArrow("borrower")}
                 </Th>
+                <Th>Segment</Th>
                 <Th
                   className="sortable"
                   num
@@ -637,6 +688,7 @@ export default function CommitteeHistoryPage() {
                     </span>
                   </Td>
                   <Td>{borrowerName(row)}</Td>
+                  <Td>{segmentBadge(row.segment)}</Td>
                   <Td num className="mono">
                     <span
                       style={

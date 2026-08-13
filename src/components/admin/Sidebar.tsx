@@ -8,6 +8,7 @@ import { usePathname } from "next/navigation";
 import { LoanStarLogo, LoanStarMark } from "@/components/ui";
 import { cn } from "@/components/ui/cn";
 import { usePermissions } from "@/hooks/usePermissions";
+import { resolveHomePath } from "@/lib/permissions/home";
 import type { ModuleSlug } from "@/lib/permissions/types";
 
 /* ── Icons (Lucide-style, stroke = currentColor) ────────────────────────── */
@@ -306,7 +307,6 @@ const PORTAL_NAV_ITEMS: PortalNavItem[] = [
     modules: ["collection"],
     children: [
       { href: "/collector", label: "Overview", exact: true },
-      { href: "/collector/briefings", label: "Briefings" },
       { href: "/collector/accounts", label: "Accounts" },
       { href: "/collector/proofs", label: "Payment proofs" },
       { href: "/collector/dcr", label: "DCR" },
@@ -315,6 +315,7 @@ const PORTAL_NAV_ITEMS: PortalNavItem[] = [
       { href: "/collector/closed-accounts", label: "Closed accounts" },
     ],
   },
+  { href: "/collector/briefings", label: "Briefings", icon: "collection", modules: ["briefings"] },
   {
     href: "/remedial",
     label: "Remedial",
@@ -444,10 +445,12 @@ function SidebarContent({
   onNavClick?: () => void;
 }) {
   const pathname = usePathname();
-  const { can, loading } = usePermissions();
+  const { can, loading, permissions } = usePermissions();
 
   const visibleItems = NAV_ITEMS.filter(
-    (item) => !item.module || can(item.module, "view"),
+    (item) =>
+      (!item.module || can(item.module, "view")) &&
+      !(item.href === "/dashboard" && resolveHomePath(permissions) === "/borrower"),
   );
 
   const visiblePortalItems = PORTAL_NAV_ITEMS.filter((item) =>
@@ -520,35 +523,29 @@ function SidebarContent({
         className="flex-1 overflow-y-auto overflow-x-hidden p-2.5"
         style={{ scrollbarWidth: "none" }}
       >
-        <p className={cn("side-grp", collapsed && "lg:hidden")}>Main Menu</p>
-        {loading ? (
-          <div className="flex flex-col gap-0.5" aria-hidden>
-            {NAV_ITEMS.map((item) => (
-              <div key={item.href} className="px-3 py-2">
-                <div className="h-[17px] w-24 animate-pulse rounded bg-white/10" />
-              </div>
-            ))}
-          </div>
-        ) : (
-          <div className="flex flex-col gap-0.5">
-            {visibleItems.map((item) => {
-              const active = item.exact
-                ? pathname === item.href
-                : pathname.startsWith(item.href);
-              return (
-                <NavLink
-                  key={item.href}
-                  href={item.href}
-                  label={item.label}
-                  icon={item.icon}
-                  active={active}
-                  collapsed={collapsed}
-                  onNavClick={onNavClick}
-                />
-              );
-            })}
-          </div>
-        )}
+        {!loading && visibleItems.length > 0 ? (
+          <>
+            <p className={cn("side-grp", collapsed && "lg:hidden")}>Main Menu</p>
+            <div className="flex flex-col gap-0.5">
+              {visibleItems.map((item) => {
+                const active = item.exact
+                  ? pathname === item.href
+                  : pathname.startsWith(item.href);
+                return (
+                  <NavLink
+                    key={item.href}
+                    href={item.href}
+                    label={item.label}
+                    icon={item.icon}
+                    active={active}
+                    collapsed={collapsed}
+                    onNavClick={onNavClick}
+                  />
+                );
+              })}
+            </div>
+          </>
+        ) : null}
 
         {!loading && visiblePortalItems.length > 0 ? (
           <>

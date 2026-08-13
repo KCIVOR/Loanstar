@@ -67,14 +67,14 @@ Per-item plan files:
 |---|------|--------|-------|
 | 9 | Add a Cash Voucher to the auto-prepared release document set | Done | Audited 2026-08-11, already implemented — `cash_voucher` is already in `AUTO_GENERATED_SLUGS.without_pdc` and genuinely rendered by `generateReleaseDocuments`. Skipped for now: a separate, deeper bug found during this audit — `closeRelease()`'s `REQUIRED_SIGNED_RELEASE_SLUGS` hardcodes `signed_check_voucher` regardless of release path, and no `signed_cash_voucher` document type exists at all — likely means a cash-path release can never close. Zero `release_files` rows with `release_path='without_pdc'` exist in the DB, so this has never been exercised. Deferred at user's request, not fixed. |
 | 10 | Combine all signing documents into a single file/upload with one confirmation, instead of one at a time | Done | Feature validated working end to end (combined upload, remarks, view, persistent uploaded-by/at log) — see `revision-plans/item-10-combined-signing-upload.md`. **Note: Phases 3 and 7 (dedicated unit test coverage) were closed as not-done by user decision, not implemented** — no automated test regression protection for `resolveCombinedUploadTargets` or `combinedUploadSchema` specifically, though the app's existing broader test suite is unaffected. |
-| 11 | Remove "client briefing" responsibility from the Collector role | Skipped | Skipped at user's request 2026-08-11 |
-| 12 | Create a new "Collection Head" position for client briefings, separate from Collector | Skipped | Skipped at user's request 2026-08-11 |
+| 11 | Remove "client briefing" responsibility from the Collector role | Done | Implemented by Cursor 2026-08-13 with Item 12 — Collector `collection:execute_trigger` cleared; briefings gated by new `briefings` module — see `revision-plans/feature-collection-head-role.md` |
+| 12 | Create a new "Collection Head" position for client briefings, separate from Collector | Done | Implemented by Cursor 2026-08-13, Phases 1–4 (module+role, API gates, nav, seed `collection_head@loanstar.local`) — see `revision-plans/feature-collection-head-role.md`. Phase 5 live UI checks for the user. |
 
 ## Post-Dated Checks
 
 | # | Item | Status | Notes |
 |---|------|--------|-------|
-| 13 | Fix rounding bug — checks must sum to the exact loan balance instead of repeating the same rounded amount | Not Started | |
+| 13 | Fix rounding bug — checks must sum to the exact loan balance instead of repeating the same rounded amount | Done | Manual AR rounding write-off (threshold-gated, logged). See `docs/revision-plans/feature-ar-rounding-writeoff.md`. Tests: 882 pass. |
 
 ## Accounts Receivable
 
@@ -88,9 +88,9 @@ Per-item plan files:
 | # | Item | Status | Notes |
 |---|------|--------|-------|
 | 16 | Only Collector can record a payment received | Not Started | |
-| 17 | Collectors can manually record in-person branch payments | Not Started | |
-| 18 | Record actual payment date, separate from original due date | Not Started | |
-| 19 | Borrowers can pay multiple months at once, applied properly across all covered months | Not Started | |
+| 17 | Collectors can manually record in-person branch payments | Done | Implemented by Cursor 2026-08-13, Phases 1–3 (RLS insert + storage + POST + Record payment modal + proofs "Recorded by"), 882/882 tests — see `revision-plans/feature-collector-record-payment.md` |
+| 18 | Record actual payment date, separate from original due date | Done | Audited 2026-08-13, already implemented — no code change needed. `payments.payment_date`/`reference_no` are already independent of `amortization_schedules.due_date`, confirmed live via the borrower's "Submit payment proof" form (`LoanActivePanel.tsx`) and Payment history list — see audit note in `revision-plans/feature-ar-multi-month-payment-allocation.md` |
+| 19 | Borrowers can pay multiple months at once, applied properly across all covered months | Done | Implemented by Cursor 2026-08-13, all 5 phases validated directly (schema + RLS + code + 882/882 tests) — see `revision-plans/feature-ar-multi-month-payment-allocation.md`. Deliberately out of scope: auto-consuming a banked advance credit on a later cycle, and a running-credit display — flagged as future follow-ups, not built here |
 
 ## Deferred to Future Phase
 
@@ -99,11 +99,11 @@ Per-item plan files:
 ## Summary
 
 - Total items: 19
-- Not Started: 5
+- Not Started: 1
 - In Progress: 1
 - Blocked: 0
-- Skipped: 2
-- Done: 11
+- Skipped: 0
+- Done: 16
 
 ## Deferred findings (out of tracker scope, flagged not fixed)
 

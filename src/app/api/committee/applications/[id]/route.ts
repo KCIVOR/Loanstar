@@ -1,5 +1,6 @@
 import { formatStatusLabel } from "@/lib/applications/status";
 import { handleApiError, jsonOk } from "@/lib/api/handler";
+import { parseBusinessInfo } from "@/lib/borrowers/business-info";
 import {
   getLatestCommitteeAction,
   getCommitteeVotes,
@@ -22,9 +23,11 @@ export async function GET(_request: Request, { params }: RouteParams) {
     const user = await requireModulePermission("committee", "view");
     const { id } = await params;
     const supabase = await createClient();
-    const committeeSize = await getCommitteeSize();
 
     const application = await getApplicationForStaff(supabase, id);
+    const committeeSize = await getCommitteeSize(
+      application.segment as string | null,
+    );
     const borrowerRaw = application.borrowers;
     const borrower = Array.isArray(borrowerRaw) ? borrowerRaw[0] : borrowerRaw;
 
@@ -115,6 +118,11 @@ export async function GET(_request: Request, { params }: RouteParams) {
         blocker: application.blocker,
         isReloan: application.is_reloan,
         segment: application.segment === "sme" ? "sme" : "seafarer",
+        entityType:
+          application.entity_type === "individual" ||
+          application.entity_type === "corporate"
+            ? application.entity_type
+            : null,
         statusHistory: application.status_history,
         canDecide:
           (application.status === "for_approval" ||
@@ -132,6 +140,9 @@ export async function GET(_request: Request, { params }: RouteParams) {
             firstName: borrower.first_name,
             lastName: borrower.last_name,
             email: borrower.email,
+            businessInfo: borrower.business_info
+              ? parseBusinessInfo(borrower.business_info)
+              : null,
           }
         : null,
       verification: verification

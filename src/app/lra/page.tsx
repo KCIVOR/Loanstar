@@ -69,6 +69,15 @@ const STATUS_CHIPS: Array<{ id: string; label: string }> = [
   { id: "paid_off", label: "Paid off" },
 ];
 
+const SEGMENT_CHIPS: Array<{
+  id: "all" | "seafarer" | "sme";
+  label: string;
+}> = [
+  { id: "all", label: "All" },
+  { id: "seafarer", label: "Seafarer" },
+  { id: "sme", label: "SME" },
+];
+
 const BUCKET_RANK: Record<string, number> = {
   ready: 0,
   setup: 1,
@@ -190,6 +199,15 @@ function statusChipLabel(filter: string): string {
   );
 }
 
+function segmentBadge(segment: "sme" | "seafarer" | null) {
+  const isSme = segment === "sme";
+  return (
+    <Badge variant={isSme ? "navy" : "teal"} dot>
+      {isSme ? "SME" : "Seafarer"}
+    </Badge>
+  );
+}
+
 function blockerBadgeVariant(item: LraQueueItem) {
   if (isCompletedLraQueueItem(classifyInput(item))) return "success" as const;
   if (lraQueueBucket(classifyInput(item)) === "ready") return "teal" as const;
@@ -200,6 +218,7 @@ function buildQueueQuery(params: {
   search: string;
   scope: LraQueueScope;
   statusFilter: string;
+  segment: "all" | "seafarer" | "sme";
   dateRange: DateRangeValue;
   sortKey: SortKey;
   sortDir: "asc" | "desc";
@@ -210,6 +229,7 @@ function buildQueueQuery(params: {
   if (params.search.trim()) qs.set("search", params.search.trim());
   qs.set("scope", params.scope);
   qs.set("status", params.statusFilter);
+  qs.set("segment", params.segment);
   qs.set("range", params.dateRange.preset);
   if (params.dateRange.preset === "custom") {
     if (params.dateRange.from) qs.set("from", params.dateRange.from);
@@ -237,6 +257,9 @@ export default function LraDashboardPage() {
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [scopeFilter, setScopeFilter] = useState<LraQueueScope>("active");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [segmentFilter, setSegmentFilter] = useState<
+    "all" | "seafarer" | "sme"
+  >("all");
   const [dateRange, setDateRange] = useState<DateRangeValue>(DEFAULT_DATE_RANGE);
   const [viewMode, setViewMode] = useState<HistoryViewMode>("list");
   const [pageSize, setPageSize] =
@@ -257,6 +280,7 @@ export default function LraDashboardPage() {
     debouncedSearch,
     scopeFilter,
     statusFilter,
+    segmentFilter,
     dateRange,
     pageSize,
     sortKey,
@@ -271,6 +295,7 @@ export default function LraDashboardPage() {
         search: debouncedSearch,
         scope: scopeFilter,
         statusFilter,
+        segment: segmentFilter,
         dateRange,
         sortKey,
         sortDir,
@@ -296,6 +321,7 @@ export default function LraDashboardPage() {
     debouncedSearch,
     scopeFilter,
     statusFilter,
+    segmentFilter,
     dateRange,
     sortKey,
     sortDir,
@@ -588,6 +614,21 @@ export default function LraDashboardPage() {
             </div>
           </div>
           <div className="filter-group">
+            <span className="filter-group-label">Segment</span>
+            <div className="filter-bar">
+              {SEGMENT_CHIPS.map((chip) => (
+                <button
+                  key={chip.id}
+                  type="button"
+                  className={cn("fchip", segmentFilter === chip.id && "is-on")}
+                  onClick={() => setSegmentFilter(chip.id)}
+                >
+                  {chip.label}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className="filter-group">
             <span className="filter-group-label">Queued date</span>
             <DateRangeFilter value={dateRange} onChange={setDateRange} />
           </div>
@@ -600,6 +641,7 @@ export default function LraDashboardPage() {
             <thead>
               <tr>
                 <Th>Borrower</Th>
+                <Th>Segment</Th>
                 <Th>Status</Th>
                 <Th>Stage / blocker</Th>
                 <Th>Path</Th>
@@ -610,7 +652,7 @@ export default function LraDashboardPage() {
             <tbody>
               {Array.from({ length: 6 }, (_, i) => (
                 <tr key={i}>
-                  <Td colSpan={6}>
+                  <Td colSpan={7}>
                     <Skeleton variant="line" />
                   </Td>
                 </tr>
@@ -689,6 +731,7 @@ export default function LraDashboardPage() {
             <thead>
               <tr>
                 <Th>Borrower</Th>
+                <Th>Segment</Th>
                 <Th
                   className="sortable"
                   onClick={() => toggleSort("status")}
@@ -721,6 +764,7 @@ export default function LraDashboardPage() {
                         item.applicationId.slice(0, 8)}
                     </span>
                   </Td>
+                  <Td>{segmentBadge(item.segment)}</Td>
                   <Td>
                     {item.application ? (
                       <Badge

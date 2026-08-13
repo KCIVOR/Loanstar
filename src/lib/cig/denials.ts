@@ -6,6 +6,7 @@ export type DenialCallItem = {
   noticeId: string;
   applicationId: string;
   applicationNo: string | null;
+  segment: "sme" | "seafarer" | null;
   deniedAt: string;
   borrower: {
     firstName: string;
@@ -15,6 +16,23 @@ export type DenialCallItem = {
   } | null;
 };
 
+export type DenialCallsQueryParams = {
+  segment?: "all" | "seafarer" | "sme";
+};
+
+function mapSegment(raw: unknown): "sme" | "seafarer" | null {
+  return raw === "sme" || raw === "seafarer" ? raw : null;
+}
+
+/** Segment chip filter — mirrors waiting-bucket `passesWaitingBucket` shape. */
+export function passesSegmentFilter(
+  row: Pick<DenialCallItem, "segment">,
+  segment: "all" | "seafarer" | "sme",
+): boolean {
+  if (segment === "all") return true;
+  return row.segment === segment;
+}
+
 /**
  * Denied files waiting for CIG's courtesy call to the borrower. The written
  * denial email is already sent on committee Deny; CIG informs by phone without
@@ -22,8 +40,11 @@ export type DenialCallItem = {
  */
 export async function getPendingDenialCalls(
   supabase: SupabaseClient,
+  params: DenialCallsQueryParams = {},
 ): Promise<DenialCallItem[]> {
-  const { data, error } = await supabase
+  const { segment: segmentFilter = "all" } = params;
+
+  let query = supabase
     .from("denial_notices")
     .select(
       `
@@ -32,6 +53,7 @@ export async function getPendingDenialCalls(
       created_at,
       loan_applications (
         application_no,
+        segment,
         borrowers (
           first_name,
           last_name,
@@ -41,8 +63,13 @@ export async function getPendingDenialCalls(
       )
     `,
     )
-    .is("informed_at", null)
-    .order("created_at", { ascending: true });
+    .is("informed_at", null);
+
+  if (segmentFilter !== "all") {
+    query = query.eq("loan_applications.segment", segmentFilter);
+  }
+
+  const { data, error } = await query.order("created_at", { ascending: true });
 
   if (error) {
     throw new Error(error.message);
@@ -60,6 +87,7 @@ export async function getPendingDenialCalls(
       noticeId: row.id as string,
       applicationId: row.loan_application_id as string,
       applicationNo: (app?.application_no as string) ?? null,
+      segment: mapSegment(app?.segment),
       deniedAt: row.created_at as string,
       borrower: borrower
         ? {

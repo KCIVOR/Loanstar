@@ -6,6 +6,7 @@ export type ReleasedLoanRow = {
   id: string;
   applicationId: string;
   applicationNo: string | null;
+  segment: "sme" | "seafarer" | null;
   borrower: {
     borrowerNo: string;
     firstName: string;
@@ -24,6 +25,7 @@ export type ReleasedLoansSortKey = "applicationNo" | "borrower" | "closedAt";
 export type ReleasedLoansQueryParams = {
   search?: string;
   releasePath?: ReleasePath | "all";
+  segment?: "all" | "seafarer" | "sme";
   from?: string | null;
   to?: string | null;
   sortKey?: ReleasedLoansSortKey;
@@ -139,6 +141,7 @@ export async function getReleasedLoansHistory(
   const {
     search = "",
     releasePath = "all",
+    segment: segmentFilter = "all",
     from = null,
     to = null,
     sortKey = "closedAt",
@@ -177,6 +180,7 @@ export async function getReleasedLoansHistory(
       pdc_collected_at,
       loan_applications (
         application_no,
+        segment,
         borrowers (
           borrower_no,
           first_name,
@@ -200,6 +204,10 @@ export async function getReleasedLoansHistory(
   const pathEq = releasePathFilterSpec(releasePath);
   if (pathEq) {
     query = query.eq("release_path", pathEq);
+  }
+
+  if (segmentFilter !== "all") {
+    query = query.eq("loan_applications.segment", segmentFilter);
   }
 
   if (from) {
@@ -261,11 +269,16 @@ export async function getReleasedLoansHistory(
     const releasePathValue =
       pathRaw === "with_pdc" || pathRaw === "without_pdc" ? pathRaw : null;
 
+    const segmentRaw = app?.segment as string | null | undefined;
+    const segment: "sme" | "seafarer" | null =
+      segmentRaw === "sme" || segmentRaw === "seafarer" ? segmentRaw : null;
+
     return [
       {
         id: row.id as string,
         applicationId: row.loan_application_id as string,
         applicationNo: (app?.application_no as string | null) ?? null,
+        segment,
         borrower: borrower
           ? {
               borrowerNo: borrower.borrower_no as string,

@@ -12,6 +12,7 @@ import { requireModulePermission } from "@/lib/permissions/server";
 import { createClient } from "@/lib/supabase/server";
 
 const STATUS_FILTERS = new Set(["all", ...ACTIVE_COMMITTEE_STATUSES]);
+const SEGMENT_FILTERS = new Set(["all", "seafarer", "sme"]);
 const RANGE_PRESETS = new Set(["30d", "90d", "all", "custom"]);
 const SORT_KEYS = new Set(["status", "tat", "forwarded"]);
 
@@ -25,6 +26,11 @@ export async function GET(request: Request) {
     const statusFilter = (
       STATUS_FILTERS.has(statusRaw) ? statusRaw : "all"
     ) as CommitteeStatusFilter;
+
+    const segmentRaw = searchParams.get("segment") ?? "all";
+    const segmentFilter = (
+      SEGMENT_FILTERS.has(segmentRaw) ? segmentRaw : "all"
+    ) as "all" | "seafarer" | "sme";
 
     // Active queue defaults to All time (must not hide old-but-still-open items).
     const rangeRaw = searchParams.get("range") ?? "all";
@@ -58,6 +64,7 @@ export async function GET(request: Request) {
       getCommitteeQueue(supabase, {
         search,
         statusFilter,
+        segment: segmentFilter,
         from,
         to,
         sortKey,

@@ -36,6 +36,7 @@ type QueueItem = {
   applicationNo: string | null;
   status: string;
   isReloan: boolean;
+  segment: "sme" | "seafarer" | null;
   createdAt: string;
   updatedAt: string;
   borrower: {
@@ -83,6 +84,15 @@ const STATUS_CHIPS: Array<{ id: CommitteeStatusFilter; label: string }> = [
   { id: "for_approval", label: "Needs decision" },
   { id: "committee_hold", label: "On hold" },
   { id: "negotiating_terms", label: "In negotiation" },
+];
+
+const SEGMENT_CHIPS: Array<{
+  id: "all" | "seafarer" | "sme";
+  label: string;
+}> = [
+  { id: "all", label: "All" },
+  { id: "seafarer", label: "Seafarer" },
+  { id: "sme", label: "SME" },
 ];
 
 const iconProps = {
@@ -159,6 +169,15 @@ function queueBorrowerName(app: QueueItem): string {
     : "Unknown borrower";
 }
 
+function segmentBadge(segment: "sme" | "seafarer" | null) {
+  const isSme = segment === "sme";
+  return (
+    <Badge variant={isSme ? "navy" : "teal"} dot>
+      {isSme ? "SME" : "Seafarer"}
+    </Badge>
+  );
+}
+
 function dateRangePillLabel(value: DateRangeValue): string {
   if (value.preset === "30d") return "Last 30 days";
   if (value.preset === "90d") return "Last 90 days";
@@ -185,6 +204,7 @@ function findingBadge(finding: string | null | undefined) {
 function buildQueueQuery(params: {
   search: string;
   statusFilter: CommitteeStatusFilter;
+  segment: "all" | "seafarer" | "sme";
   dateRange: DateRangeValue;
   sortKey: SortKey;
   sortDir: "asc" | "desc";
@@ -194,6 +214,7 @@ function buildQueueQuery(params: {
   const qs = new URLSearchParams();
   if (params.search.trim()) qs.set("search", params.search.trim());
   qs.set("status", params.statusFilter);
+  qs.set("segment", params.segment);
   qs.set("range", params.dateRange.preset);
   if (params.dateRange.preset === "custom") {
     if (params.dateRange.from) qs.set("from", params.dateRange.from);
@@ -221,6 +242,9 @@ export default function CommitteeDashboardPage() {
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [statusFilter, setStatusFilter] =
     useState<CommitteeStatusFilter>("all");
+  const [segmentFilter, setSegmentFilter] = useState<
+    "all" | "seafarer" | "sme"
+  >("all");
   const [dateRange, setDateRange] = useState<DateRangeValue>(DEFAULT_DATE_RANGE);
   const [viewMode, setViewMode] = useState<HistoryViewMode>("list");
   const [pageSize, setPageSize] =
@@ -237,7 +261,15 @@ export default function CommitteeDashboardPage() {
 
   useEffect(() => {
     setPage(1);
-  }, [debouncedSearch, statusFilter, dateRange, pageSize, sortKey, sortDir]);
+  }, [
+    debouncedSearch,
+    statusFilter,
+    segmentFilter,
+    dateRange,
+    pageSize,
+    sortKey,
+    sortDir,
+  ]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -246,6 +278,7 @@ export default function CommitteeDashboardPage() {
       const query = buildQueueQuery({
         search: debouncedSearch,
         statusFilter,
+        segment: segmentFilter,
         dateRange,
         sortKey,
         sortDir,
@@ -270,6 +303,7 @@ export default function CommitteeDashboardPage() {
   }, [
     debouncedSearch,
     statusFilter,
+    segmentFilter,
     dateRange,
     sortKey,
     sortDir,
@@ -516,6 +550,21 @@ export default function CommitteeDashboardPage() {
             </div>
           </div>
           <div className="filter-group">
+            <span className="filter-group-label">Segment</span>
+            <div className="filter-bar">
+              {SEGMENT_CHIPS.map((chip) => (
+                <button
+                  key={chip.id}
+                  type="button"
+                  className={cn("fchip", segmentFilter === chip.id && "is-on")}
+                  onClick={() => setSegmentFilter(chip.id)}
+                >
+                  {chip.label}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className="filter-group">
             <span className="filter-group-label">Forwarded date</span>
             <DateRangeFilter value={dateRange} onChange={setDateRange} />
           </div>
@@ -528,6 +577,7 @@ export default function CommitteeDashboardPage() {
             <thead>
               <tr>
                 <Th>Application</Th>
+                <Th>Segment</Th>
                 <Th>Status</Th>
                 <Th>CIG finding</Th>
                 <Th>TAT</Th>
@@ -538,7 +588,7 @@ export default function CommitteeDashboardPage() {
             <tbody>
               {Array.from({ length: 6 }, (_, i) => (
                 <tr key={i}>
-                  <Td colSpan={6}>
+                  <Td colSpan={7}>
                     <Skeleton variant="line" />
                   </Td>
                 </tr>
@@ -614,6 +664,7 @@ export default function CommitteeDashboardPage() {
             <thead>
               <tr>
                 <Th>Application</Th>
+                <Th>Segment</Th>
                 <Th
                   className="sortable"
                   onClick={() => toggleSort("status")}
@@ -650,6 +701,7 @@ export default function CommitteeDashboardPage() {
                       {app.isReloan ? " · Reloan" : ""}
                     </span>
                   </Td>
+                  <Td>{segmentBadge(app.segment)}</Td>
                   <Td>
                     <Badge variant={statusBadgeVariant(app.status)} dot>
                       {formatStatusLabel(app.status)}

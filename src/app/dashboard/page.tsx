@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 
 import { Alert, Button, PageHeader } from "@/components/ui";
@@ -8,10 +9,11 @@ import { DASHBOARD_WIDGETS, isWidgetSlug, WIDGET_SKELETON } from "@/components/d
 import { SectionSkeleton, WidgetSection } from "@/components/dashboard/WidgetTile";
 import { MODULES, type ModuleSlug } from "@/lib/constants";
 import { isWidgetError, type WidgetsResponse } from "@/lib/dashboard/types";
-import { MODULE_HOME_PATHS } from "@/lib/permissions/home";
+import { MODULE_HOME_PATHS, resolveHomePath } from "@/lib/permissions/home";
 import { usePermissions } from "@/hooks/usePermissions";
 
 export default function DashboardPage() {
+  const router = useRouter();
   const { permissions, loading, error, isSuperAdmin } = usePermissions();
   const [widgets, setWidgets] = useState<WidgetsResponse["widgets"] | null>(null);
   const [widgetsLoading, setWidgetsLoading] = useState(true);
@@ -43,7 +45,16 @@ export default function DashboardPage() {
     };
   }, [reloadKey]);
 
+  useEffect(() => {
+    if (!loading && permissions && resolveHomePath(permissions) !== "/dashboard") {
+      router.replace(resolveHomePath(permissions));
+    }
+  }, [loading, permissions, router]);
+
   if (loading) return null;
+  if (!loading && permissions && resolveHomePath(permissions) !== "/dashboard") {
+    return null;
+  }
   if (error) {
     return (
       <div className="text-sm text-danger">Failed to load permissions: {error}</div>

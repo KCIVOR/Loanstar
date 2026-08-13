@@ -38,6 +38,7 @@ export type LraQueueItem = {
   applicationId: string;
   computationId: string;
   queuedAt: string;
+  segment: "sme" | "seafarer" | null;
   application: {
     applicationNo: string | null;
     status: string;
@@ -59,6 +60,7 @@ export type LraQueueQueryParams = {
   search?: string;
   scope?: LraQueueScope;
   statusFilter?: string;
+  segmentFilter?: "all" | "seafarer" | "sme";
   from?: string | null;
   to?: string | null;
   sortKey?: LraQueueSortKey;
@@ -99,6 +101,7 @@ const QUEUE_SELECT = `
     id,
     application_no,
     status,
+    segment,
     blocker,
     updated_at,
     borrowers (
@@ -241,6 +244,7 @@ type NestedReleaseFile = {
 type NestedApplication = {
   application_no: string | null;
   status: string;
+  segment: string | null;
   blocker: string | null;
   updated_at: string;
   borrowers: NestedBorrower | NestedBorrower[] | null;
@@ -261,11 +265,15 @@ function mapQueueRow(row: RawQueueRow): LraQueueItem {
   const borrower = Array.isArray(borrowerRaw) ? borrowerRaw[0] : borrowerRaw;
   const releaseRaw = app?.release_files;
   const releaseFile = Array.isArray(releaseRaw) ? releaseRaw[0] : releaseRaw;
+  const segmentRaw = app?.segment ?? null;
+  const segment: "sme" | "seafarer" | null =
+    segmentRaw === "sme" || segmentRaw === "seafarer" ? segmentRaw : null;
 
   return {
     applicationId: row.loan_application_id,
     computationId: row.computation_id,
     queuedAt: row.queued_at,
+    segment,
     application: app
       ? {
           applicationNo: app.application_no,
@@ -308,6 +316,15 @@ function passesStatusFilter(
 ): boolean {
   if (statusSpec.mode === "all") return true;
   return item.application?.status === statusSpec.status;
+}
+
+/** Null segment never matches a concrete Seafarer/SME filter. */
+export function passesSegmentFilter(
+  item: LraQueueItem,
+  segment: "all" | "seafarer" | "sme",
+): boolean {
+  if (segment === "all") return true;
+  return item.segment === segment;
 }
 
 function compareQueueItems(
@@ -404,6 +421,7 @@ export async function getLraQueue(
     search = "",
     scope = "active",
     statusFilter = "all",
+    segmentFilter = "all",
     from = null,
     to = null,
     sortKey = "priority",
@@ -417,6 +435,7 @@ export async function getLraQueue(
   const term = sanitizeSearchTerm(search);
   const scopeSpec = scopeFilterSpec(scope);
   const statusSpec = statusFilterSpec(statusFilter);
+  const segmentSpec = segmentFilter;
 
   let applicationIds: string[] | null = null;
   if (term) {
@@ -439,7 +458,9 @@ export async function getLraQueue(
 
   const filtered = superset.filter(
     (item) =>
-      passesScope(item, scopeSpec) && passesStatusFilter(item, statusSpec),
+      passesScope(item, scopeSpec) &&
+      passesStatusFilter(item, statusSpec) &&
+      passesSegmentFilter(item, segmentSpec),
   );
   filtered.sort((a, b) => compareQueueItems(a, b, sortKey, sortDir));
 

@@ -19,6 +19,7 @@ export type CsaQueueItem = {
   status: string;
   blocker: string | null;
   isReloan: boolean;
+  segment: "sme" | "seafarer" | null;
   createdAt: string;
   updatedAt: string;
   borrower: {
@@ -33,6 +34,7 @@ export type CsaQueueItem = {
 export type CsaQueueQueryParams = {
   search?: string;
   workFilter?: CsaWorkFilter;
+  segment?: "all" | "seafarer" | "sme";
   from?: string | null;
   to?: string | null;
   sortKey?: CsaQueueSortKey;
@@ -181,6 +183,7 @@ export async function getCsaQueue(
   const {
     search = "",
     workFilter = "all",
+    segment: segmentFilter = "all",
     from = null,
     to = null,
     sortKey,
@@ -213,6 +216,7 @@ export async function getCsaQueue(
       status,
       blocker,
       is_reloan,
+      segment,
       created_at,
       updated_at,
       borrowers!inner (
@@ -234,6 +238,10 @@ export async function getCsaQueue(
     query = query.or(
       `status.in.(${filterSpec.statuses.join(",")}),blocker.not.is.null`,
     );
+  }
+
+  if (segmentFilter !== "all") {
+    query = query.eq("segment", segmentFilter);
   }
 
   if (from) {
@@ -281,12 +289,17 @@ export async function getCsaQueue(
   const rows: CsaQueueItem[] = (data ?? []).map((row) => {
     const borrowerRaw = row.borrowers;
     const borrower = Array.isArray(borrowerRaw) ? borrowerRaw[0] : borrowerRaw;
+    const segmentRaw = row.segment as string | null;
+    const segment: "sme" | "seafarer" | null =
+      segmentRaw === "sme" || segmentRaw === "seafarer" ? segmentRaw : null;
+
     return {
       id: row.id as string,
       applicationNo: (row.application_no as string | null) ?? null,
       status: row.status as string,
       blocker: (row.blocker as string | null) ?? null,
       isReloan: Boolean(row.is_reloan),
+      segment,
       createdAt: row.created_at as string,
       updatedAt: row.updated_at as string,
       borrower: borrower

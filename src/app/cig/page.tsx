@@ -66,6 +66,24 @@ const WORK_CHIPS: Array<{ id: CigWorkFilter; label: string }> = [
   { id: "endorsed_today", label: "Endorsed today" },
 ];
 
+const SEGMENT_CHIPS: Array<{
+  id: "all" | "seafarer" | "sme";
+  label: string;
+}> = [
+  { id: "all", label: "All" },
+  { id: "seafarer", label: "Seafarer" },
+  { id: "sme", label: "SME" },
+];
+
+function segmentBadge(segment: "sme" | "seafarer" | null) {
+  const isSme = segment === "sme";
+  return (
+    <Badge variant={isSme ? "navy" : "teal"} dot>
+      {isSme ? "SME" : "Seafarer"}
+    </Badge>
+  );
+}
+
 const iconProps = {
   viewBox: "0 0 24 24",
   fill: "none",
@@ -156,6 +174,7 @@ function workChipLabel(filter: CigWorkFilter): string {
 function buildQueueQuery(params: {
   search: string;
   workFilter: CigWorkFilter;
+  segment: "all" | "seafarer" | "sme";
   dateRange: DateRangeValue;
   sortKey: SortKey;
   sortDir: "asc" | "desc";
@@ -165,6 +184,7 @@ function buildQueueQuery(params: {
   const qs = new URLSearchParams();
   if (params.search.trim()) qs.set("search", params.search.trim());
   qs.set("work", params.workFilter);
+  qs.set("segment", params.segment);
   qs.set("range", params.dateRange.preset);
   if (params.dateRange.preset === "custom") {
     if (params.dateRange.from) qs.set("from", params.dateRange.from);
@@ -193,6 +213,9 @@ export default function CigDashboardPage() {
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [workFilter, setWorkFilter] = useState<CigWorkFilter>("all");
+  const [segmentFilter, setSegmentFilter] = useState<
+    "all" | "seafarer" | "sme"
+  >("all");
   const [dateRange, setDateRange] = useState<DateRangeValue>(DEFAULT_DATE_RANGE);
   const [viewMode, setViewMode] = useState<HistoryViewMode>("list");
   const [pageSize, setPageSize] =
@@ -209,7 +232,15 @@ export default function CigDashboardPage() {
 
   useEffect(() => {
     setPage(1);
-  }, [debouncedSearch, workFilter, dateRange, pageSize, sortKey, sortDir]);
+  }, [
+    debouncedSearch,
+    workFilter,
+    segmentFilter,
+    dateRange,
+    pageSize,
+    sortKey,
+    sortDir,
+  ]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -218,6 +249,7 @@ export default function CigDashboardPage() {
       const query = buildQueueQuery({
         search: debouncedSearch,
         workFilter,
+        segment: segmentFilter,
         dateRange,
         sortKey,
         sortDir,
@@ -242,6 +274,7 @@ export default function CigDashboardPage() {
   }, [
     debouncedSearch,
     workFilter,
+    segmentFilter,
     dateRange,
     sortKey,
     sortDir,
@@ -593,6 +626,21 @@ export default function CigDashboardPage() {
 
         <div className={cn("filter-panel", filterPanelOpen && "is-open")}>
           <div className="filter-group">
+            <span className="filter-group-label">Segment</span>
+            <div className="filter-bar">
+              {SEGMENT_CHIPS.map((chip) => (
+                <button
+                  key={chip.id}
+                  type="button"
+                  className={cn("fchip", segmentFilter === chip.id && "is-on")}
+                  onClick={() => setSegmentFilter(chip.id)}
+                >
+                  {chip.label}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className="filter-group">
             <span className="filter-group-label">Endorsed date</span>
             <DateRangeFilter value={dateRange} onChange={setDateRange} />
           </div>
@@ -605,6 +653,7 @@ export default function CigDashboardPage() {
             <thead>
               <tr>
                 <Th>Borrower</Th>
+                <Th>Segment</Th>
                 <Th>Status</Th>
                 <Th>Callback</Th>
                 <Th>Endorsed</Th>
@@ -616,7 +665,7 @@ export default function CigDashboardPage() {
             <tbody>
               {Array.from({ length: 6 }, (_, i) => (
                 <tr key={i}>
-                  <Td colSpan={7}>
+                  <Td colSpan={8}>
                     <Skeleton variant="line" />
                   </Td>
                 </tr>
@@ -695,6 +744,7 @@ export default function CigDashboardPage() {
             <thead>
               <tr>
                 <Th>Borrower</Th>
+                <Th>Segment</Th>
                 <Th className="sortable" onClick={() => toggleSort("status")}>
                   Status
                   {sortArrow("status")}
@@ -732,6 +782,7 @@ export default function CigDashboardPage() {
                     )}
                   >
                     <Td>{renderBorrowerCell(app)}</Td>
+                    <Td>{segmentBadge(app.segment)}</Td>
                     <Td>{renderStatusCell(app)}</Td>
                     <Td>
                       {app.callbackOverdueAt ? (

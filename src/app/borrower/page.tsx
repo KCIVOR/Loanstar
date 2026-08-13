@@ -10,6 +10,7 @@ import {
   Button,
   Card,
   cn,
+  ConfirmDialog,
   DropdownMenu,
   EmptyState,
   Label,
@@ -50,6 +51,8 @@ type Application = {
   blocker: string | null;
   isReloan: boolean;
   createdAt: string;
+  segment: string;
+  entityType: string | null;
   loanAmount: number | null;
   loanTypeName: string | null;
   termMonths: number | null;
@@ -183,6 +186,8 @@ export default function BorrowerDashboardPage() {
   const [pickerSegment, setPickerSegment] = useState<StartSegment>("seafarer");
   const [pickerEntityType, setPickerEntityType] =
     useState<StartEntityType>("individual");
+  const [confirmDeleteDraft, setConfirmDeleteDraft] = useState(false);
+  const [deleteDraftLoading, setDeleteDraftLoading] = useState(false);
   const [historySearch, setHistorySearch] = useState("");
   const [historyStatus, setHistoryStatus] = useState("all");
   const [historyPage, setHistoryPage] = useState(1);
@@ -298,9 +303,9 @@ export default function BorrowerDashboardPage() {
   }, [load]);
 
   /**
-   * `body` is only meaningful for a brand-new ("first") application — the
-   * API ignores it for resume/reloan (inherits parent segment instead), so
-   * the reloan "Apply again" click below can keep calling this with no body.
+   * `body` supplies segment/entityType for first and reloan creates. Resume
+   * of an existing draft ignores body (API returns early). Omit body only
+   * when you intentionally want the API's no-body fallback (inherit/default).
    */
   async function handleStartApplication(body?: {
     segment: StartSegment;
@@ -332,16 +337,25 @@ export default function BorrowerDashboardPage() {
     }
   }
 
-  /** First applications choose a segment via the picker modal; a reloan
-   * always inherits the parent's segment, so it can start immediately. */
+  /** Both first and reloan open the segment picker. Reloan prefills from the
+   * latest application; first defaults to Seafarer. */
   function handleStartClick() {
-    if (appKind === "first") {
+    if (appKind === "reloan") {
+      const latest = applications[0];
+      const segment = latest?.segment === "sme" ? "sme" : "seafarer";
+      setPickerSegment(segment);
+      setPickerEntityType(
+        segment === "sme"
+          ? latest?.entityType === "corporate"
+            ? "corporate"
+            : "individual"
+          : "individual",
+      );
+    } else {
       setPickerSegment("seafarer");
       setPickerEntityType("individual");
-      setShowSegmentPicker(true);
-      return;
     }
-    void handleStartApplication();
+    setShowSegmentPicker(true);
   }
 
   function handleConfirmSegmentPicker() {
@@ -364,6 +378,34 @@ export default function BorrowerDashboardPage() {
         !(RELOAN_TERMINAL_STATUSES as readonly string[]).includes(a.status) &&
         !LOAN_STATUSES.includes(a.status),
     ) ?? null;
+
+  async function handleDeleteDraft() {
+    if (!pipelineApp || pipelineApp.status !== "draft") return;
+    setDeleteDraftLoading(true);
+    setError(null);
+    try {
+      const res = await fetch(
+        `/api/borrower/applications/${pipelineApp.id}`,
+        { method: "DELETE" },
+      );
+      if (!res.ok) {
+        const errBody = (await res.json().catch(() => null)) as {
+          error?: string;
+        } | null;
+        throw new Error(errBody?.error ?? "Failed to delete draft");
+      }
+      setConfirmDeleteDraft(false);
+      await load();
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : "Failed to delete draft",
+      );
+      setConfirmDeleteDraft(false);
+    } finally {
+      setDeleteDraftLoading(false);
+    }
+  }
+
   const appKind = nextApplicationKind({ applicationStatuses: statuses });
   const canStart = canStartReloan({ applicationStatuses: statuses });
   const startLabel =
@@ -722,9 +764,18 @@ export default function BorrowerDashboardPage() {
                     {nextActionLabel(pipelineApp.status)}
                   </Button>
                 </Link>
+                {pipelineApp.status === "draft" ? (
+                  <Button
+                    variant="danger-soft"
+                    size="sm"
+                    onClick={() => setConfirmDeleteDraft(true)}
+                  >
+                    Delete draft
+                  </Button>
+                ) : null}
               </div>
             </Card>
-          ) : loan ? null : (
+          ) : loan && !fullyPaid ? null : (
             <Card className="mt-6">
               <EmptyState
                 title="No active application"
@@ -927,7 +978,7 @@ export default function BorrowerDashboardPage() {
 
       <Modal
         open={showSegmentPicker}
-        title="Start application"
+        title={startLabel}
         onClose={() => setShowSegmentPicker(false)}
         footer={
           <Button
@@ -976,6 +1027,18 @@ export default function BorrowerDashboardPage() {
           ) : null}
         </div>
       </Modal>
+
+      <ConfirmDialog
+        open={confirmDeleteDraft}
+        title="Delete this draft application?"
+        message="This cannot be undone. Any documents you uploaded with this draft will be removed too."
+        confirmLabel="Delete draft"
+        cancelLabel="Cancel"
+        variant="danger"
+        loading={deleteDraftLoading}
+        onConfirm={() => void handleDeleteDraft()}
+        onCancel={() => setConfirmDeleteDraft(false)}
+      />
     </div>
   );
 }

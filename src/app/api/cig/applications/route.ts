@@ -6,6 +6,7 @@ import {
   computeCigQueueKpis,
   getCigQueue,
   inEndorsedAtBounds,
+  passesSegmentFilter,
   passesWorkFilter,
   sortCigQueue,
   workFilterSpec,
@@ -15,6 +16,7 @@ import { requireModulePermission } from "@/lib/permissions/server";
 import { createClient } from "@/lib/supabase/server";
 
 const RANGE_PRESETS = new Set(["30d", "90d", "all", "custom"]);
+const SEGMENT_FILTERS = new Set(["all", "seafarer", "sme"]);
 const SORT_KEYS = new Set<CigQueueSortKey>([
   "priority",
   "endorsed",
@@ -31,6 +33,11 @@ export async function GET(request: Request) {
     const workRaw =
       searchParams.get("work") ?? searchParams.get("filter") ?? "all";
     const workFilter = workFilterSpec(workRaw);
+
+    const segmentRaw = searchParams.get("segment") ?? "all";
+    const segmentFilter = (
+      SEGMENT_FILTERS.has(segmentRaw) ? segmentRaw : "all"
+    ) as "all" | "seafarer" | "sme";
 
     // Active queue defaults to All time (must not hide old-but-still-open items).
     const rangeRaw = searchParams.get("range") ?? "all";
@@ -70,6 +77,7 @@ export async function GET(request: Request) {
       (row) =>
         inEndorsedAtBounds(row.endorsedAt, from, to) &&
         passesWorkFilter(row, workFilter) &&
+        passesSegmentFilter(row, segmentFilter) &&
         cigQueueSearchPredicate(row, search),
     );
     const sorted = sortCigQueue(filtered, sortKey, sortDir);

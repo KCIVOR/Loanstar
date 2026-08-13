@@ -36,9 +36,24 @@ import {
   proofSearchPredicate,
   proofStatusFilterSpec,
   sortProofsByDate,
+  type ProofMasterlistJoin,
   type ProofQueueItem,
   type ProofStatusFilter,
 } from "@/lib/collector/proofs";
+
+type SegmentFilter = "all" | "seafarer" | "sme";
+
+type ProofMasterlistWithSegment = ProofMasterlistJoin & {
+  segment: "sme" | "seafarer" | null;
+};
+
+/** Desk payment row with `masterlist.segment` from PAYMENT_SELECT (Phase 16). */
+type ProofPaymentRow = Omit<ProofQueueItem, "masterlist"> & {
+  masterlist?:
+    | ProofMasterlistWithSegment
+    | ProofMasterlistWithSegment[]
+    | null;
+};
 
 const PAGE_SIZE_OPTIONS = PROOF_LIST_PAGE_SIZES;
 
@@ -47,6 +62,21 @@ const STATUS_CHIPS: Array<{ id: ProofStatusFilter; label: string }> = [
   { id: "pending_verification", label: "Pending" },
   { id: "confirmed", label: "Confirmed" },
 ];
+
+const SEGMENT_CHIPS: Array<{ id: SegmentFilter; label: string }> = [
+  { id: "all", label: "All" },
+  { id: "seafarer", label: "Seafarer" },
+  { id: "sme", label: "SME" },
+];
+
+function segmentBadge(segment: string | null | undefined) {
+  const isSme = segment === "sme";
+  return (
+    <Badge variant={isSme ? "navy" : "teal"} dot>
+      {isSme ? "SME" : "Seafarer"}
+    </Badge>
+  );
+}
 
 const iconProps = {
   viewBox: "0 0 24 24",
@@ -106,13 +136,14 @@ function statusLabel(status: string): string {
 }
 
 export default function CollectorProofsPage() {
-  const [payments, setPayments] = useState<ProofQueueItem[]>([]);
+  const [payments, setPayments] = useState<ProofPaymentRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [acting, setActing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<ProofStatusFilter>("all");
+  const [segmentFilter, setSegmentFilter] = useState<SegmentFilter>("all");
   const [dateSortDir, setDateSortDir] = useState<"asc" | "desc" | null>(null);
   const [viewMode, setViewMode] = useState<HistoryViewMode>("list");
   const [filterPanelOpen, setFilterPanelOpen] = useState(false);
@@ -127,7 +158,7 @@ export default function CollectorProofsPage() {
     try {
       const res = await fetch("/api/collector/payments?scope=desk");
       if (!res.ok) throw new Error("Failed to load proofs");
-      const data = (await res.json()) as { payments: ProofQueueItem[] };
+      const data = (await res.json()) as { payments: ProofPaymentRow[] };
       setPayments(data.payments);
       if (!opts?.silent) setError(null);
     } catch (err) {
@@ -143,7 +174,7 @@ export default function CollectorProofsPage() {
 
   useEffect(() => {
     setPage(1);
-  }, [search, statusFilter, pageSize, dateSortDir]);
+  }, [search, statusFilter, segmentFilter, pageSize, dateSortDir]);
 
   async function viewProof(id: string) {
     setError(null);
@@ -214,10 +245,16 @@ export default function CollectorProofsPage() {
     const statused = searched.filter((pay) =>
       passesProofStatusFilter(pay.status, statusFilter),
     );
+    const segmented =
+      segmentFilter === "all"
+        ? statused
+        : statused.filter(
+            (pay) => firstJoin(pay.masterlist)?.segment === segmentFilter,
+          );
     return dateSortDir === null
-      ? statused
-      : sortProofsByDate(statused, dateSortDir);
-  }, [payments, search, statusFilter, dateSortDir]);
+      ? segmented
+      : sortProofsByDate(segmented, dateSortDir);
+  }, [payments, search, statusFilter, segmentFilter, dateSortDir]);
 
   const safePageSize = clampProofListPageSize(pageSize);
   const totalCount = filtered.length;
@@ -228,9 +265,15 @@ export default function CollectorProofsPage() {
   const summaryStart = rows.length ? pageStart + 1 : 0;
   const summaryEnd = pageStart + rows.length;
 
-  const activeFilterCount = statusFilter !== "all" ? 1 : 0;
+  const activeFilterCount =
+    (statusFilter !== "all" ? 1 : 0) + (segmentFilter !== "all" ? 1 : 0);
 
-  function renderActions(pay: ProofQueueItem) {
+  function clearFilters() {
+    setStatus("all");
+    setSegmentFilter("all");
+  }
+
+  function renderActions(pay: ProofPaymentRow) {
     return (
       <div className="flex flex-wrap gap-1.5">
         {pay.status === "pending_verification" ? (
@@ -362,11 +405,23 @@ export default function CollectorProofsPage() {
                 </button>
               </span>
             ) : null}
+            {segmentFilter !== "all" ? (
+              <span className="active-pill">
+                Segment: {segmentFilter === "sme" ? "SME" : "Seafarer"}
+                <button
+                  type="button"
+                  aria-label="Clear segment filter"
+                  onClick={() => setSegmentFilter("all")}
+                >
+                  ×
+                </button>
+              </span>
+            ) : null}
             {activeFilterCount > 0 ? (
               <button
                 type="button"
                 className="clear-link"
-                onClick={() => setStatus("all")}
+                onClick={clearFilters}
               >
                 Clear
               </button>
@@ -434,6 +489,21 @@ export default function CollectorProofsPage() {
               ))}
             </div>
           </div>
+          <div className="filter-group">
+            <span className="filter-group-label">Segment</span>
+            <div className="flex flex-wrap gap-1.5">
+              {SEGMENT_CHIPS.map((chip) => (
+                <button
+                  key={chip.id}
+                  type="button"
+                  className={cn("fchip", segmentFilter === chip.id && "is-on")}
+                  onClick={() => setSegmentFilter(chip.id)}
+                >
+                  {chip.label}
+                </button>
+              ))}
+            </div>
+          </div>
         </div>
       </div>
 
@@ -443,6 +513,7 @@ export default function CollectorProofsPage() {
             <thead>
               <tr>
                 <Th>Borrower</Th>
+                <Th>Segment</Th>
                 <Th>Reference</Th>
                 <Th>Date</Th>
                 <Th num>Amount</Th>
@@ -453,7 +524,7 @@ export default function CollectorProofsPage() {
             <tbody>
               {Array.from({ length: 6 }, (_, i) => (
                 <tr key={i}>
-                  <Td colSpan={6}>
+                  <Td colSpan={7}>
                     <Skeleton variant="line" />
                   </Td>
                 </tr>
@@ -470,7 +541,7 @@ export default function CollectorProofsPage() {
       ) : totalCount === 0 ? (
         <EmptyState
           title="No matching proofs"
-          description="Try a different search term or status filter."
+          description="Try a different search term, status, or segment filter."
           showMark={false}
         />
       ) : viewMode === "grid" ? (
@@ -486,7 +557,16 @@ export default function CollectorProofsPage() {
                   </Badge>
                 </div>
                 <div className="gcard-name">{ml?.borrower_name ?? "—"}</div>
+                {pay.status === "confirmed" && pay.uploadedByName ? (
+                  <p className="mb-2 text-xs text-ink-500">
+                    Recorded by {pay.uploadedByName}
+                  </p>
+                ) : null}
                 <div className="gcard-meta">
+                  <div className="row">
+                    <span className="k">Segment</span>
+                    <span className="v">{segmentBadge(ml?.segment)}</span>
+                  </div>
                   <div className="row">
                     <span className="k">Account</span>
                     <span className="v mono">{ml?.loan_account_no ?? "—"}</span>
@@ -513,6 +593,7 @@ export default function CollectorProofsPage() {
             <thead>
               <tr>
                 <Th>Borrower</Th>
+                <Th>Segment</Th>
                 <Th>Reference</Th>
                 <Th className="sortable" onClick={toggleDateSort}>
                   Date
@@ -540,6 +621,7 @@ export default function CollectorProofsPage() {
                         {ml?.loan_account_no ?? "—"}
                       </div>
                     </Td>
+                    <Td>{segmentBadge(ml?.segment)}</Td>
                     <Td className="mono">{pay.reference_no ?? "—"}</Td>
                     <Td className="mono">{formatDate(pay.payment_date)}</Td>
                     <Td num className="mono text-teal-600">
@@ -549,6 +631,11 @@ export default function CollectorProofsPage() {
                       <Badge variant={paymentStatusVariant(pay.status)}>
                         {statusLabel(pay.status)}
                       </Badge>
+                      {pay.status === "confirmed" && pay.uploadedByName ? (
+                        <div className="mt-1 text-xs text-ink-500">
+                          Recorded by {pay.uploadedByName}
+                        </div>
+                      ) : null}
                     </Td>
                     <Td>{renderActions(pay)}</Td>
                   </tr>

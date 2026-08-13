@@ -11,6 +11,7 @@ import {
 } from "@/components/history";
 import {
   Alert,
+  Badge,
   Button,
   EmptyState,
   PageHeader,
@@ -44,6 +45,15 @@ const PATH_CHIPS: Array<{ id: ReleasePathFilter; label: string }> = [
   { id: "without_pdc", label: "Without PDC" },
 ];
 
+const SEGMENT_CHIPS: Array<{
+  id: "all" | "seafarer" | "sme";
+  label: string;
+}> = [
+  { id: "all", label: "All" },
+  { id: "seafarer", label: "Seafarer" },
+  { id: "sme", label: "SME" },
+];
+
 const DEFAULT_DATE_RANGE: DateRangeValue = {
   preset: "30d",
   from: "",
@@ -69,6 +79,15 @@ function releasePathLabel(path: ReleasePath): string {
   return "Without PDC";
 }
 
+function segmentBadge(segment: "sme" | "seafarer" | null) {
+  const isSme = segment === "sme";
+  return (
+    <Badge variant={isSme ? "navy" : "teal"} dot>
+      {isSme ? "SME" : "Seafarer"}
+    </Badge>
+  );
+}
+
 function dateRangePillLabel(value: DateRangeValue): string {
   if (value.preset === "30d") return "Last 30 days";
   if (value.preset === "90d") return "Last 90 days";
@@ -81,6 +100,7 @@ function dateRangePillLabel(value: DateRangeValue): string {
 function buildHistoryQuery(params: {
   search: string;
   releasePath: ReleasePathFilter;
+  segment: "all" | "seafarer" | "sme";
   dateRange: DateRangeValue;
   sortKey: SortKey;
   sortDir: "asc" | "desc";
@@ -90,6 +110,7 @@ function buildHistoryQuery(params: {
   const qs = new URLSearchParams();
   if (params.search.trim()) qs.set("search", params.search.trim());
   qs.set("releasePath", params.releasePath);
+  qs.set("segment", params.segment);
   qs.set("range", params.dateRange.preset);
   if (params.dateRange.preset === "custom") {
     if (params.dateRange.from) qs.set("from", params.dateRange.from);
@@ -119,6 +140,9 @@ export default function LraHistoryPage() {
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [releasePath, setReleasePath] = useState<ReleasePathFilter>("all");
+  const [segmentFilter, setSegmentFilter] = useState<
+    "all" | "seafarer" | "sme"
+  >("all");
   const [dateRange, setDateRange] = useState<DateRangeValue>(DEFAULT_DATE_RANGE);
   const [viewMode, setViewMode] = useState<HistoryViewMode>("list");
   const [pageSize, setPageSize] =
@@ -135,7 +159,15 @@ export default function LraHistoryPage() {
 
   useEffect(() => {
     setPage(1);
-  }, [debouncedSearch, releasePath, dateRange, pageSize, sortKey, sortDir]);
+  }, [
+    debouncedSearch,
+    releasePath,
+    segmentFilter,
+    dateRange,
+    pageSize,
+    sortKey,
+    sortDir,
+  ]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -144,6 +176,7 @@ export default function LraHistoryPage() {
       const query = buildHistoryQuery({
         search: debouncedSearch,
         releasePath,
+        segment: segmentFilter,
         dateRange,
         sortKey,
         sortDir,
@@ -168,6 +201,7 @@ export default function LraHistoryPage() {
   }, [
     debouncedSearch,
     releasePath,
+    segmentFilter,
     dateRange,
     sortKey,
     sortDir,
@@ -214,7 +248,9 @@ export default function LraHistoryPage() {
 
   const dateIsDefault = dateRange.preset === "30d";
   const activeFilterCount =
-    (releasePath !== "all" ? 1 : 0) + (dateIsDefault ? 0 : 1);
+    (releasePath !== "all" ? 1 : 0) +
+    (segmentFilter !== "all" ? 1 : 0) +
+    (dateIsDefault ? 0 : 1);
 
   const summaryStart = displayRows.length
     ? (safePage - 1) * pageSize + 1
@@ -289,6 +325,18 @@ export default function LraHistoryPage() {
                 </button>
               </span>
             ) : null}
+            {segmentFilter !== "all" ? (
+              <span className="active-pill">
+                {segmentFilter === "sme" ? "SME" : "Seafarer"}
+                <button
+                  type="button"
+                  aria-label="Clear segment filter"
+                  onClick={() => setSegmentFilter("all")}
+                >
+                  ×
+                </button>
+              </span>
+            ) : null}
             {!dateIsDefault ? (
               <span className="active-pill">
                 {dateRangePillLabel(dateRange)}
@@ -307,6 +355,7 @@ export default function LraHistoryPage() {
                 className="clear-link"
                 onClick={() => {
                   setReleasePath("all");
+                  setSegmentFilter("all");
                   setDateRange(DEFAULT_DATE_RANGE);
                 }}
               >
@@ -377,6 +426,21 @@ export default function LraHistoryPage() {
             </div>
           </div>
           <div className="filter-group">
+            <span className="filter-group-label">Segment</span>
+            <div className="filter-bar">
+              {SEGMENT_CHIPS.map((chip) => (
+                <button
+                  key={chip.id}
+                  type="button"
+                  className={cn("fchip", segmentFilter === chip.id && "is-on")}
+                  onClick={() => setSegmentFilter(chip.id)}
+                >
+                  {chip.label}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className="filter-group">
             <span className="filter-group-label">Closed date</span>
             <DateRangeFilter value={dateRange} onChange={setDateRange} />
           </div>
@@ -390,6 +454,7 @@ export default function LraHistoryPage() {
               <tr>
                 <Th>Application No.</Th>
                 <Th>Borrower</Th>
+                <Th>Segment</Th>
                 <Th>Loan Type</Th>
                 <Th num>Net Released</Th>
                 <Th>PDC Collected</Th>
@@ -400,7 +465,7 @@ export default function LraHistoryPage() {
             <tbody>
               {Array.from({ length: 6 }, (_, i) => (
                 <tr key={i}>
-                  <Td colSpan={7}>
+                  <Td colSpan={8}>
                     <Skeleton variant="line" />
                   </Td>
                 </tr>
@@ -425,6 +490,10 @@ export default function LraHistoryPage() {
               </div>
               <div className="gcard-name">{borrowerName(row)}</div>
               <div className="gcard-meta">
+                <div className="row">
+                  <span className="k">Segment</span>
+                  <span className="v">{segmentBadge(row.segment)}</span>
+                </div>
                 <div className="row">
                   <span className="k">Loan Type</span>
                   <span className="v">{row.loanTypeName ?? "—"}</span>
@@ -486,6 +555,7 @@ export default function LraHistoryPage() {
                   Borrower
                   {sortArrow("borrower")}
                 </Th>
+                <Th>Segment</Th>
                 <Th>Loan Type</Th>
                 <Th
                   className="sortable"
@@ -515,6 +585,7 @@ export default function LraHistoryPage() {
                     </span>
                   </Td>
                   <Td>{borrowerName(row)}</Td>
+                  <Td>{segmentBadge(row.segment)}</Td>
                   <Td>{row.loanTypeName ?? "—"}</Td>
                   <Td num className="mono">
                     <span

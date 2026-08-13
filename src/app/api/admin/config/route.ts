@@ -16,7 +16,9 @@ const CONFIG_KEYS = [
   "penalty_rate_sme",
   "coverage_ratio",
   "committee_size",
+  "committee_size_sme",
   "aging_thresholds",
+  "rounding_writeoff_threshold",
   "sms_enabled",
   "twilio_account_sid",
   "twilio_auth_token",
@@ -70,6 +72,7 @@ const patchConfigSchema = z.object({
   penalty_rate_sme: z.number().min(0).max(1).optional(),
   coverage_ratio: z.number().min(0).max(1).optional(),
   committee_size: z.number().int().min(1).max(15).optional(),
+  committee_size_sme: z.number().int().min(1).max(15).optional(),
   aging_thresholds: z
     .object({
       "30": z.number().int().positive(),
@@ -77,6 +80,7 @@ const patchConfigSchema = z.object({
       "90": z.number().int().positive(),
     })
     .optional(),
+  rounding_writeoff_threshold: z.number().min(0).optional(),
   sms_enabled: z.boolean().optional(),
   twilio_account_sid: z.string().optional(),
   twilio_auth_token: z.string().optional(),
@@ -116,8 +120,17 @@ export async function PATCH(request: Request) {
     if (body.committee_size !== undefined) {
       updates.push({ key: "committee_size", value: body.committee_size });
     }
+    if (body.committee_size_sme !== undefined) {
+      updates.push({ key: "committee_size_sme", value: body.committee_size_sme });
+    }
     if (body.aging_thresholds !== undefined) {
       updates.push({ key: "aging_thresholds", value: body.aging_thresholds });
+    }
+    if (body.rounding_writeoff_threshold !== undefined) {
+      updates.push({
+        key: "rounding_writeoff_threshold",
+        value: body.rounding_writeoff_threshold,
+      });
     }
     if (body.sms_enabled !== undefined) {
       updates.push({ key: "sms_enabled", value: body.sms_enabled });

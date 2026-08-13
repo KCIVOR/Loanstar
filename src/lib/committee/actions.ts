@@ -141,7 +141,7 @@ export async function executeFinalAction(
 ): Promise<{ status: string }> {
   const { data: application, error: appError } = await supabase
     .from("loan_applications")
-    .select("id, status")
+    .select("id, status, segment")
     .eq("id", applicationId)
     .single();
 
@@ -152,7 +152,9 @@ export async function executeFinalAction(
   assertFinalActionPreconditions(application.status, action, options);
 
   const votes = await getCommitteeVotes(supabase, applicationId);
-  const committeeSize = await getCommitteeSize();
+  const committeeSize = await getCommitteeSize(
+    application.segment as string | null,
+  );
   assertAllVotesCast(votes, committeeSize);
   const tally = computeVoteTally(votes, committeeSize);
 

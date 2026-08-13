@@ -6,6 +6,7 @@ export type ClosedLeadRow = {
   businessName: string | null;
   applicationId: string | null;
   applicationNo: string | null;
+  segment: "sme" | "seafarer" | null;
   convertedAt: string;
 };
 
@@ -13,6 +14,7 @@ export type ClosedLeadsSortKey = "borrower" | "business" | "convertedAt";
 
 export type ClosedLeadsQueryParams = {
   search?: string;
+  segment?: "all" | "seafarer" | "sme";
   from?: string | null;
   to?: string | null;
   sortKey?: ClosedLeadsSortKey;
@@ -62,6 +64,7 @@ export async function getClosedLeadsHistory(
 ): Promise<{ rows: ClosedLeadRow[]; totalCount: number }> {
   const {
     search = "",
+    segment: segmentFilter = "all",
     from = null,
     to = null,
     sortKey = "convertedAt",
@@ -85,12 +88,16 @@ export async function getClosedLeadsHistory(
       business_name,
       application_id,
       updated_at,
-      loan_applications ( application_no )
+      loan_applications ( application_no, segment )
     `,
       { count: "exact" },
     )
     .eq("agent_user_id", userId)
     .eq("status", "converted");
+
+  if (segmentFilter !== "all") {
+    query = query.eq("loan_applications.segment", segmentFilter);
+  }
 
   if (from) {
     query = query.gte("updated_at", toInclusiveStart(from));
@@ -126,6 +133,9 @@ export async function getClosedLeadsHistory(
   const rows = (data ?? []).map((row) => {
     const appRaw = row.loan_applications;
     const app = Array.isArray(appRaw) ? appRaw[0] : appRaw;
+    const segmentRaw = app?.segment as string | null | undefined;
+    const segment: "sme" | "seafarer" | null =
+      segmentRaw === "sme" || segmentRaw === "seafarer" ? segmentRaw : null;
 
     return {
       id: row.id as string,
@@ -133,6 +143,7 @@ export async function getClosedLeadsHistory(
       businessName: (row.business_name as string | null) ?? null,
       applicationId: (row.application_id as string | null) ?? null,
       applicationNo: (app?.application_no as string | null | undefined) ?? null,
+      segment,
       convertedAt: row.updated_at as string,
     };
   });

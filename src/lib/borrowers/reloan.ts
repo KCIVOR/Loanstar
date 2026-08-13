@@ -99,13 +99,13 @@ export type BorrowerCreateSegmentResult =
 
 /**
  * Segment to write when a borrower starts their NEXT application (first or
- * reloan). A reloan always inherits from its parent (`resolveReloanSegment`,
- * unchanged, body ignored) — see that function's doc comment for why. A first
- * application may now self-declare a segment: omitted/seafarer body keeps the
- * pre-existing default (Seafarer, no entity type) so old clients that POST an
- * empty body behave exactly as before; declaring 'sme' requires a valid
- * entityType so the insert never hits the DB's
- * `loan_applications_entity_type_sme_only` constraint.
+ * reloan). An explicit `bodySegment` is validated and used for either kind
+ * (seafarer → ok; sme → require entityType individual/corporate). When
+ * `bodySegment` is omitted/null, fall back by kind: reloan inherits from the
+ * parent via `resolveReloanSegment`; first defaults to Seafarer (no entity
+ * type) so old clients that POST an empty body behave exactly as before.
+ * Declaring 'sme' requires a valid entityType so the insert never hits the
+ * DB's `loan_applications_entity_type_sme_only` constraint.
  */
 export function resolveBorrowerCreateSegment(input: {
   kind: "first" | "reloan";
@@ -114,6 +114,28 @@ export function resolveBorrowerCreateSegment(input: {
   parentSegment?: string | null;
   parentEntityType?: string | null;
 }): BorrowerCreateSegmentResult {
+  if (input.bodySegment != null) {
+    const bodySegment = input.bodySegment;
+
+    if (bodySegment === "seafarer") {
+      return { ok: true, scope: { segment: "seafarer", entityType: null } };
+    }
+
+    if (bodySegment !== "sme") {
+      return { ok: false, error: `Invalid segment: ${bodySegment}` };
+    }
+
+    const entityType = input.bodyEntityType;
+    if (entityType !== "individual" && entityType !== "corporate") {
+      return {
+        ok: false,
+        error: "entityType (individual or corporate) is required for SME",
+      };
+    }
+
+    return { ok: true, scope: { segment: "sme", entityType } };
+  }
+
   if (input.kind === "reloan") {
     return {
       ok: true,
@@ -125,23 +147,5 @@ export function resolveBorrowerCreateSegment(input: {
     };
   }
 
-  const bodySegment = input.bodySegment ?? "seafarer";
-
-  if (bodySegment === "seafarer") {
-    return { ok: true, scope: { segment: "seafarer", entityType: null } };
-  }
-
-  if (bodySegment !== "sme") {
-    return { ok: false, error: `Invalid segment: ${bodySegment}` };
-  }
-
-  const entityType = input.bodyEntityType;
-  if (entityType !== "individual" && entityType !== "corporate") {
-    return {
-      ok: false,
-      error: "entityType (individual or corporate) is required for SME",
-    };
-  }
-
-  return { ok: true, scope: { segment: "sme", entityType } };
+  return { ok: true, scope: { segment: "seafarer", entityType: null } };
 }

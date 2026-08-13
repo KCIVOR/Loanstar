@@ -41,6 +41,7 @@ type QueueItem = {
   status: string;
   blocker: string | null;
   isReloan: boolean;
+  segment: "sme" | "seafarer" | null;
   createdAt: string;
   updatedAt: string;
   borrower: {
@@ -158,10 +159,28 @@ const WORK_CHIPS: Array<{ id: CsaWorkFilter; label: string }> = [
   { id: "negotiation", label: "Negotiation" },
 ];
 
+const SEGMENT_CHIPS: Array<{
+  id: "all" | "seafarer" | "sme";
+  label: string;
+}> = [
+  { id: "all", label: "All" },
+  { id: "seafarer", label: "Seafarer" },
+  { id: "sme", label: "SME" },
+];
+
 function queueBorrowerName(app: QueueItem): string {
   return app.borrower
     ? `${app.borrower.firstName} ${app.borrower.lastName}`
     : "Unknown borrower";
+}
+
+function segmentBadge(segment: "sme" | "seafarer" | null) {
+  const isSme = segment === "sme";
+  return (
+    <Badge variant={isSme ? "navy" : "teal"} dot>
+      {isSme ? "SME" : "Seafarer"}
+    </Badge>
+  );
 }
 
 function dateRangePillLabel(value: DateRangeValue): string {
@@ -180,6 +199,7 @@ function workFilterLabel(filter: CsaWorkFilter): string {
 function buildQueueQuery(params: {
   search: string;
   workFilter: CsaWorkFilter;
+  segment: "all" | "seafarer" | "sme";
   dateRange: DateRangeValue;
   sortKey: SortKey;
   sortDir: "asc" | "desc";
@@ -189,6 +209,7 @@ function buildQueueQuery(params: {
   const qs = new URLSearchParams();
   if (params.search.trim()) qs.set("search", params.search.trim());
   qs.set("work", params.workFilter);
+  qs.set("segment", params.segment);
   qs.set("range", params.dateRange.preset);
   if (params.dateRange.preset === "custom") {
     if (params.dateRange.from) qs.set("from", params.dateRange.from);
@@ -215,6 +236,9 @@ export default function CsaDashboardPage() {
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [workFilter, setWorkFilter] = useState<CsaWorkFilter>("all");
+  const [segmentFilter, setSegmentFilter] = useState<
+    "all" | "seafarer" | "sme"
+  >("all");
   const [dateRange, setDateRange] = useState<DateRangeValue>(DEFAULT_DATE_RANGE);
   const [viewMode, setViewMode] = useState<HistoryViewMode>("list");
   const [pageSize, setPageSize] =
@@ -231,7 +255,15 @@ export default function CsaDashboardPage() {
 
   useEffect(() => {
     setPage(1);
-  }, [debouncedSearch, workFilter, dateRange, pageSize, sortKey, sortDir]);
+  }, [
+    debouncedSearch,
+    workFilter,
+    segmentFilter,
+    dateRange,
+    pageSize,
+    sortKey,
+    sortDir,
+  ]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -240,6 +272,7 @@ export default function CsaDashboardPage() {
       const query = buildQueueQuery({
         search: debouncedSearch,
         workFilter,
+        segment: segmentFilter,
         dateRange,
         sortKey,
         sortDir,
@@ -264,6 +297,7 @@ export default function CsaDashboardPage() {
   }, [
     debouncedSearch,
     workFilter,
+    segmentFilter,
     dateRange,
     sortKey,
     sortDir,
@@ -557,6 +591,21 @@ export default function CsaDashboardPage() {
             </div>
           </div>
           <div className="filter-group">
+            <span className="filter-group-label">Segment</span>
+            <div className="filter-bar">
+              {SEGMENT_CHIPS.map((chip) => (
+                <button
+                  key={chip.id}
+                  type="button"
+                  className={cn("fchip", segmentFilter === chip.id && "is-on")}
+                  onClick={() => setSegmentFilter(chip.id)}
+                >
+                  {chip.label}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className="filter-group">
             <span className="filter-group-label">Filed date</span>
             <DateRangeFilter value={dateRange} onChange={setDateRange} />
           </div>
@@ -570,6 +619,7 @@ export default function CsaDashboardPage() {
               <tr>
                 <Th>Borrower</Th>
                 <Th>Type</Th>
+                <Th>Segment</Th>
                 <Th>Status</Th>
                 <Th>Blocker</Th>
                 <Th>Filed</Th>
@@ -580,7 +630,7 @@ export default function CsaDashboardPage() {
             <tbody>
               {Array.from({ length: 6 }, (_, i) => (
                 <tr key={i}>
-                  <Td colSpan={7}>
+                  <Td colSpan={8}>
                     <Skeleton variant="line" />
                   </Td>
                 </tr>
@@ -662,6 +712,7 @@ export default function CsaDashboardPage() {
               <tr>
                 <Th>Borrower</Th>
                 <Th>Type</Th>
+                <Th>Segment</Th>
                 <Th
                   className="sortable"
                   onClick={() => toggleSort("status")}
@@ -719,6 +770,7 @@ export default function CsaDashboardPage() {
                       </div>
                     </Td>
                     <Td>{app.isReloan ? "Reloan" : "New loan"}</Td>
+                    <Td>{segmentBadge(app.segment)}</Td>
                     <Td>
                       <Badge variant={statusBadgeVariant(app.status)} dot>
                         {formatStatusLabel(app.status)}

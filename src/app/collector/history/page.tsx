@@ -28,6 +28,7 @@ import {
 type MasterlistJoin = {
   borrower_name: string;
   loan_account_no: string | null;
+  segment: "sme" | "seafarer" | null;
 };
 
 type Payment = {
@@ -60,8 +61,24 @@ const RECENT_DAYS = 30;
 
 type RangeFilter = "recent" | "all";
 type HistoryTab = "dcrs" | "payments";
+type SegmentFilter = "all" | "seafarer" | "sme";
 type PayStatusFilter = "all" | "confirmed" | "rejected" | "posted" | "pending_verification";
 type DcrStatusFilter = "all" | "draft" | "submitted" | "reconciled" | "rejected";
+
+const SEGMENT_CHIPS: Array<{ id: SegmentFilter; label: string }> = [
+  { id: "all", label: "All segment" },
+  { id: "seafarer", label: "Seafarer" },
+  { id: "sme", label: "SME" },
+];
+
+function segmentBadge(segment: string | null | undefined) {
+  const isSme = segment === "sme";
+  return (
+    <Badge variant={isSme ? "navy" : "teal"} dot>
+      {isSme ? "SME" : "Seafarer"}
+    </Badge>
+  );
+}
 
 export default function CollectorHistoryPage() {
   const [payments, setPayments] = useState<Payment[]>([]);
@@ -73,6 +90,7 @@ export default function CollectorHistoryPage() {
   const [range, setRange] = useState<RangeFilter>("recent");
   const [search, setSearch] = useState("");
   const [payStatus, setPayStatus] = useState<PayStatusFilter>("all");
+  const [segmentFilter, setSegmentFilter] = useState<SegmentFilter>("all");
   const [dcrStatus, setDcrStatus] = useState<DcrStatusFilter>("all");
   const [page, setPage] = useState(1);
 
@@ -102,7 +120,7 @@ export default function CollectorHistoryPage() {
 
   useEffect(() => {
     setPage(1);
-  }, [tab, range, search, payStatus, dcrStatus]);
+  }, [tab, range, search, payStatus, segmentFilter, dcrStatus]);
 
   const filteredDcrs = useMemo(() => {
     const term = search.trim().toLowerCase();
@@ -124,12 +142,15 @@ export default function CollectorHistoryPage() {
     const term = search.trim().toLowerCase();
     return payments.filter((pay) => {
       if (payStatus !== "all" && pay.status !== payStatus) return false;
+      const ml = firstJoin(pay.masterlist);
+      if (segmentFilter !== "all" && ml?.segment !== segmentFilter) {
+        return false;
+      }
       const when = pay.reviewed_at ?? pay.created_at;
       if (range === "recent" && !isWithinRecentDays(when, RECENT_DAYS)) {
         return false;
       }
       if (!term) return true;
-      const ml = firstJoin(pay.masterlist);
       return (
         (pay.reference_no?.toLowerCase().includes(term) ?? false) ||
         (ml?.borrower_name.toLowerCase().includes(term) ?? false) ||
@@ -137,7 +158,7 @@ export default function CollectorHistoryPage() {
         pay.status.toLowerCase().includes(term)
       );
     });
-  }, [payments, payStatus, range, search]);
+  }, [payments, payStatus, segmentFilter, range, search]);
 
   const rows = tab === "dcrs" ? filteredDcrs : filteredPayments;
   const pageCount = Math.max(1, Math.ceil(rows.length / PAGE_SIZE));
@@ -249,23 +270,38 @@ export default function CollectorHistoryPage() {
                 </button>
               ))
             : (
-                [
-                  ["all", "All status"],
-                  ["pending_verification", "Pending"],
-                  ["confirmed", "Confirmed"],
-                  ["posted", "Posted"],
-                  ["rejected", "Rejected"],
-                ] as const
-              ).map(([value, label]) => (
-                <button
-                  key={value}
-                  type="button"
-                  className={cn("fchip", payStatus === value && "on")}
-                  onClick={() => setPayStatus(value)}
-                >
-                  {label}
-                </button>
-              ))}
+                <>
+                  {(
+                    [
+                      ["all", "All status"],
+                      ["pending_verification", "Pending"],
+                      ["confirmed", "Confirmed"],
+                      ["posted", "Posted"],
+                      ["rejected", "Rejected"],
+                    ] as const
+                  ).map(([value, label]) => (
+                    <button
+                      key={value}
+                      type="button"
+                      className={cn("fchip", payStatus === value && "on")}
+                      onClick={() => setPayStatus(value)}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                  <span className="mx-1 self-center text-ink-300">|</span>
+                  {SEGMENT_CHIPS.map((chip) => (
+                    <button
+                      key={chip.id}
+                      type="button"
+                      className={cn("fchip", segmentFilter === chip.id && "on")}
+                      onClick={() => setSegmentFilter(chip.id)}
+                    >
+                      {chip.label}
+                    </button>
+                  ))}
+                </>
+              )}
         </div>
       </div>
 
@@ -343,6 +379,7 @@ export default function CollectorHistoryPage() {
               <thead>
                 <tr>
                   <Th>Borrower</Th>
+                  <Th>Segment</Th>
                   <Th>Reference</Th>
                   <Th>Date</Th>
                   <Th num>Amount</Th>
@@ -363,6 +400,7 @@ export default function CollectorHistoryPage() {
                           {ml?.loan_account_no ?? "—"}
                         </div>
                       </Td>
+                      <Td>{segmentBadge(ml?.segment)}</Td>
                       <Td className="mono">{pay.reference_no ?? "—"}</Td>
                       <Td className="mono">{formatDate(pay.payment_date)}</Td>
                       <Td num className="mono text-teal-600">

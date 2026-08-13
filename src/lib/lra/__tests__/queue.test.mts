@@ -34,6 +34,7 @@ function queueItem(overrides: {
     applicationId: "app-1",
     computationId: "comp-1",
     queuedAt: "2026-08-01T10:00:00.000Z",
+    segment: null,
     application: {
       applicationNo: "APP-001",
       status: applicationStatus ?? "release_signing",

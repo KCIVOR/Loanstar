@@ -4,7 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 
 export async function GET() {
   try {
-    await requireModulePermission("collection", "view");
+    await requireModulePermission("briefings", "view");
     const supabase = await createClient();
 
     const { data, error } = await supabase
@@ -19,6 +19,7 @@ export async function GET() {
           id,
           application_no,
           status,
+          segment,
           borrowers (
             borrower_no,
             first_name,
@@ -53,6 +54,7 @@ export async function GET() {
               id: app.id as string,
               applicationNo: (app.application_no as string | null) ?? null,
               status: app.status as string,
+              segment: (app.segment as "sme" | "seafarer" | null) ?? null,
             }
           : null,
         borrower: borrower

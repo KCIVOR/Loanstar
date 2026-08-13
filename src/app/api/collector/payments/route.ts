@@ -1,7 +1,19 @@
+import { NextResponse } from "next/server";
+import { z } from "zod";
+
+import { writeAuditEvent } from "@/lib/audit/writer";
 import { handleApiError, jsonOk } from "@/lib/api/handler";
 import { paymentIdsLockedForCollectorDesk } from "@/lib/collector/desk";
-import { requireModulePermission } from "@/lib/permissions/server";
-import { createClient } from "@/lib/supabase/server";
+import { DOCUMENT_BUCKET } from "@/lib/constants";
+import {
+  assertPaymentProofPathOwnedByBorrower,
+  isAllowedPaymentProofMime,
+} from "@/lib/payments/proof-storage";
+import {
+  ForbiddenError,
+  requireModulePermission,
+} from "@/lib/permissions/server";
+import { createClient, createServiceClient } from "@/lib/supabase/server";
 
 const PAYMENT_SELECT = `
   id,
@@ -15,11 +27,24 @@ const PAYMENT_SELECT = `
   reviewed_at,
   storage_path,
   file_name,
+  uploaded_by,
   masterlist (
     borrower_name,
-    loan_account_no
+    loan_account_no,
+    segment
   )
 `;
+
+const recordSchema = z.object({
+  masterlistId: z.string().uuid(),
+  referenceNo: z.string().optional(),
+  paymentDate: z.string().min(1),
+  amount: z.number().positive(),
+  channel: z.enum(["bank_deposit", "check", "pos_cash"]),
+  storagePath: z.string().optional(),
+  fileName: z.string().optional(),
+  mimeType: z.string().optional(),
+});
 
 type Scope = "desk" | "dcr" | "history";
 
@@ -104,11 +129,146 @@ export async function GET(request: Request) {
       payments = payments.filter((p) => !locked.has(p.id as string));
     }
 
+    const uploaderIds = Array.from(
+      new Set(
+        payments
+          .map((p) => p.uploaded_by as string | null)
+          .filter((id): id is string => Boolean(id)),
+      ),
+    );
+    const nameById = new Map<string, string>();
+    if (uploaderIds.length > 0) {
+      const admin = createServiceClient();
+      const { data: profiles } = await admin
+        .from("profiles")
+        .select("id, full_name, email")
+        .in("id", uploaderIds);
+      for (const p of profiles ?? []) {
+        nameById.set(
+          p.id as string,
+          (p.full_name as string) || (p.email as string),
+        );
+      }
+    }
+
+    const paymentsWithNames = payments.map((p) => ({
+      ...p,
+      uploadedByName: p.uploaded_by
+        ? (nameById.get(p.uploaded_by as string) ?? null)
+        : null,
+    }));
+
     return jsonOk({
-      payments,
+      payments: paymentsWithNames,
       draftPaymentIds: [...draftIds],
     });
   } catch (error) {
+    return handleApiError(error);
+  }
+}
+
+export async function POST(request: Request) {
+  try {
+    const user = await requireModulePermission("collection", "edit");
+    const body = recordSchema.parse(await request.json());
+    const supabase = await createClient();
+
+    const { data: assignment } = await supabase
+      .from("assignments")
+      .select("masterlist_id")
+      .eq("masterlist_id", body.masterlistId)
+      .eq("collector_user_id", user.id)
+      .maybeSingle();
+
+    if (!assignment) {
+      throw new ForbiddenError("You are not assigned to this account");
+    }
+
+    const { data: masterlist, error: mlError } = await supabase
+      .from("masterlist")
+      .select("id, loan_application_id, borrower_id")
+      .eq("id", body.masterlistId)
+      .single();
+
+    if (mlError || !masterlist) {
+      throw new ForbiddenError("Account not found");
+    }
+
+    const borrowerId = masterlist.borrower_id as string;
+
+    if (body.storagePath || body.fileName) {
+      if (!body.storagePath || !body.fileName) {
+        return NextResponse.json(
+          { error: "storagePath and fileName are required together" },
+          { status: 400 },
+        );
+      }
+      try {
+        assertPaymentProofPathOwnedByBorrower(body.storagePath, borrowerId);
+      } catch (pathError) {
+        return NextResponse.json(
+          {
+            error:
+              pathError instanceof Error
+                ? pathError.message
+                : "Invalid payment proof storage path",
+          },
+          { status: 400 },
+        );
+      }
+      if (body.mimeType && !isAllowedPaymentProofMime(body.mimeType)) {
+        return NextResponse.json(
+          { error: "Unsupported file type for payment proof" },
+          { status: 400 },
+        );
+      }
+    }
+
+    const now = new Date().toISOString();
+    const { data, error } = await supabase
+      .from("payments")
+      .insert({
+        masterlist_id: body.masterlistId,
+        loan_application_id: masterlist.loan_application_id,
+        borrower_id: borrowerId,
+        reference_no: body.referenceNo ?? null,
+        payment_date: body.paymentDate,
+        amount: body.amount,
+        channel: body.channel,
+        storage_path: body.storagePath ?? null,
+        file_name: body.fileName ?? null,
+        status: "confirmed",
+        uploaded_by: user.id,
+        reviewed_by: user.id,
+        reviewed_at: now,
+      })
+      .select("*")
+      .single();
+
+    if (error || !data) {
+      throw new Error(error?.message ?? "Failed to record payment");
+    }
+
+    await writeAuditEvent({
+      actorId: user.id,
+      moduleSlug: "collection",
+      action: "create",
+      entityType: "payment",
+      entityId: data.id,
+      afterData: {
+        masterlistId: body.masterlistId,
+        amount: body.amount,
+        channel: body.channel,
+        status: "confirmed",
+        bucket: DOCUMENT_BUCKET,
+      },
+    });
+
+    return jsonOk({ payment: data });
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return NextResponse.json({ error: error.message }, { status: 400 });
+    }
     return handleApiError(error);
   }
 }

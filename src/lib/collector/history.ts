@@ -7,6 +7,7 @@ export type CollectorClosedAccountRow = {
   loanAccountNo: string | null;
   borrowerName: string;
   borrowerNo: string;
+  segment: "sme" | "seafarer" | null;
   outstandingBalance: number;
   closedAt: string;
 };
@@ -15,6 +16,7 @@ export type CollectorClosedAccountSortKey = "borrower" | "account" | "closedAt";
 
 export type CollectorClosedAccountsQueryParams = {
   search?: string;
+  segment?: "all" | "seafarer" | "sme";
   from?: string | null;
   to?: string | null;
   sortKey?: CollectorClosedAccountSortKey;
@@ -33,6 +35,7 @@ export type CollectorTurnedOverRow = {
   loanAccountNo: string | null;
   borrowerName: string;
   borrowerNo: string;
+  segment: "sme" | "seafarer" | null;
   turnedOverAt: string;
   turnoverReason: string;
 };
@@ -41,6 +44,7 @@ export type CollectorTurnedOverSortKey = "borrower" | "account" | "turnedOverAt"
 
 export type CollectorTurnedOverQueryParams = {
   search?: string;
+  segment?: "all" | "seafarer" | "sme";
   from?: string | null;
   to?: string | null;
   sortKey?: CollectorTurnedOverSortKey;
@@ -107,6 +111,7 @@ export async function getCollectorClosedAccountsHistory(
 ): Promise<{ rows: CollectorClosedAccountRow[]; totalCount: number }> {
   const {
     search = "",
+    segment: segmentFilter = "all",
     from = null,
     to = null,
     sortKey = "closedAt",
@@ -129,6 +134,7 @@ export async function getCollectorClosedAccountsHistory(
       loan_account_no,
       borrower_name,
       borrower_no,
+      segment,
       outstanding_balance,
       closed_at,
       assignments!inner ( collector_user_id )
@@ -138,6 +144,10 @@ export async function getCollectorClosedAccountsHistory(
     .eq("assignments.collector_user_id", collectorId)
     .eq("account_status", "paid")
     .not("closed_at", "is", null);
+
+  if (segmentFilter !== "all") {
+    query = query.eq("segment", segmentFilter);
+  }
 
   if (from) {
     query = query.gte("closed_at", toInclusiveStart(from));
@@ -174,12 +184,17 @@ export async function getCollectorClosedAccountsHistory(
     const closedAt = row.closed_at as string | null;
     if (!closedAt) return [];
 
+    const segmentRaw = row.segment as string | null | undefined;
+    const segment: "sme" | "seafarer" | null =
+      segmentRaw === "sme" || segmentRaw === "seafarer" ? segmentRaw : null;
+
     return [
       {
         id: row.id as string,
         loanAccountNo: (row.loan_account_no as string | null) ?? null,
         borrowerName: row.borrower_name as string,
         borrowerNo: row.borrower_no as string,
+        segment,
         outstandingBalance: Number(row.outstanding_balance),
         closedAt,
       },
@@ -266,6 +281,7 @@ export async function getCollectorTurnedOverHistory(
 ): Promise<{ rows: CollectorTurnedOverRow[]; totalCount: number }> {
   const {
     search = "",
+    segment: segmentFilter = "all",
     from = null,
     to = null,
     sortKey = "turnedOverAt",
@@ -301,12 +317,17 @@ export async function getCollectorTurnedOverHistory(
         loan_account_no,
         borrower_name,
         borrower_no,
-        outstanding_balance
+        outstanding_balance,
+        segment
       )
     `,
       { count: "exact" },
     )
     .eq("from_collector_id", collectorId);
+
+  if (segmentFilter !== "all") {
+    query = query.eq("masterlist.segment", segmentFilter);
+  }
 
   if (from) {
     query = query.gte("confirmed_at", toInclusiveStart(from));
@@ -350,6 +371,10 @@ export async function getCollectorTurnedOverHistory(
 
     const masterlist = firstJoin(row.masterlist);
 
+    const segmentRaw = masterlist?.segment as string | null | undefined;
+    const segment: "sme" | "seafarer" | null =
+      segmentRaw === "sme" || segmentRaw === "seafarer" ? segmentRaw : null;
+
     return [
       {
         id: row.id as string,
@@ -358,6 +383,7 @@ export async function getCollectorTurnedOverHistory(
           (masterlist?.loan_account_no as string | null | undefined) ?? null,
         borrowerName: (masterlist?.borrower_name as string | undefined) ?? "",
         borrowerNo: (masterlist?.borrower_no as string | undefined) ?? "",
+        segment,
         turnedOverAt,
         turnoverReason: turnoverReasonLabel(
           row.turnover_reason as string | null,

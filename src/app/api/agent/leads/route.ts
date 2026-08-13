@@ -29,6 +29,7 @@ const STAGE_FILTERS = new Set([
   "docs_ready",
 ]);
 const STATUS_FILTERS = new Set(["all", "open", "converted"]);
+const SEGMENT_FILTERS = new Set(["all", "seafarer", "sme"]);
 
 /**
  * Param-driven agent leads queue → `{ rows, totalCount, kpi }`.
@@ -47,6 +48,11 @@ export async function GET(request: Request) {
     // Default "all" — preserves open + converted (do not exclude converted).
     const statusRaw = searchParams.get("status") ?? "all";
     const statusFilter = STATUS_FILTERS.has(statusRaw) ? statusRaw : "all";
+
+    const segmentRaw = searchParams.get("segment") ?? "all";
+    const segmentFilter = (
+      SEGMENT_FILTERS.has(segmentRaw) ? segmentRaw : "all"
+    ) as "all" | "seafarer" | "sme";
 
     // Active queue defaults to All time (must not hide old-but-still-open leads).
     const rangeRaw = searchParams.get("range") ?? "all";
@@ -78,6 +84,7 @@ export async function GET(request: Request) {
         search,
         stageFilter,
         statusFilter,
+        segmentFilter,
         from,
         to,
         sortKey,

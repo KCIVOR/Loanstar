@@ -33,6 +33,7 @@ function row(
 ): CollectorQueueMappedRow {
   return {
     id: overrides.id,
+    borrowerId: overrides.borrowerId ?? "borrower-1",
     borrowerName: overrides.borrowerName ?? "Borrower",
     borrowerNo: overrides.borrowerNo ?? "B-001",
     loanAccountNo: overrides.loanAccountNo ?? "LA-001",

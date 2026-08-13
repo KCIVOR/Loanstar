@@ -17,6 +17,14 @@ const addItemSchema = z.object({
   action: z.literal("add_item"),
   dcrId: z.string().uuid(),
   paymentId: z.string().uuid(),
+  allocations: z
+    .array(
+      z.object({
+        amortizationScheduleId: z.string().uuid().nullable(),
+        amount: z.number().positive(),
+      }),
+    )
+    .optional(),
 });
 
 const submitSchema = z.object({
@@ -68,6 +76,7 @@ export async function POST(request: Request) {
         addParsed.data.dcrId,
         addParsed.data.paymentId,
         user.id,
+        addParsed.data.allocations,
       );
       return jsonOk({ added: true });
     }

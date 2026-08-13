@@ -8,9 +8,10 @@ import {
   assignRemedial,
   markPaidOff,
 } from "@/lib/ar/masterlist";
+import { getRoundingWriteoffThreshold } from "@/lib/ar/posting";
 import { PaidOffEligibilityError } from "@/lib/ar/paid-off";
 import { requireModulePermission } from "@/lib/permissions/server";
-import { createClient } from "@/lib/supabase/server";
+import { createClient, createServiceClient } from "@/lib/supabase/server";
 
 type RouteParams = { params: Promise<{ id: string }> };
 
@@ -64,9 +65,88 @@ export async function GET(_request: Request, { params }: RouteParams) {
       .eq("masterlist_id", id)
       .order("created_at", { ascending: false });
 
+    const { data: postings } = await supabase
+      .from("postings")
+      .select("id, amortization_schedule_id, amount, payments ( payment_date )")
+      .eq("masterlist_id", id)
+      .not("amortization_schedule_id", "is", null)
+      .order("posted_at", { ascending: true });
+
+    const roundingWriteoffThreshold =
+      await getRoundingWriteoffThreshold(supabase);
+
+    const { data: writeoffRows } = await supabase
+      .from("rounding_writeoffs")
+      .select(
+        "id, amount, amortization_schedule_id, performed_at, notes, performed_by",
+      )
+      .eq("masterlist_id", id)
+      .order("performed_at", { ascending: false });
+
+    const scheduleIds = Array.from(
+      new Set(
+        (writeoffRows ?? [])
+          .map((row) => row.amortization_schedule_id as string | null)
+          .filter((sid): sid is string => Boolean(sid)),
+      ),
+    );
+    const installmentByScheduleId = new Map<string, number>();
+    if (scheduleIds.length > 0) {
+      const { data: scheduleRows } = await supabase
+        .from("amortization_schedules")
+        .select("id, installment_no")
+        .in("id", scheduleIds);
+      for (const row of scheduleRows ?? []) {
+        installmentByScheduleId.set(
+          row.id as string,
+          row.installment_no as number,
+        );
+      }
+    }
+
+    const performerIds = Array.from(
+      new Set(
+        (writeoffRows ?? [])
+          .map((row) => row.performed_by as string)
+          .filter(Boolean),
+      ),
+    );
+    const nameById = new Map<string, string>();
+    if (performerIds.length > 0) {
+      const admin = createServiceClient();
+      const { data: profiles } = await admin
+        .from("profiles")
+        .select("id, full_name, email")
+        .in("id", performerIds);
+      for (const p of profiles ?? []) {
+        nameById.set(
+          p.id as string,
+          (p.full_name as string) || (p.email as string),
+        );
+      }
+    }
+
+    const roundingWriteoffs = (writeoffRows ?? []).map((row) => {
+      const scheduleId = row.amortization_schedule_id as string | null;
+      return {
+        id: row.id as string,
+        amount: Number(row.amount),
+        amortization_schedule_id: scheduleId,
+        performed_at: row.performed_at as string,
+        notes: (row.notes as string | null) ?? null,
+        performedByName: nameById.get(row.performed_by as string) ?? null,
+        installmentNo: scheduleId
+          ? (installmentByScheduleId.get(scheduleId) ?? null)
+          : null,
+      };
+    });
+
     return jsonOk({
       record: { ...data, application_status: applicationStatus },
       payments: payments ?? [],
+      postings: postings ?? [],
+      roundingWriteoffThreshold,
+      roundingWriteoffs,
     });
   } catch (error) {
     return handleApiError(error);
