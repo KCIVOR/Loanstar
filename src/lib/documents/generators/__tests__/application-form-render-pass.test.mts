@@ -76,10 +76,10 @@ function baseProfile(overrides: Partial<BorrowerProfile> = {}): BorrowerProfile 
 }
 
 const seafarerBodies = extractBodies(
-  join(root, "supabase/migrations/20260714040000_p8_seed_new_document_templates.sql"),
+  join(root, "supabase/migrations/20260714030530_p8_seed_new_document_templates.sql"),
 );
 const smeBodies = extractBodies(
-  join(root, "supabase/migrations/20260807120000_sme_application_form_templates.sql"),
+  join(root, "supabase/migrations/20260807042702_sme_application_form_templates.sql"),
 );
 
 test("Phase 4: Seafarer template still prints manning / ship wording with fixture data", () => {

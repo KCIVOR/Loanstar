@@ -29,7 +29,7 @@ const returnToCsaViewSql = readFileSync(
     "..",
     "supabase",
     "migrations",
-    "20260812110000_cig_return_to_csa_view.sql",
+    "20260812030307_cig_return_to_csa_view.sql",
   ),
   "utf8",
 );
