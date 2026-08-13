@@ -11,7 +11,8 @@ import {
 } from "@/lib/payments/proof-storage";
 import {
   ForbiddenError,
-  requireModulePermission,
+  hasModulePermission,
+  requireAuth,
 } from "@/lib/permissions/server";
 import { createClient, createServiceClient } from "@/lib/supabase/server";
 
@@ -55,14 +56,28 @@ function parseScope(raw: string | null): Scope {
 
 export async function GET(request: Request) {
   try {
-    const user = await requireModulePermission("collection", "view");
+    const user = await requireAuth();
+    const isCollector = await hasModulePermission("collection", "view", user.id);
+    const isRemedial = await hasModulePermission("remedial", "view", user.id);
+    if (!isCollector && !isRemedial) {
+      throw new ForbiddenError(
+        "Missing 'view' permission on module 'collection' or 'remedial'",
+      );
+    }
+
     const supabase = await createClient();
     const scope = parseScope(new URL(request.url).searchParams.get("scope"));
 
-    const { data: assignments } = await supabase
+    let assignmentQuery = supabase
       .from("assignments")
-      .select("masterlist_id")
-      .eq("collector_user_id", user.id);
+      .select("masterlist_id");
+    if (isCollector) {
+      assignmentQuery = assignmentQuery.eq("collector_user_id", user.id);
+    } else {
+      assignmentQuery = assignmentQuery.eq("remedial_user_id", user.id);
+    }
+
+    const { data: assignments } = await assignmentQuery;
 
     const ids = (assignments ?? []).map((a) => a.masterlist_id as string);
     if (!ids.length) {
@@ -169,16 +184,29 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
-    const user = await requireModulePermission("collection", "edit");
+    const user = await requireAuth();
+    const isCollector = await hasModulePermission("collection", "edit", user.id);
+    const isRemedial = await hasModulePermission("remedial", "edit", user.id);
+    if (!isCollector && !isRemedial) {
+      throw new ForbiddenError(
+        "Missing 'edit' permission on module 'collection' or 'remedial'",
+      );
+    }
+
     const body = recordSchema.parse(await request.json());
     const supabase = await createClient();
 
-    const { data: assignment } = await supabase
+    let assignmentQuery = supabase
       .from("assignments")
       .select("masterlist_id")
-      .eq("masterlist_id", body.masterlistId)
-      .eq("collector_user_id", user.id)
-      .maybeSingle();
+      .eq("masterlist_id", body.masterlistId);
+    if (isCollector) {
+      assignmentQuery = assignmentQuery.eq("collector_user_id", user.id);
+    } else {
+      assignmentQuery = assignmentQuery.eq("remedial_user_id", user.id);
+    }
+
+    const { data: assignment } = await assignmentQuery.maybeSingle();
 
     if (!assignment) {
       throw new ForbiddenError("You are not assigned to this account");
@@ -251,7 +279,7 @@ export async function POST(request: Request) {
 
     await writeAuditEvent({
       actorId: user.id,
-      moduleSlug: "collection",
+      moduleSlug: isCollector ? "collection" : "remedial",
       action: "create",
       entityType: "payment",
       entityId: data.id,

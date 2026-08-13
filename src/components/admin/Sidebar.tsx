@@ -328,6 +328,7 @@ const PORTAL_NAV_ITEMS: PortalNavItem[] = [
         exact: true,
         matchPrefixes: ["/remedial/accounts"],
       },
+      { href: "/remedial/dcr", label: "DCR" },
     ],
   },
 ];

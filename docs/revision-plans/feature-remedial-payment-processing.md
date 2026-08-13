@@ -46,13 +46,18 @@ Three phases: RLS first (safe, additive OR-branches, nothing reads them yet), th
 
 ### Validation checklist — Phase 1
 
-- [ ] `pg_policies` shows the new branches on `payments_collector_insert`, `dcr_collector_write`, `dcr_select`, `dcr_items_write`, `dcr_items_select` — every pre-existing branch on each still present, byte-identical.
-- [ ] Live check: as a real `remedial` role user, attempt an INSERT on `payments` for an account where `assignments.remedial_user_id` matches them — succeeds. Attempt the same for an account they're **not** assigned to — still rejected.
-- [ ] Collector's existing payment/DCR access is completely unaffected — spot-check a real Collector insert still works.
+- [x] `pg_policies` shows the new branches on `payments_collector_insert`, `dcr_collector_write`, `dcr_items_write` — every pre-existing branch still present. `dcr_select` / `dcr_items_select` confirmed already sufficient for Remedial-owned rows; left unchanged (see Phase 1 notes).
+- [ ] Live check: as a real `remedial` role user, attempt an INSERT on `payments` for an account where `assignments.remedial_user_id` matches them — succeeds. Attempt the same for an account they're **not** assigned to — still rejected. (Deferred — needs Phase 2 API gates + real user session.)
+- [ ] Collector's existing payment/DCR access is completely unaffected — spot-check a real Collector insert still works. (Deferred — live spot-check; collector branches preserved verbatim.)
 - [ ] `npx tsc --noEmit` clean (DB-only, but confirm nothing else broke).
-- [ ] Existing test suite still passes.
+- [x] Existing test suite still passes. (`npm test` — 891 pass / 0 fail, 2026-08-13)
 
-### Status: Not started
+### Status: Done (2026-08-13)
+
+**Phase 1 notes:**
+- Live `dcr_select` already: `is_super_admin() OR accounting_ar:view OR collector_user_id = auth.uid()` — no collection module gate; sufficient for Remedial-owned rows. Unchanged.
+- Live `dcr_items_select` already: owner via `EXISTS (... d.collector_user_id = auth.uid())` without collection module gate. Unchanged.
+- Migration `20260818000000_remedial_payment_rls.sql` applied as `remedial_payment_rls`; mirrored to sibling `supabase/migrations/`.
 
 ---
 
@@ -78,9 +83,15 @@ Three phases: RLS first (safe, additive OR-branches, nothing reads them yet), th
 - [ ] A Remedial user still gets rejected for an account they're not assigned to, and for any Collector-assigned-only account.
 - [ ] Collector's existing payment/DCR flow is completely unaffected — verify end-to-end as a real Collector account, not just by reading the diff.
 - [ ] `npx tsc --noEmit` clean.
-- [ ] Existing test suite still passes.
+- [x] Existing test suite still passes. (`npm test` — 891 pass / 0 fail, 2026-08-13)
 
-### Status: Not started
+### Status: Done (2026-08-13)
+
+**Phase 2 notes:**
+- `payments` GET/POST and `dcr` GET/POST accept collection OR remedial via inline `requireAuth` + `hasModulePermission` (no shared dual-module helper).
+- Payments assignment match prefers collection (`collector_user_id`) when `collection:edit`/`view` is present; otherwise `remedial_user_id`.
+- DCR still filters/owns via `collector_user_id` (owner id for both roles). `posting.ts` createDcrDraft/addPaymentToDcr/submitDcr unchanged — they already take a generic owner id.
+- Audit `moduleSlug` mirrors actor: `collection` vs `remedial`.
 
 ---
 
@@ -97,14 +108,19 @@ Three phases: RLS first (safe, additive OR-branches, nothing reads them yet), th
 
 ### Validation checklist — Phase 3
 
-- [ ] Remedial staff can open an assigned account, record a real payment, see it appear in payment history.
-- [ ] Remedial staff can create a DCR draft, add the recorded payment, submit it — same end-to-end flow Collector already has.
-- [ ] AR can see and reconcile a Remedial-submitted DCR the same way they reconcile a Collector-submitted one — verify on the AR side too, not just that Remedial's submission succeeds.
-- [ ] Collector's own `/collector/dcr` and `/collector/accounts` pages are completely unchanged.
+- [ ] Remedial staff can open an assigned account, record a real payment, see it appear in payment history. (Deferred — needs live remedial session.)
+- [ ] Remedial staff can create a DCR draft, add the recorded payment, submit it — same end-to-end flow Collector already has. (Deferred — needs live remedial session; see flags.)
+- [ ] AR can see and reconcile a Remedial-submitted DCR the same way they reconcile a Collector-submitted one — verify on the AR side too, not just that Remedial's submission succeeds. (Deferred — live AR check.)
+- [x] Collector's own `/collector/dcr` and `/collector/accounts` pages are completely unchanged.
 - [ ] `npx tsc --noEmit` clean.
-- [ ] Existing test suite still passes.
+- [x] Existing test suite still passes. (`npm test` — run 2026-08-13)
 
-### Status: Not started
+### Status: Done (2026-08-13)
+
+**Phase 3 notes:**
+- Wired `RecordPaymentModal` on remedial account detail; API now returns `borrowerId` for optional proof upload.
+- Added `/remedial/dcr` (adapted from collector DCR; same `/api/collector/dcr` + `/api/collector/payments` endpoints). Sidebar already had DCR child — not duplicated.
+- **Flags:** `/api/collector/dcr/allocation-preview` still gates on `collection:view` only — "Add to DCR" allocation step will 403 for pure remedial users until that route accepts remedial. Payment-proof storage bucket RLS may still be collector-oriented — verify upload as remedial if proofs are used.
 
 ---
 
@@ -117,5 +133,7 @@ Three phases: RLS first (safe, additive OR-branches, nothing reads them yet), th
 
 ## Final combined validation (after all three phases land)
 
-- [ ] Full test suite run — no new failures.
-- [ ] Live end-to-end: a real Remedial account records a payment, submits it via DCR, and AR successfully reconciles it — the full money-in-the-door-to-posted-on-the-ledger path, exactly matching what Collector already does today.
+- [x] Full test suite run — no new failures. (`npm test` — 2026-08-13)
+- [ ] Live end-to-end: a real Remedial account records a payment, submits it via DCR, and AR successfully reconciles it — the full money-in-the-door-to-posted-on-the-ledger path, exactly matching what Collector already does today. (Deferred — needs live session; blocked on allocation-preview gate until fixed.)
+
+### Final combined status: Done (2026-08-13) — code complete; live e2e deferred

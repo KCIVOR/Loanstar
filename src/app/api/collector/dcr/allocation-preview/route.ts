@@ -2,12 +2,27 @@ import { NextResponse } from "next/server";
 
 import { handleApiError, jsonOk } from "@/lib/api/handler";
 import { computeAutoAllocation } from "@/lib/ar/posting";
-import { requireModulePermission } from "@/lib/permissions/server";
+import {
+  ForbiddenError,
+  hasModulePermission,
+  requireAuth,
+} from "@/lib/permissions/server";
 import { createClient } from "@/lib/supabase/server";
 
 export async function GET(request: Request) {
   try {
-    await requireModulePermission("collection", "view");
+    const user = await requireAuth();
+    const isCollector = await hasModulePermission(
+      "collection",
+      "view",
+      user.id,
+    );
+    const isRemedial = await hasModulePermission("remedial", "view", user.id);
+    if (!isCollector && !isRemedial) {
+      throw new ForbiddenError(
+        "Missing 'view' permission on module 'collection' or 'remedial'",
+      );
+    }
     const supabase = await createClient();
 
     const paymentId = new URL(request.url).searchParams.get("paymentId");

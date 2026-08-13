@@ -8,7 +8,11 @@ import {
   createDcrDraft,
   submitDcr,
 } from "@/lib/ar/posting";
-import { requireModulePermission } from "@/lib/permissions/server";
+import {
+  ForbiddenError,
+  hasModulePermission,
+  requireAuth,
+} from "@/lib/permissions/server";
 import { createClient } from "@/lib/supabase/server";
 
 const createSchema = z.object({ action: z.literal("create") });
@@ -34,7 +38,15 @@ const submitSchema = z.object({
 
 export async function GET(request: Request) {
   try {
-    const user = await requireModulePermission("collection", "view");
+    const user = await requireAuth();
+    const isCollector = await hasModulePermission("collection", "view", user.id);
+    const isRemedial = await hasModulePermission("remedial", "view", user.id);
+    if (!isCollector && !isRemedial) {
+      throw new ForbiddenError(
+        "Missing 'view' permission on module 'collection' or 'remedial'",
+      );
+    }
+
     const supabase = await createClient();
     const limitRaw = Number(
       new URL(request.url).searchParams.get("limit") ?? "50",
@@ -43,6 +55,7 @@ export async function GET(request: Request) {
       ? Math.min(Math.max(limitRaw, 1), 200)
       : 50;
 
+    // collector_user_id is the DCR owner id for both collector and remedial actors
     const { data, error } = await supabase
       .from("dcr")
       .select("*, dcr_items (*)")
@@ -60,7 +73,15 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
-    const user = await requireModulePermission("collection", "edit");
+    const user = await requireAuth();
+    const isCollector = await hasModulePermission("collection", "edit", user.id);
+    const isRemedial = await hasModulePermission("remedial", "edit", user.id);
+    if (!isCollector && !isRemedial) {
+      throw new ForbiddenError(
+        "Missing 'edit' permission on module 'collection' or 'remedial'",
+      );
+    }
+
     const body = await request.json();
     const supabase = await createClient();
 
@@ -91,7 +112,7 @@ export async function POST(request: Request) {
 
       await writeAuditEvent({
         actorId: user.id,
-        moduleSlug: "collection",
+        moduleSlug: isCollector ? "collection" : "remedial",
         action: "execute_trigger",
         entityType: "dcr",
         entityId: submitParsed.data.dcrId,

@@ -3,10 +3,12 @@
 import { useCallback, useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 
+import { RecordPaymentModal } from "@/components/collector/RecordPaymentModal";
 import {
   Alert,
   Badge,
   Breadcrumbs,
+  Button,
   EmptyState,
   PageHeader,
   Spinner,
@@ -28,6 +30,8 @@ type Account = {
   id: string;
   borrowerName: string;
   borrowerNo: string;
+  /** Present when API exposes it; required for optional proof upload. */
+  borrowerId?: string | null;
   loanAccountNo: string | null;
   segment?: string | null;
   manningAgency?: string | null;
@@ -113,6 +117,7 @@ export default function RemedialAccountPage() {
   const [payments, setPayments] = useState<PaymentRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [recordPaymentOpen, setRecordPaymentOpen] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -359,9 +364,14 @@ export default function RemedialAccountPage() {
       </section>
 
       <section>
-        <h2 className="mb-3 font-display text-lg font-semibold text-navy-900">
-          Payment history
-        </h2>
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+          <h2 className="font-display text-lg font-semibold text-navy-900">
+            Payment history
+          </h2>
+          <Button onClick={() => setRecordPaymentOpen(true)}>
+            Record payment
+          </Button>
+        </div>
         {payments.length === 0 ? (
           <EmptyState
             title="No payments recorded"
@@ -401,6 +411,15 @@ export default function RemedialAccountPage() {
           </div>
         )}
       </section>
+
+      <RecordPaymentModal
+        open={recordPaymentOpen}
+        borrowerName={account.borrowerName}
+        masterlistId={account.id}
+        borrowerId={account.borrowerId ?? ""}
+        onClose={() => setRecordPaymentOpen(false)}
+        onRecorded={() => void load()}
+      />
     </div>
   );
 }
