@@ -286,14 +286,46 @@ export async function savePdcChecks(
   };
 }
 
+/** Prefer `release_paths`; fall back to legacy scalar `release_path`. */
+function releasePathsFromRow(row: Record<string, unknown>): ReleasePath[] {
+  const paths = row.release_paths;
+  if (Array.isArray(paths) && paths.length > 0) {
+    return [
+      ...new Set(
+        paths.filter(
+          (p): p is ReleasePath => p === "with_pdc" || p === "without_pdc",
+        ),
+      ),
+    ];
+  }
+  const scalar = row.release_path;
+  if (scalar === "with_pdc" || scalar === "without_pdc") {
+    return [scalar];
+  }
+  return [];
+}
+
 export async function generateReleaseDocuments(
   supabase: SupabaseClient,
   releaseFileId: string,
   actorId: string,
 ) {
-  const file = await getReleaseFile(supabase, releaseFileId);
+  // Fetch the raw row so we can read `release_paths` (mapped file still
+  // exposes only legacy scalar `releasePath` until a later phase).
+  const { data: row, error: rowError } = await supabase
+    .from("release_files")
+    .select("*")
+    .eq("id", releaseFileId)
+    .single();
 
-  if (!file.releasePath) {
+  if (rowError || !row) {
+    throw new Error("Release file not found");
+  }
+
+  const file = mapReleaseFileRow(row);
+  const releasePaths = releasePathsFromRow(row);
+
+  if (releasePaths.length === 0) {
     throw new Error("Release path must be selected first");
   }
 
@@ -312,8 +344,9 @@ export async function generateReleaseDocuments(
     releaseFileId,
   );
 
-  const releasePath = file.releasePath as ReleasePath;
-  const slugs = AUTO_GENERATED_SLUGS[releasePath];
+  const slugs = [
+    ...new Set(releasePaths.flatMap((p) => AUTO_GENERATED_SLUGS[p])),
+  ];
   const { data: app } = await supabase
     .from("loan_applications")
     .select("borrower_id, segment, borrowers (*)")
@@ -324,29 +357,38 @@ export async function generateReleaseDocuments(
     throw new Error("Borrower not found");
   }
 
-  // Template merge context is path-level — identical for every slug in this
-  // release — so build it once.
+  // One merge context per selected path — voucher pairs need path-specific
+  // disbursement fields; shared slugs are path-independent.
   const borrowerRaw = app.borrowers;
   const borrowerProfile = mapBorrowerRow(
     (Array.isArray(borrowerRaw) ? borrowerRaw[0] : borrowerRaw) as BorrowerRow,
   );
-  const templateContext = buildReleaseTemplateContext(
-    blri,
-    {
-      netReleased: computation.netReleased,
-      releaseDate: computation.releaseDate,
-      addonMonths: computation.addonMonths,
-      interestRate: computation.interestRate,
-      loanTypeName: computation.loanTypeName,
-      processingFee: computation.processingFee,
-      securityFee: computation.securityFee,
-      docStamp: computation.docStamp,
-      adminCost: computation.adminCost,
-      notaryFee: computation.notaryFee,
-    },
-    borrowerProfile,
-    releasePath,
-    { segment: app.segment === "sme" ? "sme" : "seafarer" },
+  const computationInput = {
+    netReleased: computation.netReleased,
+    releaseDate: computation.releaseDate,
+    addonMonths: computation.addonMonths,
+    interestRate: computation.interestRate,
+    loanTypeName: computation.loanTypeName,
+    processingFee: computation.processingFee,
+    securityFee: computation.securityFee,
+    docStamp: computation.docStamp,
+    adminCost: computation.adminCost,
+    notaryFee: computation.notaryFee,
+  };
+  const segmentScope = {
+    segment: (app.segment === "sme" ? "sme" : "seafarer") as "sme" | "seafarer",
+  };
+  const contextByPath = new Map(
+    releasePaths.map((p) => [
+      p,
+      buildReleaseTemplateContext(
+        blri,
+        computationInput,
+        borrowerProfile,
+        p,
+        segmentScope,
+      ),
+    ]),
   );
 
   for (const slug of slugs) {
@@ -359,6 +401,23 @@ export async function generateReleaseDocuments(
         `No published template for release document "${slug}" — cannot generate.`,
       );
     }
+
+    const onlyWithPdc =
+      AUTO_GENERATED_SLUGS.with_pdc.includes(slug) &&
+      !AUTO_GENERATED_SLUGS.without_pdc.includes(slug);
+    const onlyWithoutPdc =
+      AUTO_GENERATED_SLUGS.without_pdc.includes(slug) &&
+      !AUTO_GENERATED_SLUGS.with_pdc.includes(slug);
+    const contextPath: ReleasePath = onlyWithPdc
+      ? "with_pdc"
+      : onlyWithoutPdc
+        ? "without_pdc"
+        : releasePaths[0];
+    const templateContext = contextByPath.get(contextPath);
+    if (!templateContext) {
+      throw new Error(`Missing template context for path "${contextPath}"`);
+    }
+
     const pdf = await renderTemplateToPdf(published.body, templateContext);
     const templateVersionId = published.versionId;
 
