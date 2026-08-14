@@ -628,8 +628,8 @@ export default function LraApplicationPage() {
   const isClosed = rf?.status === "closed";
   const pdcCollected = Boolean(rf?.pdc_collected_at);
   const showPdcCollectCard =
+    rf != null &&
     releasePaths.includes("with_pdc") &&
-    Boolean(rf?.status) &&
     (isPostSignForPdcCollect(rf.status) || isClosed);
   const canConfirmPdcCollect =
     rf != null &&
