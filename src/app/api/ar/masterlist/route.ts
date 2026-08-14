@@ -24,6 +24,7 @@ export async function GET(request: Request) {
     const search = searchParams.get("search") ?? "";
     const statusFilter = searchParams.get("status") ?? "all";
     const agingFilter = searchParams.get("aging") ?? "all";
+    const birStatusFilter = searchParams.get("birStatus") ?? "all";
     const segmentRaw = searchParams.get("segment") ?? "all";
     const segmentFilter = (
       SEGMENT_FILTERS.has(segmentRaw) ? segmentRaw : "all"
@@ -62,6 +63,7 @@ export async function GET(request: Request) {
         search,
         statusFilter,
         agingFilter,
+        birStatusFilter,
         segmentFilter,
         from,
         to,

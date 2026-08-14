@@ -5,6 +5,7 @@ import {
   MASTERLIST_QUEUE_PAGE_SIZES,
   OUTSTANDING_BALANCE_FETCH_PAGE,
   agingFilterSpec,
+  birStatusFilterSpec,
   clampMasterlistQueuePageSize,
   needsAttention,
   statusFilterSpec,
@@ -100,6 +101,16 @@ describe("statusFilterSpec / agingFilterSpec", () => {
   it("treats empty filter as all", () => {
     assert.deepEqual(statusFilterSpec(""), { mode: "all" });
     assert.deepEqual(agingFilterSpec(""), { mode: "all" });
+    assert.deepEqual(birStatusFilterSpec(""), { mode: "all" });
+  });
+
+  it("maps classification filters to eq / unset / all", () => {
+    assert.deepEqual(birStatusFilterSpec("all"), { mode: "all" });
+    assert.deepEqual(birStatusFilterSpec("unset"), { mode: "unset" });
+    assert.deepEqual(birStatusFilterSpec("A1"), {
+      mode: "eq",
+      code: "A1",
+    });
   });
 });
 

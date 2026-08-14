@@ -26,6 +26,7 @@ export type MasterlistQueueQueryParams = {
   search?: string;
   statusFilter?: string;
   agingFilter?: string;
+  birStatusFilter?: string;
   segmentFilter?: "all" | "seafarer" | "sme";
   from?: string | null;
   to?: string | null;
@@ -43,6 +44,7 @@ export type MasterlistQueueRow = Record<string, unknown> & {
   outstanding_balance: number;
   aging_bucket: string;
   account_status: string;
+  bir_status_code?: string | null;
   monthly_amortization: number;
   remedial_flag?: boolean | null;
   segment?: string | null;
@@ -104,6 +106,18 @@ export function agingFilterSpec(filter: string): AgingFilterSpec {
   return { mode: "eq", aging: filter };
 }
 
+/** Pure classification-code filter → query-builder spec. */
+export type BirStatusFilterSpec =
+  | { mode: "all" }
+  | { mode: "eq"; code: string }
+  | { mode: "unset" };
+
+export function birStatusFilterSpec(filter: string): BirStatusFilterSpec {
+  if (!filter || filter === "all") return { mode: "all" };
+  if (filter === "unset") return { mode: "unset" };
+  return { mode: "eq", code: filter };
+}
+
 /**
  * Pure needs-attention predicate — mirrors `src/app/ar/page.tsx`.
  * Remedial flag, or aging bucket that is neither "current" nor empty
@@ -162,6 +176,7 @@ export async function getMasterlistQueue(
     search = "",
     statusFilter = "all",
     agingFilter = "all",
+    birStatusFilter = "all",
     segmentFilter = "all",
     from = null,
     to = null,
@@ -189,6 +204,13 @@ export async function getMasterlistQueue(
   const agingSpec = agingFilterSpec(agingFilter);
   if (agingSpec.mode === "eq") {
     query = query.eq("aging_bucket", agingSpec.aging);
+  }
+
+  const birSpec = birStatusFilterSpec(birStatusFilter);
+  if (birSpec.mode === "eq") {
+    query = query.eq("bir_status_code", birSpec.code);
+  } else if (birSpec.mode === "unset") {
+    query = query.is("bir_status_code", null);
   }
 
   if (segmentFilter !== "all") {

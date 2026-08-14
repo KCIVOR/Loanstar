@@ -18,6 +18,7 @@ type RouteParams = { params: Promise<{ id: string }> };
 const assignSchema = z.object({
   portfolioId: z.string().uuid().optional().nullable(),
   collectorUserId: z.string().uuid().optional().nullable(),
+  birStatusCode: z.string().nullable().optional(),
 });
 
 const remedialSchema = z.object({
@@ -166,6 +167,35 @@ export async function PATCH(request: Request, { params }: RouteParams) {
         collectorUserId: body.collectorUserId,
         assignedBy: user.id,
       });
+    }
+
+    if (body.birStatusCode !== undefined) {
+      if (body.birStatusCode !== null) {
+        const { data: configRow, error: configError } = await supabase
+          .from("config_settings")
+          .select("value")
+          .eq("key", "bir_status_codes")
+          .maybeSingle();
+        if (configError) throw new Error(configError.message);
+        const map =
+          configRow?.value &&
+          typeof configRow.value === "object" &&
+          !Array.isArray(configRow.value)
+            ? (configRow.value as Record<string, string>)
+            : {};
+        if (!(body.birStatusCode in map)) {
+          return NextResponse.json(
+            { error: "Unrecognized classification code" },
+            { status: 400 },
+          );
+        }
+      }
+
+      const { error: birError } = await supabase
+        .from("masterlist")
+        .update({ bir_status_code: body.birStatusCode })
+        .eq("id", id);
+      if (birError) throw new Error(birError.message);
     }
 
     await writeAuditEvent({
