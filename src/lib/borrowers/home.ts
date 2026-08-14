@@ -279,7 +279,7 @@ export function nextStepGuidance(input: {
     case "cancelled":
       return {
         title: "Application cancelled",
-        body: "This application was cancelled at your request. Contact us if this was a mistake.",
+        body: "This application was cancelled. Contact us if you have questions.",
       };
     default:
       return {

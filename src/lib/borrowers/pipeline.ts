@@ -43,6 +43,7 @@ const STATUS_TO_STAGE: Record<string, BorrowerPipelineStageId> = {
   committee_hold: "approval",
   approved: "approval",
   denied: "approval",
+  cancelled: "approval",
   negotiating_terms: "terms",
   awaiting_confirmation: "terms",
   lra_pending: "release",
@@ -67,6 +68,8 @@ function stageNote(status: string): string | undefined {
       return "Draft — submit when ready";
     case "denied":
       return "Application denied";
+    case "cancelled":
+      return "Application cancelled";
     case "on_hold":
       return "On hold";
     case "committee_hold":

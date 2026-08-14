@@ -80,7 +80,7 @@ type ComputationHistRow = {
  * Unknown/future statuses default to in_progress (not dropped).
  */
 export function csaHistoryStatusGroup(status: string): CsaHistoryStatusGroup {
-  if (status === "denied") return "denied";
+  if (status === "denied" || status === "cancelled") return "denied";
   if ((RELEASED_STATUSES as readonly string[]).includes(status)) {
     return "released";
   }
@@ -92,7 +92,7 @@ export function statusesForHistoryGroup(
   statusGroup: CsaHistoryStatusGroup | "all",
 ): readonly string[] | null {
   if (statusGroup === "all") return null;
-  if (statusGroup === "denied") return ["denied"];
+  if (statusGroup === "denied") return ["denied", "cancelled"];
   if (statusGroup === "released") return RELEASED_STATUSES;
   return IN_PROGRESS_STATUSES;
 }
