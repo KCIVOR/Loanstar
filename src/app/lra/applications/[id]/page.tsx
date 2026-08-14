@@ -573,7 +573,7 @@ export default function LraApplicationPage() {
   const canConfirmPdcCollect =
     rf != null &&
     canConfirmPdcCollection({
-      releasePath: rf.release_path,
+      releasePaths: rf.release_path ? [rf.release_path] : null,
       status: rf.status,
       pdcCheckCount: data.pdcChecks.length,
       pdcCollectedAt: rf.pdc_collected_at,

@@ -16,7 +16,7 @@ import {
 } from "../pdc-collect";
 
 type StubOpts = {
-  releasePath: string | null;
+  releasePaths: string[] | null;
   status: string;
   pdcCollectedAt: string | null;
   checkCount: number;
@@ -32,7 +32,7 @@ function makeConfirmStub(opts: StubOpts) {
       data: {
         id: "rf-1",
         loan_application_id: "app-1",
-        release_path: opts.releasePath,
+        release_paths: opts.releasePaths,
         status: opts.status,
         pdc_collected_at: opts.pdcCollectedAt,
         pdc_collected_by: null,
@@ -84,7 +84,7 @@ describe("physical PDC collection gates", () => {
     it("rejects without_pdc path", () => {
       assert.equal(
         canConfirmPdcCollection({
-          releasePath: "without_pdc",
+          releasePaths: ["without_pdc"],
           status: "released",
           pdcCheckCount: 3,
           pdcCollectedAt: null,
@@ -94,7 +94,7 @@ describe("physical PDC collection gates", () => {
       assert.throws(
         () =>
           assertCanConfirmPdcCollection({
-            releasePath: "without_pdc",
+            releasePaths: ["without_pdc"],
             status: "released",
             pdcCheckCount: 3,
             pdcCollectedAt: null,
@@ -113,7 +113,7 @@ describe("physical PDC collection gates", () => {
         assert.throws(
           () =>
             assertCanConfirmPdcCollection({
-              releasePath: "with_pdc",
+              releasePaths: ["with_pdc"],
               status,
               pdcCheckCount: 2,
               pdcCollectedAt: null,
@@ -127,7 +127,7 @@ describe("physical PDC collection gates", () => {
       assert.throws(
         () =>
           assertCanConfirmPdcCollection({
-            releasePath: "with_pdc",
+            releasePaths: ["with_pdc"],
             status: "released",
             pdcCheckCount: 0,
             pdcCollectedAt: null,
@@ -144,7 +144,7 @@ describe("physical PDC collection gates", () => {
       ] as const) {
         assert.doesNotThrow(() =>
           assertCanConfirmPdcCollection({
-            releasePath: "with_pdc",
+            releasePaths: ["with_pdc"],
             status,
             pdcCheckCount: 1,
             pdcCollectedAt: null,
@@ -152,7 +152,7 @@ describe("physical PDC collection gates", () => {
         );
         assert.equal(
           canConfirmPdcCollection({
-            releasePath: "with_pdc",
+            releasePaths: ["with_pdc"],
             status,
             pdcCheckCount: 1,
             pdcCollectedAt: null,
@@ -162,10 +162,30 @@ describe("physical PDC collection gates", () => {
       }
     });
 
+    it("allows both-selected paths the same as with_pdc-only", () => {
+      assert.equal(
+        canConfirmPdcCollection({
+          releasePaths: ["with_pdc", "without_pdc"],
+          status: "released",
+          pdcCheckCount: 1,
+          pdcCollectedAt: null,
+        }),
+        true,
+      );
+      assert.doesNotThrow(() =>
+        assertCanConfirmPdcCollection({
+          releasePaths: ["with_pdc", "without_pdc"],
+          status: "released",
+          pdcCheckCount: 1,
+          pdcCollectedAt: null,
+        }),
+      );
+    });
+
     it("rejects when already collected", () => {
       assert.equal(
         canConfirmPdcCollection({
-          releasePath: "with_pdc",
+          releasePaths: ["with_pdc"],
           status: "released",
           pdcCheckCount: 2,
           pdcCollectedAt: "2026-07-23T00:00:00.000Z",
@@ -176,9 +196,13 @@ describe("physical PDC collection gates", () => {
   });
 
   describe("assertPdcCollectedForClose / closeRequiresPdcCollection", () => {
-    it("requires collection only for with_pdc", () => {
-      assert.equal(closeRequiresPdcCollection("with_pdc"), true);
-      assert.equal(closeRequiresPdcCollection("without_pdc"), false);
+    it("requires collection only when with_pdc is selected", () => {
+      assert.equal(closeRequiresPdcCollection(["with_pdc"]), true);
+      assert.equal(closeRequiresPdcCollection(["without_pdc"]), false);
+      assert.equal(
+        closeRequiresPdcCollection(["with_pdc", "without_pdc"]),
+        true,
+      );
       assert.equal(closeRequiresPdcCollection(null), false);
     });
 
@@ -186,7 +210,18 @@ describe("physical PDC collection gates", () => {
       assert.throws(
         () =>
           assertPdcCollectedForClose({
-            releasePath: "with_pdc",
+            releasePaths: ["with_pdc"],
+            pdcCollectedAt: null,
+          }),
+        new RegExp(PDC_COLLECT_CLOSE_ERROR),
+      );
+    });
+
+    it("rejects both-selected without collection", () => {
+      assert.throws(
+        () =>
+          assertPdcCollectedForClose({
+            releasePaths: ["with_pdc", "without_pdc"],
             pdcCollectedAt: null,
           }),
         new RegExp(PDC_COLLECT_CLOSE_ERROR),
@@ -196,7 +231,7 @@ describe("physical PDC collection gates", () => {
     it("allows without_pdc without collection", () => {
       assert.doesNotThrow(() =>
         assertPdcCollectedForClose({
-          releasePath: "without_pdc",
+          releasePaths: ["without_pdc"],
           pdcCollectedAt: null,
         }),
       );
@@ -205,7 +240,16 @@ describe("physical PDC collection gates", () => {
     it("allows with_pdc with collection", () => {
       assert.doesNotThrow(() =>
         assertPdcCollectedForClose({
-          releasePath: "with_pdc",
+          releasePaths: ["with_pdc"],
+          pdcCollectedAt: "2026-07-23T12:00:00.000Z",
+        }),
+      );
+    });
+
+    it("allows both-selected with collection", () => {
+      assert.doesNotThrow(() =>
+        assertPdcCollectedForClose({
+          releasePaths: ["with_pdc", "without_pdc"],
           pdcCollectedAt: "2026-07-23T12:00:00.000Z",
         }),
       );
@@ -214,7 +258,7 @@ describe("physical PDC collection gates", () => {
     it("surfaces released-stage blocker only for uncollected with_pdc", () => {
       assert.equal(
         maybePdcCollectBlocker({
-          releasePath: "with_pdc",
+          releasePaths: ["with_pdc"],
           status: "released",
           pdcCollectedAt: null,
         }),
@@ -222,7 +266,15 @@ describe("physical PDC collection gates", () => {
       );
       assert.equal(
         maybePdcCollectBlocker({
-          releasePath: "with_pdc",
+          releasePaths: ["with_pdc", "without_pdc"],
+          status: "released",
+          pdcCollectedAt: null,
+        }),
+        PDC_PHYSICAL_COLLECT_BLOCKER,
+      );
+      assert.equal(
+        maybePdcCollectBlocker({
+          releasePaths: ["with_pdc"],
           status: "awaiting_briefing",
           pdcCollectedAt: null,
         }),
@@ -230,7 +282,7 @@ describe("physical PDC collection gates", () => {
       );
       assert.equal(
         maybePdcCollectBlocker({
-          releasePath: "without_pdc",
+          releasePaths: ["without_pdc"],
           status: "released",
           pdcCollectedAt: null,
         }),
@@ -245,7 +297,7 @@ describe("physical PDC collection gates", () => {
         () =>
           confirmPdcCollected(
             makeConfirmStub({
-              releasePath: "without_pdc",
+              releasePaths: ["without_pdc"],
               status: "released",
               pdcCollectedAt: null,
               checkCount: 2,
@@ -260,7 +312,7 @@ describe("physical PDC collection gates", () => {
         () =>
           confirmPdcCollected(
             makeConfirmStub({
-              releasePath: "with_pdc",
+              releasePaths: ["with_pdc"],
               status: "awaiting_signatures",
               pdcCollectedAt: null,
               checkCount: 2,
@@ -275,7 +327,7 @@ describe("physical PDC collection gates", () => {
         () =>
           confirmPdcCollected(
             makeConfirmStub({
-              releasePath: "with_pdc",
+              releasePaths: ["with_pdc"],
               status: "released",
               pdcCollectedAt: null,
               checkCount: 0,
@@ -289,7 +341,7 @@ describe("physical PDC collection gates", () => {
 
     it("succeeds on allowed statuses and sets timestamp", async () => {
       const stub = makeConfirmStub({
-        releasePath: "with_pdc",
+        releasePaths: ["with_pdc"],
         status: "released",
         pdcCollectedAt: null,
         checkCount: 3,
@@ -308,6 +360,24 @@ describe("physical PDC collection gates", () => {
         stub.getUpdated()?.pdc_collected_at,
         result.pdcCollectedAt,
       );
+    });
+
+    it("succeeds for both-selected paths", async () => {
+      const stub = makeConfirmStub({
+        releasePaths: ["with_pdc", "without_pdc"],
+        status: "released",
+        pdcCollectedAt: null,
+        checkCount: 2,
+      });
+
+      const result = await confirmPdcCollected(
+        stub.supabase,
+        "rf-1",
+        "actor-1",
+      );
+
+      assert.equal(result.pdcCollectedBy, "actor-1");
+      assert.ok(result.pdcCollectedAt);
     });
   });
 });

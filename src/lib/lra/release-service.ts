@@ -819,7 +819,18 @@ export async function recordRelease(
   actorId: string,
   notes?: string,
 ) {
-  const file = await getReleaseFile(supabase, releaseFileId);
+  const { data: row, error: rowError } = await supabase
+    .from("release_files")
+    .select("*")
+    .eq("id", releaseFileId)
+    .single();
+
+  if (rowError || !row) {
+    throw new Error("Release file not found");
+  }
+
+  const file = mapReleaseFileRow(row);
+  const releasePaths = releasePathsFromRow(row);
 
   const hasContract = await hasEmploymentContractUploaded(
     supabase,
@@ -863,7 +874,7 @@ export async function recordRelease(
   // Prefer a close-stage pending message when with_pdc physical collection
   // is still outstanding — does not touch earlier briefing/contract blockers.
   const collectBlocker = maybePdcCollectBlocker({
-    releasePath: file.releasePath,
+    releasePaths,
     status: "released",
     pdcCollectedAt: file.pdcCollectedAt,
   });
@@ -883,14 +894,24 @@ export async function closeRelease(
   actorId: string,
   signedVoucherDocumentId?: string,
 ) {
-  const file = await getReleaseFile(supabase, releaseFileId);
+  const { data: row, error: rowError } = await supabase
+    .from("release_files")
+    .select("*")
+    .eq("id", releaseFileId)
+    .single();
+
+  if (rowError || !row) {
+    throw new Error("Release file not found");
+  }
+
+  const file = mapReleaseFileRow(row);
 
   if (file.status !== "released") {
     throw new Error("Release must be recorded before closure");
   }
 
   assertPdcCollectedForClose({
-    releasePath: file.releasePath,
+    releasePaths: releasePathsFromRow(row),
     pdcCollectedAt: file.pdcCollectedAt,
   });
 
