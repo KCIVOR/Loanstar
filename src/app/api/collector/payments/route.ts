@@ -38,7 +38,7 @@ const PAYMENT_SELECT = `
 
 const recordSchema = z.object({
   masterlistId: z.string().uuid(),
-  referenceNo: z.string().optional(),
+  referenceNo: z.string().trim().min(1, "Reference number is required"),
   paymentDate: z.string().min(1),
   amount: z.number().positive(),
   channel: z.enum(["bank_deposit", "check", "pos_cash"]),
@@ -259,7 +259,7 @@ export async function POST(request: Request) {
         masterlist_id: body.masterlistId,
         loan_application_id: masterlist.loan_application_id,
         borrower_id: borrowerId,
-        reference_no: body.referenceNo ?? null,
+        reference_no: body.referenceNo,
         payment_date: body.paymentDate,
         amount: body.amount,
         channel: body.channel,

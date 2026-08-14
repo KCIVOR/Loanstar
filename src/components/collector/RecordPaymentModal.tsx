@@ -84,12 +84,15 @@ export function RecordPaymentModal({
       if (!paymentDate || !Number.isFinite(parsedAmount) || parsedAmount <= 0) {
         throw new Error("Amount and payment date are required");
       }
+      if (!referenceNo.trim()) {
+        throw new Error("Reference number is required");
+      }
 
       const payload: {
         masterlistId: string;
         amount: number;
         paymentDate: string;
-        referenceNo?: string;
+        referenceNo: string;
         channel: Channel;
         storagePath?: string;
         fileName?: string;
@@ -98,7 +101,7 @@ export function RecordPaymentModal({
         masterlistId,
         amount: parsedAmount,
         paymentDate,
-        referenceNo: referenceNo.trim() || undefined,
+        referenceNo: referenceNo.trim(),
         channel,
       };
 
@@ -180,7 +183,8 @@ export function RecordPaymentModal({
         <div className="mb-4">
           <Alert variant="info">
             Use this for in-person or branch payments the borrower cannot
-            submit through the portal. Amount and payment date are required.
+            submit through the portal. Amount, payment date, and reference
+            number are required.
           </Alert>
         </div>
       )}
@@ -215,11 +219,12 @@ export function RecordPaymentModal({
               />
             </div>
             <div>
-              <Label>Reference no.</Label>
+              <Label required>Reference no.</Label>
               <Input
                 value={referenceNo}
                 onChange={(e) => setReferenceNo(e.target.value)}
-                placeholder="Optional"
+                placeholder="Bank reference / receipt no."
+                required
                 className="mono"
               />
             </div>

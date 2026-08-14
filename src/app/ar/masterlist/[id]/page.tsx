@@ -73,7 +73,10 @@ type PostingRow = {
   id: string;
   amortization_schedule_id: string;
   amount: number;
-  payments: { payment_date: string } | { payment_date: string }[] | null;
+  payments:
+    | { payment_date: string; reference_no: string | null }
+    | { payment_date: string; reference_no: string | null }[]
+    | null;
 };
 
 function formatMoney(value: number) {
@@ -112,6 +115,25 @@ function paymentDatesByScheduleId(
       id,
       [...dates].sort((a, b) => a.localeCompare(b)),
     );
+  }
+  return map;
+}
+
+/** Unique reference numbers from postings linked to each installment. */
+function referenceNosByScheduleId(
+  postings: PostingRow[],
+): Map<string, string[]> {
+  const map = new Map<string, string[]>();
+  for (const posting of postings) {
+    const scheduleId = posting.amortization_schedule_id;
+    if (!scheduleId) continue;
+    const raw = posting.payments;
+    const payment = Array.isArray(raw) ? raw[0] : raw;
+    const ref = payment?.reference_no?.trim();
+    if (!ref) continue;
+    const list = map.get(scheduleId) ?? [];
+    if (!list.includes(ref)) list.push(ref);
+    map.set(scheduleId, list);
   }
   return map;
 }
@@ -402,6 +424,7 @@ export default function ArMasterlistDetailPage() {
       (a, b) => Number(a.installment_no) - Number(b.installment_no),
     );
   const paymentDatesBySchedule = paymentDatesByScheduleId(postings);
+  const referenceNosBySchedule = referenceNosByScheduleId(postings);
   const borrowerName = (record.borrower_name as string) ?? "Account";
   const borrowerNo = String(record.borrower_no ?? "");
   const accountNo = (record.loan_account_no as string | null) ?? null;
@@ -829,6 +852,7 @@ export default function ArMasterlistDetailPage() {
                 <Th className="num">#</Th>
                 <Th>Due date</Th>
                 <Th>Payment date</Th>
+                <Th>Reference No.</Th>
                 <Th className="num">Amount due</Th>
                 <Th className="num">Running bal.</Th>
                 <Th>Status</Th>
@@ -874,6 +898,10 @@ export default function ArMasterlistDetailPage() {
                           paymentDatesBySchedule.get(String(row.id)),
                         )}
                       </span>
+                    </Td>
+                    <Td className="mono">
+                      {referenceNosBySchedule.get(String(row.id))?.join(", ") ||
+                        "—"}
                     </Td>
                     <Td className="num mono text-teal-600">
                       {formatMoney(due)}

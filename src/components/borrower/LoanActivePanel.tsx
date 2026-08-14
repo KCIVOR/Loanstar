@@ -82,7 +82,10 @@ type PostingRow = {
   id: string;
   amortization_schedule_id: string;
   amount: number;
-  payments: { payment_date: string } | { payment_date: string }[] | null;
+  payments:
+    | { payment_date: string; reference_no: string | null }
+    | { payment_date: string; reference_no: string | null }[]
+    | null;
 };
 
 function formatMoney(value: number) {
@@ -121,6 +124,25 @@ function paymentDatesByScheduleId(
       id,
       [...dates].sort((a, b) => a.localeCompare(b)),
     );
+  }
+  return map;
+}
+
+/** Unique reference numbers from postings linked to each installment (comma-joined for display). */
+function referenceNosByScheduleId(
+  postings: PostingRow[],
+): Map<string, string[]> {
+  const map = new Map<string, string[]>();
+  for (const posting of postings) {
+    const scheduleId = posting.amortization_schedule_id;
+    if (!scheduleId) continue;
+    const raw = posting.payments;
+    const payment = Array.isArray(raw) ? raw[0] : raw;
+    const ref = payment?.reference_no?.trim();
+    if (!ref) continue;
+    const list = map.get(scheduleId) ?? [];
+    if (!list.includes(ref)) list.push(ref);
+    map.set(scheduleId, list);
   }
   return map;
 }
@@ -307,6 +329,7 @@ export function LoanActivePanel({
     (a, b) => a.installment_no - b.installment_no,
   );
   const paymentDatesBySchedule = paymentDatesByScheduleId(postings);
+  const referenceNosBySchedule = referenceNosByScheduleId(postings);
   const totalLoan = Number(loan.total_loan ?? 0);
   let runningBalance = totalLoan;
   const scheduleRows = schedules.map((row) => {
@@ -358,6 +381,7 @@ export function LoanActivePanel({
             <Th num>#</Th>
             <Th>Due date</Th>
             <Th>Payment date</Th>
+            <Th>Reference No.</Th>
             <Th num>Amortization</Th>
             <Th num>Balance</Th>
             <Th>Status</Th>
@@ -392,6 +416,9 @@ export function LoanActivePanel({
                   )}
                 </span>
               </Td>
+              <Td className="mono">
+                {referenceNosBySchedule.get(String(row.id))?.join(", ") || "—"}
+              </Td>
               <Td num className="mono">
                 {formatMoney(Number(row.amount_due))}
               </Td>
@@ -416,6 +443,7 @@ export function LoanActivePanel({
           <tr className="tfoot-row">
             <Td>{""}</Td>
             <Td>Total</Td>
+            <Td>{""}</Td>
             <Td>{""}</Td>
             <Td num className="mono">
               {formatMoney(totalAmortization)}
