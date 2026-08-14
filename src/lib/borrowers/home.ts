@@ -276,6 +276,11 @@ export function nextStepGuidance(input: {
           ? `${blocker}. You can review the file for details.`
           : "This application was denied. Open the file for details.",
       };
+    case "cancelled":
+      return {
+        title: "Application cancelled",
+        body: "This application was cancelled at your request. Contact us if this was a mistake.",
+      };
     default:
       return {
         title: "Continue your application",

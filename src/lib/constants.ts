@@ -150,6 +150,7 @@ export const APPLICATION_STATUSES = [
   "closed",
   "loan_active",
   "paid_off",
+  "cancelled",
 ] as const;
 
 export type ApplicationStatus = (typeof APPLICATION_STATUSES)[number];

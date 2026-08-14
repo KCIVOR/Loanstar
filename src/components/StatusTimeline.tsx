@@ -9,6 +9,7 @@ export function StatusTimeline({ currentStatus }: { currentStatus: string }) {
     currentStatus as (typeof APPLICATION_STATUSES)[number],
   );
   const isDenied = currentStatus === "denied";
+  const isCancelled = currentStatus === "cancelled";
 
   const steps: StepperStep[] = APPLICATION_STATUSES.map((status, index) => {
     const label = formatStatusLabel(status);
@@ -22,7 +23,11 @@ export function StatusTimeline({ currentStatus }: { currentStatus: string }) {
       return {
         label,
         state: "current" as const,
-        description: isDenied ? "Application denied" : undefined,
+        description: isDenied
+          ? "Application denied"
+          : isCancelled
+            ? "Application cancelled"
+            : undefined,
       };
     }
     return { label, state: "todo" as const };
