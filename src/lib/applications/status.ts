@@ -31,6 +31,7 @@ const STATUS_LABELS: Record<ApplicationStatus, string> = {
   closed: "Closed — Transmitted",
   loan_active: "Loan Active",
   paid_off: "Paid Off",
+  cancelled: "Cancelled",
 };
 
 export function formatStatusLabel(status: ApplicationStatus | string): string {
@@ -68,6 +69,7 @@ const STATUS_BADGE_VARIANTS: Record<
   closed: "success",
   loan_active: "success",
   paid_off: "success",
+  cancelled: "danger",
 };
 
 export function statusBadgeVariant(

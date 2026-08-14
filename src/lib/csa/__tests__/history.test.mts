@@ -26,6 +26,7 @@ const POST_ENDORSEMENT_GROUPS: Record<string, CsaHistoryStatusGroup> = {
   release_briefing: "in_progress",
   release_ready: "in_progress",
   denied: "denied",
+  cancelled: "denied",
   released: "released",
   closed: "released",
   loan_active: "released",
@@ -61,6 +62,7 @@ describe("IN_PROGRESS_STATUSES / RELEASED_STATUSES", () => {
       assert.equal(csaHistoryStatusGroup(status), "released", status);
     }
     assert.equal(csaHistoryStatusGroup("denied"), "denied");
+    assert.equal(csaHistoryStatusGroup("cancelled"), "denied");
   });
 
   it("cover every post-endorsement in_progress and released status", () => {
@@ -80,7 +82,7 @@ describe("IN_PROGRESS_STATUSES / RELEASED_STATUSES", () => {
 describe("statusesForHistoryGroup", () => {
   it("maps statusGroup to the .in() status list used by the query builder", () => {
     assert.equal(statusesForHistoryGroup("all"), null);
-    assert.deepEqual(statusesForHistoryGroup("denied"), ["denied"]);
+    assert.deepEqual(statusesForHistoryGroup("denied"), ["denied", "cancelled"]);
     assert.equal(statusesForHistoryGroup("released"), RELEASED_STATUSES);
     assert.equal(statusesForHistoryGroup("in_progress"), IN_PROGRESS_STATUSES);
   });

@@ -32,6 +32,8 @@ import {
   CIG_HISTORY_PAGE_SIZES,
   type CigCallbacksResolvedHistoryRow,
   type CigCallbacksResolvedSortKey,
+  type CigCancellationsHistoryRow,
+  type CigCancellationsSortKey,
   type CigDenialCallsHistoryRow,
   type CigDenialCallsSortKey,
   type CigForwardedHistoryRow,
@@ -43,7 +45,12 @@ import {
   type CigReturnedSortKey,
 } from "@/lib/cig/history";
 
-type HistoryTab = "forwarded" | "returned" | "denialCalls" | "callbacks";
+type HistoryTab =
+  | "forwarded"
+  | "returned"
+  | "denialCalls"
+  | "callbacks"
+  | "cancellations";
 type CallbacksUiSortKey = CigCallbacksResolvedSortKey | "borrower";
 
 const EMPTY_KPI: CigHistoryKpiCounts = { total: 0 };
@@ -59,6 +66,7 @@ const TAB_CHIPS: Array<{ id: HistoryTab; label: string }> = [
   { id: "returned", label: "Returned to CSA" },
   { id: "denialCalls", label: "Denial Calls" },
   { id: "callbacks", label: "Callbacks Resolved" },
+  { id: "cancellations", label: "Cancelled" },
 ];
 
 const FINDING_CHIPS: Array<{ id: CigRecentFindingFilter; label: string }> = [
@@ -1294,6 +1302,267 @@ function DenialCallsHistoryPanel() {
   );
 }
 
+function CancellationsHistoryPanel() {
+  const [rows, setRows] = useState<CigCancellationsHistoryRow[]>([]);
+  const [totalCount, setTotalCount] = useState(0);
+  const [kpi, setKpi] = useState<CigHistoryKpiCounts>(EMPTY_KPI);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const [search, setSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+  const [dateRange, setDateRange] = useState<DateRangeValue>(DEFAULT_DATE_RANGE);
+  const [viewMode, setViewMode] = useState<HistoryViewMode>("list");
+  const [pageSize, setPageSize] =
+    useState<(typeof CIG_HISTORY_PAGE_SIZES)[number]>(10);
+  const [page, setPage] = useState(1);
+  const [sortKey, setSortKey] = useState<CigCancellationsSortKey>("cancelledAt");
+  const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
+  const [filterPanelOpen, setFilterPanelOpen] = useState(false);
+
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearch(search), 300);
+    return () => clearTimeout(timer);
+  }, [search]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [debouncedSearch, dateRange, pageSize, sortKey, sortDir]);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const query = buildHistoryQuery({
+        search: debouncedSearch,
+        dateRange,
+        sortKey: sortKey === "borrower" ? "cancelledAt" : sortKey,
+        sortDir,
+        page,
+        pageSize,
+      });
+      const res = await fetch(`/api/cig/history/cancellations?${query}`);
+      if (!res.ok) throw new Error("Failed to load cancellation history");
+      const data = (await res.json()) as {
+        rows: CigCancellationsHistoryRow[];
+        totalCount: number;
+        kpi: CigHistoryKpiCounts;
+      };
+      setRows(data.rows ?? []);
+      setTotalCount(data.totalCount ?? 0);
+      setKpi(data.kpi ?? EMPTY_KPI);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to load");
+    } finally {
+      setLoading(false);
+    }
+  }, [debouncedSearch, dateRange, sortKey, sortDir, page, pageSize]);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  const displayRows = useMemo(
+    () => (sortKey === "borrower" ? sortBorrowerPage(rows, sortDir) : rows),
+    [rows, sortKey, sortDir],
+  );
+
+  const pageCount = Math.max(1, Math.ceil(totalCount / pageSize));
+  const safePage = Math.min(page, pageCount);
+
+  function toggleSort(key: CigCancellationsSortKey) {
+    if (sortKey === key) {
+      setSortDir((d) => (d === "asc" ? "desc" : "asc"));
+    } else {
+      setSortKey(key);
+      setSortDir(key === "cancelledAt" ? "desc" : "asc");
+    }
+  }
+
+  function sortArrow(key: CigCancellationsSortKey) {
+    if (sortKey !== key) return null;
+    return <span className="arr">{sortDir === "asc" ? "▲" : "▼"}</span>;
+  }
+
+  const dateIsDefault = dateRange.preset === "30d";
+  const activeFilterCount = dateIsDefault ? 0 : 1;
+  const summaryStart = displayRows.length ? (safePage - 1) * pageSize + 1 : 0;
+  const summaryEnd = (safePage - 1) * pageSize + displayRows.length;
+
+  return (
+    <div>
+      {error ? (
+        <div className="mb-4">
+          <Alert>{error}</Alert>
+        </div>
+      ) : null}
+
+      <div className="kpi-grid mb-4">
+        {!loading ? (
+          <div className="card stat">
+            <div className="k">Total cancelled</div>
+            <div className="v">{kpi.total}</div>
+          </div>
+        ) : (
+          <Skeleton variant="kpi" />
+        )}
+      </div>
+
+      <HistoryToolbar
+        search={search}
+        onSearchChange={setSearch}
+        placeholder="Search borrower, application no…"
+        pills={
+          <DatePill
+            dateRange={dateRange}
+            onClear={() => setDateRange(DEFAULT_DATE_RANGE)}
+          />
+        }
+        activeFilterCount={activeFilterCount}
+        onClearAll={() => setDateRange(DEFAULT_DATE_RANGE)}
+        viewMode={viewMode}
+        onViewModeChange={setViewMode}
+        filterPanelOpen={filterPanelOpen}
+        onToggleFilters={() => setFilterPanelOpen((open) => !open)}
+        filterPanel={
+          <div className="filter-group">
+            <span className="filter-group-label">Cancelled date</span>
+            <DateRangeFilter value={dateRange} onChange={setDateRange} />
+          </div>
+        }
+      />
+
+      {loading ? (
+        <TableSkeleton
+          columns={[
+            "Borrower",
+            "App no",
+            "Reason",
+            "Cancelled by",
+            "Cancelled date",
+            "",
+          ]}
+          colSpan={6}
+        />
+      ) : kpi.total === 0 ? (
+        <EmptyState
+          title="No matching records"
+          description="No cancelled applications in this date range."
+          showMark={false}
+        />
+      ) : totalCount === 0 ? (
+        <EmptyState
+          title="No matching records"
+          description="Try clearing a filter or search term."
+          showMark={false}
+        />
+      ) : viewMode === "grid" ? (
+        <div className="grid-view mb-4">
+          {displayRows.map((row) => (
+            <div key={row.id} className="gcard">
+              <div className="gcard-top">
+                <span className="gcard-id mono">
+                  {row.applicationNo ?? row.applicationId.slice(0, 8)}
+                </span>
+              </div>
+              <div className="gcard-name">{borrowerName(row.borrower)}</div>
+              <div className="gcard-meta">
+                {row.borrower?.email ? (
+                  <div className="row">
+                    <span className="k">Email</span>
+                    <span className="v">{row.borrower.email}</span>
+                  </div>
+                ) : null}
+                <div className="row">
+                  <span className="k">Reason</span>
+                  <span className="v">{row.reason}</span>
+                </div>
+                <div className="row">
+                  <span className="k">Cancelled by</span>
+                  <span className="v mono">{row.cancelledBy ?? "—"}</span>
+                </div>
+                <div className="row">
+                  <span className="k">Cancelled</span>
+                  <span className="v mono">
+                    {formatDateTime(row.cancelledAt)}
+                  </span>
+                </div>
+              </div>
+              <ViewApplicationButton applicationId={row.applicationId} />
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div className="mb-4">
+          <Table className={viewMode === "compact" ? "is-compact" : undefined}>
+            <thead>
+              <tr>
+                <Th className="sortable" onClick={() => toggleSort("borrower")}>
+                  Borrower
+                  {sortArrow("borrower")}
+                </Th>
+                <Th
+                  className="sortable"
+                  onClick={() => toggleSort("applicationNo")}
+                >
+                  App no
+                  {sortArrow("applicationNo")}
+                </Th>
+                <Th>Reason</Th>
+                <Th>Cancelled by</Th>
+                <Th
+                  className="sortable"
+                  onClick={() => toggleSort("cancelledAt")}
+                >
+                  Cancelled date
+                  {sortArrow("cancelledAt")}
+                </Th>
+                <Th className="w-1">{""}</Th>
+              </tr>
+            </thead>
+            <tbody>
+              {displayRows.map((row) => (
+                <tr key={row.id}>
+                  <Td>
+                    <div className="font-medium text-ink-900">
+                      {borrowerName(row.borrower)}
+                    </div>
+                    {row.borrower?.email ? (
+                      <div className="truncate text-xs text-ink-400">
+                        {row.borrower.email}
+                      </div>
+                    ) : null}
+                  </Td>
+                  <Td className="mono">{row.applicationNo ?? "—"}</Td>
+                  <Td>
+                    <span className="line-clamp-2">{row.reason}</span>
+                  </Td>
+                  <Td className="mono">{row.cancelledBy ?? "—"}</Td>
+                  <Td className="mono">{formatDateTime(row.cancelledAt)}</Td>
+                  <Td>
+                    <ViewApplicationButton applicationId={row.applicationId} />
+                  </Td>
+                </tr>
+              ))}
+            </tbody>
+          </Table>
+        </div>
+      )}
+
+      <HistoryPager
+        page={safePage}
+        pageCount={pageCount}
+        pageSize={pageSize}
+        onPageChange={setPage}
+        onPageSizeChange={setPageSize}
+        summaryStart={summaryStart}
+        summaryEnd={summaryEnd}
+        totalCount={totalCount}
+      />
+    </div>
+  );
+}
+
 function CallbacksResolvedHistoryPanel() {
   const [rows, setRows] = useState<CigCallbacksResolvedHistoryRow[]>([]);
   const [totalCount, setTotalCount] = useState(0);
@@ -1584,7 +1853,7 @@ export default function CigHistoryPage() {
         ))}
       </div>
 
-      {/* Keep all four panels mounted so each tab retains its own filters/sort/page. */}
+      {/* Keep all panels mounted so each tab retains its own filters/sort/page. */}
       <div hidden={tab !== "forwarded"}>
         <ForwardedHistoryPanel />
       </div>
@@ -1596,6 +1865,9 @@ export default function CigHistoryPage() {
       </div>
       <div hidden={tab !== "callbacks"}>
         <CallbacksResolvedHistoryPanel />
+      </div>
+      <div hidden={tab !== "cancellations"}>
+        <CancellationsHistoryPanel />
       </div>
     </div>
   );

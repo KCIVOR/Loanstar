@@ -1,5 +1,5 @@
-/** Terminal statuses that do not block starting a new reloan. */
-export const RELOAN_TERMINAL_STATUSES = ["paid_off", "denied"] as const;
+/** Terminal statuses that do not block starting a new reloan (paid off, denied, or cancelled). */
+export const RELOAN_TERMINAL_STATUSES = ["paid_off", "denied", "cancelled"] as const;
 
 export type ReloanEligibilityResult =
   | { ok: true }
@@ -9,8 +9,8 @@ export type NextApplicationKind = "first" | "reloan";
 
 /**
  * A borrower may start a reloan only when every existing application is
- * terminal (paid off or denied). Any in-flight application blocks another.
- * An empty history is allowed (first application).
+ * terminal (paid off, denied, or cancelled). Any in-flight application blocks
+ * another. An empty history is allowed (first application).
  */
 export function canStartReloan(input: {
   applicationStatuses: string[];

@@ -23,6 +23,13 @@ test("canStartReloan allows when borrower has only denied apps", () => {
   );
 });
 
+test("canStartReloan allows when borrower has only cancelled apps", () => {
+  assert.deepEqual(
+    canStartReloan({ applicationStatuses: ["cancelled", "paid_off"] }),
+    { ok: true },
+  );
+});
+
 test("canStartReloan allows when borrower has no applications", () => {
   assert.deepEqual(canStartReloan({ applicationStatuses: [] }), { ok: true });
 });
