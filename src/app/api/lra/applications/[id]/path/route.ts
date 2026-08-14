@@ -3,7 +3,7 @@ import { z } from "zod";
 
 import { writeAuditEvent } from "@/lib/audit/writer";
 import { handleApiError, jsonOk } from "@/lib/api/handler";
-import { setReleasePath } from "@/lib/lra/release-service";
+import { setReleasePaths } from "@/lib/lra/release-service";
 import { requireModulePermission } from "@/lib/permissions/server";
 import { createClient } from "@/lib/supabase/server";
 
@@ -11,12 +11,20 @@ type RouteParams = { params: Promise<{ id: string }> };
 
 const schema = z
   .object({
-    releasePath: z.enum(["with_pdc", "without_pdc"]),
+    releasePaths: z
+      .array(z.enum(["with_pdc", "without_pdc"]))
+      .min(1)
+      .max(2)
+      .refine(
+        (paths) => new Set(paths).size === paths.length,
+        "Duplicate release paths are not allowed",
+      ),
     atmBankName: z.string().min(1).max(120).optional(),
     atmCardLast4: z.string().regex(/^\d{4}$/).optional(),
+    atmAccountNumber: z.string().min(1).max(64).optional(),
   })
   .superRefine((value, ctx) => {
-    if (value.releasePath === "without_pdc") {
+    if (value.releasePaths.includes("without_pdc")) {
       if (!value.atmBankName) {
         ctx.addIssue({
           code: "custom",
@@ -29,6 +37,13 @@ const schema = z
           code: "custom",
           message: "ATM card last 4 digits are required for Without PDC path",
           path: ["atmCardLast4"],
+        });
+      }
+      if (!value.atmAccountNumber) {
+        ctx.addIssue({
+          code: "custom",
+          message: "ATM account number is required for Without PDC path",
+          path: ["atmAccountNumber"],
         });
       }
     }
@@ -54,14 +69,15 @@ export async function POST(request: Request, { params }: RouteParams) {
       );
     }
 
-    const result = await setReleasePath(
+    const result = await setReleasePaths(
       supabase,
       releaseFile.id,
-      body.releasePath,
+      body.releasePaths,
       user.id,
       {
         atmBankName: body.atmBankName,
         atmCardLast4: body.atmCardLast4,
+        atmAccountNumber: body.atmAccountNumber,
       },
     );
 

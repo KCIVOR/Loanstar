@@ -1,3 +1,4 @@
+/** Element type for `release_files.release_paths` / `masterlist.release_paths` (`ReleasePath[]`). */
 export type ReleasePath = "with_pdc" | "without_pdc";
 
 export type ReleaseFileStatus =

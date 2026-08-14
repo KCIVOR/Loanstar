@@ -78,23 +78,35 @@ export async function getOrCreateReleaseFile(
   return mapReleaseFileRow(created);
 }
 
-export async function setReleasePath(
+export async function setReleasePaths(
   supabase: SupabaseClient,
   releaseFileId: string,
-  path: ReleasePath,
+  paths: ReleasePath[],
   actorId: string,
-  options?: { atmBankName?: string; atmCardLast4?: string },
+  options?: {
+    atmBankName?: string;
+    atmCardLast4?: string;
+    atmAccountNumber?: string;
+  },
 ) {
-  const file = await getReleaseFile(supabase, releaseFileId);
-  const nextStatus: ReleaseFileStatus =
-    path === "with_pdc" ? "pdc_encoding" : "ready_generate";
+  if (paths.length === 0) {
+    throw new Error("At least one release path is required");
+  }
 
-  if (path === "without_pdc") {
+  const file = await getReleaseFile(supabase, releaseFileId);
+  const nextStatus: ReleaseFileStatus = paths.includes("with_pdc")
+    ? "pdc_encoding"
+    : "ready_generate";
+
+  if (paths.includes("without_pdc")) {
     if (!options?.atmBankName?.trim()) {
       throw new Error("ATM bank name is required for Without PDC path");
     }
     if (!options?.atmCardLast4?.trim() || options.atmCardLast4.length !== 4) {
       throw new Error("ATM card last 4 digits are required for Without PDC path");
+    }
+    if (!options?.atmAccountNumber?.trim()) {
+      throw new Error("ATM account number is required for Without PDC path");
     }
   }
 
@@ -116,15 +128,21 @@ export async function setReleasePath(
         : null,
   };
 
+  const hasAtm = paths.includes("without_pdc");
+  // Legacy scalar: single path only; both-selected leaves it null (no third enum).
+  const legacyReleasePath = paths.length === 1 ? paths[0] : null;
+
   const { error } = await supabase
     .from("release_files")
     .update({
-      release_path: path,
+      release_paths: paths,
+      release_path: legacyReleasePath,
       status: nextStatus,
-      atm_bank_name: path === "without_pdc" ? options?.atmBankName?.trim() : null,
-      atm_card_last4: path === "without_pdc" ? options?.atmCardLast4?.trim() : null,
-      blank_check_from: path === "without_pdc" ? null : undefined,
-      blank_check_to: path === "without_pdc" ? null : undefined,
+      atm_bank_name: hasAtm ? options?.atmBankName?.trim() : null,
+      atm_card_last4: hasAtm ? options?.atmCardLast4?.trim() : null,
+      atm_account_number: hasAtm ? options?.atmAccountNumber?.trim() : null,
+      blank_check_from: hasAtm ? null : undefined,
+      blank_check_to: hasAtm ? null : undefined,
       updated_at: new Date().toISOString(),
     })
     .eq("id", releaseFileId);
@@ -133,14 +151,15 @@ export async function setReleasePath(
     throw new Error(error.message);
   }
 
-  const signingStage = releaseStageForPath(path);
-  await ensureDocumentSlots(
-    supabase,
-    signingStage,
-    file.loanApplicationId,
-    app.borrower_id as string,
-    checklistScope,
-  );
+  for (const p of paths) {
+    await ensureDocumentSlots(
+      supabase,
+      releaseStageForPath(p),
+      file.loanApplicationId,
+      app.borrower_id as string,
+      checklistScope,
+    );
+  }
   await ensureDocumentSlots(
     supabase,
     "release",
@@ -153,7 +172,12 @@ export async function setReleasePath(
     actorId,
   });
 
-  return { status: nextStatus, releasePath: path, signingStage };
+  const signingStages = paths.map((p) => releaseStageForPath(p));
+  return {
+    status: nextStatus,
+    releasePaths: paths,
+    signingStages,
+  };
 }
 
 export async function getReleaseFile(
