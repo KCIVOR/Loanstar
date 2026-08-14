@@ -5,7 +5,11 @@ import {
   masterlistEmploymentLabels,
   masterlistSecondaryIdentity,
 } from "../masterlist-display";
-import { resolveMasterlistEmploymentFields } from "../masterlist";
+import {
+  masterlistToCsv,
+  masterlistToExportRow,
+  resolveMasterlistEmploymentFields,
+} from "../masterlist";
 
 describe("resolveMasterlistEmploymentFields", () => {
   it("keeps Seafarer manning / vessel", () => {
@@ -89,5 +93,57 @@ describe("masterlistSecondaryIdentity", () => {
       }),
       null,
     );
+  });
+});
+
+describe("masterlistToExportRow", () => {
+  it("joins release_paths and copies atm_account_number", () => {
+    const row = masterlistToExportRow({
+      loan_account_no: "LS-1",
+      borrower_no: "B-1",
+      borrower_name: "Ada",
+      principal: 1000,
+      total_loan: 1100,
+      net_released: 900,
+      monthly_amortization: 100,
+      terms: 12,
+      first_payment_date: "2026-09-10",
+      release_date: "2026-08-14",
+      loan_type_name: "G1",
+      manning_agency: "Marlow",
+      vessel_name: "MV Example",
+      outstanding_balance: 1100,
+      aging_bucket: "current",
+      account_status: "active",
+      release_paths: ["with_pdc", "without_pdc"],
+      atm_bank_name: "BDO",
+      atm_card_last4: "1234",
+      atm_account_number: "0011223344",
+    });
+    assert.equal(row.release_paths, "with_pdc, without_pdc");
+    assert.equal(row.atm_account_number, "0011223344");
+    assert.equal(row.atm_bank_name, "BDO");
+    assert.equal(row.atm_card_last4, "1234");
+  });
+
+  it("exports an empty string when release_paths is missing", () => {
+    const row = masterlistToExportRow({});
+    assert.equal(row.release_paths, "");
+    assert.equal(row.atm_account_number, undefined);
+  });
+});
+
+describe("masterlistToCsv", () => {
+  it("quotes joined release_paths in CSV", () => {
+    const csv = masterlistToCsv([
+      {
+        release_paths: ["with_pdc", "without_pdc"],
+        atm_account_number: "0011223344",
+      },
+    ]);
+    assert.match(csv, /"with_pdc, without_pdc"/);
+    assert.match(csv, /atm_account_number/);
+    assert.match(csv, /0011223344/);
+    assert.doesNotMatch(csv, /release_path,/);
   });
 });

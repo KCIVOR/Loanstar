@@ -128,9 +128,10 @@ export async function initializeArAccount(
       manning_agency: employment.manningAgency,
       vessel_name: employment.vesselName,
       coverage_ratio: computation.coverageRatio,
-      release_path: releaseFile?.release_path ?? null,
+      release_paths: releaseFile?.release_paths ?? [],
       atm_bank_name: releaseFile?.atm_bank_name ?? null,
       atm_card_last4: releaseFile?.atm_card_last4 ?? null,
+      atm_account_number: releaseFile?.atm_account_number ?? null,
       outstanding_balance: computation.totalLoan,
       aging_bucket: "current",
       account_status: "active",
@@ -345,9 +346,12 @@ export function masterlistToExportRow(row: Record<string, unknown>) {
     outstanding_balance: row.outstanding_balance,
     aging_bucket: row.aging_bucket,
     account_status: row.account_status,
-    release_path: row.release_path,
+    release_paths: Array.isArray(row.release_paths)
+      ? (row.release_paths as unknown[]).join(", ")
+      : (row.release_paths ?? ""),
     atm_bank_name: row.atm_bank_name,
     atm_card_last4: row.atm_card_last4,
+    atm_account_number: row.atm_account_number,
   };
 }
 
