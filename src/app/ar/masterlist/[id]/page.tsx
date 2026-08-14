@@ -195,6 +195,10 @@ export default function ArMasterlistDetailPage() {
   const [portfolioId, setPortfolioId] = useState("");
   const [collectorId, setCollectorId] = useState("");
   const [remedialId, setRemedialId] = useState("");
+  const [birStatusCode, setBirStatusCode] = useState("");
+  const [birStatusCodes, setBirStatusCodes] = useState<Record<string, string>>(
+    {},
+  );
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
@@ -211,9 +215,10 @@ export default function ArMasterlistDetailPage() {
   const load = useCallback(async (opts?: { silent?: boolean }) => {
     if (!opts?.silent) setLoading(true);
     try {
-      const [recRes, lookupRes] = await Promise.all([
+      const [recRes, lookupRes, codesRes] = await Promise.all([
         fetch(`/api/ar/masterlist/${id}`),
         fetch("/api/ar/lookups"),
+        fetch("/api/ar/bir-status-codes"),
       ]);
       if (!recRes.ok) throw new Error("Failed to load");
       const recData = (await recRes.json()) as {
@@ -241,8 +246,17 @@ export default function ArMasterlistDetailPage() {
       setPortfolioId((recData.record.portfolio_id as string) ?? "");
       setCollectorId((assignment?.collector_user_id as string) ?? "");
       setRemedialId((assignment?.remedial_user_id as string) ?? "");
+      setBirStatusCode(
+        (recData.record.bir_status_code as string | null) ?? "",
+      );
       if (lookupRes.ok) {
         setLookups((await lookupRes.json()) as Lookup);
+      }
+      if (codesRes.ok) {
+        const codesData = (await codesRes.json()) as {
+          codes?: Record<string, string>;
+        };
+        setBirStatusCodes(codesData.codes ?? {});
       }
       if (!opts?.silent) setError(null);
     } catch (err) {
@@ -268,9 +282,15 @@ export default function ArMasterlistDetailPage() {
         body: JSON.stringify({
           portfolioId: portfolioId || null,
           collectorUserId: collectorId || null,
+          birStatusCode: birStatusCode || null,
         }),
       });
-      if (!res.ok) throw new Error("Assignment failed");
+      if (!res.ok) {
+        const body = (await res.json().catch(() => null)) as {
+          error?: string;
+        } | null;
+        throw new Error(body?.error ?? "Assignment failed");
+      }
       setMessage("Assignment saved.");
       await load({ silent: true });
     } catch (err) {
@@ -699,6 +719,23 @@ export default function ArMasterlistDetailPage() {
                   {c.full_name ?? c.email}
                 </option>
               ))}
+            </Select>
+          </div>
+          <div>
+            <Label>Classification</Label>
+            <Select
+              value={birStatusCode}
+              onChange={(e) => setBirStatusCode(e.target.value)}
+            >
+              <option value="">— Unset —</option>
+              {Object.entries(birStatusCodes).map(([code, label]) => (
+                <option key={code} value={code}>
+                  {label}
+                </option>
+              ))}
+              {birStatusCode && !(birStatusCode in birStatusCodes) ? (
+                <option value={birStatusCode}>{birStatusCode}</option>
+              ) : null}
             </Select>
           </div>
           <Button type="submit" loading={saving}>

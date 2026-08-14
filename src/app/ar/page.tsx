@@ -253,6 +253,7 @@ function buildQueueQuery(params: {
   search: string;
   statusFilter: StatusFilter;
   agingFilter: AgingFilter;
+  birStatusFilter: string;
   segmentFilter: SegmentFilter;
   dateRange: DateRangeValue;
   sortKey: SortKey;
@@ -264,6 +265,7 @@ function buildQueueQuery(params: {
   if (params.search.trim()) qs.set("search", params.search.trim());
   qs.set("status", params.statusFilter);
   qs.set("aging", params.agingFilter);
+  qs.set("birStatus", params.birStatusFilter);
   qs.set("segment", params.segmentFilter);
   qs.set("range", params.dateRange.preset);
   if (params.dateRange.preset === "custom") {
@@ -295,6 +297,10 @@ export default function ArDashboardPage() {
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [agingFilter, setAgingFilter] = useState<AgingFilter>("all");
+  const [birStatusFilter, setBirStatusFilter] = useState("all");
+  const [birStatusCodes, setBirStatusCodes] = useState<Record<string, string>>(
+    {},
+  );
   const [segmentFilter, setSegmentFilter] = useState<SegmentFilter>("all");
   const [dateRange, setDateRange] = useState<DateRangeValue>(DEFAULT_DATE_RANGE);
   const [viewMode, setViewMode] = useState<HistoryViewMode>("list");
@@ -316,6 +322,7 @@ export default function ArDashboardPage() {
     debouncedSearch,
     statusFilter,
     agingFilter,
+    birStatusFilter,
     segmentFilter,
     dateRange,
     pageSize,
@@ -338,6 +345,7 @@ export default function ArDashboardPage() {
         search: debouncedSearch,
         statusFilter,
         agingFilter,
+        birStatusFilter,
         segmentFilter,
         dateRange,
         sortKey,
@@ -364,6 +372,7 @@ export default function ArDashboardPage() {
     debouncedSearch,
     statusFilter,
     agingFilter,
+    birStatusFilter,
     segmentFilter,
     dateRange,
     sortKey,
@@ -377,6 +386,19 @@ export default function ArDashboardPage() {
       setError(err instanceof Error ? err.message : "Failed to load");
     });
   }, [loadQueue]);
+
+  useEffect(() => {
+    void (async () => {
+      try {
+        const res = await fetch("/api/ar/bir-status-codes");
+        if (!res.ok) return;
+        const data = (await res.json()) as { codes?: Record<string, string> };
+        setBirStatusCodes(data.codes ?? {});
+      } catch {
+        /* filter chips stay empty if config unavailable */
+      }
+    })();
+  }, []);
 
   useEffect(() => {
     void load();
@@ -449,6 +471,7 @@ export default function ArDashboardPage() {
   const activeFilterCount =
     (statusFilter !== "all" ? 1 : 0) +
     (agingFilter !== "all" ? 1 : 0) +
+    (birStatusFilter !== "all" ? 1 : 0) +
     (segmentFilter !== "all" ? 1 : 0) +
     (dateIsDefault ? 0 : 1);
 
@@ -788,6 +811,35 @@ export default function ArDashboardPage() {
                   onClick={() => setAgingFilter(chip.id)}
                 >
                   {chip.label}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className="filter-group">
+            <span className="filter-group-label">Classification</span>
+            <div className="filter-bar">
+              <button
+                type="button"
+                className={cn("fchip", birStatusFilter === "all" && "is-on")}
+                onClick={() => setBirStatusFilter("all")}
+              >
+                All
+              </button>
+              <button
+                type="button"
+                className={cn("fchip", birStatusFilter === "unset" && "is-on")}
+                onClick={() => setBirStatusFilter("unset")}
+              >
+                Unset
+              </button>
+              {Object.entries(birStatusCodes).map(([code, label]) => (
+                <button
+                  key={code}
+                  type="button"
+                  className={cn("fchip", birStatusFilter === code && "is-on")}
+                  onClick={() => setBirStatusFilter(code)}
+                >
+                  {label}
                 </button>
               ))}
             </div>

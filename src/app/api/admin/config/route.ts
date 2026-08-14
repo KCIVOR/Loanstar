@@ -18,6 +18,7 @@ const CONFIG_KEYS = [
   "committee_size",
   "committee_size_sme",
   "aging_thresholds",
+  "bir_status_codes",
   "rounding_writeoff_threshold",
   "sms_enabled",
   "twilio_account_sid",
@@ -80,6 +81,7 @@ const patchConfigSchema = z.object({
       "90": z.number().int().positive(),
     })
     .optional(),
+  bir_status_codes: z.record(z.string(), z.string()).optional(),
   rounding_writeoff_threshold: z.number().min(0).optional(),
   sms_enabled: z.boolean().optional(),
   twilio_account_sid: z.string().optional(),
@@ -125,6 +127,9 @@ export async function PATCH(request: Request) {
     }
     if (body.aging_thresholds !== undefined) {
       updates.push({ key: "aging_thresholds", value: body.aging_thresholds });
+    }
+    if (body.bir_status_codes !== undefined) {
+      updates.push({ key: "bir_status_codes", value: body.bir_status_codes });
     }
     if (body.rounding_writeoff_threshold !== undefined) {
       updates.push({

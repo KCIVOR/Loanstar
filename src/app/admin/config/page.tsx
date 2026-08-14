@@ -37,6 +37,9 @@ export default function ConfigPage() {
   const [aging30, setAging30] = useState("");
   const [aging60, setAging60] = useState("");
   const [aging90, setAging90] = useState("");
+  const [classificationRows, setClassificationRows] = useState<
+    Array<{ code: string; label: string }>
+  >([{ code: "", label: "" }]);
 
   const [smsEnabled, setSmsEnabled] = useState(false);
   const [twilioSid, setTwilioSid] = useState("");
@@ -75,6 +78,14 @@ export default function ConfigPage() {
           setAging60(String(v["60"] ?? ""));
           setAging90(String(v["90"] ?? ""));
         }
+        if (s.key === "bir_status_codes" && typeof s.value === "object" && s.value) {
+          const map = s.value as Record<string, string>;
+          const rows = Object.entries(map).map(([code, label]) => ({
+            code,
+            label: String(label ?? ""),
+          }));
+          setClassificationRows(rows.length > 0 ? rows : [{ code: "", label: "" }]);
+        }
         if (s.key === "sms_enabled") setSmsEnabled(Boolean(s.value));
         if (s.key === "twilio_account_sid") setTwilioSid(String(s.value ?? ""));
         if (s.key === "twilio_auth_token") setTwilioToken(String(s.value ?? ""));
@@ -106,6 +117,20 @@ export default function ConfigPage() {
     setError(null);
     setMessage(null);
     try {
+      const birStatusCodes: Record<string, string> = {};
+      for (const row of classificationRows) {
+        const code = row.code.trim();
+        const label = row.label.trim();
+        if (!code && !label) continue;
+        if (!code || !label) {
+          throw new Error("Each classification row needs both a code and a label");
+        }
+        if (birStatusCodes[code] !== undefined) {
+          throw new Error(`Duplicate classification code: ${code}`);
+        }
+        birStatusCodes[code] = label;
+      }
+
       const res = await fetch("/api/admin/config", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
@@ -120,6 +145,7 @@ export default function ConfigPage() {
             "60": Number(aging60),
             "90": Number(aging90),
           },
+          bir_status_codes: birStatusCodes,
           sms_enabled: smsEnabled,
           twilio_account_sid: twilioSid,
           twilio_auth_token: twilioToken,
@@ -340,6 +366,80 @@ export default function ConfigPage() {
                     className="mono"
                   />
                 </div>
+              </div>
+            </div>
+            <div className="md:col-span-2">
+              <Label>Classification codes</Label>
+              <p className="mb-2 mt-1 text-xs text-ink-400">
+                {settings.find((s) => s.key === "bir_status_codes")?.description ??
+                  "Code → label map used when AR tags master list accounts"}
+              </p>
+              <div className="space-y-2">
+                {classificationRows.map((row, index) => (
+                  <div key={index} className="flex flex-wrap items-end gap-2">
+                    <div className="min-w-[8rem] flex-1">
+                      <Label
+                        htmlFor={`class-code-${index}`}
+                        className="text-xs text-ink-500"
+                      >
+                        Code
+                      </Label>
+                      <Input
+                        id={`class-code-${index}`}
+                        value={row.code}
+                        onChange={(e) => {
+                          const next = [...classificationRows];
+                          next[index] = { ...next[index], code: e.target.value };
+                          setClassificationRows(next);
+                        }}
+                        className="mono"
+                      />
+                    </div>
+                    <div className="min-w-[10rem] flex-[2]">
+                      <Label
+                        htmlFor={`class-label-${index}`}
+                        className="text-xs text-ink-500"
+                      >
+                        Label
+                      </Label>
+                      <Input
+                        id={`class-label-${index}`}
+                        value={row.label}
+                        onChange={(e) => {
+                          const next = [...classificationRows];
+                          next[index] = { ...next[index], label: e.target.value };
+                          setClassificationRows(next);
+                        }}
+                      />
+                    </div>
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      size="sm"
+                      onClick={() => {
+                        const next = classificationRows.filter((_, i) => i !== index);
+                        setClassificationRows(
+                          next.length > 0 ? next : [{ code: "", label: "" }],
+                        );
+                      }}
+                    >
+                      Remove
+                    </Button>
+                  </div>
+                ))}
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="sm"
+                  onClick={() =>
+                    setClassificationRows([
+                      ...classificationRows,
+                      { code: "", label: "" },
+                    ])
+                  }
+                >
+                  Add code
+                </Button>
               </div>
             </div>
           </div>
