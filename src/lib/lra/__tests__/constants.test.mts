@@ -25,18 +25,20 @@ test("releaseStagesForPaths maps each path through releaseStageForPath", () => {
   ]);
 });
 
-test("Without-PDC path generates cash voucher, not check voucher", () => {
+test("Without-PDC path generates cash + AR ATM voucher, not check voucher", () => {
   assert.ok(AUTO_GENERATED_SLUGS.without_pdc.includes("cash_voucher"));
-  assert.ok(AUTO_GENERATED_SLUGS.without_pdc.includes("ar_cash_voucher"));
+  assert.ok(AUTO_GENERATED_SLUGS.without_pdc.includes("ar_atm_voucher"));
+  assert.ok(!AUTO_GENERATED_SLUGS.without_pdc.includes("ar_cash_voucher"));
   assert.ok(!AUTO_GENERATED_SLUGS.without_pdc.includes("check_voucher"));
   assert.ok(!AUTO_GENERATED_SLUGS.without_pdc.includes("ar_check_voucher"));
 });
 
-test("With-PDC path generates check voucher, not cash voucher", () => {
+test("With-PDC path generates check voucher, not cash/ATM AR voucher", () => {
   assert.ok(AUTO_GENERATED_SLUGS.with_pdc.includes("check_voucher"));
   assert.ok(AUTO_GENERATED_SLUGS.with_pdc.includes("ar_check_voucher"));
   assert.ok(!AUTO_GENERATED_SLUGS.with_pdc.includes("cash_voucher"));
   assert.ok(!AUTO_GENERATED_SLUGS.with_pdc.includes("ar_cash_voucher"));
+  assert.ok(!AUTO_GENERATED_SLUGS.with_pdc.includes("ar_atm_voucher"));
 });
 
 test("both paths generate 7 docs including Letter of Intent and Loan Agreement (Phase 11)", () => {

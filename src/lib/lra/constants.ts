@@ -28,7 +28,7 @@ export const AUTO_GENERATED_SLUGS: Record<ReleasePath, string[]> = {
     "letter_of_intent",
     "loan_agreement",
     "cash_voucher",
-    "ar_cash_voucher",
+    "ar_atm_voucher",
   ],
 };
 

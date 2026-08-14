@@ -22,10 +22,10 @@ Per-item plan files (filled in as each item's plan is written):
 
 - Item 1 — CIG: Edit application form — [feature-cig-edit-application-form.md](revision-plans/feature-cig-edit-application-form.md), audited + planned 2026-08-14
 - Item 2 — CIG: Cancel/stop application — [feature-cig-cancel-application.md](revision-plans/feature-cig-cancel-application.md), audited + planned 2026-08-14
-- Item 3 — Committee: Bypass borrower confirmation (no account) — *plan not yet written*
+- Item 3 — Committee: Bypass borrower confirmation (no account) — [feature-committee-bypass-borrower-confirmation.md](revision-plans/feature-committee-bypass-borrower-confirmation.md), audited + planned 2026-08-14
 - Item 4 — LRA: PDC + ATM surrender simultaneous release — [feature-lra-pdc-atm-simultaneous-release.md](revision-plans/feature-lra-pdc-atm-simultaneous-release.md), audited + planned 2026-08-14
 - Item 5 — LRA: Cash Voucher + Check Voucher simultaneous generation — *plan not yet written*
-- Item 6 — LRA: AR Check in document set — *plan not yet written*
+- Item 6 — LRA: AR Check in document set — [feature-lra-ar-atm-voucher.md](revision-plans/feature-lra-ar-atm-voucher.md), audited + planned 2026-08-14
 - Item 7 — AR: BIR / Non-BIR status tagging — *plan not yet written*
 - Item 8 — AR: Reference/transaction number on amortization ledger — *plan not yet written*
 - Item 9 — AR: Rounding write-off page — *plan not yet written* (see note below — likely overlaps existing work)
@@ -41,15 +41,15 @@ Per-item plan files (filled in as each item's plan is written):
 
 | # | Item | Status | Notes |
 |---|------|--------|-------|
-| 3 | Auto-bypass borrower confirmation after committee approval when the borrower has no portal account — route straight to LRA, log the bypass, show committee a visible "no account" indicator before voting | Not Started | Seafarer flow only at this stage. Standard flow (notify + wait for confirmation) unchanged when an account exists. |
+| 3 | Auto-bypass borrower confirmation after committee approval when the borrower has no portal account — route straight to LRA, log the bypass, show committee a visible "no account" indicator before voting | In Progress | Audited + planned 2026-08-14 — see `revision-plans/feature-committee-bypass-borrower-confirmation.md`. Bypass reuses the existing `queueForLra()` service-role write (no new RLS needed on `loan_applications` — the committee policy already permits writing `lra_pending` directly); "no account" indicator is nearly free since the detail page already fetches `borrower.user_id`. 2 phases. Ready for Cursor. |
 
 ## LRA (Loan Release)
 
 | # | Item | Status | Notes |
 |---|------|--------|-------|
 | 4 | Allow PDC and ATM Surrender to be selected simultaneously as release methods (not mutually exclusive), collecting and recording details for both, visible to AR at transmittal, with document generation responding to both | Done | Implemented by Cursor 2026-08-14, all 8 phases validated (code diffed directly against plan for every phase, `tsc` clean, 902/902 tests including a dedicated "both paths" test, live DB state independently confirmed for both the schema-add and the legacy-column-drop migrations), merged to `main` — see `revision-plans/feature-lra-pdc-atm-simultaneous-release.md`. Pre-existing `signed_cash_voucher` gap correctly left untouched, as instructed. A few consequential fixes outside the plan's literal file list (queue/briefings list labels, `employment-contract.ts`) — verified as correct TypeScript-driven ripple fixes, not scope creep. Live end-to-end browser click-through still pending — left for the user given the size of this change. |
-| 5 | Allow Cash Voucher and Check Voucher (PDC) to be generated simultaneously in the same document set — currently treated as mutually exclusive | Not Started | Checklist-based, no auto-exclusion; each is a separate output file. |
-| 6 | Add "AR Check" as a selectable document in the LRA generation checklist, alongside AR Cash and AR ATM — generated when release method includes PDC/check issuance | Not Started | All three (AR Cash, AR Check, AR ATM) can coexist on the checklist; LRA selects what applies. |
+| 5 | Allow Cash Voucher and Check Voucher (PDC) to be generated simultaneously in the same document set — currently treated as mutually exclusive | Done | Already satisfied as a side effect of Item 4 — confirmed 2026-08-14. `AUTO_GENERATED_SLUGS` already includes both `check_voucher` and `cash_voucher`; since Item 4 made both release paths selectable together, `generateReleaseDocuments()` now generates their union whenever both are checked (no auto-exclusion). The document checklist UI (`data.generatedDocuments.map(...)`) renders whatever's returned generically, no hardcoded filter. No new plan/implementation needed. |
+| 6 | Add "AR Check" as a selectable document in the LRA generation checklist, alongside AR Cash and AR ATM — generated when release method includes PDC/check issuance | Done | Implemented by Cursor 2026-08-14, validated (code + `tsc` + full suite 902/902 checked directly, template body confirmed byte-identical to source live in the DB), merged to `main` — see `revision-plans/feature-lra-ar-atm-voucher.md`. Cursor correctly caught and fixed an error in the plan (voucher templates live in `document_templates`, not the unrelated legacy `document_types` table — verified). Scope note still open: "AR Cash" as a literally distinct document has no trigger condition without inventing a 3rd release method — needs a decision from the client, not silently built or dropped. |
 
 ## AR (Accounts Receivable)
 
