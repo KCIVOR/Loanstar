@@ -30,7 +30,7 @@ function makeSavePdcStub(opts: StubOpts) {
     id: "rf-1",
     loan_application_id: "app-1",
     computation_id: "comp-1",
-    release_path: opts.releasePath ?? "with_pdc",
+    release_paths: [opts.releasePath ?? "with_pdc"],
     status: "pdc_encoding",
     blank_check_from: null,
     blank_check_to: null,

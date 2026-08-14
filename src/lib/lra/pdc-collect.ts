@@ -28,7 +28,7 @@ export const PDC_COLLECT_ALLOWED_STATUSES: readonly ReleaseFileStatus[] = [
 ] as const;
 
 export type PdcCollectContext = {
-  releasePath: ReleasePath | string | null;
+  releasePaths: ReleasePath[] | string[] | null;
   status: ReleaseFileStatus | string;
   pdcCheckCount: number;
   pdcCollectedAt: string | null;
@@ -41,7 +41,7 @@ export function isPostSignForPdcCollect(
 }
 
 export function canConfirmPdcCollection(ctx: PdcCollectContext): boolean {
-  if (ctx.releasePath !== "with_pdc") return false;
+  if (!ctx.releasePaths?.includes("with_pdc")) return false;
   if (!isPostSignForPdcCollect(ctx.status)) return false;
   if (ctx.pdcCheckCount < 1) return false;
   if (ctx.pdcCollectedAt) return false;
@@ -49,7 +49,7 @@ export function canConfirmPdcCollection(ctx: PdcCollectContext): boolean {
 }
 
 export function assertCanConfirmPdcCollection(ctx: PdcCollectContext): void {
-  if (ctx.releasePath !== "with_pdc") {
+  if (!ctx.releasePaths?.includes("with_pdc")) {
     throw new Error(PDC_COLLECT_PATH_ERROR);
   }
   if (!isPostSignForPdcCollect(ctx.status)) {
@@ -64,16 +64,16 @@ export function assertCanConfirmPdcCollection(ctx: PdcCollectContext): void {
 }
 
 export function closeRequiresPdcCollection(
-  releasePath: ReleasePath | string | null,
+  releasePaths: ReleasePath[] | string[] | null,
 ): boolean {
-  return releasePath === "with_pdc";
+  return releasePaths?.includes("with_pdc") ?? false;
 }
 
 export function assertPdcCollectedForClose(input: {
-  releasePath: ReleasePath | string | null;
+  releasePaths: ReleasePath[] | string[] | null;
   pdcCollectedAt: string | null;
 }): void {
-  if (!closeRequiresPdcCollection(input.releasePath)) return;
+  if (!closeRequiresPdcCollection(input.releasePaths)) return;
   if (!input.pdcCollectedAt) {
     throw new Error(PDC_COLLECT_CLOSE_ERROR);
   }
@@ -85,11 +85,11 @@ export function assertPdcCollectedForClose(input: {
  * employment-contract blockers earlier in the pipeline.
  */
 export function maybePdcCollectBlocker(input: {
-  releasePath: ReleasePath | string | null;
+  releasePaths: ReleasePath[] | string[] | null;
   status: ReleaseFileStatus | string;
   pdcCollectedAt: string | null;
 }): string | null {
-  if (input.releasePath !== "with_pdc") return null;
+  if (!input.releasePaths?.includes("with_pdc")) return null;
   if (input.status !== "released") return null;
   if (input.pdcCollectedAt) return null;
   return PDC_PHYSICAL_COLLECT_BLOCKER;
@@ -107,7 +107,7 @@ export async function confirmPdcCollected(
   const { data: file, error: fileError } = await supabase
     .from("release_files")
     .select(
-      "id, loan_application_id, release_path, status, pdc_collected_at, pdc_collected_by",
+      "id, loan_application_id, release_paths, status, pdc_collected_at, pdc_collected_by",
     )
     .eq("id", releaseFileId)
     .single();
@@ -126,7 +126,7 @@ export async function confirmPdcCollected(
   }
 
   assertCanConfirmPdcCollection({
-    releasePath: (file.release_path as string | null) ?? null,
+    releasePaths: (file.release_paths as string[] | null) ?? null,
     status: file.status as string,
     pdcCheckCount: count ?? 0,
     pdcCollectedAt: (file.pdc_collected_at as string | null) ?? null,

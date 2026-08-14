@@ -13,7 +13,7 @@ export async function GET() {
         `
         id,
         status,
-        release_path,
+        release_paths,
         updated_at,
         loan_applications (
           id,
@@ -47,7 +47,7 @@ export async function GET() {
 
       return {
         releaseFileId: row.id as string,
-        releasePath: (row.release_path as string | null) ?? null,
+        releasePaths: Array.isArray(row.release_paths) ? row.release_paths : [],
         updatedAt: row.updated_at as string,
         application: app
           ? {

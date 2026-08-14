@@ -32,7 +32,7 @@ export async function GET(_request: Request, { params }: RouteParams) {
 
     const { data: releaseFile } = await supabase
       .from("release_files")
-      .select("id, status, release_path")
+      .select("id, status, release_paths")
       .eq("loan_application_id", id)
       .maybeSingle();
 
@@ -65,7 +65,9 @@ export async function GET(_request: Request, { params }: RouteParams) {
       releaseFile: {
         id: releaseFile.id,
         status: releaseFile.status,
-        releasePath: releaseFile.release_path,
+        releasePaths: Array.isArray(releaseFile.release_paths)
+          ? releaseFile.release_paths
+          : [],
       },
       blocker: app.blocker,
       documents,

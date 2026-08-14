@@ -47,10 +47,12 @@ function stepState(
  */
 export function releasePipelineSteps(
   status: ReleaseFileStatus | string,
-  path: ReleasePath | string | null,
+  path: ReleasePath | string[] | null,
 ): StepperStep[] {
   const rank = STATUS_RANK[status as ReleaseFileStatus] ?? 0;
-  const skipEncode = path === "without_pdc";
+  const skipEncode = !Array.isArray(path)
+    ? path === "without_pdc"
+    : !path.includes("with_pdc");
 
   return PIPELINE.map(({ key, label }) => {
     switch (key) {

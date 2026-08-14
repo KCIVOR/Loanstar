@@ -23,7 +23,7 @@ Per-item plan files (filled in as each item's plan is written):
 - Item 1 — CIG: Edit application form — [feature-cig-edit-application-form.md](revision-plans/feature-cig-edit-application-form.md), audited + planned 2026-08-14
 - Item 2 — CIG: Cancel/stop application — [feature-cig-cancel-application.md](revision-plans/feature-cig-cancel-application.md), audited + planned 2026-08-14
 - Item 3 — Committee: Bypass borrower confirmation (no account) — *plan not yet written*
-- Item 4 — LRA: PDC + ATM surrender simultaneous release — *plan not yet written*
+- Item 4 — LRA: PDC + ATM surrender simultaneous release — [feature-lra-pdc-atm-simultaneous-release.md](revision-plans/feature-lra-pdc-atm-simultaneous-release.md), audited + planned 2026-08-14
 - Item 5 — LRA: Cash Voucher + Check Voucher simultaneous generation — *plan not yet written*
 - Item 6 — LRA: AR Check in document set — *plan not yet written*
 - Item 7 — AR: BIR / Non-BIR status tagging — *plan not yet written*
@@ -47,7 +47,7 @@ Per-item plan files (filled in as each item's plan is written):
 
 | # | Item | Status | Notes |
 |---|------|--------|-------|
-| 4 | Allow PDC and ATM Surrender to be selected simultaneously as release methods (not mutually exclusive), collecting and recording details for both, visible to AR at transmittal, with document generation responding to both | Not Started | At least one method required; borrower does not choose the method. |
+| 4 | Allow PDC and ATM Surrender to be selected simultaneously as release methods (not mutually exclusive), collecting and recording details for both, visible to AR at transmittal, with document generation responding to both | Done | Implemented by Cursor 2026-08-14, all 8 phases validated (code diffed directly against plan for every phase, `tsc` clean, 902/902 tests including a dedicated "both paths" test, live DB state independently confirmed for both the schema-add and the legacy-column-drop migrations), merged to `main` — see `revision-plans/feature-lra-pdc-atm-simultaneous-release.md`. Pre-existing `signed_cash_voucher` gap correctly left untouched, as instructed. A few consequential fixes outside the plan's literal file list (queue/briefings list labels, `employment-contract.ts`) — verified as correct TypeScript-driven ripple fixes, not scope creep. Live end-to-end browser click-through still pending — left for the user given the size of this change. |
 | 5 | Allow Cash Voucher and Check Voucher (PDC) to be generated simultaneously in the same document set — currently treated as mutually exclusive | Not Started | Checklist-based, no auto-exclusion; each is a separate output file. |
 | 6 | Add "AR Check" as a selectable document in the LRA generation checklist, alongside AR Cash and AR ATM — generated when release method includes PDC/check issuance | Not Started | All three (AR Cash, AR Check, AR ATM) can coexist on the checklist; LRA selects what applies. |
 

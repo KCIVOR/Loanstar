@@ -23,11 +23,11 @@ export function assertEmploymentContractForRelease(present: boolean): void {
 }
 
 export function releaseBlockerForReadyRelease(
-  path: ReleasePath | null,
+  paths: ReleasePath[] | null,
   hasContract: boolean,
 ): string {
   if (!hasContract) return EMPLOYMENT_CONTRACT_BLOCKER;
-  return readyReleaseBlocker(path);
+  return readyReleaseBlocker(paths);
 }
 
 export function assertLraIntakeUploadAllowed(

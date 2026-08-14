@@ -6,9 +6,12 @@ import { resolveDisplayName } from "@/lib/account/display-name";
 import { writeAuditEvent } from "@/lib/audit/writer";
 import { handleApiError, jsonOk } from "@/lib/api/handler";
 import { getStageChecklist } from "@/lib/documents/checklist";
-import { resolveCombinedUploadTargets } from "@/lib/lra/combined-signing-upload";
 import {
-  releaseStageForPath,
+  resolveCombinedUploadTargets,
+  type CombinedUploadTarget,
+} from "@/lib/lra/combined-signing-upload";
+import {
+  releaseStagesForPaths,
   type ReleasePath,
 } from "@/lib/lra/constants";
 import { requireModulePermission } from "@/lib/permissions/server";
@@ -24,6 +27,10 @@ const combinedUploadSchema = z.object({
   fileSize: z.number().int().positive().max(10_485_760),
   remarks: z.string().trim().max(2000).optional(),
 });
+
+function isReleasePath(value: unknown): value is ReleasePath {
+  return value === "with_pdc" || value === "without_pdc";
+}
 
 async function resolveUploaderName(
   supabase: SupabaseClient,
@@ -63,21 +70,32 @@ export async function POST(request: Request, { params }: RouteParams) {
 
     const { data: releaseFile, error: releaseError } = await supabase
       .from("release_files")
-      .select("release_path")
+      .select("release_paths")
       .eq("loan_application_id", id)
       .maybeSingle();
 
     if (releaseError) throw new Error(releaseError.message);
 
-    const releasePath = releaseFile?.release_path as ReleasePath | null | undefined;
-    if (releasePath !== "with_pdc" && releasePath !== "without_pdc") {
+    const releasePathsRaw = releaseFile?.release_paths;
+    const releasePaths = (
+      Array.isArray(releasePathsRaw) ? releasePathsRaw : []
+    ).filter(isReleasePath);
+
+    if (
+      releasePaths.length === 0 ||
+      (Array.isArray(releasePathsRaw) &&
+        releasePathsRaw.some((p) => !isReleasePath(p)))
+    ) {
       return NextResponse.json(
         { error: "Release path must be selected first" },
         { status: 400 },
       );
     }
 
-    const signingStage = releaseStageForPath(releasePath);
+    // Route already tags each target by its checklist stage (signing_* vs
+    // release). For dual paths, gather required docs from every applicable
+    // signing stage and tag each with that stage — no UI stage-pick needed.
+    const signingStages = releaseStagesForPaths(releasePaths);
     const scope = {
       segment: (app.segment === "sme" ? "sme" : "seafarer") as "seafarer" | "sme",
       entityType:
@@ -86,16 +104,35 @@ export async function POST(request: Request, { params }: RouteParams) {
           : null,
     };
 
-    const [signingItems, releaseItems] = await Promise.all([
-      getStageChecklist(supabase, signingStage, id, scope),
+    const [signingItemArrays, releaseItems] = await Promise.all([
+      Promise.all(
+        signingStages.map((signingStage) =>
+          getStageChecklist(supabase, signingStage, id, scope),
+        ),
+      ),
       getStageChecklist(supabase, "release", id, scope),
     ]);
 
-    const targets = resolveCombinedUploadTargets(
-      signingItems,
+    const targetsByKey = new Map<string, CombinedUploadTarget>();
+    for (let i = 0; i < signingStages.length; i++) {
+      const signingStage = signingStages[i]!;
+      const signingItems = signingItemArrays[i] ?? [];
+      for (const target of resolveCombinedUploadTargets(
+        signingItems,
+        [],
+        signingStage,
+      )) {
+        targetsByKey.set(`${target.documentTypeId}:${target.stage}`, target);
+      }
+    }
+    for (const target of resolveCombinedUploadTargets(
+      [],
       releaseItems,
-      signingStage,
-    );
+      signingStages[0]!,
+    )) {
+      targetsByKey.set(`${target.documentTypeId}:${target.stage}`, target);
+    }
+    const targets = Array.from(targetsByKey.values());
 
     const written: Array<{
       id: string;

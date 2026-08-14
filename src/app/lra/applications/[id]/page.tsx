@@ -10,11 +10,11 @@ import {
   Breadcrumbs,
   Button,
   Card,
+  Checkbox,
   ConfirmDialog,
   Input,
   Label,
   PageHeader,
-  Select,
   Spinner,
   Stepper,
   Table,
@@ -59,9 +59,12 @@ type LraWorkspace = {
   releaseFile: {
     id: string;
     status: string;
-    release_path: string | null;
+    release_paths: string[] | null;
     blank_check_from: string | null;
     blank_check_to: string | null;
+    atm_bank_name: string | null;
+    atm_card_last4: string | null;
+    atm_account_number: string | null;
     pdc_collected_at: string | null;
     pdc_collected_by: string | null;
   } | null;
@@ -96,6 +99,30 @@ type LraWorkspace = {
   employmentContractPresent: boolean;
   pdcCollectedByName: string | null;
 };
+
+type PathChoice = "with_pdc" | "without_pdc";
+
+function pathsFromReleaseFile(
+  rf: LraWorkspace["releaseFile"],
+): PathChoice[] {
+  if (!rf) return [];
+  if (!Array.isArray(rf.release_paths) || rf.release_paths.length === 0) {
+    return [];
+  }
+  return rf.release_paths.filter(
+    (p): p is PathChoice => p === "with_pdc" || p === "without_pdc",
+  );
+}
+
+function pathLabelFromPaths(paths: PathChoice[]): string | null {
+  if (paths.length === 0) return null;
+  const hasPdc = paths.includes("with_pdc");
+  const hasAtm = paths.includes("without_pdc");
+  if (hasPdc && hasAtm) return "With PDC + ATM Surrender";
+  if (hasPdc) return "With PDC";
+  if (hasAtm) return "Without PDC";
+  return null;
+}
 
 function formatMoney(v: number) {
   return v.toLocaleString("en-PH", {
@@ -140,8 +167,8 @@ export default function LraApplicationPage() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
-  const [releasePath, setReleasePath] = useState<"with_pdc" | "without_pdc">(
-    "with_pdc",
+  const [selectedPaths, setSelectedPaths] = useState<Set<PathChoice>>(
+    () => new Set<PathChoice>(["with_pdc"]),
   );
   const [pdcDate, setPdcDate] = useState("");
   const [pdcBank, setPdcBank] = useState("");
@@ -150,6 +177,7 @@ export default function LraApplicationPage() {
   const [blankTo, setBlankTo] = useState("");
   const [atmBank, setAtmBank] = useState("");
   const [atmCardLast4, setAtmCardLast4] = useState("");
+  const [atmAccountNumber, setAtmAccountNumber] = useState("");
   const [confirmRelease, setConfirmRelease] = useState(false);
   const [confirmClose, setConfirmClose] = useState(false);
   const [confirmPdcCollect, setConfirmPdcCollect] = useState(false);
@@ -191,6 +219,18 @@ export default function LraApplicationPage() {
   useEffect(() => {
     void load();
   }, [load]);
+
+  useEffect(() => {
+    const rf = data?.releaseFile;
+    if (!rf) return;
+    const paths = pathsFromReleaseFile(rf);
+    if (paths.length > 0) {
+      setSelectedPaths(new Set(paths));
+    }
+    if (rf.atm_bank_name) setAtmBank(rf.atm_bank_name);
+    if (rf.atm_card_last4) setAtmCardLast4(rf.atm_card_last4);
+    if (rf.atm_account_number) setAtmAccountNumber(rf.atm_account_number);
+  }, [data?.releaseFile]);
 
   useEffect(() => {
     let cancelled = false;
@@ -250,17 +290,32 @@ export default function LraApplicationPage() {
     }
   }
 
+  function togglePath(path: PathChoice, checked: boolean) {
+    setSelectedPaths((prev) => {
+      const next = new Set(prev);
+      if (checked) next.add(path);
+      else next.delete(path);
+      return next;
+    });
+  }
+
   async function savePath() {
+    if (selectedPaths.size === 0) {
+      setError("Select at least one release path.");
+      return;
+    }
+    const releasePaths = Array.from(selectedPaths);
+    const includesAtm = selectedPaths.has("without_pdc");
     setSaving(true);
     try {
       const res = await fetch(`/api/lra/applications/${applicationId}/path`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          releasePath,
-          atmBankName: releasePath === "without_pdc" ? atmBank : undefined,
-          atmCardLast4:
-            releasePath === "without_pdc" ? atmCardLast4 : undefined,
+          releasePaths,
+          atmBankName: includesAtm ? atmBank : undefined,
+          atmCardLast4: includesAtm ? atmCardLast4 : undefined,
+          atmAccountNumber: includesAtm ? atmAccountNumber : undefined,
         }),
       });
       if (!res.ok) throw new Error("Failed to set path");
@@ -554,8 +609,9 @@ export default function LraApplicationPage() {
   if (!data) return <Alert>Application not found.</Alert>;
 
   const rf = data.releaseFile;
-  const signingStage = rf?.release_path
-    ? releaseStageForPath(rf.release_path as ReleasePath)
+  const releasePaths = pathsFromReleaseFile(rf);
+  const signingStage = releasePaths[0]
+    ? releaseStageForPath(releasePaths[0] as ReleasePath)
     : null;
   const canRelease =
     rf?.status === "ready_release" &&
@@ -567,20 +623,20 @@ export default function LraApplicationPage() {
   const isClosed = rf?.status === "closed";
   const pdcCollected = Boolean(rf?.pdc_collected_at);
   const showPdcCollectCard =
-    rf?.release_path === "with_pdc" &&
-    Boolean(rf?.status) &&
+    rf != null &&
+    releasePaths.includes("with_pdc") &&
     (isPostSignForPdcCollect(rf.status) || isClosed);
   const canConfirmPdcCollect =
     rf != null &&
     canConfirmPdcCollection({
-      releasePath: rf.release_path,
+      releasePaths,
       status: rf.status,
       pdcCheckCount: data.pdcChecks.length,
       pdcCollectedAt: rf.pdc_collected_at,
     });
   const canClose =
     showCloseAction &&
-    (rf?.release_path !== "with_pdc" || pdcCollected);
+    (!releasePaths.includes("with_pdc") || pdcCollected);
   const releaseBlockers: string[] = [];
   if (showReleaseAction && !data.briefing?.acknowledged_at) {
     releaseBlockers.push("Briefing sign-off required");
@@ -589,7 +645,11 @@ export default function LraApplicationPage() {
     releaseBlockers.push("Employment contract must be uploaded");
   }
   const closeBlockers: string[] = [];
-  if (showCloseAction && rf?.release_path === "with_pdc" && !pdcCollected) {
+  if (
+    showCloseAction &&
+    releasePaths.includes("with_pdc") &&
+    !pdcCollected
+  ) {
     closeBlockers.push(PDC_COLLECT_CLOSE_ERROR);
   }
 
@@ -607,15 +667,10 @@ export default function LraApplicationPage() {
     data.application.applicationNo ??
     data.borrower?.borrower_no ??
     applicationId.slice(0, 8);
-  const pathLabel =
-    rf?.release_path === "with_pdc"
-      ? "With PDC"
-      : rf?.release_path === "without_pdc"
-        ? "Without PDC"
-        : null;
+  const pathLabel = pathLabelFromPaths(releasePaths);
 
   const pipelineSteps = rf
-    ? releasePipelineSteps(rf.status, rf.release_path)
+    ? releasePipelineSteps(rf.status, releasePaths)
     : [];
 
   const nextAction =
@@ -750,20 +805,22 @@ export default function LraApplicationPage() {
                 Release path
               </h2>
               <p className="mb-3 text-sm text-ink-500">
-                Choose how funds will be released for this file.
+                Choose how funds will be released for this file. You may select
+                both when PDC and ATM surrender apply together.
               </p>
-              <Select
-                value={releasePath}
-                onChange={(e) =>
-                  setReleasePath(e.target.value as typeof releasePath)
-                }
-              >
-                <option value="with_pdc">With PDC</option>
-                <option value="without_pdc">
-                  Without PDC (ATM surrender)
-                </option>
-              </Select>
-              {releasePath === "without_pdc" ? (
+              <div className="flex flex-col gap-2">
+                <Checkbox
+                  label="With PDC"
+                  checked={selectedPaths.has("with_pdc")}
+                  onChange={(checked) => togglePath("with_pdc", checked)}
+                />
+                <Checkbox
+                  label="Without PDC (ATM surrender)"
+                  checked={selectedPaths.has("without_pdc")}
+                  onChange={(checked) => togglePath("without_pdc", checked)}
+                />
+              </div>
+              {selectedPaths.has("without_pdc") ? (
                 <div className="mt-3 grid gap-3 sm:grid-cols-2">
                   <div>
                     <Label required>ATM bank name</Label>
@@ -787,11 +844,26 @@ export default function LraApplicationPage() {
                       className="mono"
                     />
                   </div>
+                  <div className="sm:col-span-2">
+                    <Label required>ATM account number</Label>
+                    <Input
+                      value={atmAccountNumber}
+                      onChange={(e) => setAtmAccountNumber(e.target.value)}
+                      required
+                      className="mono"
+                    />
+                  </div>
                 </div>
+              ) : null}
+              {selectedPaths.size === 0 ? (
+                <p className="mt-2 text-sm text-warning">
+                  Select at least one release path.
+                </p>
               ) : null}
               <Button
                 className="mt-3"
                 loading={saving}
+                disabled={selectedPaths.size === 0}
                 onClick={() => void savePath()}
               >
                 Save path
@@ -799,7 +871,8 @@ export default function LraApplicationPage() {
             </Card>
           ) : null}
 
-          {rf.status === "pdc_encoding" && rf.release_path === "with_pdc" ? (
+          {rf.status === "pdc_encoding" &&
+          releasePaths.includes("with_pdc") ? (
             <Card>
               <h2 className="mb-1 font-display text-lg font-semibold text-navy-900">
                 PDC encoding
@@ -1225,7 +1298,8 @@ export default function LraApplicationPage() {
           {showReleaseAction ? (
             <Card>
               <h2 className="mb-1 font-display text-lg font-semibold text-navy-900">
-                {rf.release_path === "without_pdc"
+                {!releasePaths.includes("with_pdc") &&
+                releasePaths.includes("without_pdc")
                   ? "Release cash"
                   : "Release check / cash"}
               </h2>

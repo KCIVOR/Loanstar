@@ -47,7 +47,7 @@ function queueItem(overrides: {
       lastName: "Dela Cruz",
     },
     releaseFile: releaseFileStatus
-      ? { status: releaseFileStatus, releasePath: "with_pdc" }
+      ? { status: releaseFileStatus, releasePaths: ["with_pdc"] }
       : null,
   };
 }

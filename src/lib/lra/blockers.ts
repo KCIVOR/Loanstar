@@ -37,7 +37,7 @@ export function mapReleaseFileRow(row: Record<string, unknown>) {
     id: row.id as string,
     loanApplicationId: row.loan_application_id as string,
     computationId: row.computation_id as string,
-    releasePath: (row.release_path as string) ?? null,
+    releasePaths: (row.release_paths as string[]) ?? [],
     status: row.status as ReleaseFileStatus,
     blankCheckFrom: (row.blank_check_from as string) ?? null,
     blankCheckTo: (row.blank_check_to as string) ?? null,

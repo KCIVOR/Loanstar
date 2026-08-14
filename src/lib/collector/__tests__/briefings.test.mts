@@ -22,7 +22,7 @@ function item(
 ): BriefingQueueItem {
   return {
     releaseFileId: overrides.releaseFileId,
-    releasePath: overrides.releasePath ?? null,
+    releasePaths: overrides.releasePaths ?? [],
     updatedAt: overrides.updatedAt,
     application:
       overrides.application === undefined

@@ -78,23 +78,35 @@ export async function getOrCreateReleaseFile(
   return mapReleaseFileRow(created);
 }
 
-export async function setReleasePath(
+export async function setReleasePaths(
   supabase: SupabaseClient,
   releaseFileId: string,
-  path: ReleasePath,
+  paths: ReleasePath[],
   actorId: string,
-  options?: { atmBankName?: string; atmCardLast4?: string },
+  options?: {
+    atmBankName?: string;
+    atmCardLast4?: string;
+    atmAccountNumber?: string;
+  },
 ) {
-  const file = await getReleaseFile(supabase, releaseFileId);
-  const nextStatus: ReleaseFileStatus =
-    path === "with_pdc" ? "pdc_encoding" : "ready_generate";
+  if (paths.length === 0) {
+    throw new Error("At least one release path is required");
+  }
 
-  if (path === "without_pdc") {
+  const file = await getReleaseFile(supabase, releaseFileId);
+  const nextStatus: ReleaseFileStatus = paths.includes("with_pdc")
+    ? "pdc_encoding"
+    : "ready_generate";
+
+  if (paths.includes("without_pdc")) {
     if (!options?.atmBankName?.trim()) {
       throw new Error("ATM bank name is required for Without PDC path");
     }
     if (!options?.atmCardLast4?.trim() || options.atmCardLast4.length !== 4) {
       throw new Error("ATM card last 4 digits are required for Without PDC path");
+    }
+    if (!options?.atmAccountNumber?.trim()) {
+      throw new Error("ATM account number is required for Without PDC path");
     }
   }
 
@@ -116,15 +128,18 @@ export async function setReleasePath(
         : null,
   };
 
+  const hasAtm = paths.includes("without_pdc");
+
   const { error } = await supabase
     .from("release_files")
     .update({
-      release_path: path,
+      release_paths: paths,
       status: nextStatus,
-      atm_bank_name: path === "without_pdc" ? options?.atmBankName?.trim() : null,
-      atm_card_last4: path === "without_pdc" ? options?.atmCardLast4?.trim() : null,
-      blank_check_from: path === "without_pdc" ? null : undefined,
-      blank_check_to: path === "without_pdc" ? null : undefined,
+      atm_bank_name: hasAtm ? options?.atmBankName?.trim() : null,
+      atm_card_last4: hasAtm ? options?.atmCardLast4?.trim() : null,
+      atm_account_number: hasAtm ? options?.atmAccountNumber?.trim() : null,
+      blank_check_from: hasAtm ? null : undefined,
+      blank_check_to: hasAtm ? null : undefined,
       updated_at: new Date().toISOString(),
     })
     .eq("id", releaseFileId);
@@ -133,14 +148,15 @@ export async function setReleasePath(
     throw new Error(error.message);
   }
 
-  const signingStage = releaseStageForPath(path);
-  await ensureDocumentSlots(
-    supabase,
-    signingStage,
-    file.loanApplicationId,
-    app.borrower_id as string,
-    checklistScope,
-  );
+  for (const p of paths) {
+    await ensureDocumentSlots(
+      supabase,
+      releaseStageForPath(p),
+      file.loanApplicationId,
+      app.borrower_id as string,
+      checklistScope,
+    );
+  }
   await ensureDocumentSlots(
     supabase,
     "release",
@@ -153,7 +169,12 @@ export async function setReleasePath(
     actorId,
   });
 
-  return { status: nextStatus, releasePath: path, signingStage };
+  const signingStages = paths.map((p) => releaseStageForPath(p));
+  return {
+    status: nextStatus,
+    releasePaths: paths,
+    signingStages,
+  };
 }
 
 export async function getReleaseFile(
@@ -188,7 +209,7 @@ export async function savePdcChecks(
 ) {
   const file = await getReleaseFile(supabase, releaseFileId);
 
-  if (file.releasePath !== "with_pdc") {
+  if (!file.releasePaths.includes("with_pdc")) {
     throw new Error("PDC encoding only applies to With PDC path");
   }
 
@@ -262,14 +283,37 @@ export async function savePdcChecks(
   };
 }
 
+function releasePathsFromRow(row: Record<string, unknown>): ReleasePath[] {
+  const paths = row.release_paths;
+  if (!Array.isArray(paths) || paths.length === 0) return [];
+  return [
+    ...new Set(
+      paths.filter(
+        (p): p is ReleasePath => p === "with_pdc" || p === "without_pdc",
+      ),
+    ),
+  ];
+}
+
 export async function generateReleaseDocuments(
   supabase: SupabaseClient,
   releaseFileId: string,
   actorId: string,
 ) {
-  const file = await getReleaseFile(supabase, releaseFileId);
+  const { data: row, error: rowError } = await supabase
+    .from("release_files")
+    .select("*")
+    .eq("id", releaseFileId)
+    .single();
 
-  if (!file.releasePath) {
+  if (rowError || !row) {
+    throw new Error("Release file not found");
+  }
+
+  const file = mapReleaseFileRow(row);
+  const releasePaths = releasePathsFromRow(row);
+
+  if (releasePaths.length === 0) {
     throw new Error("Release path must be selected first");
   }
 
@@ -288,8 +332,9 @@ export async function generateReleaseDocuments(
     releaseFileId,
   );
 
-  const releasePath = file.releasePath as ReleasePath;
-  const slugs = AUTO_GENERATED_SLUGS[releasePath];
+  const slugs = [
+    ...new Set(releasePaths.flatMap((p) => AUTO_GENERATED_SLUGS[p])),
+  ];
   const { data: app } = await supabase
     .from("loan_applications")
     .select("borrower_id, segment, borrowers (*)")
@@ -300,29 +345,38 @@ export async function generateReleaseDocuments(
     throw new Error("Borrower not found");
   }
 
-  // Template merge context is path-level — identical for every slug in this
-  // release — so build it once.
+  // One merge context per selected path — voucher pairs need path-specific
+  // disbursement fields; shared slugs are path-independent.
   const borrowerRaw = app.borrowers;
   const borrowerProfile = mapBorrowerRow(
     (Array.isArray(borrowerRaw) ? borrowerRaw[0] : borrowerRaw) as BorrowerRow,
   );
-  const templateContext = buildReleaseTemplateContext(
-    blri,
-    {
-      netReleased: computation.netReleased,
-      releaseDate: computation.releaseDate,
-      addonMonths: computation.addonMonths,
-      interestRate: computation.interestRate,
-      loanTypeName: computation.loanTypeName,
-      processingFee: computation.processingFee,
-      securityFee: computation.securityFee,
-      docStamp: computation.docStamp,
-      adminCost: computation.adminCost,
-      notaryFee: computation.notaryFee,
-    },
-    borrowerProfile,
-    releasePath,
-    { segment: app.segment === "sme" ? "sme" : "seafarer" },
+  const computationInput = {
+    netReleased: computation.netReleased,
+    releaseDate: computation.releaseDate,
+    addonMonths: computation.addonMonths,
+    interestRate: computation.interestRate,
+    loanTypeName: computation.loanTypeName,
+    processingFee: computation.processingFee,
+    securityFee: computation.securityFee,
+    docStamp: computation.docStamp,
+    adminCost: computation.adminCost,
+    notaryFee: computation.notaryFee,
+  };
+  const segmentScope = {
+    segment: (app.segment === "sme" ? "sme" : "seafarer") as "sme" | "seafarer",
+  };
+  const contextByPath = new Map(
+    releasePaths.map((p) => [
+      p,
+      buildReleaseTemplateContext(
+        blri,
+        computationInput,
+        borrowerProfile,
+        p,
+        segmentScope,
+      ),
+    ]),
   );
 
   for (const slug of slugs) {
@@ -335,6 +389,23 @@ export async function generateReleaseDocuments(
         `No published template for release document "${slug}" — cannot generate.`,
       );
     }
+
+    const onlyWithPdc =
+      AUTO_GENERATED_SLUGS.with_pdc.includes(slug) &&
+      !AUTO_GENERATED_SLUGS.without_pdc.includes(slug);
+    const onlyWithoutPdc =
+      AUTO_GENERATED_SLUGS.without_pdc.includes(slug) &&
+      !AUTO_GENERATED_SLUGS.with_pdc.includes(slug);
+    const contextPath: ReleasePath = onlyWithPdc
+      ? "with_pdc"
+      : onlyWithoutPdc
+        ? "without_pdc"
+        : releasePaths[0];
+    const templateContext = contextByPath.get(contextPath);
+    if (!templateContext) {
+      throw new Error(`Missing template context for path "${contextPath}"`);
+    }
+
     const pdf = await renderTemplateToPdf(published.body, templateContext);
     const templateVersionId = published.versionId;
 
@@ -636,7 +707,7 @@ export async function acknowledgeBriefing(
       file.loanApplicationId,
     );
     const blocker = releaseBlockerForReadyRelease(
-      file.releasePath as ReleasePath | null,
+      file.releasePaths as ReleasePath[],
       hasContract,
     );
 
@@ -736,7 +807,18 @@ export async function recordRelease(
   actorId: string,
   notes?: string,
 ) {
-  const file = await getReleaseFile(supabase, releaseFileId);
+  const { data: row, error: rowError } = await supabase
+    .from("release_files")
+    .select("*")
+    .eq("id", releaseFileId)
+    .single();
+
+  if (rowError || !row) {
+    throw new Error("Release file not found");
+  }
+
+  const file = mapReleaseFileRow(row);
+  const releasePaths = releasePathsFromRow(row);
 
   const hasContract = await hasEmploymentContractUploaded(
     supabase,
@@ -755,7 +837,10 @@ export async function recordRelease(
   }
 
   const eventType =
-    file.releasePath === "without_pdc" ? "cash_released" : "check_released";
+    file.releasePaths.includes("with_pdc") ||
+    !file.releasePaths.includes("without_pdc")
+      ? "check_released"
+      : "cash_released";
 
   await supabase.from("release_events").insert({
     release_file_id: releaseFileId,
@@ -780,7 +865,7 @@ export async function recordRelease(
   // Prefer a close-stage pending message when with_pdc physical collection
   // is still outstanding — does not touch earlier briefing/contract blockers.
   const collectBlocker = maybePdcCollectBlocker({
-    releasePath: file.releasePath,
+    releasePaths,
     status: "released",
     pdcCollectedAt: file.pdcCollectedAt,
   });
@@ -800,14 +885,24 @@ export async function closeRelease(
   actorId: string,
   signedVoucherDocumentId?: string,
 ) {
-  const file = await getReleaseFile(supabase, releaseFileId);
+  const { data: row, error: rowError } = await supabase
+    .from("release_files")
+    .select("*")
+    .eq("id", releaseFileId)
+    .single();
+
+  if (rowError || !row) {
+    throw new Error("Release file not found");
+  }
+
+  const file = mapReleaseFileRow(row);
 
   if (file.status !== "released") {
     throw new Error("Release must be recorded before closure");
   }
 
   assertPdcCollectedForClose({
-    releasePath: file.releasePath,
+    releasePaths: releasePathsFromRow(row),
     pdcCollectedAt: file.pdcCollectedAt,
   });
 
@@ -905,7 +1000,7 @@ export async function listLraQueue(supabase: SupabaseClient) {
         ),
         release_files (
           status,
-          release_path
+          release_paths
         )
       )
     `,
@@ -946,7 +1041,9 @@ export async function listLraQueue(supabase: SupabaseClient) {
       releaseFile: releaseFile
         ? {
             status: releaseFile.status as string,
-            releasePath: (releaseFile.release_path as string | null) ?? null,
+            releasePaths: Array.isArray(releaseFile.release_paths)
+              ? releaseFile.release_paths
+              : [],
           }
         : null,
     };

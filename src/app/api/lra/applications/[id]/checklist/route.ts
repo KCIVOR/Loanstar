@@ -3,13 +3,21 @@ import {
   ensureDocumentSlots,
   getCompletionSummary,
   getStageChecklist,
+  type ChecklistItem,
 } from "@/lib/documents/checklist";
 import { STAGES } from "@/lib/constants";
-import { releaseStageForPath, type ReleasePath } from "@/lib/lra/constants";
+import {
+  releaseStagesForPaths,
+  type ReleasePath,
+} from "@/lib/lra/constants";
 import { requireModulePermission } from "@/lib/permissions/server";
 import { createClient } from "@/lib/supabase/server";
 
 type RouteParams = { params: Promise<{ id: string }> };
+
+function isReleasePath(value: unknown): value is ReleasePath {
+  return value === "with_pdc" || value === "without_pdc";
+}
 
 export async function GET(request: Request, { params }: RouteParams) {
   try {
@@ -37,18 +45,59 @@ export async function GET(request: Request, { params }: RouteParams) {
           : null,
     };
 
+    const { data: releaseFile } = await supabase
+      .from("release_files")
+      .select("release_paths")
+      .eq("loan_application_id", id)
+      .maybeSingle();
+
+    const paths = (
+      Array.isArray(releaseFile?.release_paths) ? releaseFile.release_paths : []
+    ).filter(isReleasePath);
+    const applicableStages = releaseStagesForPaths(paths);
+
     let stage = requestedStage ?? "release";
 
     if (!requestedStage) {
-      const { data: releaseFile } = await supabase
-        .from("release_files")
-        .select("release_path")
-        .eq("loan_application_id", id)
-        .maybeSingle();
-
-      if (releaseFile?.release_path) {
-        stage = releaseStageForPath(releaseFile.release_path as ReleasePath);
+      if (applicableStages.length === 1) {
+        stage = applicableStages[0]!;
+      } else if (applicableStages.length > 1) {
+        // Both paths selected — ensure + return docs from every applicable stage.
+        for (const s of applicableStages) {
+          await ensureDocumentSlots(
+            supabase,
+            s,
+            id,
+            app.borrower_id as string,
+            scope,
+          );
+        }
+        const itemArrays = await Promise.all(
+          applicableStages.map((s) =>
+            getStageChecklist(supabase, s, id, scope),
+          ),
+        );
+        const seen = new Set<string>();
+        const items: ChecklistItem[] = [];
+        for (const arr of itemArrays) {
+          for (const item of arr) {
+            const key = `${item.documentTypeId}:${item.stage}`;
+            if (seen.has(key)) continue;
+            seen.add(key);
+            items.push(item);
+          }
+        }
+        const summary = getCompletionSummary(items);
+        return jsonOk({ stage: applicableStages[0], stages: applicableStages, items, summary });
       }
+    } else if (
+      applicableStages.length > 0 &&
+      (requestedStage === "signing_with_pdc" ||
+        requestedStage === "signing_without_pdc") &&
+      !applicableStages.includes(requestedStage)
+    ) {
+      // Document belongs only if its stage matches ANY selected path's stage.
+      throw new Error("Invalid checklist stage for selected release paths");
     }
 
     if (!STAGES.includes(stage as (typeof STAGES)[number])) {
