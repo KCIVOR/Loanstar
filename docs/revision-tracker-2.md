@@ -23,7 +23,7 @@ Per-item plan files (filled in as each item's plan is written):
 - Item 1 — CIG: Edit application form — [feature-cig-edit-application-form.md](revision-plans/feature-cig-edit-application-form.md), audited + planned 2026-08-14
 - Item 2 — CIG: Cancel/stop application — [feature-cig-cancel-application.md](revision-plans/feature-cig-cancel-application.md), audited + planned 2026-08-14
 - Item 3 — Committee: Bypass borrower confirmation (no account) — *plan not yet written*
-- Item 4 — LRA: PDC + ATM surrender simultaneous release — *plan not yet written*
+- Item 4 — LRA: PDC + ATM surrender simultaneous release — [feature-lra-pdc-atm-simultaneous-release.md](revision-plans/feature-lra-pdc-atm-simultaneous-release.md), audited + planned 2026-08-14
 - Item 5 — LRA: Cash Voucher + Check Voucher simultaneous generation — *plan not yet written*
 - Item 6 — LRA: AR Check in document set — *plan not yet written*
 - Item 7 — AR: BIR / Non-BIR status tagging — *plan not yet written*
@@ -47,7 +47,7 @@ Per-item plan files (filled in as each item's plan is written):
 
 | # | Item | Status | Notes |
 |---|------|--------|-------|
-| 4 | Allow PDC and ATM Surrender to be selected simultaneously as release methods (not mutually exclusive), collecting and recording details for both, visible to AR at transmittal, with document generation responding to both | Not Started | At least one method required; borrower does not choose the method. |
+| 4 | Allow PDC and ATM Surrender to be selected simultaneously as release methods (not mutually exclusive), collecting and recording details for both, visible to AR at transmittal, with document generation responding to both | In Progress | Audited + planned 2026-08-14 — see `revision-plans/feature-lra-pdc-atm-simultaneous-release.md`. Substantially larger than the CIG items: `release_path` is a single-value column ~16 files treat as a scalar; requires a real schema change (`release_paths text[]`, staged migration with a legacy-column cleanup as the final phase) plus a missing `atm_account_number` field the spec needs but the schema never had. Also confirmed and explicitly deferred a pre-existing gap: no `signed_cash_voucher` document type exists, so `without_pdc`-only releases have never had a working signed-voucher close-gate (matches the already-deferred Item 9 note in the original tracker) — this plan works around it rather than silently expanding scope to fix it. 8 phases. Phase 1/8 (DB foundation) done and independently validated 2026-08-14 — migration filename tracked correctly first try (no drift), backfill and CHECK constraint verified live, zero app code touched as claimed. 7 phases remain. |
 | 5 | Allow Cash Voucher and Check Voucher (PDC) to be generated simultaneously in the same document set — currently treated as mutually exclusive | Not Started | Checklist-based, no auto-exclusion; each is a separate output file. |
 | 6 | Add "AR Check" as a selectable document in the LRA generation checklist, alongside AR Cash and AR ATM — generated when release method includes PDC/check issuance | Not Started | All three (AR Cash, AR Check, AR ATM) can coexist on the checklist; LRA selects what applies. |
 
