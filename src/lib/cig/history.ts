@@ -124,6 +124,31 @@ export type CigDenialCallsQueryParams = {
   pageSize: number;
 };
 
+export type CigCancellationsHistoryRow = {
+  id: string;
+  applicationId: string;
+  applicationNo: string | null;
+  cancelledAt: string;
+  cancelledBy: string | null;
+  reason: string;
+  borrower: CigHistoryBorrower | null;
+};
+
+export type CigCancellationsSortKey =
+  | "cancelledAt"
+  | "applicationNo"
+  | "borrower";
+
+export type CigCancellationsQueryParams = {
+  search?: string;
+  from?: string | null;
+  to?: string | null;
+  sortKey?: CigCancellationsSortKey;
+  sortDir?: "asc" | "desc";
+  page: number;
+  pageSize: number;
+};
+
 export type CigCallbacksResolvedHistoryRow = {
   id: string;
   applicationId: string;
@@ -1015,6 +1040,148 @@ export async function getCigDenialCallsKpiCounts(
   }
   if (to) {
     query = query.lte("informed_at", toInclusiveEnd(to));
+  }
+
+  const { count, error } = await query;
+  if (error) throw new Error(error.message);
+  return { total: count ?? 0 };
+}
+
+/**
+ * Cancelled-application history — `application_cancellations`. Display
+ * join is `loan_applications` + `borrowers`. Closest existing shape is
+ * denial calls (actor + reason + timestamp).
+ *
+ * Search: two-query identity lookup, then `.in("loan_application_id")`.
+ * Date scope and default sort use `created_at` (cancellation stamp).
+ *
+ * Sort: `applicationNo` is 1-hop. `borrower` 2-hop is unreliable; falls
+ * back to `created_at`.
+ */
+export async function getCigCancellationsHistory(
+  supabase: SupabaseClient,
+  params: CigCancellationsQueryParams,
+): Promise<{ rows: CigCancellationsHistoryRow[]; totalCount: number }> {
+  const {
+    search = "",
+    from = null,
+    to = null,
+    sortKey = "cancelledAt",
+    sortDir = "desc",
+    page,
+    pageSize,
+  } = params;
+
+  const safePage = Math.max(1, page);
+  const safePageSize = clampCigHistoryPageSize(pageSize);
+  const offset = (safePage - 1) * safePageSize;
+  const ascending = sortDir === "asc";
+  const term = sanitizeSearchTerm(search);
+
+  let applicationIds: string[] | null = null;
+  if (term) {
+    applicationIds = await findApplicationIdsForIdentitySearch(supabase, term);
+    if (applicationIds.length === 0) {
+      return { rows: [], totalCount: 0 };
+    }
+  }
+
+  let query = supabase
+    .from("application_cancellations")
+    .select(
+      `
+      id,
+      loan_application_id,
+      reason,
+      cancelled_by,
+      created_at,
+      loan_applications (
+        application_no,
+        borrowers (
+          borrower_no,
+          first_name,
+          last_name,
+          email
+        )
+      )
+    `,
+      { count: "exact" },
+    );
+
+  if (from) {
+    query = query.gte("created_at", toInclusiveStart(from));
+  }
+  if (to) {
+    query = query.lte("created_at", toInclusiveEnd(to));
+  }
+
+  if (applicationIds) {
+    query = query.in("loan_application_id", applicationIds);
+  }
+
+  if (sortKey === "applicationNo") {
+    query = query.order("application_no", {
+      ascending,
+      foreignTable: "loan_applications",
+    });
+  } else {
+    query = query.order("created_at", { ascending });
+  }
+
+  query = query
+    .order("id", { ascending: true })
+    .range(offset, offset + safePageSize - 1);
+
+  const { data, error, count } = await query;
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  const rows = (data ?? []).flatMap((row) => {
+    const cancelledAt = row.created_at as string | null;
+    if (!cancelledAt) return [];
+
+    const application = firstEmbed(
+      row.loan_applications as
+        | Record<string, unknown>
+        | Record<string, unknown>[]
+        | null,
+    );
+
+    return [
+      {
+        id: row.id as string,
+        applicationId: row.loan_application_id as string,
+        applicationNo: (application?.application_no as string | null) ?? null,
+        cancelledAt,
+        cancelledBy: (row.cancelled_by as string | null) ?? null,
+        reason: row.reason as string,
+        borrower: mapBorrower(application?.borrowers),
+      },
+    ];
+  });
+
+  return { rows, totalCount: count ?? 0 };
+}
+
+/**
+ * Cancellations KPI — date-scoped only (ignores search).
+ */
+export async function getCigCancellationsKpiCounts(
+  supabase: SupabaseClient,
+  bounds: { from?: string | null; to?: string | null },
+): Promise<CigHistoryKpiCounts> {
+  const { from = null, to = null } = bounds;
+
+  let query = supabase
+    .from("application_cancellations")
+    .select("id", { count: "exact", head: true });
+
+  if (from) {
+    query = query.gte("created_at", toInclusiveStart(from));
+  }
+  if (to) {
+    query = query.lte("created_at", toInclusiveEnd(to));
   }
 
   const { count, error } = await query;
