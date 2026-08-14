@@ -21,7 +21,7 @@ Claude should not implement code for these items directly unless the user explic
 Per-item plan files (filled in as each item's plan is written):
 
 - Item 1 — CIG: Edit application form — [feature-cig-edit-application-form.md](revision-plans/feature-cig-edit-application-form.md), audited + planned 2026-08-14
-- Item 2 — CIG: Cancel/stop application — *plan not yet written*
+- Item 2 — CIG: Cancel/stop application — [feature-cig-cancel-application.md](revision-plans/feature-cig-cancel-application.md), audited + planned 2026-08-14
 - Item 3 — Committee: Bypass borrower confirmation (no account) — *plan not yet written*
 - Item 4 — LRA: PDC + ATM surrender simultaneous release — *plan not yet written*
 - Item 5 — LRA: Cash Voucher + Check Voucher simultaneous generation — *plan not yet written*
@@ -34,8 +34,8 @@ Per-item plan files (filled in as each item's plan is written):
 
 | # | Item | Status | Notes |
 |---|------|--------|-------|
-| 1 | Allow CIG to edit the borrower's application form in-place (personal info, reference contacts — not computation/amount/documents), with audit trail of before/after values, attributed and timestamped, no re-submission triggered | In Progress | Audited + planned 2026-08-14 — see `revision-plans/feature-cig-edit-application-form.md`. Most of the plumbing (RLS, role permission, route, `for_verification`-stage gate) already exists for a 4-field subset; plan expands the field set and adds the missing before/after audit snapshot, plus a new "Edit Application Form" modal. Ready for Cursor. |
-| 2 | Allow CIG to cancel/withdraw an application from the CI stage, with a required reason, full audit log (who/when/why), confirmation dialog, and the record preserved in history (not deleted) | Not Started | Irreversible from the UI — reactivation requires Super Admin. |
+| 1 | Allow CIG to edit the borrower's application form in-place (personal info, reference contacts — not computation/amount/documents), with audit trail of before/after values, attributed and timestamped, no re-submission triggered | Done | Implemented by Cursor 2026-08-14, both phases validated (code + `tsc` + full suite 891/891 checked directly), merged to `main` locally — see `revision-plans/feature-cig-edit-application-form.md`. User confirmed "Edit Application Form" button working live (initial "missing button" report was a stale dev-server bundle, resolved by hard refresh — not a code bug). |
+| 2 | Allow CIG to cancel/withdraw an application from the CI stage, with a required reason, full audit log (who/when/why), confirmation dialog, and the record preserved in history (not deleted) | In Progress | Audited + planned 2026-08-14 — see `revision-plans/feature-cig-cancel-application.md`. Requires a genuinely new `cancelled` status (didn't exist before) + new RLS policy + new `application_cancellations` table + a new CIG history tab (no unified history view existed to hook into). Reactivation UI explicitly out of scope — confirmed no such mechanism exists anywhere in the app today. Ready for Cursor. |
 
 ## Committee
 
