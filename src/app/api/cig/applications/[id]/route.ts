@@ -309,11 +309,18 @@ export async function PATCH(request: Request, { params }: RouteParams) {
         throw new ForbiddenError(result.reason);
       }
 
-      const { data: existingBorrower } = await supabase
-        .from("borrowers")
-        .select("*")
-        .eq("id", application.borrower_id)
-        .single();
+      const { data: existingBorrower, error: existingBorrowerError } =
+        await supabase
+          .from("borrowers")
+          .select("*")
+          .eq("id", application.borrower_id)
+          .single();
+
+      if (existingBorrowerError || !existingBorrower) {
+        throw new Error(
+          existingBorrowerError?.message ?? "Borrower not found",
+        );
+      }
 
       const row = borrowerProfileToRow(body.borrower);
 
@@ -324,8 +331,8 @@ export async function PATCH(request: Request, { params }: RouteParams) {
         .select("*")
         .single();
 
-      if (borrowerError) {
-        throw new Error(borrowerError.message);
+      if (borrowerError || !updatedBorrower) {
+        throw new Error(borrowerError?.message ?? "Borrower update failed");
       }
 
       await writeAuditEvent({
