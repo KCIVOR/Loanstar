@@ -52,7 +52,7 @@ export type LraQueueItem = {
   } | null;
   releaseFile: {
     status: string;
-    releasePath: string | null;
+    releasePaths: string[];
   } | null;
 };
 
@@ -111,7 +111,7 @@ const QUEUE_SELECT = `
     ),
     release_files (
       status,
-      release_path
+      release_paths
     )
   )
 `;
@@ -238,7 +238,7 @@ type NestedBorrower = {
 
 type NestedReleaseFile = {
   status: string;
-  release_path: string | null;
+  release_paths: string[] | null;
 };
 
 type NestedApplication = {
@@ -292,7 +292,9 @@ function mapQueueRow(row: RawQueueRow): LraQueueItem {
     releaseFile: releaseFile
       ? {
           status: releaseFile.status,
-          releasePath: releaseFile.release_path ?? null,
+          releasePaths: Array.isArray(releaseFile.release_paths)
+            ? releaseFile.release_paths
+            : [],
         }
       : null,
   };

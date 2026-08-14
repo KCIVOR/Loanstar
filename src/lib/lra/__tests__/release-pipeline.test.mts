@@ -22,6 +22,19 @@ test("without_pdc skips Encode as done once path is set", () => {
   assert.equal(steps.find((s) => s.label === "Generate")?.state, "current");
 });
 
+test("both-paths array does not skip Encode", () => {
+  const steps = releasePipelineSteps("pdc_encoding", [
+    "with_pdc",
+    "without_pdc",
+  ]);
+  assert.equal(steps.find((s) => s.label === "Encode")?.state, "current");
+});
+
+test("without_pdc-only array skips Encode", () => {
+  const steps = releasePipelineSteps("ready_generate", ["without_pdc"]);
+  assert.equal(steps.find((s) => s.label === "Encode")?.state, "done");
+});
+
 test("ready_release marks Release as current with prior steps done", () => {
   const steps = releasePipelineSteps("ready_release", "with_pdc");
   assert.equal(steps.find((s) => s.label === "Release")?.state, "current");

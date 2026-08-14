@@ -173,10 +173,12 @@ function queueBorrowerName(item: LraQueueItem): string {
     : "Unknown borrower";
 }
 
-function releasePathLabel(path: string | null | undefined): string {
-  if (path === "with_pdc") return "With PDC";
-  if (path === "without_pdc") return "Without PDC";
-  return "—";
+function releasePathLabel(paths: string[] | null | undefined): string {
+  if (!paths?.length) return "—";
+  const labels: string[] = [];
+  if (paths.includes("with_pdc")) labels.push("With PDC");
+  if (paths.includes("without_pdc")) labels.push("Without PDC");
+  return labels.length > 0 ? labels.join(" + ") : "—";
 }
 
 function dateRangePillLabel(value: DateRangeValue): string {
@@ -697,7 +699,7 @@ export default function LraDashboardPage() {
                 <div className="row">
                   <span className="k">Path</span>
                   <span className="v">
-                    {releasePathLabel(item.releaseFile?.releasePath)}
+                    {releasePathLabel(item.releaseFile?.releasePaths)}
                   </span>
                 </div>
                 <div className="row">
@@ -779,7 +781,7 @@ export default function LraDashboardPage() {
                   </Td>
                   <Td>{renderBlocker(item)}</Td>
                   <Td>
-                    {releasePathLabel(item.releaseFile?.releasePath)}
+                    {releasePathLabel(item.releaseFile?.releasePaths)}
                   </Td>
                   <Td className="mono">{formatDateTime(item.queuedAt)}</Td>
                   <Td>{renderOpenButton(item)}</Td>

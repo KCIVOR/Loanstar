@@ -32,7 +32,7 @@ export async function generateAcknowledgementReceipt(
   }
   const file = mapReleaseFileRow(fileRow);
 
-  if (!file.releasePath) {
+  if (file.releasePaths.length === 0) {
     throw new Error("Release path must be selected first");
   }
 
@@ -57,7 +57,11 @@ export async function generateAcknowledgementReceipt(
     (Array.isArray(borrowerRaw) ? borrowerRaw[0] : borrowerRaw) as BorrowerRow,
   );
 
-  const releasePath = file.releasePath as ReleasePath;
+  const releasePath = (
+    file.releasePaths.includes("with_pdc")
+      ? "with_pdc"
+      : file.releasePaths[0]
+  ) as ReleasePath;
   const context = buildReleaseTemplateContext(
     blri,
     {

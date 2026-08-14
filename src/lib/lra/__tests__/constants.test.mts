@@ -6,11 +6,23 @@ import {
   canRecordRelease,
   readyReleaseBlocker,
   releaseStageForPath,
+  releaseStagesForPaths,
 } from "../constants";
 
 test("releaseStageForPath maps paths to signing checklist stages", () => {
   assert.equal(releaseStageForPath("with_pdc"), "signing_with_pdc");
   assert.equal(releaseStageForPath("without_pdc"), "signing_without_pdc");
+});
+
+test("releaseStagesForPaths maps each path through releaseStageForPath", () => {
+  assert.deepEqual(releaseStagesForPaths(["with_pdc"]), ["signing_with_pdc"]);
+  assert.deepEqual(releaseStagesForPaths(["without_pdc"]), [
+    "signing_without_pdc",
+  ]);
+  assert.deepEqual(releaseStagesForPaths(["with_pdc", "without_pdc"]), [
+    "signing_with_pdc",
+    "signing_without_pdc",
+  ]);
 });
 
 test("Without-PDC path generates cash voucher, not check voucher", () => {
@@ -59,7 +71,12 @@ test("canRecordRelease requires borrower briefing sign-off", () => {
   assert.equal(canRecordRelease("awaiting_briefing", "2026-07-07T00:00:00Z"), false);
 });
 
-test("readyReleaseBlocker uses cash wording for Without-PDC path", () => {
-  assert.match(readyReleaseBlocker("without_pdc"), /cash release/i);
-  assert.match(readyReleaseBlocker("with_pdc"), /check release/i);
+test("readyReleaseBlocker uses path-set wording", () => {
+  assert.match(readyReleaseBlocker(["without_pdc"]), /cash release/i);
+  assert.match(readyReleaseBlocker(["with_pdc"]), /check release/i);
+  assert.match(
+    readyReleaseBlocker(["with_pdc", "without_pdc"]),
+    /check and cash release/i,
+  );
+  assert.match(readyReleaseBlocker(null), /check release/i);
 });

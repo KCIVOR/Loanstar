@@ -212,7 +212,7 @@ export async function savePdcChecks(
 ) {
   const file = await getReleaseFile(supabase, releaseFileId);
 
-  if (file.releasePath !== "with_pdc") {
+  if (!file.releasePaths.includes("with_pdc")) {
     throw new Error("PDC encoding only applies to With PDC path");
   }
 
@@ -310,8 +310,7 @@ export async function generateReleaseDocuments(
   releaseFileId: string,
   actorId: string,
 ) {
-  // Fetch the raw row so we can read `release_paths` (mapped file still
-  // exposes only legacy scalar `releasePath` until a later phase).
+  // Prefer release_paths from the raw row (legacy scalar still present during transition).
   const { data: row, error: rowError } = await supabase
     .from("release_files")
     .select("*")
@@ -719,7 +718,7 @@ export async function acknowledgeBriefing(
       file.loanApplicationId,
     );
     const blocker = releaseBlockerForReadyRelease(
-      file.releasePath as ReleasePath | null,
+      file.releasePaths as ReleasePath[],
       hasContract,
     );
 
@@ -849,7 +848,10 @@ export async function recordRelease(
   }
 
   const eventType =
-    file.releasePath === "without_pdc" ? "cash_released" : "check_released";
+    file.releasePaths.includes("with_pdc") ||
+    !file.releasePaths.includes("without_pdc")
+      ? "check_released"
+      : "cash_released";
 
   await supabase.from("release_events").insert({
     release_file_id: releaseFileId,

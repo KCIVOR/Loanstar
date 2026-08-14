@@ -615,7 +615,7 @@ export default function LraApplicationPage() {
         : null;
 
   const pipelineSteps = rf
-    ? releasePipelineSteps(rf.status, rf.release_path)
+    ? releasePipelineSteps(rf.status, rf.release_path as ReleasePath | null)
     : [];
 
   const nextAction =

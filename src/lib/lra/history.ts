@@ -1,6 +1,8 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
-export type ReleasePath = "with_pdc" | "without_pdc";
+import type { ReleasePath } from "@/lib/lra/constants";
+
+export type { ReleasePath };
 
 export type ReleasedLoanRow = {
   id: string;
@@ -13,7 +15,7 @@ export type ReleasedLoanRow = {
     lastName: string;
     email: string;
   } | null;
-  releasePath: ReleasePath | null;
+  releasePaths: ReleasePath[];
   loanTypeName: string | null;
   netReleased: number | null;
   pdcCollectedAt: string | null;
@@ -44,7 +46,8 @@ export const RELEASED_LOANS_PAGE_SIZES = [10, 20, 30, 50, 100] as const;
 
 /**
  * Release-path filter for History queries, or null for "all".
- * Mirrors Committee's actionFilterSpec — eq filter when set.
+ * Applied via `.contains("release_paths", [path])` so a "both" file matches
+ * either single-path filter chip.
  */
 export function releasePathFilterSpec(
   releasePath: ReleasePath | "all",
@@ -175,7 +178,7 @@ export async function getReleasedLoansHistory(
       `
       id,
       loan_application_id,
-      release_path,
+      release_paths,
       computation_id,
       pdc_collected_at,
       loan_applications (
@@ -203,7 +206,7 @@ export async function getReleasedLoansHistory(
 
   const pathEq = releasePathFilterSpec(releasePath);
   if (pathEq) {
-    query = query.eq("release_path", pathEq);
+    query = query.contains("release_paths", [pathEq]);
   }
 
   if (segmentFilter !== "all") {
@@ -265,9 +268,12 @@ export async function getReleasedLoansHistory(
     const netReleased =
       netRaw === null || netRaw === undefined ? null : Number(netRaw);
 
-    const pathRaw = row.release_path as string | null;
-    const releasePathValue: ReleasePath | null =
-      pathRaw === "with_pdc" || pathRaw === "without_pdc" ? pathRaw : null;
+    const pathsRaw = row.release_paths;
+    const releasePaths: ReleasePath[] = Array.isArray(pathsRaw)
+      ? pathsRaw.filter(
+          (p): p is ReleasePath => p === "with_pdc" || p === "without_pdc",
+        )
+      : [];
 
     const segmentRaw = app?.segment as string | null | undefined;
     const segment: "sme" | "seafarer" | null =
@@ -287,7 +293,7 @@ export async function getReleasedLoansHistory(
               email: borrower.email as string,
             }
           : null,
-        releasePath: releasePathValue,
+        releasePaths,
         loanTypeName: (computation?.loan_type_name as string | null) ?? null,
         netReleased,
         pdcCollectedAt: (row.pdc_collected_at as string | null) ?? null,

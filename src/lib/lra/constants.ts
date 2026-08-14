@@ -59,10 +59,24 @@ export function releaseStageForPath(path: ReleasePath): string {
   return path === "with_pdc" ? "signing_with_pdc" : "signing_without_pdc";
 }
 
-export function readyReleaseBlocker(path: ReleasePath | null): string {
-  return path === "without_pdc"
-    ? "Documents signed, awaiting cash release"
-    : BLOCKER_BY_STATUS.ready_release;
+/** All signing checklist stages for the selected release path(s). */
+export function releaseStagesForPaths(paths: ReleasePath[]): string[] {
+  return paths.map(releaseStageForPath);
+}
+
+export function readyReleaseBlocker(paths: ReleasePath[] | null): string {
+  if (paths == null) {
+    return BLOCKER_BY_STATUS.ready_release;
+  }
+  const hasWithPdc = paths.includes("with_pdc");
+  const hasWithoutPdc = paths.includes("without_pdc");
+  if (hasWithPdc && hasWithoutPdc) {
+    return "Documents signed, awaiting check and cash release";
+  }
+  if (hasWithoutPdc) {
+    return "Documents signed, awaiting cash release";
+  }
+  return BLOCKER_BY_STATUS.ready_release;
 }
 
 /** Release is allowed only when briefing was click-signed by the borrower. */

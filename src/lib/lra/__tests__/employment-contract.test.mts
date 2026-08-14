@@ -86,23 +86,27 @@ describe("employment contract before release (Phase 10)", () => {
 
   it("sets Pending: employment contract blocker when missing at ready_release", () => {
     assert.equal(
-      releaseBlockerForReadyRelease("with_pdc", false),
+      releaseBlockerForReadyRelease(["with_pdc"], false),
       EMPLOYMENT_CONTRACT_BLOCKER,
     );
     assert.equal(
-      releaseBlockerForReadyRelease("without_pdc", false),
+      releaseBlockerForReadyRelease(["without_pdc"], false),
       EMPLOYMENT_CONTRACT_BLOCKER,
     );
   });
 
   it("keeps path-specific ready_release blocker when contract is present", () => {
     assert.equal(
-      releaseBlockerForReadyRelease("with_pdc", true),
+      releaseBlockerForReadyRelease(["with_pdc"], true),
       "Documents signed, awaiting check release",
     );
     assert.equal(
-      releaseBlockerForReadyRelease("without_pdc", true),
+      releaseBlockerForReadyRelease(["without_pdc"], true),
       "Documents signed, awaiting cash release",
+    );
+    assert.equal(
+      releaseBlockerForReadyRelease(["with_pdc", "without_pdc"], true),
+      "Documents signed, awaiting check and cash release",
     );
   });
 
