@@ -135,10 +135,12 @@ function borrowerName(item: BriefingItem): string {
     : "Unknown borrower";
 }
 
-function pathLabel(releasePath: string | null): string {
-  if (releasePath === "with_pdc") return "With PDC";
-  if (releasePath === "without_pdc") return "Without PDC";
-  return "—";
+function pathLabel(paths: string[] | null | undefined): string {
+  if (!paths?.length) return "—";
+  const labels: string[] = [];
+  if (paths.includes("with_pdc")) labels.push("With PDC");
+  if (paths.includes("without_pdc")) labels.push("Without PDC");
+  return labels.length > 0 ? labels.join(" + ") : "—";
 }
 
 function rowId(item: BriefingItem): string {
@@ -514,7 +516,7 @@ export default function CollectorBriefingsPage() {
                 <div className="gcard-top">
                   <span className="gcard-id">{rowId(item)}</span>
                   <Badge variant="navy" dot>
-                    {pathLabel(item.releasePath)}
+                    {pathLabel(item.releasePaths)}
                   </Badge>
                 </div>
                 <div className="gcard-name">{borrowerName(item)}</div>
@@ -577,7 +579,7 @@ export default function CollectorBriefingsPage() {
                     <Td>{segmentBadge(item.application?.segment)}</Td>
                     <Td>
                       <Badge variant="navy" dot>
-                        {pathLabel(item.releasePath)}
+                        {pathLabel(item.releasePaths)}
                       </Badge>
                     </Td>
                     <Td className="mono">{formatDateTime(item.updatedAt)}</Td>

@@ -1,7 +1,7 @@
 /** Queue row shape from `GET /api/collector/briefings` (client-side filters). */
 export type BriefingQueueItem = {
   releaseFileId: string;
-  releasePath: string | null;
+  releasePaths: string[];
   updatedAt: string;
   application: {
     id: string;

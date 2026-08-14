@@ -129,14 +129,11 @@ export async function setReleasePaths(
   };
 
   const hasAtm = paths.includes("without_pdc");
-  // Legacy scalar: single path only; both-selected leaves it null (no third enum).
-  const legacyReleasePath = paths.length === 1 ? paths[0] : null;
 
   const { error } = await supabase
     .from("release_files")
     .update({
       release_paths: paths,
-      release_path: legacyReleasePath,
       status: nextStatus,
       atm_bank_name: hasAtm ? options?.atmBankName?.trim() : null,
       atm_card_last4: hasAtm ? options?.atmCardLast4?.trim() : null,
@@ -286,23 +283,16 @@ export async function savePdcChecks(
   };
 }
 
-/** Prefer `release_paths`; fall back to legacy scalar `release_path`. */
 function releasePathsFromRow(row: Record<string, unknown>): ReleasePath[] {
   const paths = row.release_paths;
-  if (Array.isArray(paths) && paths.length > 0) {
-    return [
-      ...new Set(
-        paths.filter(
-          (p): p is ReleasePath => p === "with_pdc" || p === "without_pdc",
-        ),
+  if (!Array.isArray(paths) || paths.length === 0) return [];
+  return [
+    ...new Set(
+      paths.filter(
+        (p): p is ReleasePath => p === "with_pdc" || p === "without_pdc",
       ),
-    ];
-  }
-  const scalar = row.release_path;
-  if (scalar === "with_pdc" || scalar === "without_pdc") {
-    return [scalar];
-  }
-  return [];
+    ),
+  ];
 }
 
 export async function generateReleaseDocuments(
@@ -310,7 +300,6 @@ export async function generateReleaseDocuments(
   releaseFileId: string,
   actorId: string,
 ) {
-  // Prefer release_paths from the raw row (legacy scalar still present during transition).
   const { data: row, error: rowError } = await supabase
     .from("release_files")
     .select("*")
@@ -1011,7 +1000,7 @@ export async function listLraQueue(supabase: SupabaseClient) {
         ),
         release_files (
           status,
-          release_path
+          release_paths
         )
       )
     `,
@@ -1052,7 +1041,9 @@ export async function listLraQueue(supabase: SupabaseClient) {
       releaseFile: releaseFile
         ? {
             status: releaseFile.status as string,
-            releasePath: (releaseFile.release_path as string | null) ?? null,
+            releasePaths: Array.isArray(releaseFile.release_paths)
+              ? releaseFile.release_paths
+              : [],
           }
         : null,
     };

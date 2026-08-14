@@ -59,7 +59,6 @@ type LraWorkspace = {
   releaseFile: {
     id: string;
     status: string;
-    release_path: string | null;
     release_paths: string[] | null;
     blank_check_from: string | null;
     blank_check_to: string | null;
@@ -103,20 +102,16 @@ type LraWorkspace = {
 
 type PathChoice = "with_pdc" | "without_pdc";
 
-/** Prefer `release_paths`; fall back to legacy scalar during transition. */
 function pathsFromReleaseFile(
   rf: LraWorkspace["releaseFile"],
 ): PathChoice[] {
   if (!rf) return [];
-  if (Array.isArray(rf.release_paths) && rf.release_paths.length > 0) {
-    return rf.release_paths.filter(
-      (p): p is PathChoice => p === "with_pdc" || p === "without_pdc",
-    );
+  if (!Array.isArray(rf.release_paths) || rf.release_paths.length === 0) {
+    return [];
   }
-  if (rf.release_path === "with_pdc" || rf.release_path === "without_pdc") {
-    return [rf.release_path];
-  }
-  return [];
+  return rf.release_paths.filter(
+    (p): p is PathChoice => p === "with_pdc" || p === "without_pdc",
+  );
 }
 
 function pathLabelFromPaths(paths: PathChoice[]): string | null {

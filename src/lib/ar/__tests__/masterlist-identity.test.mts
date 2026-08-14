@@ -144,6 +144,6 @@ describe("masterlistToCsv", () => {
     assert.match(csv, /"with_pdc, without_pdc"/);
     assert.match(csv, /atm_account_number/);
     assert.match(csv, /0011223344/);
-    assert.doesNotMatch(csv, /release_path,/);
+    assert.match(csv, /release_paths,/);
   });
 });
