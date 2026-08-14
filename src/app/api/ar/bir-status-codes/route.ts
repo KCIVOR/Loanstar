@@ -1,12 +1,13 @@
 import { handleApiError, jsonOk } from "@/lib/api/handler";
 import { requireModulePermission } from "@/lib/permissions/server";
-import { createClient } from "@/lib/supabase/server";
+import { createServiceClient } from "@/lib/supabase/server";
 
 /** Read-only classification code→label map for AR UI (system_config-gated admin config is not reachable to AR). */
 export async function GET() {
   try {
     await requireModulePermission("accounting_ar", "view");
-    const supabase = await createClient();
+    // config_settings SELECT is RLS-gated to system_config; AR must not get that module.
+    const supabase = createServiceClient();
 
     const { data, error } = await supabase
       .from("config_settings")

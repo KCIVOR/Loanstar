@@ -171,7 +171,8 @@ export async function PATCH(request: Request, { params }: RouteParams) {
 
     if (body.birStatusCode !== undefined) {
       if (body.birStatusCode !== null) {
-        const { data: configRow, error: configError } = await supabase
+        const admin = createServiceClient();
+        const { data: configRow, error: configError } = await admin
           .from("config_settings")
           .select("value")
           .eq("key", "bir_status_codes")
