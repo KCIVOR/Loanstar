@@ -1,7 +1,7 @@
 "use client";
 
 import { FormEvent, useCallback, useEffect, useState } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 
 import {
   Alert,
@@ -169,6 +169,7 @@ function displayText(value: string | null | undefined): string {
 
 export default function CigApplicationPage() {
   const params = useParams();
+  const router = useRouter();
   const applicationId = params.id as string;
   const { permissions } = usePermissions();
   const verifierName = permissions?.fullName ?? "";
@@ -209,6 +210,8 @@ export default function CigApplicationPage() {
   const [returnNote, setReturnNote] = useState("");
   const [returnOpen, setReturnOpen] = useState(false);
   const [submitOpen, setSubmitOpen] = useState(false);
+  const [cancelOpen, setCancelOpen] = useState(false);
+  const [cancelReason, setCancelReason] = useState("");
 
   const load = useCallback(async (opts?: { silent?: boolean }) => {
     if (!opts?.silent) setLoading(true);
@@ -522,6 +525,36 @@ export default function CigApplicationPage() {
     } catch (err) {
       setReturnOpen(false);
       setError(err instanceof Error ? err.message : "Return failed");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function handleCancelApplication() {
+    const reason = cancelReason.trim();
+    if (reason.length < 3) return;
+    setSaving(true);
+    setMessage(null);
+    setError(null);
+    try {
+      const res = await fetch(
+        `/api/cig/applications/${applicationId}/cancel`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ reason }),
+        },
+      );
+      const data = (await res.json()) as { error?: string };
+      if (!res.ok) throw new Error(data.error ?? "Cancel failed");
+      setCancelOpen(false);
+      setCancelReason("");
+      setMessage("Application cancelled.");
+      await load({ silent: true });
+      router.push("/cig");
+    } catch (err) {
+      setCancelOpen(false);
+      setError(err instanceof Error ? err.message : "Cancel failed");
     } finally {
       setSaving(false);
     }
@@ -1661,13 +1694,23 @@ export default function CigApplicationPage() {
                 )}
               </div>
             ) : null}
-            <Button
-              loading={saving}
-              disabled={!forwardReady}
-              onClick={() => setSubmitOpen(true)}
-            >
-              Submit CI report to Committee
-            </Button>
+            <div className="flex flex-wrap gap-2">
+              <Button
+                loading={saving}
+                disabled={!forwardReady}
+                onClick={() => setSubmitOpen(true)}
+              >
+                Submit CI report to Committee
+              </Button>
+              <Button
+                type="button"
+                variant="danger-soft"
+                loading={saving}
+                onClick={() => setCancelOpen(true)}
+              >
+                Cancel Application
+              </Button>
+            </div>
           </Card>
         ) : null}
 
@@ -1767,6 +1810,35 @@ export default function CigApplicationPage() {
         onConfirm={() => void handleReturnToCsa()}
         onCancel={() => setReturnOpen(false)}
       />
+
+      <ConfirmDialog
+        open={cancelOpen}
+        title="Cancel Application"
+        message="This permanently cancels the application and removes it from the CIG queue. Provide a reason to continue."
+        confirmLabel="Cancel Application"
+        cancelLabel="Back"
+        variant="danger"
+        loading={saving}
+        confirmDisabled={cancelReason.trim().length < 3}
+        onConfirm={() => void handleCancelApplication()}
+        onCancel={() => {
+          setCancelOpen(false);
+          setCancelReason("");
+        }}
+      >
+        <div>
+          <Label htmlFor="cancelReason" required>
+            Reason
+          </Label>
+          <Textarea
+            id="cancelReason"
+            placeholder="Why is this application being cancelled?"
+            value={cancelReason}
+            onChange={(e) => setCancelReason(e.target.value)}
+            rows={3}
+          />
+        </div>
+      </ConfirmDialog>
     </div>
   );
 }
