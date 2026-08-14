@@ -27,6 +27,7 @@ import {
   ciFormCompletionBadge,
   type CiFormDraft,
 } from "@/components/cig/CiReferencesFormModal";
+import { EditApplicationFormModal } from "@/components/cig/EditApplicationFormModal";
 import { FieldVisitForm } from "@/components/cig/FieldVisitForm";
 import { SmeReloanVerificationForm } from "@/components/cig/SmeReloanVerificationForm";
 import { usePermissions } from "@/hooks/usePermissions";
@@ -181,6 +182,7 @@ export default function CigApplicationPage() {
   const [verification, setVerification] = useState<VerificationData | null>(null);
   const [showCiForm, setShowCiForm] = useState(false);
   const [showApplicationForm, setShowApplicationForm] = useState(false);
+  const [showEditApplicationForm, setShowEditApplicationForm] = useState(false);
   const [showFieldVisitForm, setShowFieldVisitForm] = useState(false);
   const [checks, setChecks] = useState<CheckItem[]>([]);
   const [completeness, setCompleteness] = useState<{ complete: boolean; missing: string[] }>({
@@ -832,6 +834,17 @@ export default function CigApplicationPage() {
               />
             </div>
           </Modal>
+          {showEditApplicationForm ? (
+            <EditApplicationFormModal
+              open={showEditApplicationForm}
+              onClose={() => setShowEditApplicationForm(false)}
+              borrower={borrower}
+              applicationId={applicationId}
+              onSaved={() => load({ silent: true })}
+              segment={segment}
+              entityType={entityType}
+            />
+          ) : null}
         </>
       ) : null}
 
@@ -893,40 +906,50 @@ export default function CigApplicationPage() {
 
                   <div className="mt-auto border-t border-line-soft pt-4">
                     {editable ? (
-                      <form
-                        onSubmit={(e) => void handleSaveBorrower(e)}
-                        className="grid gap-3"
-                      >
-                        <div>
-                          <Label htmlFor="firstName">First name</Label>
-                          <Input
-                            id="firstName"
-                            value={borrower.firstName}
-                            onChange={(e) =>
-                              setBorrower({
-                                ...borrower,
-                                firstName: e.target.value,
-                              })
-                            }
-                          />
-                        </div>
-                        <div>
-                          <Label htmlFor="lastName">Last name</Label>
-                          <Input
-                            id="lastName"
-                            value={borrower.lastName}
-                            onChange={(e) =>
-                              setBorrower({
-                                ...borrower,
-                                lastName: e.target.value,
-                              })
-                            }
-                          />
-                        </div>
-                        <Button type="submit" loading={saving} size="sm">
-                          Save name
+                      <div className="grid gap-3">
+                        <Button
+                          type="button"
+                          variant="secondary"
+                          size="sm"
+                          onClick={() => setShowEditApplicationForm(true)}
+                        >
+                          Edit Application Form
                         </Button>
-                      </form>
+                        <form
+                          onSubmit={(e) => void handleSaveBorrower(e)}
+                          className="grid gap-3"
+                        >
+                          <div>
+                            <Label htmlFor="firstName">First name</Label>
+                            <Input
+                              id="firstName"
+                              value={borrower.firstName}
+                              onChange={(e) =>
+                                setBorrower({
+                                  ...borrower,
+                                  firstName: e.target.value,
+                                })
+                              }
+                            />
+                          </div>
+                          <div>
+                            <Label htmlFor="lastName">Last name</Label>
+                            <Input
+                              id="lastName"
+                              value={borrower.lastName}
+                              onChange={(e) =>
+                                setBorrower({
+                                  ...borrower,
+                                  lastName: e.target.value,
+                                })
+                              }
+                            />
+                          </div>
+                          <Button type="submit" loading={saving} size="sm">
+                            Save name
+                          </Button>
+                        </form>
+                      </div>
                     ) : (
                       <div className="kv contact-kv">
                         <div className="row">

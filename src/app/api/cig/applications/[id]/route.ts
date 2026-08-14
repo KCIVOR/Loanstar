@@ -145,6 +145,23 @@ const patchSchema = z.object({
       middleName: z.string().nullable().optional(),
       lastName: z.string().optional(),
       suffix: z.string().nullable().optional(),
+      dateOfBirth: z.string().nullable().optional(),
+      placeOfBirth: z.string().nullable().optional(),
+      citizenship: z.string().nullable().optional(),
+      civilStatus: z.string().nullable().optional(),
+      gender: z.string().nullable().optional(),
+      mobilePhone: z.string().nullable().optional(),
+      landline: z.string().nullable().optional(),
+      presentAddress: z.record(z.string(), z.unknown()).optional(),
+      permanentAddress: z.record(z.string(), z.unknown()).optional(),
+      manningAgency: z.record(z.string(), z.unknown()).optional(),
+      financial: z.record(z.string(), z.unknown()).optional(),
+      allottee: z.record(z.string(), z.unknown()).optional(),
+      picWork: z.record(z.string(), z.unknown()).optional(),
+      businessInfo: z.record(z.string(), z.unknown()).optional(),
+      dependents: z.array(z.record(z.string(), z.unknown())).optional(),
+      references: z.array(z.record(z.string(), z.unknown())).optional(),
+      profileData: z.record(z.string(), z.unknown()).optional(),
     })
     .optional(),
   verification: z
@@ -283,34 +300,39 @@ export async function PATCH(request: Request, { params }: RouteParams) {
     const application = await getApplicationForStaff(supabase, id);
 
     if (body.borrower) {
-      const borrowerFields = ["firstName", "middleName", "lastName", "suffix"] as const;
-      for (const field of borrowerFields) {
-        if (body.borrower[field] !== undefined) {
-          const result = await validateFieldEdit(
-            "verification",
-            "borrower_info",
-            user.id,
-          );
-          if (!result.allowed) {
-            throw new ForbiddenError(result.reason);
-          }
-        }
+      const result = await validateFieldEdit(
+        "verification",
+        "borrower_info",
+        user.id,
+      );
+      if (!result.allowed) {
+        throw new ForbiddenError(result.reason);
       }
 
-      const row = borrowerProfileToRow({
-        firstName: body.borrower.firstName,
-        middleName: body.borrower.middleName ?? undefined,
-        lastName: body.borrower.lastName,
-        suffix: body.borrower.suffix ?? undefined,
-      });
+      const { data: existingBorrower, error: existingBorrowerError } =
+        await supabase
+          .from("borrowers")
+          .select("*")
+          .eq("id", application.borrower_id)
+          .single();
 
-      const { error: borrowerError } = await supabase
+      if (existingBorrowerError || !existingBorrower) {
+        throw new Error(
+          existingBorrowerError?.message ?? "Borrower not found",
+        );
+      }
+
+      const row = borrowerProfileToRow(body.borrower);
+
+      const { data: updatedBorrower, error: borrowerError } = await supabase
         .from("borrowers")
         .update(row)
-        .eq("id", application.borrower_id);
+        .eq("id", application.borrower_id)
+        .select("*")
+        .single();
 
-      if (borrowerError) {
-        throw new Error(borrowerError.message);
+      if (borrowerError || !updatedBorrower) {
+        throw new Error(borrowerError?.message ?? "Borrower update failed");
       }
 
       await writeAuditEvent({
@@ -319,7 +341,8 @@ export async function PATCH(request: Request, { params }: RouteParams) {
         action: "update",
         entityType: "borrower",
         entityId: application.borrower_id as string,
-        afterData: body.borrower,
+        beforeData: mapBorrowerRow(existingBorrower),
+        afterData: mapBorrowerRow(updatedBorrower),
       });
     }
 
