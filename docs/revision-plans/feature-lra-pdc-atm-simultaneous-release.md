@@ -119,7 +119,9 @@ Verified independently, not just from Cursor's report: live-queried `supabase_mi
 - [ ] `npx tsc --noEmit` clean.
 - [ ] Existing test suite still passes.
 
-### Status: Not Started
+### Status: Done (2026-08-14)
+
+Phase 2: setReleasePaths + API route diffed directly against spec — matches exactly (membership widening, atmAccountNumber required alongside existing ATM fields, per-path ensureDocumentSlots loop).
 
 ---
 
@@ -145,7 +147,9 @@ Verified independently, not just from Cursor's report: live-queried `supabase_mi
 - [ ] `npx tsc --noEmit` clean.
 - [ ] Existing test suite still passes.
 
-### Status: Not Started
+### Status: Done (2026-08-14)
+
+Phase 3: verified the exact mechanism specified in the plan — union+dedup slug set, one template context per selected path via a Map, and correct per-slug context routing (onlyWithPdc/onlyWithoutPdc) for the two voucher pairs. Improves on the plan's description with a cleaner implementation.
 
 ---
 
@@ -174,7 +178,9 @@ Verified independently, not just from Cursor's report: live-queried `supabase_mi
 - [ ] `npx tsc --noEmit` clean.
 - [ ] Existing test suite still passes.
 
-### Status: Not Started
+### Status: Done (2026-08-14)
+
+Phase 4: pure equality-to-.includes() widening across all five pdc-collect.ts gates, diffed directly — semantics unchanged for single-path releases, correctly permissive for both. Confirmed REQUIRED_SIGNED_RELEASE_SLUGS was left untouched, exactly as instructed (does not attempt to fix the separately-tracked signed_cash_voucher gap).
 
 ---
 
@@ -209,7 +215,9 @@ Verified independently, not just from Cursor's report: live-queried `supabase_mi
 - [ ] `npx tsc --noEmit` clean.
 - [ ] Existing test suite still passes.
 
-### Status: Not Started
+### Status: Done (2026-08-14)
+
+Phase 5: releaseStagesForPaths/readyReleaseBlocker/skipEncode widened correctly; history.ts filter intentionally kept single-select as specified (array-contains, not array-equals). combined-upload route resolved the plan's flagged ambiguity well — gathers required docs from every applicable signing stage and dedupes by documentTypeId:stage, no forced single-stage UI pick needed.
 
 ---
 
@@ -241,7 +249,9 @@ Verified independently, not just from Cursor's report: live-queried `supabase_mi
 - [ ] `npx tsc --noEmit` clean.
 - [ ] Existing test suite still passes.
 
-### Status: Not Started
+### Status: Done (2026-08-14)
+
+Phase 6: checkboxes + Set<PathChoice> state, client-side "at least one" guard before the request fires, correct POST body shape, "With PDC + ATM Surrender" combined label. Consequential fixes to src/app/lra/page.tsx and src/app/collector/briefings/page.tsx (queue/briefings list labels) found via TypeScript, not explicitly in this plan's file list, but correctly follow the same widening pattern.
 
 ---
 
@@ -264,7 +274,9 @@ Verified independently, not just from Cursor's report: live-queried `supabase_mi
 - [ ] `npx tsc --noEmit` clean.
 - [ ] Existing test suite still passes.
 
-### Status: Not Started
+### Status: Done (2026-08-14)
+
+Phase 7: masterlist insert + export row diffed directly — release_paths joined as a readable CSV string exactly as specified, atm_account_number copied through.
 
 ---
 
@@ -288,14 +300,19 @@ Verified independently, not just from Cursor's report: live-queried `supabase_mi
 - [ ] `npx tsc --noEmit` clean.
 - [ ] Existing test suite still passes.
 
-### Status: Not Started
+### Status: Done (2026-08-14)
+
+Phase 8: live-confirmed release_path (singular) fully dropped from both tables; independently grepped the entire src/ tree for any lingering scalar reference (DB column name and camelCase TS field) before trusting the drop was safe — zero hits.
 
 ---
 
 ## Final validation
 
-- [ ] Full test suite run — no new failures.
-- [ ] Live, end-to-end: as LRA, select both PDC and ATM Surrender on a real test application, encode PDC checks, enter ATM details (including the new account number), generate documents — confirm all 9 unique slugs (5 shared + both voucher pairs) exist with correct disbursement details, sign all of them, complete briefing, release, confirm physical PDC collection, close.
+- [x] Full test suite run — no new failures (902/902, re-run independently on the feature branch, 2026-08-14; 10 new tests over the pre-feature 892, including a dedicated "both paths" case in `pdc-collect.test.mts`).
+- [x] Code-level validation: all 8 phases' diffs read directly against this plan (not just Cursor's summary) — schema, `generateReleaseDocuments`' per-path template context routing, all five `pdc-collect.ts` gates, the combined-upload route's multi-stage resolution, the AR export, and the UI checkboxes all diffed line-by-line. Confirmed `REQUIRED_SIGNED_RELEASE_SLUGS` was correctly left untouched (the deferred pre-existing gap noted above). `tsc --noEmit` clean (same 4 pre-existing unrelated errors) despite ~1040 lines changed across 32 files.
+- [x] Live DB: independently confirmed (own queries, not Cursor's) — Phase 1's backfill had zero mismatches, the `CHECK` constraint actually rejects an invalid value (tested via a rolled-back scratch transaction), and Phase 8's column drop is real and complete on both tables with zero lingering references anywhere in `src/` (grepped both the DB column name and the camelCase TS field name).
+- [x] Consequential fixes beyond the plan's literal file list (`src/app/lra/page.tsx`, `src/app/collector/briefings/page.tsx`, `src/lib/collector/briefings.ts`, `src/lib/lra/employment-contract.ts`) verified as correct, TypeScript-driven ripple fixes from the `releasePaths` rename — not scope creep.
+- [ ] Live, end-to-end click-through: as LRA, select both PDC and ATM Surrender on a real test application, encode PDC checks, enter ATM details (including the new account number), generate documents, sign, brief, release, confirm physical PDC collection, close. **Not yet done by Claude** — code-level review covered the full logic path with high confidence, but an actual browser walkthrough is still worth doing given the size of this change. Left for the user.
 - [ ] Live: confirm the closed account's masterlist row and CSV export show both release methods and both detail sets.
 - [ ] Live: confirm a single-path release (either) still works exactly as before, start to finish, with no regression.
 - [ ] Live: confirm the borrower's own portal view doesn't break for a "both" release.
