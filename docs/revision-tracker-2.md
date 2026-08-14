@@ -26,7 +26,7 @@ Per-item plan files (filled in as each item's plan is written):
 - Item 4 — LRA: PDC + ATM surrender simultaneous release — [feature-lra-pdc-atm-simultaneous-release.md](revision-plans/feature-lra-pdc-atm-simultaneous-release.md), audited + planned 2026-08-14
 - Item 5 — LRA: Cash Voucher + Check Voucher simultaneous generation — *plan not yet written*
 - Item 6 — LRA: AR Check in document set — [feature-lra-ar-atm-voucher.md](revision-plans/feature-lra-ar-atm-voucher.md), audited + planned 2026-08-14
-- Item 7 — AR: BIR / Non-BIR status tagging — *plan not yet written*
+- Item 7 — AR: BIR / Non-BIR status tagging — [feature-ar-bir-status-tagging.md](revision-plans/feature-ar-bir-status-tagging.md), audited + planned 2026-08-14
 - Item 8 — AR: Reference/transaction number on amortization ledger — *plan not yet written*
 - Item 9 — AR: Rounding write-off page — *plan not yet written* (see note below — likely overlaps existing work)
 
@@ -55,6 +55,6 @@ Per-item plan files (filled in as each item's plan is written):
 
 | # | Item | Status | Notes |
 |---|------|--------|-------|
-| 7 | Add a configurable coded BIR / Non-BIR status field to AR master list accounts (no literal "BIR"/"Non-BIR" labels in UI), editable by AR, filterable/sortable, visible in account detail, codes configurable by Super Admin, never exposed to the borrower portal | Not Started | Internal classification only. |
+| 7 | Add a configurable coded BIR / Non-BIR status field to AR master list accounts (no literal "BIR"/"Non-BIR" labels in UI), editable by AR, filterable/sortable, visible in account detail, codes configurable by Super Admin, never exposed to the borrower portal | Done | Implemented by Cursor 2026-08-14, all 3 phases validated (code + `tsc` + full suite 903/903 checked directly, live DB/RLS state confirmed, borrower-exclusion fix independently verified field-by-field for regressions), merged to `main` — see `revision-plans/feature-ar-bir-status-tagging.md`. Zero literal "BIR"/"Non-BIR" text confirmed anywhere in the UI. Unknown/removed codes fall back to showing the raw code rather than crashing — verified directly in the diff. |
 | 8 | Add a required "Reference / Transaction No." free-text field to the payment posting form (collector + AR), surfaced as a ledger column and in the borrower portal's payment history; locked after AR confirms posting (correction requires Super Admin) | Not Started | Required at posting — cannot post without it. |
 | 9 | Dedicated Rounding Write-Off page: a "Clear Rounding Difference" action on the account/ledger view (visible below a Super-Admin-configured threshold), logging borrower, account/loan no., amount, timestamp, and acting AR user; page filterable by date range/borrower/AR user with summarized totals; confirmation dialog; irreversible; AR + Super Admin only | Not Started | **Likely overlaps existing work** — `revision-plans/feature-ar-rounding-writeoff.md` (tracked as item 13, Done, in `system-revision-report-tracker.md`) already added a manual, threshold-gated, logged rounding write-off. Audit must start by diffing this request against what's already live before assuming any of it is net-new — this may be a "add the missing dedicated page/filtering/summary" delta rather than a from-scratch build. |
