@@ -41,6 +41,7 @@ type Payment = {
   payment_date: string;
   amount: number;
   status: string;
+  notes?: string | null;
   masterlist?: MasterlistJoin | MasterlistJoin[] | null;
 };
 
@@ -194,7 +195,7 @@ export default function CollectorDcrPage() {
         setDraftPaymentIds(
           (existing.dcr_items ?? []).map((item) => item.payment_id),
         );
-        setMessage("Resumed open DCR draft.");
+        setMessage("Resumed open DCRR draft.");
         return;
       }
       const res = await fetch("/api/collector/dcr", {
@@ -206,12 +207,12 @@ export default function CollectorDcrPage() {
         const body = (await res.json().catch(() => null)) as {
           error?: string;
         } | null;
-        throw new Error(body?.error ?? "Failed to create DCR");
+        throw new Error(body?.error ?? "Failed to create DCRR");
       }
       const data = (await res.json()) as { dcrId: string };
       setDraftDcrId(data.dcrId);
       setDraftPaymentIds([]);
-      setMessage("DCR draft created.");
+      setMessage("DCRR draft created.");
       await load({ silent: true });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed");
@@ -343,10 +344,10 @@ export default function CollectorDcrPage() {
         const body = (await res.json().catch(() => null)) as {
           error?: string;
         } | null;
-        throw new Error(body?.error ?? "Could not add to DCR");
+        throw new Error(body?.error ?? "Could not add to DCRR");
       }
       setAllocationModal(null);
-      setMessage("Payment added to DCR.");
+      setMessage("Payment added to DCRR.");
       await load({ silent: true });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed");
@@ -375,7 +376,7 @@ export default function CollectorDcrPage() {
       setConfirmSubmit(false);
       setDraftDcrId(null);
       setDraftPaymentIds([]);
-      setMessage("DCR submitted to AR.");
+      setMessage("DCRR submitted to AR.");
       await load({ silent: true });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed");
@@ -404,12 +405,12 @@ export default function CollectorDcrPage() {
   return (
     <div>
       <PageHeader
-        title="DCR builder"
+        title="DCRR builder"
         description="Batch confirmed payments into a daily collection report for AR."
         actions={
           <div className="flex gap-2">
             <Link href="/collector/dcr/history" className="btn btn-secondary">
-              DCR history
+              DCRR history
             </Link>
             {draftDcrId ? (
               <Button
@@ -417,11 +418,11 @@ export default function CollectorDcrPage() {
                 onClick={() => setConfirmSubmit(true)}
                 disabled={draftItems.length === 0}
               >
-                Submit DCR
+                Submit DCRR
               </Button>
             ) : (
               <Button loading={acting} onClick={() => void startDcr()}>
-                New DCR
+                New DCRR
               </Button>
             )}
           </div>
@@ -456,7 +457,7 @@ export default function CollectorDcrPage() {
       ) : (
         <div className="mb-6">
           <Alert variant="info">
-            Start a DCR draft, then add confirmed payments below. Confirm new
+            Start a DCRR draft, then add confirmed payments below. Confirm new
             proofs on{" "}
             <Link href="/collector/proofs" className="font-semibold underline">
               Payment proofs
@@ -490,7 +491,7 @@ export default function CollectorDcrPage() {
             description={
               draftDcrId
                 ? "Add confirmed payments from the list below."
-                : "Create a New DCR to begin batching."
+                : "Create a New DCRR to begin batching."
             }
             showMark={false}
           />
@@ -582,7 +583,14 @@ export default function CollectorDcrPage() {
                         </div>
                       </Td>
                       <Td>{segmentBadge(ml?.segment)}</Td>
-                      <Td className="mono">{pay.reference_no ?? "—"}</Td>
+                      <Td className="mono">
+                        {pay.reference_no ?? "—"}
+                        {pay.notes ? (
+                          <div className="mt-1 whitespace-normal text-xs font-normal text-ink-500">
+                            {pay.notes}
+                          </div>
+                        ) : null}
+                      </Td>
                       <Td className="mono">{formatDate(pay.payment_date)}</Td>
                       <Td num className="mono text-teal-600">
                         {formatMoney(Number(pay.amount))}
@@ -593,7 +601,7 @@ export default function CollectorDcrPage() {
                         </Badge>
                         {already ? (
                           <Badge variant="success" className="ml-1.5">
-                            In DCR
+                            In DCRR
                           </Badge>
                         ) : null}
                       </Td>
@@ -604,7 +612,7 @@ export default function CollectorDcrPage() {
                             loading={acting}
                             onClick={() => void openAllocationModal(pay.id)}
                           >
-                            Add to DCR
+                            Add to DCRR
                           </Button>
                         ) : already ? (
                           <span className="text-xs text-ink-400">Added</span>
@@ -630,9 +638,9 @@ export default function CollectorDcrPage() {
 
       <ConfirmDialog
         open={confirmSubmit}
-        title="Submit DCR to AR?"
+        title="Submit DCRR to AR?"
         message={`Submit ${draftItems.length} payment${draftItems.length === 1 ? "" : "s"} totaling ₱${formatMoney(draftTotal)} for reconciliation.`}
-        confirmLabel="Submit DCR"
+        confirmLabel="Submit DCRR"
         loading={acting}
         onConfirm={() => void submitDcr()}
         onCancel={() => setConfirmSubmit(false)}
@@ -661,7 +669,7 @@ export default function CollectorDcrPage() {
               loading={acting}
               disabled={allocationMismatch}
             >
-              Add to DCR
+              Add to DCRR
             </Button>
           </>
         }

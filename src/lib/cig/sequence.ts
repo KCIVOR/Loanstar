@@ -88,6 +88,11 @@ const CREWING_MANAGER_KEYS: ReadonlySet<string> = new Set([
   "cmContractStatus",
   "cmFitToWork",
   "cmNotes",
+  "cmManagerName",
+  "cmManagerPosition",
+  "cmManagerContact",
+  "cmManningAgencyName",
+  "cmJoiningPort",
 ]);
 
 const FINDING_KEYS: ReadonlySet<string> = new Set([

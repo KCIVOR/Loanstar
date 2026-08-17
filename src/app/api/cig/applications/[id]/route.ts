@@ -2,12 +2,16 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 
 import { resolveDisplayName } from "@/lib/account/display-name";
-import { formatStatusLabel } from "@/lib/applications/status";
+import {
+  formatStatusLabel,
+  type StatusHistoryEntry,
+} from "@/lib/applications/status";
 import { writeAuditEvent } from "@/lib/audit/writer";
 import { handleApiError, jsonOk } from "@/lib/api/handler";
 import { assertCigVerificationStage } from "@/lib/cig/queue-guards";
 import { saveVerificationPatch } from "@/lib/cig/forward";
 import { getReceiptReadiness } from "@/lib/cig/receipt";
+import { csaScreeningCheckSlug } from "@/lib/csa/sme-duplication";
 import {
   assertVerificationPatchAllowed,
   CigSequenceError,
@@ -29,7 +33,7 @@ import {
   requireModulePermission,
 } from "@/lib/permissions/server";
 import { validateFieldEdit } from "@/lib/permissions/field-rules";
-import { createClient } from "@/lib/supabase/server";
+import { createClient, createServiceClient } from "@/lib/supabase/server";
 
 type RouteParams = { params: Promise<{ id: string }> };
 
@@ -51,20 +55,27 @@ const picSiblingSchema = z.object({
   occupation: z.string().optional(),
 });
 
-const picOtherFinancingSchema = z.object({
-  hasOther: z.boolean().nullable(),
+const picOtherFinancingEntrySchema = z.object({
   company: z.string().optional(),
-  financingOrBank: z.string().optional(),
   when: z.string().optional(),
   loanAmount: z.number().optional(),
   monthly: z.number().optional(),
   startEnd: z.string().optional(),
 });
 
-const picLoanFlagSchema = z.object({
-  has: z.boolean().nullable(),
+const picOtherFinancingSchema = z.object({
+  hasOther: z.boolean().nullable(),
+  entries: z.array(picOtherFinancingEntrySchema).optional(),
+});
+
+const picLoanFlagEntrySchema = z.object({
   loanAmount: z.number().optional(),
   monthlyAmort: z.number().optional(),
+});
+
+const picLoanFlagSchema = z.object({
+  has: z.boolean().nullable(),
+  entries: z.array(picLoanFlagEntrySchema).optional(),
 });
 
 const picOtherVerificationCallsSchema = z.object({
@@ -181,6 +192,11 @@ const patchSchema = z.object({
       cmContractStatus: z.string().optional(),
       cmFitToWork: z.boolean().optional(),
       cmNotes: z.string().nullable().optional(),
+      cmManagerName: z.string().nullable().optional(),
+      cmManagerPosition: z.string().nullable().optional(),
+      cmManagerContact: z.string().nullable().optional(),
+      cmManningAgencyName: z.string().nullable().optional(),
+      cmJoiningPort: z.string().nullable().optional(),
       characterReferencesNotes: z.string().optional(),
       charRefOtherLenders: z.boolean().optional(),
       picVerification: picVerificationSchema.optional(),
@@ -255,6 +271,83 @@ export async function GET(_request: Request, { params }: RouteParams) {
     const borrower = borrowerRow ? mapBorrowerRow(borrowerRow) : null;
     const receipt = await getReceiptReadiness(supabase, id, borrower);
 
+    // CSA intake summary — everything CSA recorded before endorsing, surfaced
+    // read-only so CIG can see the file's history instead of starting blind.
+    // `profiles` RLS only allows reading your own row (or auth_admin), so a
+    // CIG user's session client can't see who on CSA recorded these — use
+    // the service client for this narrow, already-permission-checked read.
+    const serviceClient = createServiceClient();
+
+    let privacyOrientationByName: string | null = null;
+    if (application.privacy_orientation_by) {
+      const { data: orientationProfile } = await serviceClient
+        .from("profiles")
+        .select("full_name")
+        .eq("id", application.privacy_orientation_by as string)
+        .maybeSingle();
+      privacyOrientationByName =
+        (orientationProfile?.full_name as string | null | undefined) ?? null;
+    }
+
+    let initialInterviewByName: string | null = null;
+    if (application.initial_interview_by) {
+      const { data: interviewProfile } = await serviceClient
+        .from("profiles")
+        .select("full_name")
+        .eq("id", application.initial_interview_by as string)
+        .maybeSingle();
+      initialInterviewByName =
+        (interviewProfile?.full_name as string | null | undefined) ?? null;
+    }
+
+    let endorsedByName: string | null = null;
+    if (application.endorsed_by) {
+      const { data: endorserProfile } = await serviceClient
+        .from("profiles")
+        .select("full_name")
+        .eq("id", application.endorsed_by as string)
+        .maybeSingle();
+      endorsedByName =
+        (endorserProfile?.full_name as string | null | undefined) ?? null;
+    }
+
+    const screeningSlug = csaScreeningCheckSlug(scope.segment);
+    const { data: screeningType } = await supabase
+      .from("check_types")
+      .select("id, name")
+      .eq("slug", screeningSlug)
+      .maybeSingle();
+    let csaScreening: {
+      slug: string;
+      name: string | null;
+      result: string;
+      notes: string | null;
+      checkedAt: string | null;
+    } = { slug: screeningSlug, name: null, result: "pending", notes: null, checkedAt: null };
+    if (screeningType?.id) {
+      const { data: screeningCheck } = await supabase
+        .from("checks_recorded")
+        .select("result, notes, checked_at")
+        .eq("loan_application_id", id)
+        .eq("check_type_id", screeningType.id)
+        .maybeSingle();
+      csaScreening = {
+        slug: screeningSlug,
+        name: (screeningType.name as string | null) ?? null,
+        result: (screeningCheck?.result as string | undefined) ?? "pending",
+        notes: (screeningCheck?.notes as string | null | undefined) ?? null,
+        checkedAt:
+          (screeningCheck?.checked_at as string | null | undefined) ?? null,
+      };
+    }
+
+    const timeline = (
+      (application.status_history ?? []) as StatusHistoryEntry[]
+    ).map((entry) => ({
+      ...entry,
+      label: formatStatusLabel(entry.status),
+    }));
+
     return jsonOk({
       application: {
         id: application.id,
@@ -262,6 +355,7 @@ export async function GET(_request: Request, { params }: RouteParams) {
         status: application.status,
         statusLabel: formatStatusLabel(application.status),
         endorsedAt: application.endorsed_at,
+        endorsedByName,
         blocker: application.blocker,
         editable: application.status === "for_verification",
         segment: scope.segment,
@@ -271,12 +365,22 @@ export async function GET(_request: Request, { params }: RouteParams) {
             ? application.entity_type
             : null,
         isReloan: scope.isReloan,
+        privacyOrientationAt:
+          (application.privacy_orientation_at as string | null) ?? null,
+        privacyOrientationByName,
+        initialInterviewAt:
+          (application.initial_interview_at as string | null) ?? null,
+        initialInterviewNotes:
+          (application.initial_interview_notes as string | null) ?? null,
+        initialInterviewByName,
+        timeline,
       },
       borrower,
       verification,
       completeness,
       sequence,
       receipt,
+      csaScreening,
       activeCallback: activeCallback
         ? {
             id: activeCallback.id,

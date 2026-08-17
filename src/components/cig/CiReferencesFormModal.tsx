@@ -19,6 +19,9 @@ import {
   assessCiReferencesRequired,
   type PicAddress,
   type PicDemeanorTag,
+  type PicLoanFlag,
+  type PicLoanFlagEntry,
+  type PicOtherFinancing,
   type PicPaymentPreference,
   type PicSibling,
   type PicVerification,
@@ -71,6 +74,54 @@ function addressFromDeclared(address: AllotteeInfo["address"]): PicAddress | nul
     zipCode: address.zipCode,
     ownership: normalizeOwnership(address.ownership),
     yearsOfStay: address.lengthOfStay,
+  };
+}
+
+/** Migrates the pre-list shape (a single company/when/loanAmount/monthly/
+ * startEnd set directly on otherFinancing) into one `entries` row, so older
+ * saved verifications still display instead of silently losing data. */
+function normalizeOtherFinancing(
+  raw: PicOtherFinancing | null | undefined,
+): PicOtherFinancing | null {
+  if (!raw) return raw ?? null;
+  if (raw.entries) return raw;
+  const legacy = raw as PicOtherFinancing & {
+    company?: string;
+    when?: string;
+    startEnd?: string;
+    loanAmount?: number;
+    monthly?: number;
+  };
+  const hasLegacyEntry =
+    legacy.company || legacy.when || legacy.startEnd || legacy.loanAmount || legacy.monthly;
+  return {
+    hasOther: raw.hasOther,
+    entries: hasLegacyEntry
+      ? [
+          {
+            company: legacy.company,
+            when: legacy.when,
+            startEnd: legacy.startEnd,
+            loanAmount: legacy.loanAmount,
+            monthly: legacy.monthly,
+          },
+        ]
+      : [],
+  };
+}
+
+/** Same migration idea as normalizeOtherFinancing, for housingLoan/carLoan —
+ * older saves had a single loanAmount/monthlyAmort pair directly on the flag. */
+function normalizeLoanFlag(raw: PicLoanFlag | null | undefined): PicLoanFlag | null {
+  if (!raw) return raw ?? null;
+  if (raw.entries) return raw;
+  const legacy = raw as PicLoanFlag & { loanAmount?: number; monthlyAmort?: number };
+  const hasLegacyEntry = legacy.loanAmount || legacy.monthlyAmort;
+  return {
+    has: raw.has,
+    entries: hasLegacyEntry
+      ? [{ loanAmount: legacy.loanAmount, monthlyAmort: legacy.monthlyAmort }]
+      : [],
   };
 }
 
@@ -128,7 +179,13 @@ function buildInitialDraft(
     cifVerifiedDate: string | null;
   },
 ): CiFormDraft {
-  const pic = saved.picVerification ?? picFromDeclared(borrower?.allottee);
+  const pic0 = saved.picVerification ?? picFromDeclared(borrower?.allottee);
+  const pic: PicVerification = {
+    ...pic0,
+    otherFinancing: normalizeOtherFinancing(pic0.otherFinancing),
+    housingLoan: normalizeLoanFlag(pic0.housingLoan),
+    carLoan: normalizeLoanFlag(pic0.carLoan),
+  };
   // References are a free add/remove list (like Siblings), not a fixed Ref
   // 1/Ref 2 pair. `saved` (once anything has been saved) is respected
   // exactly, including an empty array if CIG removed everything. Only on the
@@ -272,6 +329,60 @@ function MoneyField({
           mono
         />
       </div>
+    </div>
+  );
+}
+
+/** Repeatable loan list — used for both Housing Loan and Car Loan, since a
+ * borrower may carry more than one under either flag. */
+function LoanEntryList({
+  label,
+  entries,
+  onAdd,
+  onUpdate,
+  onRemove,
+}: {
+  label: string;
+  entries: PicLoanFlagEntry[];
+  onAdd: () => void;
+  onUpdate: (i: number, patch: Partial<PicLoanFlagEntry>) => void;
+  onRemove: (i: number) => void;
+}) {
+  return (
+    <div className="space-y-3">
+      {entries.map((entry, i) => (
+        <div key={i} className="rounded-[var(--r-md)] border border-line-soft p-3">
+          <div className="mb-2 flex items-center justify-between">
+            <span className="text-xs font-semibold uppercase tracking-wide text-ink-400">
+              {label} {i + 1}
+            </span>
+            <Button
+              type="button"
+              variant="danger-soft"
+              size="sm"
+              aria-label={`Remove ${label.toLowerCase()} ${i + 1}`}
+              onClick={() => onRemove(i)}
+            >
+              Remove
+            </Button>
+          </div>
+          <div className="grid gap-3">
+            <MoneyField
+              label="Loan Amount :"
+              value={entry.loanAmount}
+              onChange={(v) => onUpdate(i, { loanAmount: v })}
+            />
+            <MoneyField
+              label="Monthly Amort:"
+              value={entry.monthlyAmort}
+              onChange={(v) => onUpdate(i, { monthlyAmort: v })}
+            />
+          </div>
+        </div>
+      ))}
+      <Button type="button" variant="secondary" size="sm" onClick={onAdd}>
+        Add {label.toLowerCase()}
+      </Button>
     </div>
   );
 }
@@ -519,6 +630,51 @@ export function CiReferencesFormModal({
   const removeSibling = (i: number) =>
     setPic({ siblings: (pic.siblings ?? []).filter((_, idx) => idx !== i) });
 
+  const financingEntries = pic.otherFinancing?.entries ?? [];
+  const addFinancingEntry = () =>
+    setPic({
+      otherFinancing: { ...pic.otherFinancing, entries: [...financingEntries, {}] },
+    });
+  const updateFinancingEntry = (
+    i: number,
+    patch: Partial<NonNullable<PicOtherFinancing["entries"]>[number]>,
+  ) =>
+    setPic({
+      otherFinancing: {
+        ...pic.otherFinancing,
+        entries: financingEntries.map((e, idx) => (idx === i ? { ...e, ...patch } : e)),
+      },
+    });
+  const removeFinancingEntry = (i: number) =>
+    setPic({
+      otherFinancing: {
+        ...pic.otherFinancing,
+        entries: financingEntries.filter((_, idx) => idx !== i),
+      },
+    });
+
+  /** Shared add/update/remove for the housingLoan and carLoan entry lists —
+   * same repeatable shape as otherFinancing, since a borrower may carry more
+   * than one loan under either flag. */
+  function loanFlagHandlers(field: "housingLoan" | "carLoan") {
+    const entries = pic[field]?.entries ?? [];
+    return {
+      entries,
+      add: () => setPic({ [field]: { ...pic[field], entries: [...entries, {}] } }),
+      update: (i: number, patch: Partial<PicLoanFlagEntry>) =>
+        setPic({
+          [field]: {
+            ...pic[field],
+            entries: entries.map((e, idx) => (idx === i ? { ...e, ...patch } : e)),
+          },
+        }),
+      remove: (i: number) =>
+        setPic({ [field]: { ...pic[field], entries: entries.filter((_, idx) => idx !== i) } }),
+    };
+  }
+  const housingLoanHandlers = loanFlagHandlers("housingLoan");
+  const carLoanHandlers = loanFlagHandlers("carLoan");
+
   const toggleChecklist = (key: keyof VerificationChecklist) =>
     setDraft((d) => ({ ...d, checklist: { ...d.checklist, [key]: !d.checklist[key] } }));
 
@@ -692,40 +848,60 @@ export function CiReferencesFormModal({
                 setPic({ otherFinancing: { ...pic.otherFinancing, hasOther: v } })
               }
             />
-            {/* The company/financing-name label is long and wraps to two lines at
-                this width — kept on its own full-width row so it never fights
-                shorter neighbors for vertical alignment (When?/Start-End and
-                the money fields each get their own evenly-split row below). */}
-            <div className="mt-3">
-              <Field
-                label="What company ? Was it FINANCING / BANK ?"
-                value={pic.otherFinancing?.company ?? ""}
-                onChange={(v) => setPic({ otherFinancing: { ...pic.otherFinancing, hasOther: pic.otherFinancing?.hasOther ?? null, company: v } })}
-              />
-            </div>
-            <div className="mt-3 grid gap-3 sm:grid-cols-2">
-              <Field
-                label="When?"
-                value={pic.otherFinancing?.when ?? ""}
-                onChange={(v) => setPic({ otherFinancing: { ...pic.otherFinancing, hasOther: pic.otherFinancing?.hasOther ?? null, when: v } })}
-              />
-              <Field
-                label="Start / End :"
-                value={pic.otherFinancing?.startEnd ?? ""}
-                onChange={(v) => setPic({ otherFinancing: { ...pic.otherFinancing, hasOther: pic.otherFinancing?.hasOther ?? null, startEnd: v } })}
-              />
-            </div>
-            <div className="mt-3 grid gap-3 sm:grid-cols-2">
-              <MoneyField
-                label="Loan Amount :"
-                value={pic.otherFinancing?.loanAmount}
-                onChange={(v) => setPic({ otherFinancing: { ...pic.otherFinancing, hasOther: pic.otherFinancing?.hasOther ?? null, loanAmount: v } })}
-              />
-              <MoneyField
-                label="Monthly:"
-                value={pic.otherFinancing?.monthly}
-                onChange={(v) => setPic({ otherFinancing: { ...pic.otherFinancing, hasOther: pic.otherFinancing?.hasOther ?? null, monthly: v } })}
-              />
+            {/* Repeatable — a borrower may disclose more than one other
+                financing/bank loan from the last 4 years (same add/remove
+                pattern as Siblings/References). */}
+            <div className="mt-3 space-y-4">
+              {financingEntries.map((entry, i) => (
+                <div key={i} className="rounded-[var(--r-md)] border border-line-soft p-3">
+                  <div className="mb-2 flex items-center justify-between">
+                    <span className="text-xs font-semibold uppercase tracking-wide text-ink-400">
+                      Loan {i + 1}
+                    </span>
+                    <Button
+                      type="button"
+                      variant="danger-soft"
+                      size="sm"
+                      aria-label={`Remove loan ${i + 1}`}
+                      onClick={() => removeFinancingEntry(i)}
+                    >
+                      Remove
+                    </Button>
+                  </div>
+                  <Field
+                    label="What company ? Was it FINANCING / BANK ?"
+                    value={entry.company ?? ""}
+                    onChange={(v) => updateFinancingEntry(i, { company: v })}
+                  />
+                  <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                    <Field
+                      label="When?"
+                      value={entry.when ?? ""}
+                      onChange={(v) => updateFinancingEntry(i, { when: v })}
+                    />
+                    <Field
+                      label="Start / End :"
+                      value={entry.startEnd ?? ""}
+                      onChange={(v) => updateFinancingEntry(i, { startEnd: v })}
+                    />
+                  </div>
+                  <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                    <MoneyField
+                      label="Loan Amount :"
+                      value={entry.loanAmount}
+                      onChange={(v) => updateFinancingEntry(i, { loanAmount: v })}
+                    />
+                    <MoneyField
+                      label="Monthly:"
+                      value={entry.monthly}
+                      onChange={(v) => updateFinancingEntry(i, { monthly: v })}
+                    />
+                  </div>
+                </div>
+              ))}
+              <Button type="button" variant="secondary" size="sm" onClick={addFinancingEntry}>
+                Add other financing / bank loan
+              </Button>
             </div>
           </div>
 
@@ -733,17 +909,27 @@ export function CiReferencesFormModal({
             <div>
               <Label>Housing Loan?</Label>
               <YesNo name="pic-housing-loan" value={pic.housingLoan?.has} onChange={(v) => setPic({ housingLoan: { ...pic.housingLoan, has: v } })} />
-              <div className="mt-3 grid gap-3">
-                <MoneyField label="Loan Amount :" value={pic.housingLoan?.loanAmount} onChange={(v) => setPic({ housingLoan: { ...pic.housingLoan, has: pic.housingLoan?.has ?? null, loanAmount: v } })} />
-                <MoneyField label="Monthly Amort:" value={pic.housingLoan?.monthlyAmort} onChange={(v) => setPic({ housingLoan: { ...pic.housingLoan, has: pic.housingLoan?.has ?? null, monthlyAmort: v } })} />
+              <div className="mt-3">
+                <LoanEntryList
+                  label="Housing loan"
+                  entries={housingLoanHandlers.entries}
+                  onAdd={housingLoanHandlers.add}
+                  onUpdate={housingLoanHandlers.update}
+                  onRemove={housingLoanHandlers.remove}
+                />
               </div>
             </div>
             <div>
               <Label>Car Loan?</Label>
               <YesNo name="pic-car-loan" value={pic.carLoan?.has} onChange={(v) => setPic({ carLoan: { ...pic.carLoan, has: v } })} />
-              <div className="mt-3 grid gap-3">
-                <MoneyField label="Loan Amount :" value={pic.carLoan?.loanAmount} onChange={(v) => setPic({ carLoan: { ...pic.carLoan, has: pic.carLoan?.has ?? null, loanAmount: v } })} />
-                <MoneyField label="Monthly Amort:" value={pic.carLoan?.monthlyAmort} onChange={(v) => setPic({ carLoan: { ...pic.carLoan, has: pic.carLoan?.has ?? null, monthlyAmort: v } })} />
+              <div className="mt-3">
+                <LoanEntryList
+                  label="Car loan"
+                  entries={carLoanHandlers.entries}
+                  onAdd={carLoanHandlers.add}
+                  onUpdate={carLoanHandlers.update}
+                  onRemove={carLoanHandlers.remove}
+                />
               </div>
             </div>
           </div>

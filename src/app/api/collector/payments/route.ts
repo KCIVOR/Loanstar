@@ -28,6 +28,7 @@ const PAYMENT_SELECT = `
   reviewed_at,
   storage_path,
   file_name,
+  notes,
   uploaded_by,
   masterlist (
     borrower_name,

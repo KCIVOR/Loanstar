@@ -22,6 +22,7 @@ const schema = z.object({
   storagePath: z.string().optional(),
   fileName: z.string().optional(),
   mimeType: z.string().optional(),
+  notes: z.string().trim().max(1000).optional(),
 });
 
 async function getBorrowerMasterlist(userId: string, applicationId: string) {
@@ -115,15 +116,31 @@ export async function GET(_request: Request, ctx: { params: Promise<{ id: string
 
     const { data: postings } = await supabase
       .from("postings")
-      .select("id, amortization_schedule_id, amount, payments ( payment_date, reference_no )")
+      .select(
+        "id, amortization_schedule_id, amount, payments ( payment_date, reference_no, channel, status )",
+      )
       .eq("masterlist_id", ctxData.masterlistId)
-      .not("amortization_schedule_id", "is", null)
       .order("posted_at", { ascending: true });
+
+    // Borrowers may read their own release file and its LRA-encoded checks.
+    const { data: releaseFile } = await supabase
+      .from("release_files")
+      .select("id")
+      .eq("loan_application_id", id)
+      .maybeSingle();
+    const { data: pdcChecks } = releaseFile
+      ? await supabase
+          .from("pdc_checks")
+          .select("sort_order, check_number")
+          .eq("release_file_id", releaseFile.id as string)
+          .order("sort_order", { ascending: true })
+      : { data: [] };
 
     return jsonOk({
       loan: masterlist,
       payments: payments ?? [],
       postings: postings ?? [],
+      pdcChecks: pdcChecks ?? [],
     });
   } catch (error) {
     return handleApiError(error);
@@ -188,6 +205,7 @@ export async function POST(request: Request, ctx: { params: Promise<{ id: string
         channel: body.channel,
         storage_path: body.storagePath ?? null,
         file_name: body.fileName ?? null,
+        notes: body.notes || null,
         status: "pending_verification",
         uploaded_by: user.id,
       })

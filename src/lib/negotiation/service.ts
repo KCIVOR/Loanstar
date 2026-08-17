@@ -18,6 +18,141 @@ export type NegotiationRecord = {
   notes: string | null;
 };
 
+export type NegotiationMessage = {
+  id: string;
+  loanApplicationId: string;
+  authorId: string;
+  authorRole: "borrower" | "committee";
+  kind: "message" | "offer" | "accept";
+  body: string | null;
+  amount: number | null;
+  createdAt: string;
+};
+
+export function mapNegotiationMessageRow(
+  row: Record<string, unknown>,
+): NegotiationMessage {
+  return {
+    id: row.id as string,
+    loanApplicationId: row.loan_application_id as string,
+    authorId: row.author_id as string,
+    authorRole: row.author_role as "borrower" | "committee",
+    kind: row.kind as "message" | "offer",
+    body: (row.body as string) ?? null,
+    amount: row.amount != null ? Number(row.amount) : null,
+    createdAt: row.created_at as string,
+  };
+}
+
+export async function listNegotiationMessages(
+  supabase: SupabaseClient,
+  applicationId: string,
+): Promise<NegotiationMessage[]> {
+  const { data, error } = await supabase
+    .from("negotiation_messages")
+    .select("*")
+    .eq("loan_application_id", applicationId)
+    .order("created_at", { ascending: true });
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  return (data ?? []).map(mapNegotiationMessageRow);
+}
+
+/** `profiles` RLS only allows reading your own row (or auth_admin), so a
+ * viewer's session client can't resolve the OTHER party's display name —
+ * same gap fixed for CIG's CSA-intake summary. Batch-resolve via the service
+ * client instead. */
+export async function withAuthorNames(
+  messages: NegotiationMessage[],
+): Promise<(NegotiationMessage & { authorName: string | null })[]> {
+  if (messages.length === 0) return [];
+
+  const ids = [...new Set(messages.map((m) => m.authorId))];
+  const service = createServiceClient();
+  const { data: profiles } = await service
+    .from("profiles")
+    .select("id, full_name")
+    .in("id", ids);
+
+  const nameById = new Map(
+    (profiles ?? []).map((p) => [p.id as string, (p.full_name as string | null) ?? null]),
+  );
+
+  return messages.map((m) => ({ ...m, authorName: nameById.get(m.authorId) ?? null }));
+}
+
+export async function postNegotiationMessage(
+  supabase: SupabaseClient,
+  applicationId: string,
+  authorId: string,
+  authorRole: "borrower" | "committee",
+  body: string,
+): Promise<NegotiationMessage> {
+  const { data, error } = await supabase
+    .from("negotiation_messages")
+    .insert({
+      loan_application_id: applicationId,
+      author_id: authorId,
+      author_role: authorRole,
+      kind: "message",
+      body,
+    })
+    .select("*")
+    .single();
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  return mapNegotiationMessageRow(data);
+}
+
+/** System-logged entry alongside an amount-bearing negotiation event
+ * (counter-offer, override, or acceptance), with an optional note explaining
+ * it — same feed as postNegotiationMessage so the log reads as one
+ * continuous conversation. "offer" = proposing a new number; "accept" =
+ * agreeing to a number without changing it (borrower signing disclosed
+ * terms, or Committee accepting the borrower's counter-offer). */
+async function logOfferMessage(
+  supabase: SupabaseClient,
+  applicationId: string,
+  authorId: string,
+  authorRole: "borrower" | "committee",
+  amount: number,
+  body?: string,
+  kind: "offer" | "accept" = "offer",
+): Promise<void> {
+  const { error } = await supabase.from("negotiation_messages").insert({
+    loan_application_id: applicationId,
+    author_id: authorId,
+    author_role: authorRole,
+    kind,
+    amount,
+    body: body?.trim() ? body.trim() : null,
+  });
+
+  if (error) {
+    throw new Error(error.message);
+  }
+}
+
+/** Public entry point for logging a plain acceptance (no amount change) —
+ * used by the borrower's own "sign disclosed terms" action, called directly
+ * from the API route rather than through recordCounterOffer/override. */
+export async function logAcceptance(
+  supabase: SupabaseClient,
+  applicationId: string,
+  authorId: string,
+  authorRole: "borrower" | "committee",
+  amount: number,
+  body?: string,
+): Promise<void> {
+  await logOfferMessage(supabase, applicationId, authorId, authorRole, amount, body, "accept");
+}
+
 export function mapNegotiationRow(row: Record<string, unknown>): NegotiationRecord {
   return {
     id: row.id as string,
@@ -121,6 +256,7 @@ export async function recordCounterOffer(
   amount: number,
   counterBy: "borrower" | "csa",
   actorId: string,
+  message?: string,
 ) {
   const negotiation = await getNegotiation(supabase, applicationId);
   if (!negotiation) {
@@ -158,6 +294,10 @@ export async function recordCounterOffer(
     actorId,
     note: `Counter-offer: ${amount.toFixed(2)} by ${counterBy}`,
   });
+
+  if (counterBy === "borrower") {
+    await logOfferMessage(supabase, applicationId, actorId, "borrower", amount, message);
+  }
 
   return getNegotiation(supabase, applicationId);
 }
@@ -259,6 +399,7 @@ export async function committeeOverrideAmount(
   applicationId: string,
   actorId: string,
   input: OverrideInput,
+  message?: string,
 ) {
   const saved = await persistOverrideComputation(supabase, applicationId, actorId, input);
 
@@ -278,6 +419,15 @@ export async function committeeOverrideAmount(
     actorId,
     note: `Committee override — new amount ${saved.computation.netReleased.toFixed(2)}`,
   });
+
+  await logOfferMessage(
+    supabase,
+    applicationId,
+    actorId,
+    "committee",
+    saved.computation.netReleased,
+    message,
+  );
 
   return saved;
 }
@@ -302,6 +452,7 @@ export async function queueForLra(
   applicationId: string,
   computationId: string,
   actorId: string,
+  note = "Borrower signed computation — queued for LRA",
 ) {
   // Privileged workflow side-effects: borrowers can sign via borrower_portal,
   // but release_queue upsert + status → lra_pending are blocked by RLS for
@@ -338,8 +489,80 @@ export async function queueForLra(
 
   await appendStatusHistory(admin, applicationId, "lra_pending", {
     actorId,
-    note: "Borrower signed computation — queued for LRA",
+    note,
   });
+}
+
+/**
+ * Committee accepts the borrower's counter-offer as-is — Committee is the
+ * final approver here, not the borrower: no separate borrower e-signature is
+ * collected for this recalculated computation. The acceptance itself is
+ * logged (negotiation_messages "offer" entry + status_history note) so
+ * there's still an audit trail of who accepted what and when, even though
+ * there's no signatureHash the way a borrower's own sign produces.
+ * Reuses the borrower's own inputMode/terms from the last active computation
+ * — the borrower only ever proposes a target net-release number, not a full
+ * recalculated breakdown, so Committee doesn't need to re-supply anything.
+ */
+export async function committeeAcceptCounterOffer(
+  supabase: SupabaseClient,
+  applicationId: string,
+  actorId: string,
+) {
+  const negotiation = await getNegotiation(supabase, applicationId);
+  if (!negotiation || negotiation.lastCounterAmount == null) {
+    throw new Error("No borrower counter-offer to accept");
+  }
+
+  const { data: existingComp, error: existingCompError } = await supabase
+    .from("computations")
+    .select("input_mode, terms, loan_type_id")
+    .eq("loan_application_id", applicationId)
+    .eq("is_active", true)
+    .maybeSingle();
+
+  if (existingCompError || !existingComp || !existingComp.loan_type_id) {
+    throw new Error("No active computation to base acceptance on");
+  }
+
+  const saved = await persistOverrideComputation(supabase, applicationId, actorId, {
+    amount: negotiation.lastCounterAmount,
+    inputMode: existingComp.input_mode as InputMode,
+    terms: Number(existingComp.terms),
+    loanTypeId: existingComp.loan_type_id as string,
+  });
+
+  const { error: negotiationUpdateError } = await supabase
+    .from("negotiations")
+    .update({
+      current_amount: saved.computation.netReleased,
+      active_computation_id: saved.computation.id,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("loan_application_id", applicationId);
+
+  if (negotiationUpdateError) {
+    throw new Error(negotiationUpdateError.message);
+  }
+
+  await logAcceptance(
+    supabase,
+    applicationId,
+    actorId,
+    "committee",
+    saved.computation.netReleased,
+    "Accepted the borrower's counter-offer — proceeding without a separate borrower signature.",
+  );
+
+  await queueForLra(
+    supabase,
+    applicationId,
+    saved.computation.id,
+    actorId,
+    `Committee accepted borrower's counter-offer (₱${saved.computation.netReleased.toFixed(2)}) — queued for LRA, no separate borrower signature`,
+  );
+
+  return saved;
 }
 
 export async function completeRevision(

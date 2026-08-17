@@ -4,6 +4,7 @@ export const DCR_LIST_STATUS_FILTERS = [
   "all",
   "submitted",
   "reconciled",
+  "rejected",
 ] as const;
 export type DcrListStatusFilter = (typeof DCR_LIST_STATUS_FILTERS)[number];
 
@@ -16,7 +17,8 @@ export function clampDcrListPageSize(n: number): number {
 
 /** Map a raw status query/chip value to a fixed filter, else `"all"`. */
 export function dcrListStatusFilterSpec(raw: string): DcrListStatusFilter {
-  if (raw === "submitted" || raw === "reconciled") return raw;
+  if (raw === "submitted" || raw === "reconciled" || raw === "rejected")
+    return raw;
   return "all";
 }
 
@@ -28,10 +30,7 @@ export function passesDcrListStatusFilter(
   return status === spec;
 }
 
-/**
- * Rows that belong on Recent DCRs (not the builder).
- * `rejected` is unused in practice but still listed if present.
- */
+/** Rows that belong on Recent DCRs (not the builder). */
 export function isDcrListRow(status: string): boolean {
   return status !== "draft";
 }
@@ -61,18 +60,20 @@ export function sortDcrsByDate<
 
 /**
  * KPIs over the non-draft Recent-DCRs set (drafts belong to the builder).
- * Counts `submitted` and `reconciled` only — `rejected` is not a KPI.
- * Passing the full fetch including drafts is safe: drafts do not increment either count.
+ * Passing the full fetch including drafts is safe: drafts do not increment any count.
  */
 export function computeDcrListKpis(rows: { status: string }[]): {
   submitted: number;
   reconciled: number;
+  rejected: number;
 } {
   let submitted = 0;
   let reconciled = 0;
+  let rejected = 0;
   for (const row of rows) {
     if (row.status === "submitted") submitted += 1;
     else if (row.status === "reconciled") reconciled += 1;
+    else if (row.status === "rejected") rejected += 1;
   }
-  return { submitted, reconciled };
+  return { submitted, reconciled, rejected };
 }

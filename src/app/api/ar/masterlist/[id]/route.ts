@@ -29,6 +29,30 @@ const paidOffSchema = z.object({
   action: z.literal("mark_paid_off"),
 });
 
+async function fetchPdcChecks(scope: {
+  releaseFileId: string | null;
+  loanApplicationId: string | null;
+}) {
+  const admin = createServiceClient();
+  let releaseFileId = scope.releaseFileId;
+  if (!releaseFileId && scope.loanApplicationId) {
+    const { data: releaseFile } = await admin
+      .from("release_files")
+      .select("id")
+      .eq("loan_application_id", scope.loanApplicationId)
+      .maybeSingle();
+    releaseFileId = (releaseFile?.id as string | null) ?? null;
+  }
+  if (!releaseFileId) return [];
+
+  const { data } = await admin
+    .from("pdc_checks")
+    .select("sort_order, check_number")
+    .eq("release_file_id", releaseFileId)
+    .order("sort_order", { ascending: true });
+  return data ?? [];
+}
+
 export async function GET(_request: Request, { params }: RouteParams) {
   try {
     await requireModulePermission("accounting_ar", "view");
@@ -68,10 +92,18 @@ export async function GET(_request: Request, { params }: RouteParams) {
 
     const { data: postings } = await supabase
       .from("postings")
-      .select("id, amortization_schedule_id, amount, payments ( payment_date, reference_no )")
+      .select(
+        "id, amortization_schedule_id, amount, payments ( payment_date, reference_no, channel, status )",
+      )
       .eq("masterlist_id", id)
-      .not("amortization_schedule_id", "is", null)
       .order("posted_at", { ascending: true });
+
+    // AR has no RLS grant on pdc_checks, so scope a service-role read to this
+    // account's own release file to surface LRA-encoded check numbers.
+    const pdcChecks = await fetchPdcChecks({
+      releaseFileId: (data.release_file_id as string | null) ?? null,
+      loanApplicationId: (data.loan_application_id as string | null) ?? null,
+    });
 
     const roundingWriteoffThreshold =
       await getRoundingWriteoffThreshold(supabase);
@@ -146,6 +178,7 @@ export async function GET(_request: Request, { params }: RouteParams) {
       record: { ...data, application_status: applicationStatus },
       payments: payments ?? [],
       postings: postings ?? [],
+      pdcChecks,
       roundingWriteoffThreshold,
       roundingWriteoffs,
     });

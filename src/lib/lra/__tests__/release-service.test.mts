@@ -11,7 +11,7 @@ type StubOpts = {
 
 function makeCheckRow(amount: number, index = 0) {
   return {
-    checkNumber: index === 0 ? "1001" : null,
+    checkNumber: String(1001 + index),
     amount,
     checkDate: "2026-08-12",
     bankName: "Test Bank",
@@ -181,6 +181,65 @@ describe("savePdcChecks hard lock", () => {
     );
 
     assert.equal(stub.getInsertedChecks(), null);
+  });
+
+  it("throws when any check number is blank", async () => {
+    const stub = makeSavePdcStub({ terms: 3, monthlyAmortization: 5000 });
+    const checks = makeChecks(3, 5000);
+    checks[1] = { ...checks[1], checkNumber: "   " };
+
+    await assert.rejects(
+      () =>
+        savePdcChecks(stub.supabase, "rf-1", checks, undefined, "actor-1"),
+      /Check number is required for every PDC/,
+    );
+
+    assert.equal(stub.getInsertedChecks(), null);
+  });
+
+  it("throws when any bank or branch is blank", async () => {
+    const stub = makeSavePdcStub({ terms: 3, monthlyAmortization: 5000 });
+    const checks = makeChecks(3, 5000);
+    checks[1] = { ...checks[1], bankName: "   " };
+
+    await assert.rejects(
+      () =>
+        savePdcChecks(stub.supabase, "rf-1", checks, undefined, "actor-1"),
+      /Bank\/Branch is required for every PDC/,
+    );
+
+    assert.equal(stub.getInsertedChecks(), null);
+  });
+
+  it("trims check numbers and bank branches before inserting", async () => {
+    const stub = makeSavePdcStub({ terms: 1, monthlyAmortization: 5000 });
+    const checks = [
+      {
+        ...makeCheckRow(5000),
+        checkNumber: "  1001  ",
+        bankName: "  Test Bank / Main  ",
+      },
+    ];
+
+    await savePdcChecks(
+      stub.supabase,
+      "rf-1",
+      checks,
+      undefined,
+      "actor-1",
+    );
+
+    assert.deepEqual(stub.getInsertedChecks(), [
+      {
+        release_file_id: "rf-1",
+        check_number: "1001",
+        amount: 5000,
+        check_date: "2026-08-12",
+        bank_name: "Test Bank / Main",
+        ref_account: null,
+        sort_order: 0,
+      },
+    ]);
   });
 
   it("succeeds and writes pdc_checks when count and amounts match", async () => {

@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 
 import { RecordPaymentModal } from "@/components/collector/RecordPaymentModal";
+import { AccountLedger } from "@/components/ledger/AccountLedger";
 import {
   Alert,
   Badge,
@@ -20,6 +21,11 @@ import {
   masterlistEmploymentLabels,
   masterlistSecondaryIdentity,
 } from "@/lib/ar/masterlist-display";
+import {
+  buildAccountLedgerRows,
+  checkNumbersByInstallmentNo,
+  type LedgerPdcCheck,
+} from "@/lib/ledger/build-account-ledger-rows";
 import {
   severityLabel,
   severityVariant,
@@ -70,6 +76,7 @@ type PaymentRow = {
   amount: number;
   status: string;
   channel: string;
+  notes: string | null;
   created_at: string;
 };
 
@@ -86,16 +93,6 @@ function formatDate(value: string) {
     month: "short",
     day: "numeric",
   });
-}
-
-function scheduleStatusVariant(
-  status: string,
-): "success" | "warning" | "danger" | "neutral" {
-  const s = status.toLowerCase();
-  if (s === "paid") return "success";
-  if (s === "overdue") return "danger";
-  if (s === "partial") return "warning";
-  return "neutral";
 }
 
 function paymentStatusVariant(
@@ -115,6 +112,7 @@ export default function RemedialAccountPage() {
   const [account, setAccount] = useState<Account | null>(null);
   const [schedules, setSchedules] = useState<ScheduleRow[]>([]);
   const [payments, setPayments] = useState<PaymentRow[]>([]);
+  const [pdcChecks, setPdcChecks] = useState<LedgerPdcCheck[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [recordPaymentOpen, setRecordPaymentOpen] = useState(false);
@@ -129,10 +127,12 @@ export default function RemedialAccountPage() {
         account: Account;
         schedules: ScheduleRow[];
         payments: PaymentRow[];
+        pdcChecks?: LedgerPdcCheck[];
       };
       setAccount(data.account);
       setSchedules(data.schedules ?? []);
       setPayments(data.payments ?? []);
+      setPdcChecks(data.pdcChecks ?? []);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load");
     } finally {
@@ -154,6 +154,32 @@ export default function RemedialAccountPage() {
   const secondary = masterlistSecondaryIdentity({
     manning_agency: account.manningAgency,
     vessel_name: account.vesselName,
+  });
+  const checkNoByInstallment = checkNumbersByInstallmentNo(pdcChecks);
+  const ledgerRows = buildAccountLedgerRows({
+    openingDebit:
+      account.totalLoan > 0
+        ? account.totalLoan
+        : schedules.reduce((sum, row) => sum + Number(row.amountDue ?? 0), 0),
+    schedules: schedules.map((row) => ({
+      id: row.id,
+      dueDate: row.dueDate,
+      target: Number(row.amountDue ?? 0),
+      penalty: Number(row.penaltyAmount ?? 0),
+      installmentNo: row.installmentNo,
+      checkNo: checkNoByInstallment.get(row.installmentNo) ?? null,
+      status: row.status,
+    })),
+    // No postings under remedial RLS — credits are payment rows; Due/Target/Penalty stay blank until schedule join is available.
+    payments: payments.map((pay) => ({
+      id: pay.id,
+      paymentDate: pay.payment_date,
+      amount: Number(pay.amount ?? 0),
+      referenceNo: pay.reference_no,
+      channel: pay.channel,
+      status: pay.status,
+      scheduleId: null,
+    })),
   });
 
   return (
@@ -315,51 +341,22 @@ export default function RemedialAccountPage() {
 
       <section className="mb-8">
         <h2 className="mb-3 font-display text-lg font-semibold text-navy-900">
-          Amortization
+          Account ledger
         </h2>
-        {schedules.length === 0 ? (
+        <p className="mb-3 text-sm text-ink-500">
+          Opening debit from total loan, then one row per installment. Posted
+          payments appear as credits; they are listed separately because
+          postings are not readable on this desk, so they are not matched to an
+          installment row.
+        </p>
+        {schedules.length === 0 && payments.length === 0 ? (
           <EmptyState
-            title="No schedule"
-            description="Amortization rows will appear when generated."
+            title="No ledger activity"
+            description="Amortization and payments will appear when generated."
             showMark={false}
           />
         ) : (
-          <div className="tbl-wrap">
-            <Table>
-              <thead>
-                <tr>
-                  <Th>#</Th>
-                  <Th>Due</Th>
-                  <Th num>Amount</Th>
-                  <Th num>Paid</Th>
-                  <Th num>Penalty</Th>
-                  <Th>Status</Th>
-                </tr>
-              </thead>
-              <tbody>
-                {schedules.map((row) => (
-                  <tr key={row.id}>
-                    <Td className="mono">{row.installmentNo}</Td>
-                    <Td className="mono">{formatDate(row.dueDate)}</Td>
-                    <Td num className="mono">
-                      {formatMoney(row.amountDue)}
-                    </Td>
-                    <Td num className="mono">
-                      {formatMoney(row.amountPaid)}
-                    </Td>
-                    <Td num className="mono">
-                      {formatMoney(row.penaltyAmount)}
-                    </Td>
-                    <Td>
-                      <Badge variant={scheduleStatusVariant(row.status)}>
-                        {row.status}
-                      </Badge>
-                    </Td>
-                  </tr>
-                ))}
-              </tbody>
-            </Table>
-          </div>
+          <AccountLedger rows={ledgerRows} />
         )}
       </section>
 
@@ -393,7 +390,14 @@ export default function RemedialAccountPage() {
               <tbody>
                 {payments.map((pay) => (
                   <tr key={pay.id}>
-                    <Td className="mono">{pay.reference_no ?? "—"}</Td>
+                    <Td className="mono">
+                      {pay.reference_no ?? "—"}
+                      {pay.notes ? (
+                        <div className="mt-1 whitespace-normal text-xs font-normal text-ink-500">
+                          {pay.notes}
+                        </div>
+                      ) : null}
+                    </Td>
                     <Td className="mono">{formatDate(pay.payment_date)}</Td>
                     <Td>{pay.channel.replaceAll("_", " ")}</Td>
                     <Td num className="mono text-teal-600">

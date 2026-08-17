@@ -34,18 +34,23 @@ export type TatStep = {
   sampleCount: number;
 };
 
-const TAT_PAIRS: Array<{
+/** Stage-to-stage transitions tracked for TAT. `targetDays` is a business
+ * SLA threshold used by the reports dashboard's breach counting — it is a
+ * threshold choice, not derived data, and can be tuned without touching the
+ * transition pairs themselves. */
+export const TAT_PAIRS: Array<{
   from: string;
   to: string;
   label: string;
+  targetDays: number;
 }> = [
-  { from: "submitted", to: "for_verification", label: "Intake → CIG" },
-  { from: "for_verification", to: "for_approval", label: "CIG → Committee" },
-  { from: "for_approval", to: "approved", label: "Committee decision" },
-  { from: "approved", to: "lra_pending", label: "Approval → LRA queue" },
-  { from: "lra_pending", to: "closed", label: "LRA processing" },
-  { from: "closed", to: "loan_active", label: "Close → Active loan" },
-  { from: "loan_active", to: "paid_off", label: "Active → Paid off" },
+  { from: "submitted", to: "for_verification", label: "Intake → CIG", targetDays: 2 },
+  { from: "for_verification", to: "for_approval", label: "CIG → Committee", targetDays: 5 },
+  { from: "for_approval", to: "approved", label: "Committee decision", targetDays: 3 },
+  { from: "approved", to: "lra_pending", label: "Approval → LRA queue", targetDays: 3 },
+  { from: "lra_pending", to: "closed", label: "LRA processing", targetDays: 5 },
+  { from: "closed", to: "loan_active", label: "Close → Active loan", targetDays: 2 },
+  { from: "loan_active", to: "paid_off", label: "Active → Paid off", targetDays: 9999 },
 ];
 
 function daysBetween(a: string, b: string): number {
@@ -83,6 +88,40 @@ export function computeTatFromHistories(
       averageDays,
       sampleCount: durations.length,
     };
+  });
+}
+
+export type SlaBreachStep = {
+  label: string;
+  targetDays: number;
+  breachCount: number;
+  sampleCount: number;
+};
+
+/** Per-transition SLA breach counts, using the same TAT_PAIRS thresholds
+ * (`daysBetween` already treats the "Active → Paid off" 9999-day target as
+ * unreachable, so that pair never contributes a breach). */
+export function computeSlaBreachesFromHistories(
+  histories: Array<Array<{ status: string; at: string }>>,
+): SlaBreachStep[] {
+  return TAT_PAIRS.map((pair) => {
+    let breachCount = 0;
+    let sampleCount = 0;
+
+    for (const history of histories) {
+      const fromEntry = history.find((e) => e.status === pair.from);
+      const toEntry = history.find(
+        (e) => e.status === pair.to && (!fromEntry || e.at >= fromEntry.at),
+      );
+      if (fromEntry && toEntry) {
+        sampleCount += 1;
+        if (daysBetween(fromEntry.at, toEntry.at) > pair.targetDays) {
+          breachCount += 1;
+        }
+      }
+    }
+
+    return { label: pair.label, targetDays: pair.targetDays, breachCount, sampleCount };
   });
 }
 

@@ -18,6 +18,7 @@ const overrideSchema = z.object({
   terms: z.number().int().positive(),
   addonMonths: z.number().int().min(0).optional(),
   loanTypeId: z.string().uuid().optional(),
+  message: z.string().trim().max(2000).optional(),
 });
 
 export async function POST(request: Request, { params }: RouteParams) {
@@ -46,7 +47,7 @@ export async function POST(request: Request, { params }: RouteParams) {
     const isPreDecision = app.status === "for_approval";
     const saved = isPreDecision
       ? await committeeAdjustPreDecision(supabase, id, user.id, body)
-      : await committeeOverrideAmount(supabase, id, user.id, body);
+      : await committeeOverrideAmount(supabase, id, user.id, body, body.message);
 
     await writeAuditEvent({
       actorId: user.id,

@@ -23,6 +23,8 @@ import {
 import { ComputationPanel } from "@/components/csa/ComputationPanel";
 import { NegotiationPanel } from "@/components/csa/NegotiationPanel";
 import { ApplicantProfileFields } from "@/components/borrowers/ApplicantProfileFields";
+import { AutofillOverlay } from "@/components/dev/AutofillOverlay";
+import { fakeBorrowerProfile } from "@/lib/dev/fake-data";
 import { DocumentChecklist } from "@/components/DocumentChecklist";
 import {
   formatStatusLabel,
@@ -873,7 +875,7 @@ export default function CsaApplicationPage() {
               variant="secondary"
               onClick={() => setShowApplicationForm(true)}
             >
-              Open application form
+              Edit application form
             </Button>
           </Card>
         ) : null}
@@ -1357,6 +1359,24 @@ export default function CsaApplicationPage() {
           onUpdated={() => void load({ silent: true })}
         />
       </div>
+      {data.borrower ? (
+        <AutofillOverlay
+          actions={[
+            {
+              label: "Fill Application Form",
+              onClick: () =>
+                setData({
+                  ...data,
+                  borrower: fakeBorrowerProfile(
+                    data.application.segment ?? "seafarer",
+                    data.application.entityType ?? null,
+                    data.borrower!,
+                  ),
+                }),
+            },
+          ]}
+        />
+      ) : null}
     </div>
   );
 }

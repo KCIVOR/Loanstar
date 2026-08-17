@@ -172,7 +172,7 @@ export default function CollectorOverviewPage() {
     <div>
       <PageHeader
         title="Collector overview"
-        description="Your daily desk — accounts, proofs, and DCR at a glance."
+        description="Your daily desk — accounts, proofs, and DCRR at a glance."
         actions={
           <div className="flex gap-2">
             <Button
@@ -183,7 +183,7 @@ export default function CollectorOverviewPage() {
               Send reminders
             </Button>
             <Link href="/collector/dcr" className="btn btn-secondary">
-              Open DCR
+              Open DCRR
             </Link>
           </div>
         }
@@ -237,7 +237,7 @@ export default function CollectorOverviewPage() {
               : null}
             {draft ? (
               <>
-                Open DCR draft ·{" "}
+                Open DCRR draft ·{" "}
                 <span className="mono font-semibold">
                   {draftItems.length}
                 </span>{" "}
@@ -270,7 +270,7 @@ export default function CollectorOverviewPage() {
         <CollectorKpi
           tone="teal"
           icon={IconCash}
-          label="DCR draft"
+          label="DCRR draft"
           value={
             draft
               ? `${draftItems.length} · ₱${formatMoney(draftTotal)}`
@@ -294,7 +294,7 @@ export default function CollectorOverviewPage() {
             },
             {
               href: "/collector/dcr",
-              title: "DCR builder",
+              title: "DCRR builder",
               body: "Batch confirmed payments for AR.",
             },
           ] as const

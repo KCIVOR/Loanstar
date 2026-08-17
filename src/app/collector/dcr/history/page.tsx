@@ -48,6 +48,7 @@ type DcrRow = {
   status: string;
   created_at: string;
   submitted_at: string | null;
+  notes: string | null;
   dcr_items: DcrItem[] | null;
 };
 
@@ -57,6 +58,7 @@ const STATUS_CHIPS: Array<{ id: DcrListStatusFilter; label: string }> = [
   { id: "all", label: "All" },
   { id: "submitted", label: "Submitted" },
   { id: "reconciled", label: "Reconciled" },
+  { id: "rejected", label: "Rejected" },
 ];
 
 const IconSend = (
@@ -69,6 +71,13 @@ const IconSend = (
 const IconCheck = (
   <svg {...collectorIconProps}>
     <path d="M20 6 9 17l-5-5" />
+  </svg>
+);
+
+const IconX = (
+  <svg {...collectorIconProps}>
+    <path d="M18 6 6 18" />
+    <path d="m6 6 12 12" />
   </svg>
 );
 
@@ -100,7 +109,7 @@ export default function CollectorDcrHistoryPage() {
     setLoading(true);
     try {
       const res = await fetch("/api/collector/dcr?limit=100");
-      if (!res.ok) throw new Error("Failed to load DCR history");
+      if (!res.ok) throw new Error("Failed to load DCRR history");
       const data = (await res.json()) as { dcrs: DcrRow[] };
       setDcrs(data.dcrs ?? []);
       setError(null);
@@ -158,11 +167,11 @@ export default function CollectorDcrHistoryPage() {
   return (
     <div>
       <PageHeader
-        title="DCR history"
+        title="DCRR history"
         description="Submitted and reconciled daily collection reports."
         actions={
           <Link href="/collector/dcr" className="btn btn-secondary">
-            Back to DCR builder
+            Back to DCRR builder
           </Link>
         }
       />
@@ -192,6 +201,12 @@ export default function CollectorDcrHistoryPage() {
               icon={IconCheck}
               label="Reconciled"
               value={kpi.reconciled}
+            />
+            <CollectorKpi
+              tone="danger"
+              icon={IconX}
+              label="Rejected"
+              value={kpi.rejected}
             />
           </>
         )}
@@ -292,17 +307,18 @@ export default function CollectorDcrHistoryPage() {
           <Table>
             <thead>
               <tr>
-                <Th>DCR</Th>
+                <Th>DCRR</Th>
                 <Th>Status</Th>
                 <Th num>Items</Th>
                 <Th num>Total</Th>
                 <Th>Created / Submitted</Th>
+                <Th>Reason</Th>
               </tr>
             </thead>
             <tbody>
               {Array.from({ length: 6 }, (_, i) => (
                 <tr key={i}>
-                  <Td colSpan={5}>
+                  <Td colSpan={6}>
                     <Skeleton variant="line" />
                   </Td>
                 </tr>
@@ -312,13 +328,13 @@ export default function CollectorDcrHistoryPage() {
         </div>
       ) : recentRows.length === 0 ? (
         <EmptyState
-          title="No past DCRs"
-          description="Submitted and reconciled DCRs will appear here after you submit a draft."
+          title="No past DCRRs"
+          description="Submitted and reconciled DCRRs will appear here after you submit a draft."
           showMark={false}
         />
       ) : totalCount === 0 ? (
         <EmptyState
-          title="No matching DCRs"
+          title="No matching DCRRs"
           description="Try a different status filter."
           showMark={false}
         />
@@ -349,6 +365,12 @@ export default function CollectorDcrHistoryPage() {
                     <span className="k">Date</span>
                     <span className="v mono">{formatDate(dcrListDate(dcr))}</span>
                   </div>
+                  {dcr.status === "rejected" && dcr.notes ? (
+                    <div className="row">
+                      <span className="k">Reason</span>
+                      <span className="v">{dcr.notes}</span>
+                    </div>
+                  ) : null}
                 </div>
               </div>
             );
@@ -359,7 +381,7 @@ export default function CollectorDcrHistoryPage() {
           <Table className={viewMode === "compact" ? "is-compact" : undefined}>
             <thead>
               <tr>
-                <Th>DCR</Th>
+                <Th>DCRR</Th>
                 <Th>Status</Th>
                 <Th num>Items</Th>
                 <Th num>Total</Th>
@@ -371,6 +393,7 @@ export default function CollectorDcrHistoryPage() {
                     </span>
                   ) : null}
                 </Th>
+                <Th>Reason</Th>
               </tr>
             </thead>
             <tbody>
@@ -393,6 +416,7 @@ export default function CollectorDcrHistoryPage() {
                       {formatMoney(dcrItemTotal(items))}
                     </Td>
                     <Td className="mono">{formatDate(dcrListDate(dcr))}</Td>
+                    <Td>{dcr.status === "rejected" ? dcr.notes ?? "—" : "—"}</Td>
                   </tr>
                 );
               })}

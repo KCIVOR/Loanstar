@@ -24,14 +24,31 @@ export const CHART = {
   grid: "#E7ECF3",       /* --line-soft */
 } as const;
 
-/** Ordered categorical palette for multi-series charts. */
+/**
+ * Ordered categorical palette for multi-series charts. Validated against the
+ * accessibility six-checks (lightness band, chroma floor, CVD separation,
+ * normal-vision floor, contrast vs surface) — all pass in this order.
+ * `navyMuted` (#B9CBE7) is deliberately excluded: it fails lightness, chroma,
+ * and contrast, and reads as gray. Do not reorder without re-validating —
+ * amber and green in particular must not sit adjacent (fails CVD separation).
+ */
 export const CATEGORY_COLORS = [
-  CHART.gold,
-  CHART.info,
-  CHART.success,
-  CHART.warning,
-  CHART.danger,
-  CHART.navyMuted,
+  CHART.gold, // #0D9488 teal — brand primary
+  CHART.warning, // #B96A00 amber
+  CHART.info, // #23539E blue
+  CHART.danger, // #C2362F red
+  "#7C3AED", // violet
+  CHART.success, // #178A50 green
+];
+
+/** Single-hue sequential ramp, light → dark, for ordered/severity scales
+ * (aging buckets, backlog age) — never assign these by categorical identity. */
+export const SEQUENTIAL_RAMP = [
+  "#CCFBF1",
+  "#5EEAD4",
+  "#2DD4BF",
+  "#0D9488",
+  "#0A7D71",
 ];
 
 export const TOOLTIP_STYLE = {

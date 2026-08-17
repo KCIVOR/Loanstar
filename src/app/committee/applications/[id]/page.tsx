@@ -21,6 +21,11 @@ import {
   Modal,
 } from "@/components/ui";
 import { DocumentChecklist } from "@/components/DocumentChecklist";
+import { ApplicantProfileFields } from "@/components/borrowers/ApplicantProfileFields";
+import {
+  NegotiationLog,
+  type NegotiationLogMessage,
+} from "@/components/negotiation/NegotiationLog";
 import {
   CiReferencesFormModal,
   ciFormCompletionBadge,
@@ -46,7 +51,8 @@ import {
   type FieldVisit,
   type SmeReloanVerification,
 } from "@/lib/cig/field-visit";
-import type { BusinessInfo } from "@/lib/borrowers/business-info";
+import type { BorrowerProfile } from "@/lib/borrowers/types";
+import { CSA_ONLY_INTAKE_SLUGS } from "@/lib/documents/csa-only-intake";
 
 type CommitteeDetail = {
   application: {
@@ -65,14 +71,7 @@ type CommitteeDetail = {
     canOverride: boolean;
     canAdjustPreDecision: boolean;
   };
-  borrower: {
-    id: string;
-    borrowerNo: string;
-    firstName: string;
-    lastName: string;
-    email: string;
-    businessInfo: BusinessInfo | null;
-  } | null;
+  borrower: BorrowerProfile | null;
   verification: {
     finding: "positive" | "negative" | null;
     findingNotes: string | null;
@@ -90,6 +89,11 @@ type CommitteeDetail = {
     cmContractStatus: string | null;
     cmFitToWork: boolean | null;
     cmNotes: string | null;
+    cmManagerName: string | null;
+    cmManagerPosition: string | null;
+    cmManagerContact: string | null;
+    cmManningAgencyName: string | null;
+    cmJoiningPort: string | null;
     picVerification: PicVerification | null;
     referenceVerifications: ReferenceVerification[] | null;
     verificationChecklist: VerificationChecklist | null;
@@ -163,6 +167,30 @@ type CommitteeDetail = {
     lastCounterAmount: number | null;
     lastCounterBy: string | null;
   } | null;
+  negotiationMessages: NegotiationLogMessage[];
+  csaSummary: {
+    blocker: string | null;
+    endorsedAt: string | null;
+    endorsedByName: string | null;
+    privacyOrientationAt: string | null;
+    privacyOrientationByName: string | null;
+    initialInterviewAt: string | null;
+    initialInterviewNotes: string | null;
+    initialInterviewByName: string | null;
+    timeline: Array<{
+      status: string;
+      label: string;
+      at: string;
+      note?: string | null;
+    }>;
+  };
+  csaScreening: {
+    slug: string;
+    name: string | null;
+    result: string;
+    notes: string | null;
+    checkedAt: string | null;
+  };
   tatDays: number | null;
 };
 
@@ -315,9 +343,13 @@ export default function CommitteeApplicationPage() {
   const [overrideAmount, setOverrideAmount] = useState("");
   const [overrideMode, setOverrideMode] = useState("NET_SARADO");
   const [overrideTerms, setOverrideTerms] = useState("6");
+  const [overrideMessage, setOverrideMessage] = useState("");
+  const [accepting, setAccepting] = useState(false);
+  const [confirmAccept, setConfirmAccept] = useState(false);
   const [voteComment, setVoteComment] = useState("");
   const [showCiForm, setShowCiForm] = useState(false);
   const [showFieldVisitForm, setShowFieldVisitForm] = useState(false);
+  const [showApplicationForm, setShowApplicationForm] = useState(false);
   const [assessmentForm, setAssessmentForm] = useState({
     characterNotes: "",
     capacityNotes: "",
@@ -429,6 +461,7 @@ export default function CommitteeApplicationPage() {
             amount: Number(overrideAmount),
             inputMode: overrideMode,
             terms: Number(overrideTerms),
+            message: overrideMessage.trim() || undefined,
           }),
         },
       );
@@ -439,11 +472,35 @@ export default function CommitteeApplicationPage() {
           ? "Amount adjusted — this is what will be approved."
           : "Committee override saved — borrower must re-sign.",
       );
+      setOverrideMessage("");
       await load({ silent: true });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Override failed");
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function handleAcceptOffer() {
+    setAccepting(true);
+    setMessage(null);
+    setError(null);
+    try {
+      const res = await fetch(
+        `/api/committee/applications/${applicationId}/accept-offer`,
+        { method: "POST" },
+      );
+      const body = (await res.json()) as { error?: string };
+      if (!res.ok) throw new Error(body.error ?? "Accept failed");
+      setMessage(
+        "Accepted — queued for LRA. No further borrower confirmation is required.",
+      );
+      setConfirmAccept(false);
+      await load({ silent: true });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Accept failed");
+    } finally {
+      setAccepting(false);
     }
   }
 
@@ -628,6 +685,188 @@ export default function CommitteeApplicationPage() {
         />
       </div>
 
+      <Card className="mb-6 border-l-[3px] !border-l-teal-500 !bg-surface-2/30">
+        <div className="mb-3 flex flex-wrap items-center gap-2">
+          <h2 className="font-display text-lg font-semibold text-navy-900">
+            CSA intake summary
+          </h2>
+          <Badge variant="neutral">From CSA</Badge>
+        </div>
+        <p className="mb-4 text-sm text-ink-500">
+          Read-only — everything CSA recorded before endorsing this file.
+        </p>
+
+        {data.csaSummary.blocker ? (
+          <div className="mb-4 rounded-[var(--r-md)] border border-warning/40 bg-warning/10 px-3 py-2.5">
+            <p className="text-sm font-medium text-ink-800">
+              On hold — {data.csaSummary.blocker}
+            </p>
+          </div>
+        ) : null}
+
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-wide text-ink-400">
+              Data Privacy Act orientation
+            </p>
+            {data.csaSummary.privacyOrientationAt ? (
+              <p className="mt-1 text-sm text-ink-700">
+                Recorded{" "}
+                <span className="mono">
+                  {new Date(data.csaSummary.privacyOrientationAt).toLocaleString()}
+                </span>
+                {data.csaSummary.privacyOrientationByName
+                  ? ` · ${data.csaSummary.privacyOrientationByName}`
+                  : null}
+              </p>
+            ) : (
+              <p className="mt-1 text-sm text-ink-400">Not recorded.</p>
+            )}
+          </div>
+
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-wide text-ink-400">
+              {data.csaScreening.name ??
+                (data.application.segment === "sme"
+                  ? "SME duplication check"
+                  : "NCL check")}
+            </p>
+            <div className="mt-1 flex items-center gap-2">
+              <Badge
+                variant={
+                  data.csaScreening.result === "pass"
+                    ? "success"
+                    : data.csaScreening.result === "fail"
+                      ? "danger"
+                      : "neutral"
+                }
+              >
+                {data.csaScreening.result}
+              </Badge>
+              {data.csaScreening.checkedAt ? (
+                <span className="text-xs text-ink-400">
+                  {new Date(data.csaScreening.checkedAt).toLocaleDateString()}
+                </span>
+              ) : null}
+            </div>
+            {data.csaScreening.notes ? (
+              <p className="mt-1 text-sm text-ink-700">{data.csaScreening.notes}</p>
+            ) : null}
+          </div>
+
+          <div className="sm:col-span-2">
+            <p className="text-xs font-semibold uppercase tracking-wide text-ink-400">
+              Initial interview
+            </p>
+            {data.csaSummary.initialInterviewAt ? (
+              <>
+                <p className="mt-1 text-sm text-ink-700">
+                  Recorded{" "}
+                  <span className="mono">
+                    {new Date(data.csaSummary.initialInterviewAt).toLocaleString()}
+                  </span>
+                  {data.csaSummary.initialInterviewByName
+                    ? ` · ${data.csaSummary.initialInterviewByName}`
+                    : null}
+                </p>
+                {data.csaSummary.initialInterviewNotes ? (
+                  <p className="mt-1 whitespace-pre-wrap text-sm text-ink-600">
+                    {data.csaSummary.initialInterviewNotes}
+                  </p>
+                ) : null}
+              </>
+            ) : (
+              <p className="mt-1 text-sm text-ink-400">Not recorded.</p>
+            )}
+          </div>
+
+          <div className="sm:col-span-2">
+            <p className="text-xs font-semibold uppercase tracking-wide text-ink-400">
+              Endorsed to CIG
+            </p>
+            <p className="mt-1 text-sm text-ink-700">
+              {data.csaSummary.endorsedAt
+                ? new Date(data.csaSummary.endorsedAt).toLocaleString()
+                : "Not yet endorsed"}
+              {data.csaSummary.endorsedByName
+                ? ` · ${data.csaSummary.endorsedByName}`
+                : null}
+            </p>
+          </div>
+        </div>
+
+        {data.csaSummary.timeline.length ? (
+          <div className="mt-5 border-t border-line-soft pt-4">
+            <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-ink-400">
+              Status history
+            </p>
+            <ul className="flex flex-col gap-2">
+              {[...data.csaSummary.timeline]
+                .reverse()
+                .slice(0, 8)
+                .map((entry, index) => (
+                  <li
+                    key={`${entry.status}-${entry.at}-${index}`}
+                    className="flex flex-wrap items-baseline justify-between gap-2 text-sm"
+                  >
+                    <span className="font-medium text-ink-900">
+                      {entry.label ?? entry.status}
+                      {entry.note ? (
+                        <span className="font-normal text-ink-500">
+                          {" "}
+                          · {entry.note}
+                        </span>
+                      ) : null}
+                    </span>
+                    <span className="mono text-xs text-ink-400">
+                      {new Date(entry.at).toLocaleString()}
+                    </span>
+                  </li>
+                ))}
+            </ul>
+          </div>
+        ) : null}
+      </Card>
+
+      {data.borrower ? (
+        <Card className="mb-6 flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h2 className="font-display text-lg font-semibold text-navy-900">
+              Application form
+            </h2>
+            <p className="text-sm text-ink-500">
+              Read-only copy of the credit application filled by the borrower
+              or CSA.
+            </p>
+          </div>
+          <Button
+            type="button"
+            variant="secondary"
+            onClick={() => setShowApplicationForm(true)}
+          >
+            View application form
+          </Button>
+        </Card>
+      ) : null}
+
+      {data.borrower ? (
+        <Modal
+          open={showApplicationForm}
+          title="Application Form"
+          onClose={() => setShowApplicationForm(false)}
+          className="!max-w-4xl"
+        >
+          <div className="max-h-[65vh] overflow-y-auto pr-1">
+            <ApplicantProfileFields
+              profile={data.borrower}
+              segment={data.application.segment}
+              entityType={data.application.entityType}
+              readOnly
+            />
+          </div>
+        </Modal>
+      ) : null}
+
       <Card className="mb-6">
         <h2 className="mb-1 font-display text-lg font-semibold text-navy-900">
           Completeness review
@@ -659,9 +898,12 @@ export default function CommitteeApplicationPage() {
         <Card className="mb-6">
           <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
             <div>
-              <h2 className="mb-1 font-display text-lg font-semibold text-navy-900">
-                CI Report
-              </h2>
+              <div className="mb-1 flex flex-wrap items-center gap-2">
+                <h2 className="font-display text-lg font-semibold text-navy-900">
+                  CI Report
+                </h2>
+                <Badge variant="neutral">From CIG</Badge>
+              </div>
               <p className="text-sm text-ink-500">
                 Credit Investigation Group&apos;s full verification record — read
                 this before voting.
@@ -804,6 +1046,25 @@ export default function CommitteeApplicationPage() {
                 <span className="text-ink-400">Fit to work:</span>{" "}
                 {displayBool(data.verification.cmFitToWork)}
               </p>
+              <p>
+                <span className="text-ink-400">Crewing manager:</span>{" "}
+                {displayText(data.verification.cmManagerName)}
+                {data.verification.cmManagerPosition
+                  ? ` (${data.verification.cmManagerPosition})`
+                  : ""}
+              </p>
+              <p>
+                <span className="text-ink-400">CM contact:</span>{" "}
+                {displayText(data.verification.cmManagerContact)}
+              </p>
+              <p>
+                <span className="text-ink-400">Manning agency:</span>{" "}
+                {displayText(data.verification.cmManningAgencyName)}
+              </p>
+              <p>
+                <span className="text-ink-400">Joining port:</span>{" "}
+                {displayText(data.verification.cmJoiningPort)}
+              </p>
             </div>
             {data.verification.cmNotes ? (
               <p className="mt-2 text-sm text-ink-700">{data.verification.cmNotes}</p>
@@ -873,22 +1134,35 @@ export default function CommitteeApplicationPage() {
                   <span className="text-ink-400">Aware of loan:</span>{" "}
                   {displayBool(data.verification.picVerification.willAvailLoanAware)}
                 </p>
-                <p>
+                <div>
                   <span className="text-ink-400">Other financing:</span>{" "}
                   {data.verification.picVerification.otherFinancing?.hasOther == null
                     ? "—"
                     : data.verification.picVerification.otherFinancing.hasOther
-                      ? [
-                          data.verification.picVerification.otherFinancing.company,
-                          data.verification.picVerification.otherFinancing.financingOrBank,
-                          data.verification.picVerification.otherFinancing.loanAmount != null
-                            ? `₱${formatMoney(data.verification.picVerification.otherFinancing.loanAmount)}`
-                            : null,
-                        ]
-                          .filter(Boolean)
-                          .join(" · ") || "Yes"
+                      ? null
                       : "No"}
-                </p>
+                  {data.verification.picVerification.otherFinancing?.hasOther &&
+                  (data.verification.picVerification.otherFinancing.entries?.length ?? 0) > 0 ? (
+                    <ul className="mt-1 space-y-0.5">
+                      {data.verification.picVerification.otherFinancing.entries!.map(
+                        (entry, i) => (
+                          <li key={i} className="text-sm">
+                            {[
+                              entry.company,
+                              entry.loanAmount != null
+                                ? `₱${formatMoney(entry.loanAmount)}`
+                                : null,
+                            ]
+                              .filter(Boolean)
+                              .join(" · ") || `Loan ${i + 1}`}
+                          </li>
+                        ),
+                      )}
+                    </ul>
+                  ) : data.verification.picVerification.otherFinancing?.hasOther ? (
+                    "Yes"
+                  ) : null}
+                </div>
                 <p>
                   <span className="text-ink-400">Housing / car loan:</span>{" "}
                   {[
@@ -1207,9 +1481,24 @@ export default function CommitteeApplicationPage() {
           title="Borrower attachments"
           description={
             data.application.segment === "sme"
-              ? "Read-only — business registration, permits, financial statements, and other intake files."
-              : "Read-only — Passport, Seaman's Book, Contract, IDs, and House Sketch."
+              ? "Read-only — business registration, permits, financial statements, and other intake files uploaded by the borrower."
+              : "Read-only — Passport, Seaman's Book, Contract, IDs, and House Sketch uploaded by the borrower."
           }
+          excludeSlugs={CSA_ONLY_INTAKE_SLUGS}
+        />
+      ) : null}
+
+      {data.borrower ? (
+        <DocumentChecklist
+          applicationId={applicationId}
+          borrowerId={data.borrower.id}
+          stage="intake"
+          readOnly
+          checklistApiPath={`/api/committee/applications/${applicationId}/checklist`}
+          viewApiPath={(documentId) => `/api/documents/${documentId}/download`}
+          title="CSA attachments"
+          description="Read-only — signed in person at the branch and uploaded by CSA on the borrower's behalf."
+          includeSlugs={CSA_ONLY_INTAKE_SLUGS}
         />
       ) : null}
 
@@ -1263,9 +1552,12 @@ export default function CommitteeApplicationPage() {
 
       {data.computation ? (
         <div className="mb-6">
-          <h2 className="mb-1 font-display text-lg font-semibold text-navy-900">
-            Computation
-          </h2>
+          <div className="mb-1 flex flex-wrap items-center gap-2">
+            <h2 className="font-display text-lg font-semibold text-navy-900">
+              Computation
+            </h2>
+            <Badge variant="neutral">From CSA</Badge>
+          </div>
           <p className="mb-3 text-sm text-ink-500">
             {data.computation.loanTypeName ?? "Loan"} ·{" "}
             {data.computation.inputMode.replace(/_/g, " ")}
@@ -1338,6 +1630,51 @@ export default function CommitteeApplicationPage() {
               </>
             )}
           </p>
+
+          {!data.application.canAdjustPreDecision &&
+          data.negotiation?.lastCounterAmount != null ? (
+            <div className="mb-4 rounded-[var(--r-md)] border border-line-soft bg-surface-2/60 p-3">
+              <p className="mb-2 text-sm text-ink-700">
+                Agree to the borrower&apos;s exact amount — Committee&apos;s
+                acceptance is final. This skips a separate borrower signature
+                and queues the file for LRA immediately.
+              </p>
+              <Button
+                type="button"
+                variant="accent"
+                loading={accepting}
+                onClick={() => setConfirmAccept(true)}
+              >
+                Accept {formatMoney(data.negotiation.lastCounterAmount)}
+              </Button>
+              <ConfirmDialog
+                open={confirmAccept}
+                title="Accept borrower's offer?"
+                message={
+                  <>
+                    Accept{" "}
+                    <span className="mono font-bold text-teal-600">
+                      {formatMoney(data.negotiation.lastCounterAmount)}
+                    </span>{" "}
+                    as final? The borrower will not need to sign again — this
+                    queues the file for LRA immediately. This cannot be
+                    undone.
+                  </>
+                }
+                confirmLabel="Yes, accept"
+                cancelLabel="Cancel"
+                loading={accepting}
+                onConfirm={() => void handleAcceptOffer()}
+                onCancel={() => setConfirmAccept(false)}
+              />
+            </div>
+          ) : null}
+
+          <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-ink-400">
+            {data.application.canAdjustPreDecision
+              ? null
+              : "Or override with a different amount"}
+          </p>
           <form onSubmit={(e) => void handleOverride(e)} className="space-y-3">
             <div>
               <Label htmlFor="overrideAmount" required>
@@ -1381,6 +1718,18 @@ export default function CommitteeApplicationPage() {
                 className="mono"
               />
             </div>
+            {!data.application.canAdjustPreDecision ? (
+              <div>
+                <Label htmlFor="overrideMessage">Note (optional)</Label>
+                <Textarea
+                  id="overrideMessage"
+                  rows={2}
+                  value={overrideMessage}
+                  onChange={(e) => setOverrideMessage(e.target.value)}
+                  placeholder="Explain the override to the borrower…"
+                />
+              </div>
+            ) : null}
             <Button type="submit" loading={saving}>
               {data.application.canAdjustPreDecision
                 ? "Adjust amount"
@@ -1388,6 +1737,31 @@ export default function CommitteeApplicationPage() {
             </Button>
           </form>
         </Card>
+      ) : null}
+
+      {data.negotiation ? (
+        <NegotiationLog
+          messages={data.negotiationMessages}
+          viewerRole="committee"
+          canPost={data.application.canOverride}
+          onPost={async (body) => {
+            const res = await fetch(
+              `/api/committee/applications/${applicationId}/negotiation-messages`,
+              {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ body }),
+              },
+            );
+            if (!res.ok) {
+              const errBody = (await res.json().catch(() => null)) as {
+                error?: string;
+              } | null;
+              throw new Error(errBody?.error ?? "Failed to send");
+            }
+            await load({ silent: true });
+          }}
+        />
       ) : null}
 
       <Card className="mb-6">

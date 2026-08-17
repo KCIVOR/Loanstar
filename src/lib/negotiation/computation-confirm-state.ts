@@ -35,9 +35,8 @@ export function computationConfirmState(input: {
     return "confirmed";
   }
 
-  if (!negotiationStatus) {
-    return "confirm";
-  }
-
+  // No negotiation record yet means Committee hasn't made its final decision
+  // — the computation shown so far (including any pre-decision "Adjust
+  // amount" snapshot) is not yet final and must not be confirmable.
   return "hidden";
 }

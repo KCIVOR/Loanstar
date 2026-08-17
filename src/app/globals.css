@@ -4528,6 +4528,29 @@ table.tbl {
   }
 }
 
+/* Print: hide chrome (nav, header, buttons) so a page like /reports prints
+   as its content only. Scoped to structural tags + an opt-in .no-print
+   class rather than anything page-specific, so it benefits every page. */
+@media print {
+  /* AppShell layout (src/components/admin/AppShell.tsx) is the only place
+     <aside>/<header> tags appear in this app — both are chrome (sidebar,
+     topbar), never in-content — so hiding the tags outright is safe and
+     leaves printed output as the page content only. */
+  aside,
+  header,
+  .no-print {
+    display: none !important;
+  }
+  main {
+    margin: 0 !important;
+    padding: 0 !important;
+    overflow: visible !important;
+  }
+  body {
+    background: #fff !important;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,

@@ -65,7 +65,17 @@ export async function GET(request: Request) {
 
     if (error) throw new Error(error.message);
 
-    return jsonOk({ dcrs: data ?? [] });
+    // Rejected DCRs have their `dcr_items` deleted (frees the payment for
+    // re-batching) — the display data lives in `rejected_items` instead.
+    const dcrs = (data ?? []).map((row) => ({
+      ...row,
+      dcr_items:
+        row.status === "rejected"
+          ? ((row.rejected_items as unknown[]) ?? [])
+          : row.dcr_items,
+    }));
+
+    return jsonOk({ dcrs });
   } catch (error) {
     return handleApiError(error);
   }

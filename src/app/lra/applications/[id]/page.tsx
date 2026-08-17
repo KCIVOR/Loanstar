@@ -149,6 +149,12 @@ function formatDateTime(value: string) {
   });
 }
 
+function pdcScheduleDate(firstCheckDate: string, index: number) {
+  const date = new Date(firstCheckDate);
+  date.setMonth(date.getMonth() + index);
+  return date.toISOString().slice(0, 10);
+}
+
 type CombinedUploadResult = {
   fileName: string;
   count: number;
@@ -156,6 +162,13 @@ type CombinedUploadResult = {
   uploadedAt: string;
   uploadedByName: string;
   viewDocumentId: string | null;
+};
+
+type PdcDraftRow = {
+  checkNumber: string;
+  amount: number;
+  checkDate: string;
+  bankName: string;
 };
 
 export default function LraApplicationPage() {
@@ -171,8 +184,7 @@ export default function LraApplicationPage() {
     () => new Set<PathChoice>(["with_pdc"]),
   );
   const [pdcDate, setPdcDate] = useState("");
-  const [pdcBank, setPdcBank] = useState("");
-  const [pdcCheckNo, setPdcCheckNo] = useState("");
+  const [pdcDraft, setPdcDraft] = useState<PdcDraftRow[]>([]);
   const [blankFrom, setBlankFrom] = useState("");
   const [blankTo, setBlankTo] = useState("");
   const [atmBank, setAtmBank] = useState("");
@@ -328,30 +340,97 @@ export default function LraApplicationPage() {
     }
   }
 
-  async function submitPdc(e?: FormEvent) {
+  function updatePdcFirstDate(value: string) {
+    setPdcDate(value);
+    if (!value || !data?.computation) return;
+    const monthlyAmortization = data.computation.monthlyAmortization;
+    setPdcDraft((current) =>
+      current.map((row, index) => ({
+        ...row,
+        amount: monthlyAmortization,
+        checkDate: pdcScheduleDate(value, index),
+      })),
+    );
+  }
+
+  function buildPdcSchedule(e?: FormEvent) {
     e?.preventDefault();
+    if (!data?.computation) {
+      setError(
+        "No signed computation found for this application. A computation must be recorded before a PDC schedule can be built.",
+      );
+      return;
+    }
+    if (!pdcDate) {
+      setError("First check date is required.");
+      return;
+    }
+    setError(null);
+    const terms = data.computation.terms;
+    const monthlyAmortization = data.computation.monthlyAmortization;
+    const rows: PdcDraftRow[] = [];
+    for (let i = 0; i < terms; i += 1) {
+      rows.push({
+        checkNumber: pdcDraft[i]?.checkNumber ?? "",
+        amount: monthlyAmortization,
+        checkDate: pdcScheduleDate(pdcDate, i),
+        bankName: pdcDraft[i]?.bankName ?? "",
+      });
+    }
+    setPdcDraft(rows);
+  }
+
+  function updatePdcDraft(
+    index: number,
+    field: "checkNumber" | "bankName",
+    value: string,
+  ) {
+    setPdcDraft((current) =>
+      current.map((row, rowIndex) =>
+        rowIndex === index ? { ...row, [field]: value } : row,
+      ),
+    );
+  }
+
+  async function submitPdc() {
     if (!data?.computation) {
       setError(
         "No signed computation found for this application. A computation must be recorded before a PDC schedule can be saved.",
       );
       return;
     }
+    if (!pdcDate) {
+      setError("First check date is required.");
+      return;
+    }
+    const computation = data.computation;
+    if (pdcDraft.length !== computation.terms) {
+      setError("Build the complete PDC schedule before saving.");
+      return;
+    }
+    const missingCheckIndex = pdcDraft.findIndex(
+      (row) => !row.checkNumber.trim(),
+    );
+    if (missingCheckIndex >= 0) {
+      setError(`Check number is required for PDC #${missingCheckIndex + 1}.`);
+      return;
+    }
+    const missingBankIndex = pdcDraft.findIndex(
+      (row) => !row.bankName.trim(),
+    );
+    if (missingBankIndex >= 0) {
+      setError(`Bank/Branch is required for PDC #${missingBankIndex + 1}.`);
+      return;
+    }
     setSaving(true);
     setError(null);
-    const terms = data.computation.terms;
-    const monthlyAmortization = data.computation.monthlyAmortization;
-    const checks = [];
-    const baseDate = pdcDate ? new Date(pdcDate) : new Date();
-    for (let i = 0; i < terms; i += 1) {
-      const d = new Date(baseDate);
-      d.setMonth(d.getMonth() + i);
-      checks.push({
-        checkNumber: i === 0 ? pdcCheckNo || null : null,
-        amount: monthlyAmortization,
-        checkDate: d.toISOString().slice(0, 10),
-        bankName: pdcBank || "—",
-      });
-    }
+    const checks = pdcDraft.map((row, index) => ({
+      ...row,
+      amount: computation.monthlyAmortization,
+      checkDate: pdcScheduleDate(pdcDate, index),
+      checkNumber: row.checkNumber.trim(),
+      bankName: row.bankName.trim(),
+    }));
     try {
       const res = await fetch(`/api/lra/applications/${applicationId}/pdc`, {
         method: "POST",
@@ -878,11 +957,11 @@ export default function LraApplicationPage() {
                 PDC encoding
               </h2>
               <p className="mb-3 text-sm text-ink-500">
-                Enter the first check details — remaining dates are generated
-                from the approved loan term and monthly amortization.
+                Build the schedule from the first check date, then enter the
+                actual check number and bank/branch for every physical PDC.
               </p>
               <form
-                onSubmit={(e) => void submitPdc(e)}
+                onSubmit={buildPdcSchedule}
                 className="grid gap-3 sm:grid-cols-2"
               >
                 <div>
@@ -913,27 +992,12 @@ export default function LraApplicationPage() {
                   />
                 </div>
                 <div>
-                  <Label>First check date</Label>
+                  <Label required>First check date</Label>
                   <Input
                     type="date"
                     value={pdcDate}
-                    onChange={(e) => setPdcDate(e.target.value)}
-                  />
-                </div>
-                <div>
-                  <Label required>Bank name</Label>
-                  <Input
-                    value={pdcBank}
-                    onChange={(e) => setPdcBank(e.target.value)}
+                    onChange={(e) => updatePdcFirstDate(e.target.value)}
                     required
-                  />
-                </div>
-                <div>
-                  <Label>First check number</Label>
-                  <Input
-                    value={pdcCheckNo}
-                    onChange={(e) => setPdcCheckNo(e.target.value)}
-                    className="mono"
                   />
                 </div>
                 <div>
@@ -952,10 +1016,86 @@ export default function LraApplicationPage() {
                     className="mono"
                   />
                 </div>
-                <Button type="submit" loading={saving}>
-                  Save PDC schedule
+                <Button type="submit">
+                  {pdcDraft.length > 0 ? "Rebuild schedule" : "Build schedule"}
                 </Button>
               </form>
+
+              {pdcDraft.length > 0 ? (
+                <div className="mt-5 border-t border-line-soft pt-5">
+                  <h3 className="mb-1 font-display text-base font-semibold text-navy-900">
+                    PDC details
+                  </h3>
+                  <p className="mb-3 text-sm text-ink-500">
+                    Check no. and Bank/Branch are required for every row. Dates
+                    and amounts come from the approved computation.
+                  </p>
+                  <div className="overflow-x-auto">
+                    <Table>
+                      <thead>
+                        <tr>
+                          <Th>#</Th>
+                          <Th>Check no.</Th>
+                          <Th>Date</Th>
+                          <Th>Bank/Branch</Th>
+                          <Th className="num">Amount</Th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {pdcDraft.map((check, index) => (
+                          <tr key={`${check.checkDate}-${index}`}>
+                            <Td className="mono">{index + 1}</Td>
+                            <Td>
+                              <Input
+                                aria-label={`Check number ${index + 1}`}
+                                value={check.checkNumber}
+                                onChange={(e) =>
+                                  updatePdcDraft(
+                                    index,
+                                    "checkNumber",
+                                    e.target.value,
+                                  )
+                                }
+                                required
+                                className="mono min-w-36"
+                              />
+                            </Td>
+                            <Td className="mono">
+                              {formatDate(check.checkDate)}
+                            </Td>
+                            <Td>
+                              <Input
+                                aria-label={`Bank/Branch ${index + 1}`}
+                                value={check.bankName}
+                                onChange={(e) =>
+                                  updatePdcDraft(
+                                    index,
+                                    "bankName",
+                                    e.target.value,
+                                  )
+                                }
+                                required
+                                className="min-w-52"
+                              />
+                            </Td>
+                            <Td className="num mono">
+                              ₱{formatMoney(check.amount)}
+                            </Td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </Table>
+                  </div>
+                  <Button
+                    type="button"
+                    className="mt-3"
+                    loading={saving}
+                    onClick={() => void submitPdc()}
+                  >
+                    Save PDC schedule
+                  </Button>
+                </div>
+              ) : null}
             </Card>
           ) : null}
 
@@ -977,7 +1117,7 @@ export default function LraApplicationPage() {
                       <Th>#</Th>
                       <Th>Check no.</Th>
                       <Th>Date</Th>
-                      <Th>Bank</Th>
+                      <Th>Bank/Branch</Th>
                       <Th className="num">Amount</Th>
                     </tr>
                   </thead>

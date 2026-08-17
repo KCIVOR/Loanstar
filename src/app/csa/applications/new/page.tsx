@@ -14,6 +14,7 @@ import {
   PhoneInput,
   Select,
 } from "@/components/ui";
+import { AutofillOverlay } from "@/components/dev/AutofillOverlay";
 import { parseBorrowerNameParts } from "@/lib/csa/leads";
 
 type LoanSegment = "seafarer" | "sme";
@@ -39,6 +40,18 @@ function CsaNewApplicationForm() {
   const [entityType, setEntityType] = useState<EntityType>("individual");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  function fillIntake(nextSegment: LoanSegment, nextEntityType: EntityType) {
+    const rand = Math.floor(Math.random() * 100000);
+    const names = { first: "Juan", last: "Dela Cruz" };
+    setSegment(nextSegment);
+    setEntityType(nextEntityType);
+    setEmail(`autofill.${rand}@example.local`);
+    setFirstName(names.first);
+    setLastName(names.last);
+    setMiddleName("Santos");
+    setMobilePhone(`09${String(100000000 + Math.floor(Math.random() * 899999999))}`);
+  }
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -195,6 +208,13 @@ function CsaNewApplicationForm() {
           </div>
         </form>
       </Card>
+      <AutofillOverlay
+        actions={[
+          { label: "Fill: Seafarer", onClick: () => fillIntake("seafarer", "individual") },
+          { label: "Fill: SME (Individual)", onClick: () => fillIntake("sme", "individual") },
+          { label: "Fill: SME (Corporate)", onClick: () => fillIntake("sme", "corporate") },
+        ]}
+      />
     </div>
   );
 }

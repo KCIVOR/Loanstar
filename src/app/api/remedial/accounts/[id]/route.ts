@@ -28,6 +28,30 @@ function asSchedules(raw: unknown): ScheduleLite[] {
   });
 }
 
+async function fetchPdcChecks(scope: {
+  releaseFileId: string | null;
+  loanApplicationId: string | null;
+}) {
+  const admin = createServiceClient();
+  let releaseFileId = scope.releaseFileId;
+  if (!releaseFileId && scope.loanApplicationId) {
+    const { data: releaseFile } = await admin
+      .from("release_files")
+      .select("id")
+      .eq("loan_application_id", scope.loanApplicationId)
+      .maybeSingle();
+    releaseFileId = (releaseFile?.id as string | null) ?? null;
+  }
+  if (!releaseFileId) return [];
+
+  const { data } = await admin
+    .from("pdc_checks")
+    .select("sort_order, check_number")
+    .eq("release_file_id", releaseFileId)
+    .order("sort_order", { ascending: true });
+  return data ?? [];
+}
+
 export async function GET(_request: Request, { params }: RouteParams) {
   try {
     const user = await requireModulePermission("remedial", "view");
@@ -126,11 +150,17 @@ export async function GET(_request: Request, { params }: RouteParams) {
     const { data: payments } = await supabase
       .from("payments")
       .select(
-        "id, reference_no, payment_date, amount, status, channel, created_at",
+        "id, reference_no, payment_date, amount, status, channel, notes, created_at",
       )
       .eq("masterlist_id", id)
-      .order("created_at", { ascending: false })
-      .limit(30);
+      .order("payment_date", { ascending: true });
+
+    // Remedial has no RLS grant on pdc_checks; scope a service-role read to
+    // this account's release file so LRA check numbers reach the ledger.
+    const pdcChecks = await fetchPdcChecks({
+      releaseFileId: (data.release_file_id as string | null) ?? null,
+      loanApplicationId: (data.loan_application_id as string | null) ?? null,
+    });
 
     const scheduleRows = (
       Array.isArray(data.amortization_schedules)
@@ -181,6 +211,7 @@ export async function GET(_request: Request, { params }: RouteParams) {
         }))
         .sort((a, b) => a.installmentNo - b.installmentNo),
       payments: payments ?? [],
+      pdcChecks,
     });
   } catch (error) {
     return handleApiError(error);

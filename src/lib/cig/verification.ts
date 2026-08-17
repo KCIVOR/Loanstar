@@ -25,20 +25,31 @@ export type PicSibling = {
   occupation?: string;
 };
 
-export type PicOtherFinancing = {
-  hasOther?: boolean | null;
+/** One past/other financing/bank loan the PIC disclosed — repeatable, since a
+ * borrower may have taken more than one over the last 4 years. */
+export type PicOtherFinancingEntry = {
   company?: string;
-  financingOrBank?: string;
   when?: string;
   loanAmount?: number;
   monthly?: number;
   startEnd?: string;
 };
 
-export type PicLoanFlag = {
-  has?: boolean | null;
+export type PicOtherFinancing = {
+  hasOther?: boolean | null;
+  entries?: PicOtherFinancingEntry[];
+};
+
+/** One loan under a housing/car loan flag — repeatable, since a borrower may
+ * carry more than one (e.g. two vehicles, or a joint + personal mortgage). */
+export type PicLoanFlagEntry = {
   loanAmount?: number;
   monthlyAmort?: number;
+};
+
+export type PicLoanFlag = {
+  has?: boolean | null;
+  entries?: PicLoanFlagEntry[];
 };
 
 export type PicOtherVerificationCalls = {
@@ -138,6 +149,13 @@ export type VerificationRecord = {
   cmContractStatus: string | null;
   cmFitToWork: boolean | null;
   cmNotes: string | null;
+  /** The crewing manager as a person — distinct from the cm* fields above,
+   * which describe the crew member's own contract terms. */
+  cmManagerName: string | null;
+  cmManagerPosition: string | null;
+  cmManagerContact: string | null;
+  cmManningAgencyName: string | null;
+  cmJoiningPort: string | null;
   characterReferencesNotes: string | null;
   charRefOtherLenders: boolean | null;
   picVerification: PicVerification | null;
@@ -202,6 +220,11 @@ export function mapVerificationRow(row: Record<string, unknown>): VerificationRe
     cmFitToWork:
       row.cm_fit_to_work != null ? Boolean(row.cm_fit_to_work) : null,
     cmNotes: (row.cm_notes as string) ?? null,
+    cmManagerName: (row.cm_manager_name as string) ?? null,
+    cmManagerPosition: (row.cm_manager_position as string) ?? null,
+    cmManagerContact: (row.cm_manager_contact as string) ?? null,
+    cmManningAgencyName: (row.cm_manning_agency_name as string) ?? null,
+    cmJoiningPort: (row.cm_joining_port as string) ?? null,
     characterReferencesNotes: (row.character_references_notes as string) ?? null,
     charRefOtherLenders:
       row.char_ref_other_lenders != null

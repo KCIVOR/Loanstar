@@ -4,6 +4,8 @@ import { FormEvent, useCallback, useEffect, useState } from "react";
 
 import { Alert, Breadcrumbs, Button, PageHeader, Spinner } from "@/components/ui";
 import { ApplicantProfileFields } from "@/components/borrowers/ApplicantProfileFields";
+import { AutofillOverlay } from "@/components/dev/AutofillOverlay";
+import { fakeBorrowerProfile } from "@/lib/dev/fake-data";
 import type { BorrowerProfile } from "@/lib/borrowers/types";
 
 export default function BorrowerProfilePage() {
@@ -112,6 +114,14 @@ export default function BorrowerProfilePage() {
           Save profile
         </Button>
       </form>
+      <AutofillOverlay
+        actions={[
+          {
+            label: "Fill Application Form",
+            onClick: () => setProfile(fakeBorrowerProfile("seafarer", null, profile)),
+          },
+        ]}
+      />
     </div>
   );
 }

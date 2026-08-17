@@ -36,6 +36,7 @@ async function assertOwnApplication(userId: string, applicationId: string) {
 
 const counterSchema = z.object({
   amount: z.number().positive(),
+  message: z.string().trim().max(2000).optional(),
 });
 
 export async function POST(request: Request, { params }: RouteParams) {
@@ -64,6 +65,7 @@ export async function POST(request: Request, { params }: RouteParams) {
       body.amount,
       "borrower",
       user.id,
+      body.message,
     );
 
     await writeAuditEvent({

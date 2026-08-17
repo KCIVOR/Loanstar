@@ -122,11 +122,11 @@ export const WORKFLOW_TRIGGERS: WorkflowTrigger[] = [
   },
   {
     id: "submit_dcr",
-    name: "Collector submit DCR",
+    name: "Collector submit DCRR",
     module: "collection",
     requiredPermission: "edit",
     preconditions: [
-      "DCR in draft status",
+      "DCRR in draft status",
       "At least one payment item attached",
     ],
   },
@@ -146,9 +146,9 @@ export const WORKFLOW_TRIGGERS: WorkflowTrigger[] = [
     module: "accounting_ar",
     requiredPermission: "execute_trigger",
     preconditions: [
-      "DCR status submitted",
+      "DCRR status submitted",
       "Bank deposit reference provided",
-      "Deposit amount equals DCR total",
+      "Deposit amount equals DCRR total",
     ],
   },
   {

@@ -78,13 +78,13 @@ export function CollectionWidget({ data }: { data: CollectionWidgetData }) {
     <>
       <KpiRow>
         <StatCard label="Collected this week" value={peso(data.collectedThisWeek)} tone="gold" />
-        <StatCard label="DCR draft" value={data.dcr.draft} />
+        <StatCard label="DCRR draft" value={data.dcr.draft} />
         <StatCard
-          label="DCR submitted"
+          label="DCRR submitted"
           value={data.dcr.submitted}
           tone={data.dcr.submitted > 0 ? "danger" : "default"}
         />
-        <StatCard label="DCR reconciled" value={data.dcr.reconciled} tone="success" />
+        <StatCard label="DCRR reconciled" value={data.dcr.reconciled} tone="success" />
       </KpiRow>
       <CardGrid>
         <ChartCard title="Weekly collected vs due" size="full">

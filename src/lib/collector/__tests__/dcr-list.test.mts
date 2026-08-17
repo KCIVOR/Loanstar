@@ -32,11 +32,12 @@ function row(
 }
 
 describe("DCR_LIST_STATUS_FILTERS", () => {
-  it("exposes All / Submitted / Reconciled only (no draft, no rejected)", () => {
+  it("exposes All / Submitted / Reconciled / Rejected only (no draft)", () => {
     assert.deepEqual([...DCR_LIST_STATUS_FILTERS], [
       "all",
       "submitted",
       "reconciled",
+      "rejected",
     ]);
   });
 });
@@ -65,18 +66,22 @@ describe("clampDcrListPageSize", () => {
 
 describe("dcrListStatusFilterSpec", () => {
   it("maps every Status chip id the page exposes", () => {
-    const pageStatusChips = ["all", "submitted", "reconciled"] as const;
+    const pageStatusChips = [
+      "all",
+      "submitted",
+      "reconciled",
+      "rejected",
+    ] as const;
     assert.deepEqual([...DCR_LIST_STATUS_FILTERS], [...pageStatusChips]);
     for (const id of pageStatusChips) {
       assert.equal(dcrListStatusFilterSpec(id), id);
     }
   });
 
-  it("falls back to all for unknown, draft, and rejected values", () => {
+  it("falls back to all for unknown and draft values", () => {
     assert.equal(dcrListStatusFilterSpec(""), "all");
     assert.equal(dcrListStatusFilterSpec("unknown"), "all");
     assert.equal(dcrListStatusFilterSpec("draft"), "all");
-    assert.equal(dcrListStatusFilterSpec("rejected"), "all");
   });
 });
 
@@ -84,6 +89,7 @@ describe("passesDcrListStatusFilter ↔ dcrListStatusFilterSpec", () => {
   const chips: Exclude<DcrListStatusFilter, "all">[] = [
     "submitted",
     "reconciled",
+    "rejected",
   ];
   const statuses = ["draft", "submitted", "reconciled", "rejected"];
 
@@ -168,10 +174,11 @@ describe("computeDcrListKpis", () => {
     assert.deepEqual(computeDcrListKpis([]), {
       submitted: 0,
       reconciled: 0,
+      rejected: 0,
     });
   });
 
-  it("counts submitted and reconciled on the non-draft set; ignores draft and rejected", () => {
+  it("counts submitted, reconciled, and rejected on the non-draft set; ignores draft", () => {
     assert.deepEqual(
       computeDcrListKpis([
         { status: "draft" },
@@ -182,7 +189,7 @@ describe("computeDcrListKpis", () => {
         { status: "reconciled" },
         { status: "draft" },
       ]),
-      { submitted: 2, reconciled: 2 },
+      { submitted: 2, reconciled: 2, rejected: 1 },
     );
   });
 });

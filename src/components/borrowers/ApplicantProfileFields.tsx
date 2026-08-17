@@ -1,6 +1,7 @@
 "use client";
 
-import { Button, Card, Input, Label, PhoneInput } from "@/components/ui";
+import { useEffect, useState } from "react";
+import { Button, Card, Checkbox, Input, Label, PhoneInput, Select } from "@/components/ui";
 import type {
   BusinessBankAccount,
   BusinessInfo,
@@ -11,6 +12,7 @@ import type {
   TradeParty,
 } from "@/lib/borrowers/business-info";
 import type {
+  Address,
   AllotteeInfo,
   BorrowerProfile,
   ContactChannels,
@@ -91,6 +93,186 @@ function PhoneField({
   );
 }
 
+const OTHER_VALUE = "__other__";
+
+/** Case-insensitive lookup — older free-text data (e.g. "widowed") should
+ * still match a dropdown option (e.g. "Widowed") instead of falling into
+ * "Other". Returns the option's canonical casing, or null if no match. */
+function matchOption(value: string, options: readonly string[]): string | null {
+  const lower = value.toLowerCase();
+  return options.find((o) => o.toLowerCase() === lower) ?? null;
+}
+
+const CIVIL_STATUS_OPTIONS = [
+  "Single",
+  "Married",
+  "Widowed",
+  "Separated",
+  "Annulled",
+  "Legally Separated",
+];
+const OWNERSHIP_OPTIONS = ["Owned", "Rented", "With Parents", "Company-provided"];
+const EDUCATION_OPTIONS = [
+  "Elementary",
+  "High School Graduate",
+  "Vocational",
+  "College Graduate",
+  "Post Graduate",
+];
+const OFFICER_POSITION_OPTIONS = ["President", "Treasurer", "Secretary", "Director"];
+const ACCOUNT_TYPE_OPTIONS = ["Savings", "Checking", "Current"];
+const REFERENCE_RELATIONSHIP_OPTIONS = [
+  "Spouse",
+  "Sibling",
+  "Parent",
+  "Friend",
+  "Cousin",
+  "Co-worker",
+];
+const PURPOSE_OF_LOAN_OPTIONS = [
+  "Tuition Fee",
+  "Medical",
+  "Business Capital",
+  "Debt Consolidation",
+  "Home Improvement",
+];
+const NATURE_OF_BUSINESS_OPTIONS = ["Trading", "Manufacturing", "Retail", "Services"];
+const TYPE_OF_LOAN_OPTIONS = ["Business loan", "Auto loan", "Housing loan", "Personal loan"];
+const BANK_OPTIONS = ["BDO", "BPI", "Metrobank", "Landbank", "PNB"];
+
+/** A dropdown with a fixed option list plus an "Other" choice that reveals a
+ * free-text field for values outside the list — the stored value is always
+ * the plain string (no separate "other" column). */
+function SelectField({
+  id,
+  label,
+  value,
+  options,
+  onChange,
+  disabled = false,
+}: {
+  id: string;
+  label: string;
+  value: string;
+  options: readonly string[];
+  onChange?: (v: string) => void;
+  disabled?: boolean;
+}) {
+  const [otherMode, setOtherMode] = useState(
+    () => value !== "" && !matchOption(value, options),
+  );
+
+  useEffect(() => {
+    const matched = value !== "" ? matchOption(value, options) : null;
+    if (value !== "" && !matched) setOtherMode(true);
+    else if (matched) setOtherMode(false);
+  }, [value, options]);
+
+  const selectValue = otherMode
+    ? OTHER_VALUE
+    : (matchOption(value, options) ?? value);
+
+  return (
+    <div>
+      <Label htmlFor={id}>{label}</Label>
+      <Select
+        id={id}
+        value={selectValue}
+        disabled={disabled}
+        onChange={
+          onChange
+            ? (e) => {
+                const v = e.target.value;
+                if (v === OTHER_VALUE) {
+                  setOtherMode(true);
+                  onChange("");
+                } else {
+                  setOtherMode(false);
+                  onChange(v);
+                }
+              }
+            : undefined
+        }
+      >
+        <option value="">Select</option>
+        {options.map((o) => (
+          <option key={o} value={o}>
+            {o}
+          </option>
+        ))}
+        <option value={OTHER_VALUE}>Other</option>
+      </Select>
+      {otherMode ? (
+        <Input
+          id={`${id}_other`}
+          className="mt-2"
+          placeholder="Please specify"
+          value={value}
+          disabled={disabled}
+          onChange={onChange ? (e) => onChange(e.target.value) : undefined}
+        />
+      ) : null}
+    </div>
+  );
+}
+
+/** Same "Other" fallback behavior as SelectField, but without a <Label> — for
+ * use inside compact grid-row loops (references table) that supply their own
+ * column headers instead of per-field labels. */
+function InlineSelectField({
+  value,
+  options,
+  onChange,
+}: {
+  value: string;
+  options: readonly string[];
+  onChange: (v: string) => void;
+}) {
+  const [otherMode, setOtherMode] = useState(
+    () => value !== "" && !matchOption(value, options),
+  );
+
+  useEffect(() => {
+    const matched = value !== "" ? matchOption(value, options) : null;
+    if (value !== "" && !matched) setOtherMode(true);
+    else if (matched) setOtherMode(false);
+  }, [value, options]);
+
+  return (
+    <div>
+      <Select
+        value={otherMode ? OTHER_VALUE : (matchOption(value, options) ?? value)}
+        onChange={(e) => {
+          const v = e.target.value;
+          if (v === OTHER_VALUE) {
+            setOtherMode(true);
+            onChange("");
+          } else {
+            setOtherMode(false);
+            onChange(v);
+          }
+        }}
+      >
+        <option value="">Select</option>
+        {options.map((o) => (
+          <option key={o} value={o}>
+            {o}
+          </option>
+        ))}
+        <option value={OTHER_VALUE}>Other</option>
+      </Select>
+      {otherMode ? (
+        <Input
+          className="mt-2"
+          placeholder="Please specify"
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+        />
+      ) : null}
+    </div>
+  );
+}
+
 function computeAge(dateOfBirth: string | null): string {
   if (!dateOfBirth) return "";
   const dob = new Date(dateOfBirth);
@@ -151,11 +333,36 @@ export function ApplicantProfileFields({
     relativesLivingInProvince?: string;
     relativesLivingInProvinceAddress?: string;
     relativesLivingInProvinceContact?: string;
+    permanentAddressSameAsPresent?: boolean;
   };
   const setProfileData = (patch: Record<string, unknown>) =>
     onChange({
       ...profile,
       profileData: { ...profile.profileData, ...patch },
+    });
+  const sameAsPresent = contact.permanentAddressSameAsPresent ?? false;
+  /** Updates present address; while "same as present" is on, mirrors the
+   * change into permanent address too so the two never silently diverge. */
+  const setPresentAddress = (patch: Partial<Address>) => {
+    const nextPresent = { ...profile.presentAddress, ...patch };
+    onChange({
+      ...profile,
+      presentAddress: nextPresent,
+      permanentAddress: sameAsPresent
+        ? nextPresent
+        : profile.permanentAddress,
+    });
+  };
+  const setSameAsPresent = (checked: boolean) =>
+    onChange({
+      ...profile,
+      profileData: {
+        ...profile.profileData,
+        permanentAddressSameAsPresent: checked,
+      },
+      permanentAddress: checked
+        ? { ...profile.presentAddress }
+        : profile.permanentAddress,
     });
 
   return (
@@ -199,10 +406,11 @@ export function ApplicantProfileFields({
             value={contact.requestedTerms ?? ""}
             onChange={(v) => setProfileData({ requestedTerms: v })}
           />
-          <Field
+          <SelectField
             id="purposeOfLoan"
             label="Purpose of loan"
             value={contact.purposeOfLoan ?? ""}
+            options={PURPOSE_OF_LOAN_OPTIONS}
             onChange={(v) => setProfileData({ purposeOfLoan: v })}
           />
         </FieldRow>
@@ -235,55 +443,46 @@ export function ApplicantProfileFields({
           id="presentAddress"
           label="Present address"
           value={profile.presentAddress.street ?? ""}
-          onChange={(v) =>
-            onChange({
-              ...profile,
-              presentAddress: { ...profile.presentAddress, street: v },
-            })
-          }
+          onChange={(v) => setPresentAddress({ street: v })}
         />
         <FieldRow>
           <Field
             id="presentLengthOfStay"
             label="Length of stay"
             value={profile.presentAddress.lengthOfStay ?? ""}
-            onChange={(v) =>
-              onChange({
-                ...profile,
-                presentAddress: { ...profile.presentAddress, lengthOfStay: v },
-              })
-            }
+            onChange={(v) => setPresentAddress({ lengthOfStay: v })}
           />
           <div className="grid grid-cols-2 gap-3">
-            <Field
+            <SelectField
               id="presentOwnership"
               label="Ownership"
               value={profile.presentAddress.ownership ?? ""}
-              onChange={(v) =>
-                onChange({
-                  ...profile,
-                  presentAddress: { ...profile.presentAddress, ownership: v },
-                })
-              }
+              options={OWNERSHIP_OPTIONS}
+              onChange={(v) => setPresentAddress({ ownership: v })}
             />
             <Field
               id="presentMortgage"
               label="Mortgage"
               value={profile.presentAddress.mortgage ?? ""}
-              onChange={(v) =>
-                onChange({
-                  ...profile,
-                  presentAddress: { ...profile.presentAddress, mortgage: v },
-                })
-              }
+              onChange={(v) => setPresentAddress({ mortgage: v })}
             />
           </div>
         </FieldRow>
+
+        <Checkbox
+          id="permanentAddressSameAsPresent"
+          className="mb-3"
+          checked={sameAsPresent}
+          disabled={readOnly}
+          onChange={setSameAsPresent}
+          label="Permanent address same as present address"
+        />
 
         <Field
           id="permanentAddress"
           label="Permanent address"
           value={profile.permanentAddress.street ?? ""}
+          disabled={sameAsPresent}
           onChange={(v) =>
             onChange({
               ...profile,
@@ -296,6 +495,7 @@ export function ApplicantProfileFields({
             id="permanentLengthOfStay"
             label="Length of stay"
             value={profile.permanentAddress.lengthOfStay ?? ""}
+            disabled={sameAsPresent}
             onChange={(v) =>
               onChange({
                 ...profile,
@@ -307,10 +507,12 @@ export function ApplicantProfileFields({
             }
           />
           <div className="grid grid-cols-2 gap-3">
-            <Field
+            <SelectField
               id="permanentOwnership"
               label="Ownership"
               value={profile.permanentAddress.ownership ?? ""}
+              options={OWNERSHIP_OPTIONS}
+              disabled={sameAsPresent}
               onChange={(v) =>
                 onChange({
                   ...profile,
@@ -325,6 +527,7 @@ export function ApplicantProfileFields({
               id="permanentMortgage"
               label="Mortgage"
               value={profile.permanentAddress.mortgage ?? ""}
+              disabled={sameAsPresent}
               onChange={(v) =>
                 onChange({
                   ...profile,
@@ -349,10 +552,11 @@ export function ApplicantProfileFields({
             />
             <Field id="age" label="Age" value={computeAge(profile.dateOfBirth)} disabled />
           </div>
-          <Field
+          <SelectField
             id="civilStatus"
             label="Civil status"
             value={profile.civilStatus ?? ""}
+            options={CIVIL_STATUS_OPTIONS}
             onChange={(v) => onChange({ ...profile, civilStatus: v })}
           />
         </FieldRow>
@@ -417,10 +621,11 @@ export function ApplicantProfileFields({
               value={contact.facebook ?? ""}
               onChange={(v) => setProfileData({ facebook: v })}
             />
-            <Field
+            <SelectField
               id="education"
               label="Education"
               value={contact.education ?? ""}
+              options={EDUCATION_OPTIONS}
               onChange={(v) => setProfileData({ education: v })}
             />
           </div>
@@ -498,22 +703,22 @@ export function ApplicantProfileFields({
             />
           </FieldRow>
           <FieldRow>
-            <Field
-              id="biz_nature"
-              label={isCorporate ? "Nature of business" : "Years of operation"}
-              value={
-                isCorporate
-                  ? (biz.natureOfBusiness ?? "")
-                  : (biz.yearsOfOperation ?? "")
-              }
-              onChange={(v) =>
-                setBiz(
-                  isCorporate
-                    ? { natureOfBusiness: v }
-                    : { yearsOfOperation: v },
-                )
-              }
-            />
+            {isCorporate ? (
+              <SelectField
+                id="biz_nature"
+                label="Nature of business"
+                value={biz.natureOfBusiness ?? ""}
+                options={NATURE_OF_BUSINESS_OPTIONS}
+                onChange={(v) => setBiz({ natureOfBusiness: v })}
+              />
+            ) : (
+              <Field
+                id="biz_nature"
+                label="Years of operation"
+                value={biz.yearsOfOperation ?? ""}
+                onChange={(v) => setBiz({ yearsOfOperation: v })}
+              />
+            )}
             <Field
               id="biz_email"
               label="Business email"
@@ -941,10 +1146,11 @@ export function ApplicantProfileFields({
                   setBiz({ companyOfficers: rows });
                 }}
               />
-              <Field
+              <SelectField
                 id={`officer_position_${i}`}
                 label="Position"
                 value={officer.position ?? ""}
+                options={OFFICER_POSITION_OPTIONS}
                 onChange={(v) => {
                   const rows = padRows<BusinessOfficer>(biz.companyOfficers, 3);
                   rows[i] = { ...rows[i], position: v };
@@ -1053,10 +1259,11 @@ export function ApplicantProfileFields({
           />
         </FieldRow>
         <FieldRow>
-          <Field
+          <SelectField
             id="all_relationship"
             label="Relation"
             value={profile.allottee.relationship ?? ""}
+            options={REFERENCE_RELATIONSHIP_OPTIONS}
             onChange={(v) =>
               onChange({
                 ...profile,
@@ -1208,10 +1415,11 @@ export function ApplicantProfileFields({
                     setBiz({ majorStockholders: rows });
                   }}
                 />
-                <Field
+                <SelectField
                   id={`stock_position_${i}`}
                   label="Position"
                   value={row.position ?? ""}
+                  options={OFFICER_POSITION_OPTIONS}
                   onChange={(v) => {
                     const rows = padRows<BusinessStockholder>(
                       biz.majorStockholders,
@@ -1351,20 +1559,22 @@ export function ApplicantProfileFields({
               key={`credit-${i}`}
               className="mb-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-5"
             >
-              <Field
+              <SelectField
                 id={`credit_bank_${i}`}
                 label="Creditor / bank"
                 value={row.creditorBank ?? ""}
+                options={BANK_OPTIONS}
                 onChange={(v) => {
                   const rows = padRows<CreditReference>(biz.creditReferences, 3);
                   rows[i] = { ...rows[i], creditorBank: v };
                   setBiz({ creditReferences: rows });
                 }}
               />
-              <Field
+              <SelectField
                 id={`credit_type_${i}`}
                 label="Type of loan"
                 value={row.typeOfLoan ?? ""}
+                options={TYPE_OF_LOAN_OPTIONS}
                 onChange={(v) => {
                   const rows = padRows<CreditReference>(biz.creditReferences, 3);
                   rows[i] = { ...rows[i], typeOfLoan: v };
@@ -1414,10 +1624,11 @@ export function ApplicantProfileFields({
               key={`bank-${i}`}
               className="mb-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-5"
             >
-              <Field
+              <SelectField
                 id={`bank_name_${i}`}
                 label="Bank name"
                 value={row.bankName ?? ""}
+                options={BANK_OPTIONS}
                 onChange={(v) => {
                   const rows = padRows<BusinessBankAccount>(biz.bankAccounts, 3);
                   rows[i] = { ...rows[i], bankName: v };
@@ -1444,10 +1655,11 @@ export function ApplicantProfileFields({
                   setBiz({ bankAccounts: rows });
                 }}
               />
-              <Field
+              <SelectField
                 id={`bank_type_${i}`}
                 label="Account type"
                 value={row.accountType ?? ""}
+                options={ACCOUNT_TYPE_OPTIONS}
                 onChange={(v) => {
                   const rows = padRows<BusinessBankAccount>(biz.bankAccounts, 3);
                   rows[i] = { ...rows[i], accountType: v };
@@ -1586,20 +1798,35 @@ export function ApplicantProfileFields({
                 className="mb-3 grid gap-3 border-b border-line-soft pb-3 sm:grid-cols-[repeat(4,1fr)_auto]"
               >
                 {(["name", "address", "relationship", "phone"] as const).map(
-                  (f) => (
-                    <Input
-                      key={f}
-                      value={ref[f] ?? ""}
-                      onChange={(e) => {
-                        const refs = [...profile.references];
-                        refs[i] = { ...ref, [f]: e.target.value };
-                        onChange({
-                          ...profile,
-                          references: refs as Reference[],
-                        });
-                      }}
-                    />
-                  ),
+                  (f) =>
+                    f === "relationship" ? (
+                      <InlineSelectField
+                        key={f}
+                        value={ref.relationship ?? ""}
+                        options={REFERENCE_RELATIONSHIP_OPTIONS}
+                        onChange={(v) => {
+                          const refs = [...profile.references];
+                          refs[i] = { ...ref, relationship: v };
+                          onChange({
+                            ...profile,
+                            references: refs as Reference[],
+                          });
+                        }}
+                      />
+                    ) : (
+                      <Input
+                        key={f}
+                        value={ref[f] ?? ""}
+                        onChange={(e) => {
+                          const refs = [...profile.references];
+                          refs[i] = { ...ref, [f]: e.target.value };
+                          onChange({
+                            ...profile,
+                            references: refs as Reference[],
+                          });
+                        }}
+                      />
+                    ),
                 )}
                 <Button
                   type="button"
@@ -1636,20 +1863,35 @@ export function ApplicantProfileFields({
                 className="mb-3 grid gap-3 border-b border-line-soft pb-3 sm:grid-cols-[repeat(4,1fr)_auto]"
               >
                 {(["name", "relationship", "phone", "occupation"] as const).map(
-                  (f) => (
-                    <Input
-                      key={f}
-                      value={ref[f] ?? ""}
-                      onChange={(e) => {
-                        const refs = [...profile.references];
-                        refs[i] = { ...ref, [f]: e.target.value };
-                        onChange({
-                          ...profile,
-                          references: refs as Reference[],
-                        });
-                      }}
-                    />
-                  ),
+                  (f) =>
+                    f === "relationship" ? (
+                      <InlineSelectField
+                        key={f}
+                        value={ref.relationship ?? ""}
+                        options={REFERENCE_RELATIONSHIP_OPTIONS}
+                        onChange={(v) => {
+                          const refs = [...profile.references];
+                          refs[i] = { ...ref, relationship: v };
+                          onChange({
+                            ...profile,
+                            references: refs as Reference[],
+                          });
+                        }}
+                      />
+                    ) : (
+                      <Input
+                        key={f}
+                        value={ref[f] ?? ""}
+                        onChange={(e) => {
+                          const refs = [...profile.references];
+                          refs[i] = { ...ref, [f]: e.target.value };
+                          onChange({
+                            ...profile,
+                            references: refs as Reference[],
+                          });
+                        }}
+                      />
+                    ),
                 )}
                 <Button
                   type="button"

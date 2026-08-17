@@ -297,7 +297,7 @@ export default function CollectorProofsPage() {
           </>
         ) : pay.status === "confirmed" ? (
           <Link href="/collector/dcr" className="btn btn-secondary btn-sm">
-            Add via DCR
+            Add via DCRR
           </Link>
         ) : null}
         {pay.storage_path ? (
@@ -318,10 +318,10 @@ export default function CollectorProofsPage() {
     <div>
       <PageHeader
         title="Payment proofs"
-        description="Confirm or reject borrower payment uploads. Batch confirmed proofs on the DCR page."
+        description="Confirm or reject borrower payment uploads. Batch confirmed proofs on the DCRR page."
         actions={
           <Link href="/collector/dcr" className="btn btn-secondary">
-            Go to DCR
+            Go to DCRR
           </Link>
         }
       />
@@ -354,7 +354,7 @@ export default function CollectorProofsPage() {
             <Kpi
               tone="navy"
               icon={IconCheck}
-              label="Confirmed, awaiting DCR"
+              label="Confirmed, awaiting DCRR"
               value={kpi.confirmedAwaitingDcr}
             />
           </>
@@ -581,6 +581,12 @@ export default function CollectorProofsPage() {
                       {formatMoney(Number(pay.amount))}
                     </span>
                   </div>
+                  {pay.notes ? (
+                    <div className="row">
+                      <span className="k">Remarks</span>
+                      <span className="v">{pay.notes}</span>
+                    </div>
+                  ) : null}
                 </div>
                 {renderActions(pay)}
               </div>
@@ -622,7 +628,14 @@ export default function CollectorProofsPage() {
                       </div>
                     </Td>
                     <Td>{segmentBadge(ml?.segment)}</Td>
-                    <Td className="mono">{pay.reference_no ?? "—"}</Td>
+                    <Td className="mono">
+                      {pay.reference_no ?? "—"}
+                      {pay.notes ? (
+                        <div className="mt-1 whitespace-normal text-xs font-normal text-ink-500">
+                          {pay.notes}
+                        </div>
+                      ) : null}
+                    </Td>
                     <Td className="mono">{formatDate(pay.payment_date)}</Td>
                     <Td num className="mono text-teal-600">
                       {formatMoney(Number(pay.amount))}

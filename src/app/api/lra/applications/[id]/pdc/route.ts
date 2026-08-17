@@ -12,10 +12,10 @@ type RouteParams = { params: Promise<{ id: string }> };
 const schema = z.object({
   checks: z.array(
     z.object({
-      checkNumber: z.string().nullable().optional(),
+      checkNumber: z.string().trim().min(1),
       amount: z.number().positive(),
       checkDate: z.string(),
-      bankName: z.string().min(1),
+      bankName: z.string().trim().min(1),
       refAccount: z.string().nullable().optional(),
     }),
   ),

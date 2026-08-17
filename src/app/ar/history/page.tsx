@@ -50,7 +50,7 @@ const EMPTY_DCR_KPI: ReconciledDcrKpiCounts = { total: 0, totalAmount: 0 };
 
 const TAB_OPTIONS: Array<{ value: HistoryTab; label: string }> = [
   { value: "accounts", label: "Closed accounts" },
-  { value: "dcr", label: "Reconciled DCRs" },
+  { value: "dcr", label: "Reconciled DCRRs" },
 ];
 
 const SEGMENT_CHIPS: Array<{ id: SegmentFilter; label: string }> = [
@@ -557,7 +557,7 @@ function DcrHistoryPanel() {
         pageSize,
       });
       const res = await fetch(`/api/ar/history/dcr?${query}`);
-      if (!res.ok) throw new Error("Failed to load reconciled DCR history");
+      if (!res.ok) throw new Error("Failed to load reconciled DCRR history");
       const data = (await res.json()) as {
         rows: ReconciledPostingRow[];
         totalCount: number;
@@ -954,7 +954,7 @@ export default function ArHistoryPage() {
     <div>
       <PageHeader
         title="AR Posting History"
-        description="Closed accounts and reconciled DCRs."
+        description="Closed accounts and reconciled DCRRs."
       />
 
       <div className="mb-4">

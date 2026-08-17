@@ -53,6 +53,7 @@ type DcrRow = {
   status: string;
   created_at: string;
   submitted_at: string | null;
+  notes: string | null;
   dcr_items: DcrItem[] | null;
 };
 
@@ -178,7 +179,7 @@ export default function CollectorHistoryPage() {
     <div>
       <PageHeader
         title="Collection history"
-        description="Past DCRs and payment proofs for your assigned accounts."
+        description="Past DCRRs and payment proofs for your assigned accounts."
       />
 
       {error ? (
@@ -193,7 +194,7 @@ export default function CollectorHistoryPage() {
           className={cn("fchip", tab === "dcrs" && "on")}
           onClick={() => setTab("dcrs")}
         >
-          DCRs
+          DCRRs
         </button>
         <button
           type="button"
@@ -242,7 +243,7 @@ export default function CollectorHistoryPage() {
             }}
             placeholder={
               tab === "dcrs"
-                ? "Search DCR id or status"
+                ? "Search DCRR id or status"
                 : "Search ref, borrower, status"
             }
             value={search}
@@ -308,8 +309,8 @@ export default function CollectorHistoryPage() {
       {tab === "dcrs" ? (
         filteredDcrs.length === 0 ? (
           <EmptyState
-            title="No DCR history"
-            description="Submitted and reconciled DCRs will appear here."
+            title="No DCRR history"
+            description="Submitted and reconciled DCRRs will appear here."
             showMark={false}
           />
         ) : (
@@ -318,12 +319,13 @@ export default function CollectorHistoryPage() {
               <Table>
                 <thead>
                   <tr>
-                    <Th>DCR</Th>
+                    <Th>DCRR</Th>
                     <Th>Status</Th>
                     <Th num>Items</Th>
                     <Th num>Total</Th>
                     <Th>Created</Th>
                     <Th>Submitted</Th>
+                    <Th>Reason</Th>
                   </tr>
                 </thead>
                 <tbody>
@@ -349,6 +351,11 @@ export default function CollectorHistoryPage() {
                         <Td className="mono text-sm">
                           {dcr.submitted_at
                             ? formatDateTime(dcr.submitted_at)
+                            : "—"}
+                        </Td>
+                        <Td className="max-w-[260px] text-sm">
+                          {dcr.status === "rejected" && dcr.notes
+                            ? dcr.notes
                             : "—"}
                         </Td>
                       </tr>

@@ -12,11 +12,16 @@ import {
   Label,
   Select,
   Spinner,
-  Table,
-  Td,
-  Th,
+  Textarea,
 } from "@/components/ui";
+import { AccountLedger } from "@/components/ledger/AccountLedger";
 import { DOCUMENT_BUCKET } from "@/lib/constants";
+import {
+  buildAccountLedgerRows,
+  checkNumbersByInstallmentNo,
+  ledgerEntriesFromPostings,
+  type LedgerPdcCheck,
+} from "@/lib/ledger/build-account-ledger-rows";
 import {
   buildPaymentProofStoragePath,
   isAllowedPaymentProofMime,
@@ -26,14 +31,6 @@ import { createClient } from "@/lib/supabase/client";
 const MAX_PROOF_BYTES = 10 * 1024 * 1024;
 const PROOF_ACCEPT =
   ".pdf,.jpg,.jpeg,.png,.webp,.heic,.heif,application/pdf,image/jpeg,image/png,image/webp,image/heic,image/heif";
-
-const SCHEDULE_BADGE = {
-  paid: "success",
-  overdue: "danger",
-  partial: "warning",
-  pending: "navy",
-  rolled: "neutral",
-} as const;
 
 const PAYMENT_BADGE: Record<string, "success" | "warning" | "danger" | "navy"> = {
   posted: "success",
@@ -76,15 +73,28 @@ type PaymentRow = {
   status: string;
   storage_path: string | null;
   file_name: string | null;
+  notes: string | null;
+  flagged_reason: string | null;
+  flagged_at: string | null;
 };
 
 type PostingRow = {
   id: string;
-  amortization_schedule_id: string;
+  amortization_schedule_id: string | null;
   amount: number;
   payments:
-    | { payment_date: string; reference_no: string | null }
-    | { payment_date: string; reference_no: string | null }[]
+    | {
+        payment_date: string;
+        reference_no: string | null;
+        channel?: string | null;
+        status?: string | null;
+      }
+    | {
+        payment_date: string;
+        reference_no: string | null;
+        channel?: string | null;
+        status?: string | null;
+      }[]
     | null;
 };
 
@@ -103,60 +113,6 @@ function formatDate(value: string) {
   });
 }
 
-/** Groups postings by installment; each value is sorted payment dates (asc). */
-function paymentDatesByScheduleId(
-  postings: PostingRow[],
-): Map<string, string[]> {
-  const map = new Map<string, string[]>();
-  for (const posting of postings) {
-    const scheduleId = posting.amortization_schedule_id;
-    if (!scheduleId) continue;
-    const raw = posting.payments;
-    const payment = Array.isArray(raw) ? raw[0] : raw;
-    const date = payment?.payment_date;
-    if (!date) continue;
-    const list = map.get(scheduleId) ?? [];
-    list.push(date);
-    map.set(scheduleId, list);
-  }
-  for (const [id, dates] of map) {
-    map.set(
-      id,
-      [...dates].sort((a, b) => a.localeCompare(b)),
-    );
-  }
-  return map;
-}
-
-/** Unique reference numbers from postings linked to each installment (comma-joined for display). */
-function referenceNosByScheduleId(
-  postings: PostingRow[],
-): Map<string, string[]> {
-  const map = new Map<string, string[]>();
-  for (const posting of postings) {
-    const scheduleId = posting.amortization_schedule_id;
-    if (!scheduleId) continue;
-    const raw = posting.payments;
-    const payment = Array.isArray(raw) ? raw[0] : raw;
-    const ref = payment?.reference_no?.trim();
-    if (!ref) continue;
-    const list = map.get(scheduleId) ?? [];
-    if (!list.includes(ref)) list.push(ref);
-    map.set(scheduleId, list);
-  }
-  return map;
-}
-
-function formatInstallmentPaymentDate(dates: string[] | undefined): string {
-  if (!dates || dates.length === 0) return "—";
-  const mostRecent = dates[dates.length - 1];
-  const label = formatDate(mostRecent);
-  if (dates.length > 1) {
-    return `${label} (+${dates.length - 1} more)`;
-  }
-  return label;
-}
-
 export function LoanActivePanel({
   applicationId,
   applicationStatus,
@@ -164,6 +120,7 @@ export function LoanActivePanel({
   const [loan, setLoan] = useState<Record<string, unknown> | null>(null);
   const [payments, setPayments] = useState<PaymentRow[]>([]);
   const [postings, setPostings] = useState<PostingRow[]>([]);
+  const [pdcChecks, setPdcChecks] = useState<LedgerPdcCheck[]>([]);
   const [loading, setLoading] = useState(false);
   const [amount, setAmount] = useState("");
   const [paymentDate, setPaymentDate] = useState("");
@@ -171,6 +128,7 @@ export function LoanActivePanel({
   const [channel, setChannel] = useState<"bank_deposit" | "check" | "pos_cash">(
     "bank_deposit",
   );
+  const [notes, setNotes] = useState("");
   const [proofFile, setProofFile] = useState<File | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
@@ -194,10 +152,12 @@ export function LoanActivePanel({
         loan: Record<string, unknown>;
         payments: PaymentRow[];
         postings?: PostingRow[];
+        pdcChecks?: LedgerPdcCheck[];
       };
       setLoan(data.loan);
       setPayments(data.payments);
       setPostings(data.postings ?? []);
+      setPdcChecks(data.pdcChecks ?? []);
     } finally {
       setLoading(false);
     }
@@ -263,11 +223,13 @@ export function LoanActivePanel({
         storagePath?: string;
         fileName?: string;
         mimeType?: string;
+        notes?: string;
       } = {
         amount: Number(amount),
         paymentDate,
         referenceNo: referenceNo || undefined,
         channel,
+        notes: notes.trim() || undefined,
       };
 
       if (proofFile) {
@@ -313,6 +275,7 @@ export function LoanActivePanel({
       setMessage("Payment proof submitted — pending verification.");
       setAmount("");
       setReferenceNo("");
+      setNotes("");
       setProofFile(null);
       await load();
     } catch (err) {
@@ -328,18 +291,25 @@ export function LoanActivePanel({
   const schedules = [...((loan.amortization_schedules as ScheduleRow[]) ?? [])].sort(
     (a, b) => a.installment_no - b.installment_no,
   );
-  const paymentDatesBySchedule = paymentDatesByScheduleId(postings);
-  const referenceNosBySchedule = referenceNosByScheduleId(postings);
   const totalLoan = Number(loan.total_loan ?? 0);
-  let runningBalance = totalLoan;
-  const scheduleRows = schedules.map((row) => {
-    runningBalance -= Number(row.amount_due);
-    return { ...row, id: row.id, balanceAfter: Math.max(runningBalance, 0) };
-  });
-  const totalAmortization = schedules.reduce(
-    (sum, row) => sum + Number(row.amount_due),
+  const scheduleTotal = schedules.reduce(
+    (sum, row) => sum + Number(row.amount_due ?? 0),
     0,
   );
+  const checkNoByInstallment = checkNumbersByInstallmentNo(pdcChecks);
+  const ledgerRows = buildAccountLedgerRows({
+    openingDebit: totalLoan > 0 ? totalLoan : scheduleTotal,
+    schedules: schedules.map((row) => ({
+      id: String(row.id),
+      dueDate: String(row.due_date),
+      target: Number(row.amount_due ?? 0),
+      penalty: Number(row.penalty_amount ?? 0),
+      installmentNo: Number(row.installment_no),
+      checkNo: checkNoByInstallment.get(Number(row.installment_no)) ?? null,
+      status: String(row.status ?? ""),
+    })),
+    payments: ledgerEntriesFromPostings(postings),
+  });
 
   return (
     <Card className="mb-6">
@@ -374,87 +344,8 @@ export function LoanActivePanel({
         </Alert>
       ) : null}
 
-      <h3 className="mb-2 font-medium text-ink-900">Amortization schedule</h3>
-      <Table className="mb-4">
-        <thead>
-          <tr>
-            <Th num>#</Th>
-            <Th>Due date</Th>
-            <Th>Payment date</Th>
-            <Th>Reference No.</Th>
-            <Th num>Amortization</Th>
-            <Th num>Balance</Th>
-            <Th>Status</Th>
-          </tr>
-        </thead>
-        <tbody>
-          {scheduleRows.map((row) => (
-            <tr key={row.installment_no}>
-              <Td num className="mono">
-                {row.installment_no}
-              </Td>
-              <Td className="mono">
-                <span
-                  style={
-                    row.status === "overdue"
-                      ? { color: "var(--danger)" }
-                      : undefined
-                  }
-                >
-                  {row.due_date}
-                </span>
-              </Td>
-              <Td className="mono">
-                <span
-                  title={paymentDatesBySchedule
-                    .get(String(row.id))
-                    ?.map((d) => formatDate(d))
-                    .join(", ")}
-                >
-                  {formatInstallmentPaymentDate(
-                    paymentDatesBySchedule.get(String(row.id)),
-                  )}
-                </span>
-              </Td>
-              <Td className="mono">
-                {referenceNosBySchedule.get(String(row.id))?.join(", ") || "—"}
-              </Td>
-              <Td num className="mono">
-                {formatMoney(Number(row.amount_due))}
-              </Td>
-              <Td num className="mono">
-                {formatMoney(row.balanceAfter)}
-              </Td>
-              <Td>
-                <Badge
-                  variant={
-                    SCHEDULE_BADGE[row.status as keyof typeof SCHEDULE_BADGE] ??
-                    "neutral"
-                  }
-                  dot
-                >
-                  {row.status === "rolled" && row.rolled_into_installment_no
-                    ? `Rolled into #${row.rolled_into_installment_no}`
-                    : row.status}
-                </Badge>
-              </Td>
-            </tr>
-          ))}
-          <tr className="tfoot-row">
-            <Td>{""}</Td>
-            <Td>Total</Td>
-            <Td>{""}</Td>
-            <Td>{""}</Td>
-            <Td num className="mono">
-              {formatMoney(totalAmortization)}
-            </Td>
-            <Td num className="mono">
-              {formatMoney(Number(loan.outstanding_balance))}
-            </Td>
-            <Td>{""}</Td>
-          </tr>
-        </tbody>
-      </Table>
+      <h3 className="mb-2 font-medium text-ink-900">Account ledger</h3>
+      <AccountLedger rows={ledgerRows} className="mb-4" />
 
       {!isFullyPaid ? (
         <>
@@ -502,6 +393,16 @@ export function LoanActivePanel({
                 <option value="pos_cash">POS / Cash</option>
               </Select>
             </div>
+            <div className="sm:col-span-2">
+              <Label>Remarks (optional)</Label>
+              <Textarea
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+                maxLength={1000}
+                rows={2}
+                placeholder="Anything the collector should know about this payment"
+              />
+            </div>
             <div className="sm:col-span-2 w-full">
               <Label>Receipt / proof (optional)</Label>
               <FileDropzone
@@ -538,8 +439,10 @@ export function LoanActivePanel({
           <h3 className="mb-2 mt-6 font-medium text-ink-900">Payment history</h3>
           <div className="tl">
             {payments.map((p) => {
-              const tone =
-                p.status === "posted"
+              const flagged = Boolean(p.flagged_reason);
+              const tone = flagged
+                ? "warn"
+                : p.status === "posted"
                   ? "done"
                   : p.status === "rejected"
                     ? "warn"
@@ -549,9 +452,15 @@ export function LoanActivePanel({
                   <TlDot tone={tone} />
                   <div className="tl-h">
                     <b className="mono">{formatMoney(Number(p.amount))}</b>
-                    <Badge variant={PAYMENT_BADGE[p.status] ?? "neutral"} dot>
-                      {p.status.replace(/_/g, " ")}
-                    </Badge>
+                    {flagged ? (
+                      <Badge variant="danger" dot>
+                        needs re-verification
+                      </Badge>
+                    ) : (
+                      <Badge variant={PAYMENT_BADGE[p.status] ?? "neutral"} dot>
+                        {p.status.replace(/_/g, " ")}
+                      </Badge>
+                    )}
                     <span className="when">{p.payment_date}</span>
                     {p.storage_path ? (
                       <Button
@@ -569,6 +478,11 @@ export function LoanActivePanel({
                     {p.channel.replace(/_/g, " ")}
                     {p.reference_no ? ` · Ref ${p.reference_no}` : ""}
                   </p>
+                  {flagged ? (
+                    <p className="mt-1 text-danger">
+                      Returned for correction: {p.flagged_reason}
+                    </p>
+                  ) : null}
                 </div>
               );
             })}

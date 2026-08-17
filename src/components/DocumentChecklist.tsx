@@ -22,6 +22,11 @@ import {
   uploadedAwaitingSubtitle,
 } from "@/lib/documents/checklist-actions";
 import { createClient } from "@/lib/supabase/client";
+import { CameraCaptureModal } from "@/components/CameraCaptureModal";
+
+/** Document types that offer a live "Take photo" capture option alongside
+ * the regular file upload — currently just the borrower selfie. */
+const CAMERA_CAPTURE_SLUGS = new Set(["photo_2x2"]);
 
 type DocumentChecklistProps = {
   applicationId: string;
@@ -160,6 +165,7 @@ export function DocumentChecklist({
   const [revisionRemarks, setRevisionRemarks] = useState("");
   const [revising, setRevising] = useState(false);
   const [viewState, setViewState] = useState<ViewState | null>(null);
+  const [cameraItem, setCameraItem] = useState<ApiChecklistItem | null>(null);
   const [collapsed, setCollapsed] = useState(
     defaultCollapsed === true,
   );
@@ -655,6 +661,17 @@ export function DocumentChecklist({
                             </Button>
                           </label>
                         ) : null}
+                        {canUpload && CAMERA_CAPTURE_SLUGS.has(item.documentTypeSlug) ? (
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            disabled={uploadingId === item.documentTypeId}
+                            onClick={() => setCameraItem(item)}
+                          >
+                            Take photo
+                          </Button>
+                        ) : null}
                         {showSign ? (
                           <button
                             type="button"
@@ -821,6 +838,14 @@ export function DocumentChecklist({
           </div>
         ) : null}
       </Modal>
+
+      <CameraCaptureModal
+        open={cameraItem !== null}
+        onClose={() => setCameraItem(null)}
+        onCapture={(file) => {
+          if (cameraItem) void handleUpload(cameraItem, file);
+        }}
+      />
     </Card>
   );
 }

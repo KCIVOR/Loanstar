@@ -3,6 +3,7 @@
 import { FormEvent, useCallback, useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 
+import { AccountLedger } from "@/components/ledger/AccountLedger";
 import {
   Alert,
   Badge,
@@ -14,9 +15,6 @@ import {
   PageHeader,
   Select,
   Spinner,
-  Table,
-  Td,
-  Th,
 } from "@/components/ui";
 import { DocumentChecklist } from "@/components/DocumentChecklist";
 import {
@@ -26,6 +24,13 @@ import {
 import { canMarkPaidOff } from "@/lib/ar/paid-off";
 import { formatStatusLabel } from "@/lib/applications/status";
 import { halfUp } from "@/lib/computation/money";
+import {
+  buildAccountLedgerRows,
+  checkNumbersByInstallmentNo,
+  ledgerEntriesFromPostings,
+  type LedgerPaymentEntry,
+  type LedgerPdcCheck,
+} from "@/lib/ledger/build-account-ledger-rows";
 
 /** UI-only toggle — the accounting checklist card isn't wired to any workflow gate. */
 const SHOW_ACCOUNTING_CHECKLIST = false;
@@ -71,11 +76,21 @@ type RoundingWriteoffRow = {
 
 type PostingRow = {
   id: string;
-  amortization_schedule_id: string;
+  amortization_schedule_id: string | null;
   amount: number;
   payments:
-    | { payment_date: string; reference_no: string | null }
-    | { payment_date: string; reference_no: string | null }[]
+    | {
+        payment_date: string;
+        reference_no: string | null;
+        channel?: string | null;
+        status?: string | null;
+      }
+    | {
+        payment_date: string;
+        reference_no: string | null;
+        channel?: string | null;
+        status?: string | null;
+      }[]
     | null;
 };
 
@@ -92,60 +107,6 @@ function formatDate(value: string) {
     month: "short",
     day: "numeric",
   });
-}
-
-/** Groups postings by installment; each value is sorted payment dates (asc). */
-function paymentDatesByScheduleId(
-  postings: PostingRow[],
-): Map<string, string[]> {
-  const map = new Map<string, string[]>();
-  for (const posting of postings) {
-    const scheduleId = posting.amortization_schedule_id;
-    if (!scheduleId) continue;
-    const raw = posting.payments;
-    const payment = Array.isArray(raw) ? raw[0] : raw;
-    const date = payment?.payment_date;
-    if (!date) continue;
-    const list = map.get(scheduleId) ?? [];
-    list.push(date);
-    map.set(scheduleId, list);
-  }
-  for (const [id, dates] of map) {
-    map.set(
-      id,
-      [...dates].sort((a, b) => a.localeCompare(b)),
-    );
-  }
-  return map;
-}
-
-/** Unique reference numbers from postings linked to each installment. */
-function referenceNosByScheduleId(
-  postings: PostingRow[],
-): Map<string, string[]> {
-  const map = new Map<string, string[]>();
-  for (const posting of postings) {
-    const scheduleId = posting.amortization_schedule_id;
-    if (!scheduleId) continue;
-    const raw = posting.payments;
-    const payment = Array.isArray(raw) ? raw[0] : raw;
-    const ref = payment?.reference_no?.trim();
-    if (!ref) continue;
-    const list = map.get(scheduleId) ?? [];
-    if (!list.includes(ref)) list.push(ref);
-    map.set(scheduleId, list);
-  }
-  return map;
-}
-
-function formatInstallmentPaymentDate(dates: string[] | undefined): string {
-  if (!dates || dates.length === 0) return "—";
-  const mostRecent = dates[dates.length - 1];
-  const label = formatDate(mostRecent);
-  if (dates.length > 1) {
-    return `${label} (+${dates.length - 1} more)`;
-  }
-  return label;
 }
 
 function accountStatusVariant(
@@ -175,17 +136,6 @@ function agingBucketVariant(
   return "neutral";
 }
 
-function scheduleStatusVariant(
-  status: string,
-): "success" | "warning" | "danger" | "neutral" {
-  const s = status.toLowerCase();
-  if (s === "paid") return "success";
-  if (s === "partial") return "warning";
-  if (s === "overdue") return "danger";
-  if (s === "rolled") return "neutral";
-  return "neutral";
-}
-
 function paymentStatusVariant(
   status: string,
 ): "success" | "warning" | "danger" | "neutral" | "teal" {
@@ -211,6 +161,7 @@ export default function ArMasterlistDetailPage() {
   const [roundingWriteoffs, setRoundingWriteoffs] = useState<
     RoundingWriteoffRow[]
   >([]);
+  const [pdcChecks, setPdcChecks] = useState<LedgerPdcCheck[]>([]);
   const [roundingWriteoffThreshold, setRoundingWriteoffThreshold] =
     useState(1);
   const [lookups, setLookups] = useState<Lookup | null>(null);
@@ -247,12 +198,14 @@ export default function ArMasterlistDetailPage() {
         record: Record<string, unknown>;
         payments?: PaymentRow[];
         postings?: PostingRow[];
+        pdcChecks?: LedgerPdcCheck[];
         roundingWriteoffThreshold?: number;
         roundingWriteoffs?: RoundingWriteoffRow[];
       };
       setRecord(recData.record);
       setPayments(recData.payments ?? []);
       setPostings(recData.postings ?? []);
+      setPdcChecks(recData.pdcChecks ?? []);
       setRoundingWriteoffThreshold(
         Number(recData.roundingWriteoffThreshold ?? 1),
       );
@@ -423,8 +376,6 @@ export default function ArMasterlistDetailPage() {
     .sort(
       (a, b) => Number(a.installment_no) - Number(b.installment_no),
     );
-  const paymentDatesBySchedule = paymentDatesByScheduleId(postings);
-  const referenceNosBySchedule = referenceNosByScheduleId(postings);
   const borrowerName = (record.borrower_name as string) ?? "Account";
   const borrowerNo = String(record.borrower_no ?? "");
   const accountNo = (record.loan_account_no as string | null) ?? null;
@@ -512,7 +463,56 @@ export default function ArMasterlistDetailPage() {
     (sum, row) => sum + Number(row.amount_due ?? 0),
     0,
   );
-  let runningBalance = totalLoan > 0 ? totalLoan : scheduleTotal;
+  const openingDebit = totalLoan > 0 ? totalLoan : scheduleTotal;
+  const writeOffEntries: LedgerPaymentEntry[] = roundingWriteoffs.map(
+    (row) => ({
+      id: `writeoff:${row.id}`,
+      paymentDate: String(row.performed_at).slice(0, 10),
+      amount: Number(row.amount ?? 0),
+      referenceNo: null,
+      channel: "Rounding write-off",
+      status: "posted",
+      scheduleId: row.amortization_schedule_id,
+    }),
+  );
+  const checkNoByInstallment = checkNumbersByInstallmentNo(pdcChecks);
+  const ledgerRows = buildAccountLedgerRows({
+    openingDebit,
+    schedules: schedules.map((row) => ({
+      id: String(row.id),
+      dueDate: String(row.due_date),
+      target: Number(row.amount_due ?? 0),
+      penalty: Number(row.penalty_amount ?? 0),
+      installmentNo: Number(row.installment_no),
+      checkNo: checkNoByInstallment.get(Number(row.installment_no)) ?? null,
+      status: String(row.status ?? ""),
+    })),
+    payments: [
+      ...ledgerEntriesFromPostings(postings),
+      ...writeOffEntries,
+    ],
+  });
+  const writeOffCandidates = schedules.flatMap((row) => {
+    const statusLower = String(row.status ?? "").toLowerCase();
+    const remainingDue = halfUp(
+      Number(row.amount_due) +
+        Number(row.penalty_amount ?? 0) -
+        Number(row.amount_paid ?? 0),
+    );
+    const canWriteOff =
+      statusLower !== "paid" &&
+      statusLower !== "rolled" &&
+      remainingDue > 0 &&
+      remainingDue <= roundingWriteoffThreshold;
+    if (!canWriteOff) return [];
+    return [
+      {
+        scheduleId: String(row.id),
+        installmentNo: Number(row.installment_no),
+        amount: remainingDue,
+      },
+    ];
+  });
 
   return (
     <div>
@@ -837,107 +837,39 @@ export default function ArMasterlistDetailPage() {
 
       <Card className="mb-6">
         <h2 className="mb-1 font-display text-lg font-semibold text-navy-900">
-          Amortization ledger
+          Account ledger
         </h2>
         <p className="mb-3 text-sm text-ink-500">
           {paidCount} of {trackedCount} installments paid
           {rolledCount > 0
             ? ` (${rolledCount} rolled forward, excluded from count)`
             : ""}
+          . Opening debit from total loan; credits are posted allocations and
+          rounding write-offs.
         </p>
-        <div className="overflow-x-auto">
-          <Table>
-            <thead>
-              <tr>
-                <Th className="num">#</Th>
-                <Th>Due date</Th>
-                <Th>Payment date</Th>
-                <Th>Reference No.</Th>
-                <Th className="num">Amount due</Th>
-                <Th className="num">Running bal.</Th>
-                <Th>Status</Th>
-              </tr>
-            </thead>
-            <tbody>
-              {schedules.map((row) => {
-                const due = Number(row.amount_due);
-                const status = String(row.status ?? "");
-                const statusLower = status.toLowerCase();
-                // Reduce by what was actually collected on this installment
-                // (amount_paid), not the full amount due gated on "paid" —
-                // a "partial" row still collected money and must show up in
-                // the running balance, or it stays stuck at the prior row's
-                // figure even after the borrower is fully settled.
-                runningBalance = Math.max(
-                  0,
-                  runningBalance - Number(row.amount_paid ?? 0),
-                );
-                const balAfter = runningBalance;
-                const remainingDue = halfUp(
-                  Number(row.amount_due) +
-                    Number(row.penalty_amount ?? 0) -
-                    Number(row.amount_paid ?? 0),
-                );
-                const canWriteOff =
-                  statusLower !== "paid" &&
-                  statusLower !== "rolled" &&
-                  remainingDue > 0 &&
-                  remainingDue <= roundingWriteoffThreshold;
-                return (
-                  <tr key={String(row.id)}>
-                    <Td className="num mono">{String(row.installment_no)}</Td>
-                    <Td className="mono">{formatDate(String(row.due_date))}</Td>
-                    <Td className="mono">
-                      <span
-                        title={paymentDatesBySchedule
-                          .get(String(row.id))
-                          ?.map((d) => formatDate(d))
-                          .join(", ")}
-                      >
-                        {formatInstallmentPaymentDate(
-                          paymentDatesBySchedule.get(String(row.id)),
-                        )}
-                      </span>
-                    </Td>
-                    <Td className="mono">
-                      {referenceNosBySchedule.get(String(row.id))?.join(", ") ||
-                        "—"}
-                    </Td>
-                    <Td className="num mono text-teal-600">
-                      {formatMoney(due)}
-                    </Td>
-                    <Td className="num mono">{formatMoney(balAfter)}</Td>
-                    <Td>
-                      <div className="flex flex-wrap items-center gap-2">
-                        <Badge variant={scheduleStatusVariant(status)} dot>
-                          {status === "rolled" && row.rolled_into_installment_no
-                            ? `Rolled → #${row.rolled_into_installment_no}`
-                            : status}
-                        </Badge>
-                        {canWriteOff ? (
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="sm"
-                            onClick={() =>
-                              setWriteOffTarget({
-                                scheduleId: String(row.id),
-                                installmentNo: Number(row.installment_no),
-                                amount: remainingDue,
-                              })
-                            }
-                          >
-                            Write off ₱{formatMoney(remainingDue)}
-                          </Button>
-                        ) : null}
-                      </div>
-                    </Td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </Table>
-        </div>
+        <AccountLedger rows={ledgerRows} className="mb-4" />
+        {writeOffCandidates.length > 0 ? (
+            <div className="rounded-[var(--r-md)] border border-line-soft bg-surface px-4 py-3">
+            <p className="mb-2 text-sm font-medium text-ink-800">
+              Rounding write-off candidates
+            </p>
+            <ul className="flex flex-wrap gap-2">
+              {writeOffCandidates.map((candidate) => (
+                <li key={candidate.scheduleId}>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setWriteOffTarget(candidate)}
+                  >
+                    Write off ₱{formatMoney(candidate.amount)} on #
+                    {candidate.installmentNo}
+                  </Button>
+                </li>
+              ))}
+            </ul>
+          </div>
+        ) : null}
       </Card>
 
       <Card className="mb-6">

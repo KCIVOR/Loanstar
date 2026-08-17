@@ -1,6 +1,9 @@
-import { formatStatusLabel } from "@/lib/applications/status";
+import {
+  formatStatusLabel,
+  type StatusHistoryEntry,
+} from "@/lib/applications/status";
 import { handleApiError, jsonOk } from "@/lib/api/handler";
-import { parseBusinessInfo } from "@/lib/borrowers/business-info";
+import { mapBorrowerRow, type BorrowerRow } from "@/lib/borrowers/types";
 import {
   getLatestCommitteeAction,
   getCommitteeVotes,
@@ -12,7 +15,12 @@ import { getCommitteeAssessment } from "@/lib/committee/assessment";
 import { getCommitteeCompleteness } from "@/lib/committee/completeness";
 import { getApplicationForStaff } from "@/lib/csa/application";
 import { getActiveComputation } from "@/lib/csa/computation";
-import { getNegotiation } from "@/lib/negotiation/service";
+import { csaScreeningCheckSlug } from "@/lib/csa/sme-duplication";
+import {
+  getNegotiation,
+  listNegotiationMessages,
+  withAuthorNames,
+} from "@/lib/negotiation/service";
 import { requireModulePermission } from "@/lib/permissions/server";
 import { createClient, createServiceClient } from "@/lib/supabase/server";
 
@@ -39,6 +47,7 @@ export async function GET(_request: Request, { params }: RouteParams) {
         field_completeness_ok, field_completeness_notes,
         bi_identity_confirmed, bi_purpose_confirmed, bi_details_confirmed, bi_notes,
         cm_departure_date, cm_salary, cm_position, cm_contract_status, cm_fit_to_work, cm_notes,
+        cm_manager_name, cm_manager_position, cm_manager_contact, cm_manning_agency_name, cm_joining_port,
         pic_verification, reference_verifications, verification_checklist,
         pic_payment_preference, pic_demeanor, pic_rating, pic_rating_reason,
         cif_verified_by, cif_verified_date,
@@ -81,6 +90,9 @@ export async function GET(_request: Request, { params }: RouteParams) {
         : null;
     const computation = await getActiveComputation(supabase, id);
     const negotiation = await getNegotiation(supabase, id);
+    const negotiationMessages = await withAuthorNames(
+      await listNegotiationMessages(supabase, id),
+    );
 
     const myVote = votes.find((v) => v.voterId === user.id)?.vote ?? null;
 
@@ -89,17 +101,23 @@ export async function GET(_request: Request, { params }: RouteParams) {
       latestAction?.actedAt ?? null,
     );
 
-    // Vote/action rows only store actor UUIDs — resolve to names for display.
+    // Vote/action/CSA-recorded rows only store actor UUIDs — resolve to names
+    // for display. `profiles` RLS only allows reading your own row, so Committee
+    // can't otherwise see who on CSA recorded these (same gap fixed on CIG's page).
     const actorIds = Array.from(
       new Set(
-        [...votes.map((v) => v.voterId), latestAction?.actedBy].filter(
-          (v): v is string => Boolean(v),
-        ),
+        [
+          ...votes.map((v) => v.voterId),
+          latestAction?.actedBy,
+          application.privacy_orientation_by as string | null,
+          application.initial_interview_by as string | null,
+          application.endorsed_by as string | null,
+        ].filter((v): v is string => Boolean(v)),
       ),
     );
+    const admin = createServiceClient();
     const nameById = new Map<string, string>();
     if (actorIds.length) {
-      const admin = createServiceClient();
       const { data: profiles } = await admin
         .from("profiles")
         .select("id, full_name, email")
@@ -108,6 +126,66 @@ export async function GET(_request: Request, { params }: RouteParams) {
         nameById.set(p.id as string, (p.full_name as string) || (p.email as string));
       }
     }
+
+    // CSA intake summary — everything CSA recorded before endorsing, same
+    // read-only summary already surfaced on CIG's page.
+    const screeningSlug = csaScreeningCheckSlug(application.segment as string | null);
+    const { data: screeningType } = await admin
+      .from("check_types")
+      .select("id, name")
+      .eq("slug", screeningSlug)
+      .maybeSingle();
+    let csaScreening: {
+      slug: string;
+      name: string | null;
+      result: string;
+      notes: string | null;
+      checkedAt: string | null;
+    } = { slug: screeningSlug, name: null, result: "pending", notes: null, checkedAt: null };
+    if (screeningType?.id) {
+      const { data: screeningCheck } = await admin
+        .from("checks_recorded")
+        .select("result, notes, checked_at")
+        .eq("loan_application_id", id)
+        .eq("check_type_id", screeningType.id)
+        .maybeSingle();
+      csaScreening = {
+        slug: screeningSlug,
+        name: (screeningType.name as string | null) ?? null,
+        result: (screeningCheck?.result as string | undefined) ?? "pending",
+        notes: (screeningCheck?.notes as string | null | undefined) ?? null,
+        checkedAt:
+          (screeningCheck?.checked_at as string | null | undefined) ?? null,
+      };
+    }
+
+    const timeline = (
+      (application.status_history ?? []) as StatusHistoryEntry[]
+    ).map((entry) => ({
+      ...entry,
+      label: formatStatusLabel(entry.status),
+    }));
+
+    const csaSummary = {
+      blocker: application.blocker as string | null,
+      endorsedAt: (application.endorsed_at as string | null) ?? null,
+      endorsedByName: application.endorsed_by
+        ? (nameById.get(application.endorsed_by as string) ?? null)
+        : null,
+      privacyOrientationAt:
+        (application.privacy_orientation_at as string | null) ?? null,
+      privacyOrientationByName: application.privacy_orientation_by
+        ? (nameById.get(application.privacy_orientation_by as string) ?? null)
+        : null,
+      initialInterviewAt:
+        (application.initial_interview_at as string | null) ?? null,
+      initialInterviewNotes:
+        (application.initial_interview_notes as string | null) ?? null,
+      initialInterviewByName: application.initial_interview_by
+        ? (nameById.get(application.initial_interview_by as string) ?? null)
+        : null,
+      timeline,
+    };
 
     return jsonOk({
       application: {
@@ -133,18 +211,7 @@ export async function GET(_request: Request, { params }: RouteParams) {
         canOverride: application.status === "negotiating_terms",
         canAdjustPreDecision: application.status === "for_approval",
       },
-      borrower: borrower
-        ? {
-            id: borrower.id,
-            borrowerNo: borrower.borrower_no,
-            firstName: borrower.first_name,
-            lastName: borrower.last_name,
-            email: borrower.email,
-            businessInfo: borrower.business_info
-              ? parseBusinessInfo(borrower.business_info)
-              : null,
-          }
-        : null,
+      borrower: borrower ? mapBorrowerRow(borrower as BorrowerRow) : null,
       verification: verification
         ? {
             finding: verification.finding,
@@ -163,6 +230,11 @@ export async function GET(_request: Request, { params }: RouteParams) {
             cmContractStatus: verification.cm_contract_status,
             cmFitToWork: verification.cm_fit_to_work,
             cmNotes: verification.cm_notes,
+            cmManagerName: verification.cm_manager_name,
+            cmManagerPosition: verification.cm_manager_position,
+            cmManagerContact: verification.cm_manager_contact,
+            cmManningAgencyName: verification.cm_manning_agency_name,
+            cmJoiningPort: verification.cm_joining_port,
             picVerification: verification.pic_verification,
             referenceVerifications: verification.reference_verifications,
             verificationChecklist: verification.verification_checklist,
@@ -207,6 +279,9 @@ export async function GET(_request: Request, { params }: RouteParams) {
         : null,
       decisionEmail,
       negotiation,
+      negotiationMessages,
+      csaSummary,
+      csaScreening,
       tatDays,
     });
   } catch (error) {

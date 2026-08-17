@@ -55,6 +55,17 @@ test("intake-only signature (no negotiation) shows as confirmed", () => {
   );
 });
 
+test("pre-decision computation (no negotiation, no signature) is not confirmable", () => {
+  assert.equal(
+    computationConfirmState({
+      signedAt: null,
+      negotiationStatus: null,
+      applicationStatus: "for_approval",
+    }),
+    "hidden",
+  );
+});
+
 test("post-sign negotiation status hides confirm button", () => {
   assert.equal(
     computationConfirmState({

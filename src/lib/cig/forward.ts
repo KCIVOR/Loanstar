@@ -121,6 +121,11 @@ export type VerificationPatch = Partial<{
   cmContractStatus: string;
   cmFitToWork: boolean;
   cmNotes: string | null;
+  cmManagerName: string | null;
+  cmManagerPosition: string | null;
+  cmManagerContact: string | null;
+  cmManningAgencyName: string | null;
+  cmJoiningPort: string | null;
   characterReferencesNotes: string;
   charRefOtherLenders: boolean;
   picVerification: PicVerification;
@@ -184,6 +189,21 @@ export function patchToRow(patch: VerificationPatch): Record<string, unknown> {
   }
   if (patch.cmNotes !== undefined) {
     row.cm_notes = patch.cmNotes;
+  }
+  if (patch.cmManagerName !== undefined) {
+    row.cm_manager_name = patch.cmManagerName;
+  }
+  if (patch.cmManagerPosition !== undefined) {
+    row.cm_manager_position = patch.cmManagerPosition;
+  }
+  if (patch.cmManagerContact !== undefined) {
+    row.cm_manager_contact = patch.cmManagerContact;
+  }
+  if (patch.cmManningAgencyName !== undefined) {
+    row.cm_manning_agency_name = patch.cmManningAgencyName;
+  }
+  if (patch.cmJoiningPort !== undefined) {
+    row.cm_joining_port = patch.cmJoiningPort;
   }
   if (patch.characterReferencesNotes !== undefined) {
     row.character_references_notes = patch.characterReferencesNotes;

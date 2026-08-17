@@ -112,7 +112,7 @@ const SEGMENT_LABELS: Record<string, string> = {
   applications: "Applications",
   leads: "Leads",
   masterlist: "Masterlist",
-  dcr: "DCR",
+  dcr: "DCRR",
   documents: "Documents",
   sign: "Sign",
   profile: "Profile",

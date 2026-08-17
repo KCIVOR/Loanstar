@@ -227,7 +227,19 @@ export async function savePdcChecks(
     );
   }
 
-  for (const row of checks) {
+  const normalizedChecks = checks.map((row) => {
+    const checkNumber = row.checkNumber?.trim();
+    if (!checkNumber) {
+      throw new Error("Check number is required for every PDC");
+    }
+    const bankName = row.bankName.trim();
+    if (!bankName) {
+      throw new Error("Bank/Branch is required for every PDC");
+    }
+    return { ...row, checkNumber, bankName };
+  });
+
+  for (const row of normalizedChecks) {
     if (row.amount !== computation.monthlyAmortization) {
       throw new Error(
         `Check amount must equal the monthly amortization (₱${computation.monthlyAmortization})`,
@@ -239,9 +251,9 @@ export async function savePdcChecks(
 
   if (checks.length > 0) {
     const { error: insertError } = await supabase.from("pdc_checks").insert(
-      checks.map((row, index) => ({
+      normalizedChecks.map((row, index) => ({
         release_file_id: releaseFileId,
-        check_number: row.checkNumber ?? null,
+        check_number: row.checkNumber,
         amount: row.amount,
         check_date: row.checkDate,
         bank_name: row.bankName,

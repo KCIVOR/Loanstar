@@ -15,6 +15,7 @@ import {
   Label,
   Modal,
   PageHeader,
+  PhoneInput,
   Select,
   Spinner,
   Stepper,
@@ -22,6 +23,7 @@ import {
 } from "@/components/ui";
 import { DocumentChecklist } from "@/components/DocumentChecklist";
 import { ApplicantProfileFields } from "@/components/borrowers/ApplicantProfileFields";
+import { AutofillOverlay } from "@/components/dev/AutofillOverlay";
 import {
   CiReferencesFormModal,
   ciFormCompletionBadge,
@@ -33,6 +35,8 @@ import { SmeReloanVerificationForm } from "@/components/cig/SmeReloanVerificatio
 import { usePermissions } from "@/hooks/usePermissions";
 import { formatStatusLabel, statusBadgeVariant } from "@/lib/applications/status";
 import type { BorrowerProfile } from "@/lib/borrowers/types";
+import { fakeBorrowerProfile, fakeVerificationPatch } from "@/lib/dev/fake-data";
+import { CSA_ONLY_INTAKE_SLUGS } from "@/lib/documents/csa-only-intake";
 import type {
   FieldVisit,
   SmeReloanVerification,
@@ -76,6 +80,11 @@ type VerificationData = {
   cmContractStatus: string | null;
   cmFitToWork: boolean | null;
   cmNotes: string | null;
+  cmManagerName: string | null;
+  cmManagerPosition: string | null;
+  cmManagerContact: string | null;
+  cmManningAgencyName: string | null;
+  cmJoiningPort: string | null;
   characterReferencesNotes: string | null;
   charRefOtherLenders: boolean | null;
   picVerification: PicVerification | null;
@@ -207,6 +216,28 @@ export default function CigApplicationPage() {
     items: ReceiptItem[];
   } | null>(null);
   const [borrowerId, setBorrowerId] = useState<string | null>(null);
+  const [csaSummary, setCsaSummary] = useState<{
+    blocker: string | null;
+    endorsedByName: string | null;
+    privacyOrientationAt: string | null;
+    privacyOrientationByName: string | null;
+    initialInterviewAt: string | null;
+    initialInterviewNotes: string | null;
+    initialInterviewByName: string | null;
+    timeline: Array<{
+      status: string;
+      label: string;
+      at: string;
+      note?: string | null;
+    }>;
+  } | null>(null);
+  const [csaScreening, setCsaScreening] = useState<{
+    slug: string;
+    name: string | null;
+    result: string;
+    notes: string | null;
+    checkedAt: string | null;
+  } | null>(null);
   const [returnNote, setReturnNote] = useState("");
   const [returnOpen, setReturnOpen] = useState(false);
   const [submitOpen, setSubmitOpen] = useState(false);
@@ -229,9 +260,22 @@ export default function CigApplicationPage() {
           statusLabel: string;
           applicationNo: string | null;
           endorsedAt: string | null;
+          endorsedByName?: string | null;
           segment?: "seafarer" | "sme";
           entityType?: "individual" | "corporate" | null;
           isReloan?: boolean;
+          blocker?: string | null;
+          privacyOrientationAt?: string | null;
+          privacyOrientationByName?: string | null;
+          initialInterviewAt?: string | null;
+          initialInterviewNotes?: string | null;
+          initialInterviewByName?: string | null;
+          timeline?: Array<{
+            status: string;
+            label: string;
+            at: string;
+            note?: string | null;
+          }>;
         };
         borrower: (BorrowerProfile & { id?: string }) | null;
         verification: VerificationData;
@@ -239,6 +283,13 @@ export default function CigApplicationPage() {
         sequence?: CigSequenceState;
         activeCallback: ActiveCallback;
         receipt: { ready: boolean; items: ReceiptItem[] } | null;
+        csaScreening?: {
+          slug: string;
+          name: string | null;
+          result: string;
+          notes: string | null;
+          checkedAt: string | null;
+        };
       };
       setEditable(appData.application.editable);
       setApplicationStatus(appData.application.status);
@@ -256,6 +307,20 @@ export default function CigApplicationPage() {
       setSequence(appData.sequence ?? FALLBACK_SEQUENCE);
       setActiveCallback(appData.activeCallback);
       setReceipt(appData.receipt ?? null);
+      setCsaSummary({
+        blocker: appData.application.blocker ?? null,
+        endorsedByName: appData.application.endorsedByName ?? null,
+        privacyOrientationAt: appData.application.privacyOrientationAt ?? null,
+        privacyOrientationByName:
+          appData.application.privacyOrientationByName ?? null,
+        initialInterviewAt: appData.application.initialInterviewAt ?? null,
+        initialInterviewNotes:
+          appData.application.initialInterviewNotes ?? null,
+        initialInterviewByName:
+          appData.application.initialInterviewByName ?? null,
+        timeline: appData.application.timeline ?? [],
+      });
+      setCsaScreening(appData.csaScreening ?? null);
 
       if (checksRes.ok) {
         const checksData = (await checksRes.json()) as { checks: CheckItem[] };
@@ -363,6 +428,21 @@ export default function CigApplicationPage() {
       }
       if (verification.cmNotes != null) {
         patch.cmNotes = verification.cmNotes;
+      }
+      if (verification.cmManagerName != null) {
+        patch.cmManagerName = verification.cmManagerName;
+      }
+      if (verification.cmManagerPosition != null) {
+        patch.cmManagerPosition = verification.cmManagerPosition;
+      }
+      if (verification.cmManagerContact != null) {
+        patch.cmManagerContact = verification.cmManagerContact;
+      }
+      if (verification.cmManningAgencyName != null) {
+        patch.cmManningAgencyName = verification.cmManningAgencyName;
+      }
+      if (verification.cmJoiningPort != null) {
+        patch.cmJoiningPort = verification.cmJoiningPort;
       }
     }
 
@@ -773,6 +853,155 @@ export default function CigApplicationPage() {
         <Stepper steps={workspaceSteps} className="w-full max-w-none" />
       </Card>
 
+      {csaSummary ? (
+        <Card className="mb-6 border-l-[3px] !border-l-teal-500 !bg-surface-2/30">
+          <div className="mb-3 flex flex-wrap items-center gap-2">
+            <h2 className="font-display text-lg font-semibold text-navy-900">
+              CSA intake summary
+            </h2>
+            <Badge variant="neutral">From CSA</Badge>
+          </div>
+          <p className="mb-4 text-sm text-ink-500">
+            Read-only — everything CSA recorded before endorsing this file.
+          </p>
+
+          {csaSummary.blocker ? (
+            <div className="mb-4 rounded-[var(--r-md)] border border-warning/40 bg-warning/10 px-3 py-2.5">
+              <p className="text-sm font-medium text-ink-800">
+                On hold — {csaSummary.blocker}
+              </p>
+            </div>
+          ) : null}
+
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wide text-ink-400">
+                Data Privacy Act orientation
+              </p>
+              {csaSummary.privacyOrientationAt ? (
+                <p className="mt-1 text-sm text-ink-700">
+                  Recorded{" "}
+                  <span className="mono">
+                    {new Date(
+                      csaSummary.privacyOrientationAt,
+                    ).toLocaleString()}
+                  </span>
+                  {csaSummary.privacyOrientationByName
+                    ? ` · ${csaSummary.privacyOrientationByName}`
+                    : null}
+                </p>
+              ) : (
+                <p className="mt-1 text-sm text-ink-400">Not recorded.</p>
+              )}
+            </div>
+
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wide text-ink-400">
+                {csaScreening?.name ??
+                  (segment === "sme" ? "SME duplication check" : "NCL check")}
+              </p>
+              <div className="mt-1 flex items-center gap-2">
+                <Badge
+                  variant={
+                    csaScreening?.result === "pass"
+                      ? "success"
+                      : csaScreening?.result === "fail"
+                        ? "danger"
+                        : "neutral"
+                  }
+                >
+                  {csaScreening?.result ?? "pending"}
+                </Badge>
+                {csaScreening?.checkedAt ? (
+                  <span className="text-xs text-ink-400">
+                    {new Date(csaScreening.checkedAt).toLocaleDateString()}
+                  </span>
+                ) : null}
+              </div>
+              {csaScreening?.notes ? (
+                <p className="mt-1 text-sm text-ink-700">
+                  {csaScreening.notes}
+                </p>
+              ) : null}
+            </div>
+
+            <div className="sm:col-span-2">
+              <p className="text-xs font-semibold uppercase tracking-wide text-ink-400">
+                Initial interview
+              </p>
+              {csaSummary.initialInterviewAt ? (
+                <>
+                  <p className="mt-1 text-sm text-ink-700">
+                    Recorded{" "}
+                    <span className="mono">
+                      {new Date(
+                        csaSummary.initialInterviewAt,
+                      ).toLocaleString()}
+                    </span>
+                    {csaSummary.initialInterviewByName
+                      ? ` · ${csaSummary.initialInterviewByName}`
+                      : null}
+                  </p>
+                  {csaSummary.initialInterviewNotes ? (
+                    <p className="mt-1 whitespace-pre-wrap text-sm text-ink-600">
+                      {csaSummary.initialInterviewNotes}
+                    </p>
+                  ) : null}
+                </>
+              ) : (
+                <p className="mt-1 text-sm text-ink-400">Not recorded.</p>
+              )}
+            </div>
+
+            <div className="sm:col-span-2">
+              <p className="text-xs font-semibold uppercase tracking-wide text-ink-400">
+                Endorsed to CIG
+              </p>
+              <p className="mt-1 text-sm text-ink-700">
+                {endorsedAt
+                  ? new Date(endorsedAt).toLocaleString()
+                  : "Not yet endorsed"}
+                {csaSummary.endorsedByName
+                  ? ` · ${csaSummary.endorsedByName}`
+                  : null}
+              </p>
+            </div>
+          </div>
+
+          {csaSummary.timeline.length ? (
+            <div className="mt-5 border-t border-line-soft pt-4">
+              <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-ink-400">
+                Status history
+              </p>
+              <ul className="flex flex-col gap-2">
+                {[...csaSummary.timeline]
+                  .reverse()
+                  .slice(0, 8)
+                  .map((entry, index) => (
+                    <li
+                      key={`${entry.status}-${entry.at}-${index}`}
+                      className="flex flex-wrap items-baseline justify-between gap-2 text-sm"
+                    >
+                      <span className="font-medium text-ink-900">
+                        {entry.label ?? formatStatusLabel(entry.status)}
+                        {entry.note ? (
+                          <span className="font-normal text-ink-500">
+                            {" "}
+                            · {entry.note}
+                          </span>
+                        ) : null}
+                      </span>
+                      <span className="mono text-xs text-ink-400">
+                        {new Date(entry.at).toLocaleString()}
+                      </span>
+                    </li>
+                  ))}
+              </ul>
+            </div>
+          ) : null}
+        </Card>
+      ) : null}
+
       {editable && receipt ? (
         <Card className="mb-6">
           <h2 className="mb-1 font-display text-lg font-semibold text-navy-900">
@@ -829,7 +1058,19 @@ export default function CigApplicationPage() {
         checklistApiPath={`/api/cig/applications/${applicationId}/checklist`}
         viewApiPath={(documentId) => `/api/documents/${documentId}/download`}
         title="Borrower attachments"
-        description="Read-only — passport, seaman's book, contract, and other intake files. Computation details are not shown to CIG."
+        description="Read-only — passport, seaman's book, contract, and other intake files uploaded by the borrower. Computation details are not shown to CIG."
+        excludeSlugs={CSA_ONLY_INTAKE_SLUGS}
+      />
+      <DocumentChecklist
+        applicationId={applicationId}
+        borrowerId={borrowerId ?? ""}
+        stage="intake"
+        readOnly
+        checklistApiPath={`/api/cig/applications/${applicationId}/checklist`}
+        viewApiPath={(documentId) => `/api/documents/${documentId}/download`}
+        title="CSA attachments"
+        description="Read-only — signed in person at the branch and uploaded by CSA on the borrower's behalf."
+        includeSlugs={CSA_ONLY_INTAKE_SLUGS}
       />
 
       {borrower ? (
@@ -849,7 +1090,7 @@ export default function CigApplicationPage() {
               variant="secondary"
               onClick={() => setShowApplicationForm(true)}
             >
-              Open application form
+              View application form
             </Button>
           </Card>
           <Modal
@@ -1507,6 +1748,90 @@ export default function CigApplicationPage() {
                         </Select>
                       </div>
                     </div>
+
+                    <h3 className="mb-1 mt-5 font-display text-sm font-semibold uppercase tracking-wide text-navy-800">
+                      Crewing manager contact
+                    </h3>
+                    <p className="mb-3 text-sm text-ink-500">
+                      Who at the manning agency confirmed these details.
+                    </p>
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      <div>
+                        <Label htmlFor="cmManagerName">Name of crewing manager</Label>
+                        <Input
+                          id="cmManagerName"
+                          disabled={!editable}
+                          value={verification.cmManagerName ?? ""}
+                          onChange={(e) =>
+                            setVerification({
+                              ...verification,
+                              cmManagerName: e.target.value,
+                            })
+                          }
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="cmManagerPosition">
+                          Crewing manager&apos;s position
+                        </Label>
+                        <Input
+                          id="cmManagerPosition"
+                          disabled={!editable}
+                          value={verification.cmManagerPosition ?? ""}
+                          onChange={(e) =>
+                            setVerification({
+                              ...verification,
+                              cmManagerPosition: e.target.value,
+                            })
+                          }
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="cmManagerContact">Contact number</Label>
+                        <PhoneInput
+                          id="cmManagerContact"
+                          disabled={!editable}
+                          value={verification.cmManagerContact ?? ""}
+                          onChange={(v) =>
+                            setVerification({
+                              ...verification,
+                              cmManagerContact: v,
+                            })
+                          }
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="cmManningAgencyName">
+                          Name of manning agency
+                        </Label>
+                        <Input
+                          id="cmManningAgencyName"
+                          disabled={!editable}
+                          value={verification.cmManningAgencyName ?? ""}
+                          onChange={(e) =>
+                            setVerification({
+                              ...verification,
+                              cmManningAgencyName: e.target.value,
+                            })
+                          }
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="cmJoiningPort">Joining port</Label>
+                        <Input
+                          id="cmJoiningPort"
+                          disabled={!editable}
+                          value={verification.cmJoiningPort ?? ""}
+                          onChange={(e) =>
+                            setVerification({
+                              ...verification,
+                              cmJoiningPort: e.target.value,
+                            })
+                          }
+                        />
+                      </div>
+                    </div>
+
                     {editable ? (
                       <div className="mt-4">
                         <Button
@@ -1839,6 +2164,27 @@ export default function CigApplicationPage() {
           />
         </div>
       </ConfirmDialog>
+      <AutofillOverlay
+        actions={[
+          {
+            label: "Fill CI Report",
+            onClick: () =>
+              setVerification((prev) => ({
+                ...(prev as VerificationData),
+                ...fakeVerificationPatch(segment, isReloan),
+              })),
+          },
+          ...(borrower
+            ? [
+                {
+                  label: "Fill Application Form",
+                  onClick: () =>
+                    setBorrower(fakeBorrowerProfile(segment, entityType, borrower)),
+                },
+              ]
+            : []),
+        ]}
+      />
     </div>
   );
 }

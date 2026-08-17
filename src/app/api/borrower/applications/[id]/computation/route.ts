@@ -5,7 +5,13 @@ import { z } from "zod";
 import { writeAuditEvent } from "@/lib/audit/writer";
 import { handleApiError, jsonOk } from "@/lib/api/handler";
 import { getActiveComputation } from "@/lib/csa/computation";
-import { getNegotiation, queueForLra } from "@/lib/negotiation/service";
+import {
+  getNegotiation,
+  listNegotiationMessages,
+  logAcceptance,
+  queueForLra,
+  withAuthorNames,
+} from "@/lib/negotiation/service";
 import {
   ForbiddenError,
   requireModulePermission,
@@ -44,15 +50,19 @@ export async function GET(_request: Request, { params }: RouteParams) {
     const supabase = await createClient();
     const computation = await getActiveComputation(supabase, id);
     const negotiation = await getNegotiation(supabase, id);
+    const messages = await withAuthorNames(
+      await listNegotiationMessages(supabase, id),
+    );
 
     if (!computation) {
-      return jsonOk({ computation: null, negotiation });
+      return jsonOk({ computation: null, negotiation, negotiationMessages: messages });
     }
 
     return jsonOk({
       negotiation: negotiation
         ? { status: negotiation.status, currentAmount: negotiation.currentAmount }
         : null,
+      negotiationMessages: messages,
       computation: {
         id: computation.id,
         inputMode: computation.inputMode,
@@ -145,6 +155,14 @@ export async function POST(request: Request, { params }: RouteParams) {
     }
 
     if (negotiation && negotiation.status === "awaiting_signature") {
+      await logAcceptance(
+        supabase,
+        id,
+        user.id,
+        "borrower",
+        computation.netReleased,
+        "Signed and accepted the disclosed computation.",
+      );
       await queueForLra(supabase, id, computation.id, user.id);
     }
 

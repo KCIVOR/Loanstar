@@ -194,7 +194,7 @@ export default function RemedialDcrPage() {
         setDraftPaymentIds(
           (existing.dcr_items ?? []).map((item) => item.payment_id),
         );
-        setMessage("Resumed open DCR draft.");
+        setMessage("Resumed open DCRR draft.");
         return;
       }
       const res = await fetch("/api/collector/dcr", {
@@ -206,12 +206,12 @@ export default function RemedialDcrPage() {
         const body = (await res.json().catch(() => null)) as {
           error?: string;
         } | null;
-        throw new Error(body?.error ?? "Failed to create DCR");
+        throw new Error(body?.error ?? "Failed to create DCRR");
       }
       const data = (await res.json()) as { dcrId: string };
       setDraftDcrId(data.dcrId);
       setDraftPaymentIds([]);
-      setMessage("DCR draft created.");
+      setMessage("DCRR draft created.");
       await load({ silent: true });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed");
@@ -343,10 +343,10 @@ export default function RemedialDcrPage() {
         const body = (await res.json().catch(() => null)) as {
           error?: string;
         } | null;
-        throw new Error(body?.error ?? "Could not add to DCR");
+        throw new Error(body?.error ?? "Could not add to DCRR");
       }
       setAllocationModal(null);
-      setMessage("Payment added to DCR.");
+      setMessage("Payment added to DCRR.");
       await load({ silent: true });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed");
@@ -375,7 +375,7 @@ export default function RemedialDcrPage() {
       setConfirmSubmit(false);
       setDraftDcrId(null);
       setDraftPaymentIds([]);
-      setMessage("DCR submitted to AR.");
+      setMessage("DCRR submitted to AR.");
       await load({ silent: true });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed");
@@ -404,21 +404,24 @@ export default function RemedialDcrPage() {
   return (
     <div>
       <PageHeader
-        title="DCR"
+        title="DCRR"
         description="Batch confirmed remedial payments into a daily collection report for AR."
         actions={
           <div className="flex gap-2">
+            <Link href="/collector/dcr/history" className="btn btn-secondary">
+              DCRR history
+            </Link>
             {draftDcrId ? (
               <Button
                 loading={acting}
                 onClick={() => setConfirmSubmit(true)}
                 disabled={draftItems.length === 0}
               >
-                Submit DCR
+                Submit DCRR
               </Button>
             ) : (
               <Button loading={acting} onClick={() => void startDcr()}>
-                New DCR
+                New DCRR
               </Button>
             )}
           </div>
@@ -453,7 +456,7 @@ export default function RemedialDcrPage() {
       ) : (
         <div className="mb-6">
           <Alert variant="info">
-            Start a DCR draft, then add confirmed payments below. Record
+            Start a DCRR draft, then add confirmed payments below. Record
             payments from an assigned account in the{" "}
             <Link href="/remedial" className="font-semibold underline">
               recovery queue
@@ -487,7 +490,7 @@ export default function RemedialDcrPage() {
             description={
               draftDcrId
                 ? "Add confirmed payments from the list below."
-                : "Create a New DCR to begin batching."
+                : "Create a New DCRR to begin batching."
             }
             showMark={false}
           />
@@ -590,7 +593,7 @@ export default function RemedialDcrPage() {
                         </Badge>
                         {already ? (
                           <Badge variant="success" className="ml-1.5">
-                            In DCR
+                            In DCRR
                           </Badge>
                         ) : null}
                       </Td>
@@ -601,7 +604,7 @@ export default function RemedialDcrPage() {
                             loading={acting}
                             onClick={() => void openAllocationModal(pay.id)}
                           >
-                            Add to DCR
+                            Add to DCRR
                           </Button>
                         ) : already ? (
                           <span className="text-xs text-ink-400">Added</span>
@@ -627,9 +630,9 @@ export default function RemedialDcrPage() {
 
       <ConfirmDialog
         open={confirmSubmit}
-        title="Submit DCR to AR?"
+        title="Submit DCRR to AR?"
         message={`Submit ${draftItems.length} payment${draftItems.length === 1 ? "" : "s"} totaling ₱${formatMoney(draftTotal)} for reconciliation.`}
-        confirmLabel="Submit DCR"
+        confirmLabel="Submit DCRR"
         loading={acting}
         onConfirm={() => void submitDcr()}
         onCancel={() => setConfirmSubmit(false)}
@@ -658,7 +661,7 @@ export default function RemedialDcrPage() {
               loading={acting}
               disabled={allocationMismatch}
             >
-              Add to DCR
+              Add to DCRR
             </Button>
           </>
         }

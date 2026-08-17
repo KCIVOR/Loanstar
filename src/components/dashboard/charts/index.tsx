@@ -5,6 +5,7 @@ import {
   CartesianGrid,
   Cell,
   ComposedChart,
+  Legend,
   Line,
   LineChart,
   Pie,
@@ -27,6 +28,8 @@ function formatValue(value: unknown): string {
   return typeof value === "number" ? numberFormat.format(value) : String(value ?? "");
 }
 
+const LEGEND_STYLE = { fontSize: 11, color: CHART.inkFaint };
+
 /** Vertical bars, optionally stacked, with an optional line overlay. */
 export function BarMini({
   data,
@@ -35,6 +38,7 @@ export function BarMini({
   line,
   height = 140,
   stacked = false,
+  showLegend = false,
 }: {
   data: Datum[];
   xKey: string;
@@ -42,6 +46,10 @@ export function BarMini({
   line?: SeriesDef;
   height?: number;
   stacked?: boolean;
+  /** Opt-in — ships a legend for ≥2-series charts per the accessibility rule
+   * that identity must never be color-alone. Off by default so existing
+   * single-series usages are unaffected. */
+  showLegend?: boolean;
 }) {
   return (
     <ResponsiveContainer width="100%" height={height}>
@@ -50,6 +58,7 @@ export function BarMini({
         <XAxis dataKey={xKey} tick={AXIS_TICK} tickLine={false} axisLine={false} />
         <YAxis tick={AXIS_TICK} tickLine={false} axisLine={false} width={52} />
         <Tooltip contentStyle={TOOLTIP_STYLE} formatter={(v) => formatValue(v)} />
+        {showLegend ? <Legend wrapperStyle={LEGEND_STYLE} /> : null}
         {bars.map((bar) => (
           <Bar
             key={bar.key}
@@ -82,11 +91,15 @@ export function HBarMini({
   yKey,
   bars,
   height = 140,
+  showLegend = false,
 }: {
   data: Datum[];
   yKey: string;
   bars: SeriesDef[];
   height?: number;
+  /** Opt-in — ships a legend for ≥2-series charts. Off by default so
+   * existing single-series usages are unaffected. */
+  showLegend?: boolean;
 }) {
   return (
     <ResponsiveContainer width="100%" height={height}>
@@ -106,6 +119,7 @@ export function HBarMini({
           width={92}
         />
         <Tooltip contentStyle={TOOLTIP_STYLE} formatter={(v) => formatValue(v)} />
+        {showLegend ? <Legend wrapperStyle={LEGEND_STYLE} /> : null}
         {bars.map((bar) => (
           <Bar
             key={bar.key}
@@ -121,17 +135,71 @@ export function HBarMini({
   );
 }
 
+/** Horizontal ranked bars — one row, one value, optional per-row color and
+ * a direct label on every bar. Use for ordered/severity scales (pass a
+ * sequential ramp color per row) or ranked lists (pass one flat color —
+ * color follows the entity, not its rank, so re-sorting never repaints). */
+export function RankedBarMini({
+  data,
+  yKey,
+  valueKey,
+  color = CHART.gold,
+  height = 140,
+}: {
+  data: Array<Datum & { color?: string }>;
+  yKey: string;
+  valueKey: string;
+  color?: string;
+  height?: number;
+}) {
+  return (
+    <ResponsiveContainer width="100%" height={height}>
+      <ComposedChart
+        data={data}
+        layout="vertical"
+        margin={{ top: 4, right: 48, bottom: 0, left: 0 }}
+      >
+        <CartesianGrid stroke={CHART.grid} horizontal={false} />
+        <XAxis type="number" tick={AXIS_TICK} tickLine={false} axisLine={false} allowDecimals={false} />
+        <YAxis
+          type="category"
+          dataKey={yKey}
+          tick={AXIS_TICK}
+          tickLine={false}
+          axisLine={false}
+          width={110}
+        />
+        <Tooltip contentStyle={TOOLTIP_STYLE} formatter={(v) => formatValue(v)} />
+        <Bar
+          dataKey={valueKey}
+          radius={[0, 3, 3, 0]}
+          maxBarSize={18}
+          label={{ position: "right", fontSize: 11, fill: CHART.ink, formatter: formatValue }}
+        >
+          {data.map((row) => (
+            <Cell key={String(row[yKey])} fill={row.color ?? color} />
+          ))}
+        </Bar>
+      </ComposedChart>
+    </ResponsiveContainer>
+  );
+}
+
 /** Single- or multi-line trend chart. */
 export function LineMini({
   data,
   xKey,
   lines,
   height = 140,
+  showLegend = false,
 }: {
   data: Datum[];
   xKey: string;
   lines: SeriesDef[];
   height?: number;
+  /** Opt-in — ships a legend for ≥2-series charts. Off by default so
+   * existing single-series usages are unaffected. */
+  showLegend?: boolean;
 }) {
   return (
     <ResponsiveContainer width="100%" height={height}>
@@ -140,6 +208,7 @@ export function LineMini({
         <XAxis dataKey={xKey} tick={AXIS_TICK} tickLine={false} axisLine={false} />
         <YAxis tick={AXIS_TICK} tickLine={false} axisLine={false} width={52} />
         <Tooltip contentStyle={TOOLTIP_STYLE} formatter={(v) => formatValue(v)} />
+        {showLegend ? <Legend wrapperStyle={LEGEND_STYLE} /> : null}
         {lines.map((line) => (
           <Line
             key={line.key}
@@ -161,15 +230,20 @@ export function LineMini({
 export function DonutMini({
   data,
   height = 140,
+  showLegend = false,
 }: {
   data: Array<{ name: string; value: number; color?: string }>;
   height?: number;
+  /** Opt-in — a donut's slices are categorical identity, which the
+   * accessibility rule says must never be color-alone once there are ≥2. */
+  showLegend?: boolean;
 }) {
   const slices = data.filter((d) => d.value > 0);
   return (
     <ResponsiveContainer width="100%" height={height}>
       <PieChart margin={{ top: 0, right: 0, bottom: 0, left: 0 }}>
         <Tooltip contentStyle={TOOLTIP_STYLE} formatter={(v) => formatValue(v)} />
+        {showLegend ? <Legend wrapperStyle={LEGEND_STYLE} /> : null}
         <Pie
           data={slices}
           dataKey="value"

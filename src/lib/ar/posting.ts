@@ -94,7 +94,7 @@ async function validateAllocationLines(
   const expected = halfUp(paymentAmount);
   if (total !== expected) {
     throw new Error(
-      `Allocation total ${total.toFixed(2)} does not match the payment amount ${expected.toFixed(2)} — adjust the installment split before adding to the DCR`,
+      `Allocation total ${total.toFixed(2)} does not match the payment amount ${expected.toFixed(2)} — adjust the installment split before adding to the DCRR`,
     );
   }
 
@@ -438,6 +438,118 @@ export async function refreshMasterlistAging(
   return { agingBucket, remedialFlag };
 }
 
+/**
+ * AR rejects a submitted DCRR — e.g. deposit doesn't match, wrong payments
+ * batched, misallocated. Payments stay at `confirmed`: `isActiveDcrStatus()`
+ * already excludes 'rejected', so they're immediately eligible to be
+ * re-batched onto a new DCRR without any extra revert step. Returns enough
+ * to notify the submitter and every distinct borrower whose payment was
+ * batched in.
+ */
+export async function rejectDcr(
+  supabase: SupabaseClient,
+  dcrId: string,
+  actorId: string,
+  reason: string,
+): Promise<{
+  collectorUserId: string;
+  loanApplicationIds: string[];
+}> {
+  const { data: dcr } = await supabase
+    .from("dcr")
+    .select("id, status, collector_user_id")
+    .eq("id", dcrId)
+    .single();
+
+  if (!dcr || dcr.status !== "submitted") {
+    throw new Error("DCRR must be submitted before it can be rejected");
+  }
+
+  const now = new Date().toISOString();
+
+  // Snapshot line items before deleting `dcr_items` — `dcr_items_payment_id_unique`
+  // means the row must be gone before the payment can be re-batched, but AR/Collector
+  // still need to see what was rejected, so the display data is preserved on `dcr`.
+  const { data: items, error: itemsError } = await supabase
+    .from("dcr_items")
+    .select(
+      `
+      id,
+      amount,
+      payment_id,
+      payments (
+        id,
+        reference_no,
+        payment_date,
+        amount,
+        masterlist_id,
+        storage_path,
+        file_name,
+        notes,
+        loan_application_id,
+        masterlist ( borrower_name, loan_account_no, segment )
+      )
+    `,
+    )
+    .eq("dcr_id", dcrId);
+
+  if (itemsError) {
+    throw new Error(itemsError.message);
+  }
+
+  const loanApplicationIds = new Set<string>();
+  for (const item of items ?? []) {
+    const raw = item.payments as
+      | { loan_application_id?: string | null }
+      | { loan_application_id?: string | null }[]
+      | null;
+    const payment = Array.isArray(raw) ? raw[0] : raw;
+    if (payment?.loan_application_id) {
+      loanApplicationIds.add(payment.loan_application_id);
+    }
+  }
+
+  const { error: updateError } = await supabase
+    .from("dcr")
+    .update({
+      status: "rejected",
+      rejected_by: actorId,
+      rejected_at: now,
+      notes: reason,
+      rejected_items: items ?? [],
+    })
+    .eq("id", dcrId);
+
+  if (updateError) {
+    throw new Error(updateError.message);
+  }
+
+  const { error: deleteError } = await supabase
+    .from("dcr_items")
+    .delete()
+    .eq("dcr_id", dcrId);
+
+  if (deleteError) {
+    throw new Error(deleteError.message);
+  }
+
+  const paymentIds = (items ?? [])
+    .map((item) => item.payment_id as string)
+    .filter(Boolean);
+  if (paymentIds.length) {
+    const { error: flagError } = await supabase
+      .from("payments")
+      .update({ flagged_reason: reason, flagged_at: now })
+      .in("id", paymentIds);
+    if (flagError) throw new Error(flagError.message);
+  }
+
+  return {
+    collectorUserId: dcr.collector_user_id as string,
+    loanApplicationIds: Array.from(loanApplicationIds),
+  };
+}
+
 export async function reconcileAndPostDcr(
   supabase: SupabaseClient,
   dcrId: string,
@@ -455,7 +567,7 @@ export async function reconcileAndPostDcr(
     .single();
 
   if (!dcr || dcr.status !== "submitted") {
-    throw new Error("DCR must be submitted before reconciliation");
+    throw new Error("DCRR must be submitted before reconciliation");
   }
 
   const { data: items } = await supabase
@@ -464,7 +576,7 @@ export async function reconcileAndPostDcr(
     .eq("dcr_id", dcrId);
 
   if (!items?.length) {
-    throw new Error("DCR has no payment items");
+    throw new Error("DCRR has no payment items");
   }
 
   // The confirmed bank deposit must match the DCR total — a mismatched
@@ -474,7 +586,7 @@ export async function reconcileAndPostDcr(
   );
   if (halfUp(input.depositAmount) !== dcrTotal) {
     throw new Error(
-      `Deposit amount ${input.depositAmount.toFixed(2)} does not match the DCR total ${dcrTotal.toFixed(2)} — verify the bank deposit before posting`,
+      `Deposit amount ${input.depositAmount.toFixed(2)} does not match the DCRR total ${dcrTotal.toFixed(2)} — verify the bank deposit before posting`,
     );
   }
 
@@ -557,6 +669,8 @@ export async function reconcileAndPostDcr(
         status: "posted",
         reviewed_by: actorId,
         reviewed_at: now,
+        flagged_reason: null,
+        flagged_at: null,
       })
       .eq("id", payment.id);
 
@@ -607,11 +721,11 @@ export async function submitDcr(
     .single();
 
   if (!dcr || dcr.collector_user_id !== collectorUserId) {
-    throw new Error("DCR not found");
+    throw new Error("DCRR not found");
   }
 
   if (dcr.status !== "draft") {
-    throw new Error("DCR already submitted");
+    throw new Error("DCRR already submitted");
   }
 
   const { count } = await supabase
@@ -620,7 +734,7 @@ export async function submitDcr(
     .eq("dcr_id", dcrId);
 
   if (!count) {
-    throw new Error("Add at least one payment to the DCR");
+    throw new Error("Add at least one payment to the DCRR");
   }
 
   const now = new Date().toISOString();
@@ -660,7 +774,7 @@ export async function createDcrDraft(
     .single();
 
   if (error || !data) {
-    throw new Error(error?.message ?? "Failed to create DCR");
+    throw new Error(error?.message ?? "Failed to create DCRR");
   }
 
   return { dcrId: data.id as string };
@@ -680,7 +794,7 @@ export async function addPaymentToDcr(
     .single();
 
   if (!dcr || dcr.collector_user_id !== collectorUserId || dcr.status !== "draft") {
-    throw new Error("DCR not editable");
+    throw new Error("DCRR not editable");
   }
 
   const { data: payment } = await supabase
@@ -690,7 +804,7 @@ export async function addPaymentToDcr(
     .single();
 
   if (!payment || !["pending_verification", "confirmed"].includes(payment.status as string)) {
-    throw new Error("Payment not available for DCR");
+    throw new Error("Payment not available for DCRR");
   }
 
   const { data: existingItems, error: existingError } = await supabase
@@ -707,7 +821,7 @@ export async function addPaymentToDcr(
   });
 
   if (alreadyBatched) {
-    throw new Error("Payment is already on a DCR");
+    throw new Error("Payment is already on a DCRR");
   }
 
   const masterlistId = payment.masterlist_id as string;
@@ -740,7 +854,7 @@ export async function addPaymentToDcr(
     .single();
 
   if (error || !dcrItem) {
-    throw new Error(error?.message ?? "Failed to add payment to DCR");
+    throw new Error(error?.message ?? "Failed to add payment to DCRR");
   }
 
   if (resolvedAllocations.length > 0) {

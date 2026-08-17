@@ -9,6 +9,7 @@ import {
   ConfirmDialog,
   Input,
   Label,
+  Textarea,
 } from "@/components/ui";
 import { computationConfirmState } from "@/lib/negotiation/computation-confirm-state";
 
@@ -61,6 +62,7 @@ export function ComputationSign({
   const [message, setMessage] = useState<string | null>(null);
   const [showDialog, setShowDialog] = useState(false);
   const [counterAmount, setCounterAmount] = useState("");
+  const [counterMessage, setCounterMessage] = useState("");
   const [countering, setCountering] = useState(false);
 
   if (!computation) return null;
@@ -110,12 +112,16 @@ export function ComputationSign({
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ amount: Number(counterAmount) }),
+          body: JSON.stringify({
+            amount: Number(counterAmount),
+            message: counterMessage.trim() || undefined,
+          }),
         },
       );
       const data = (await res.json()) as { error?: string };
       if (!res.ok) throw new Error(data.error ?? "Counter failed");
       setCounterAmount("");
+      setCounterMessage("");
       setMessage(
         "Counter-offer submitted. Committee will review the new amount.",
       );
@@ -229,6 +235,16 @@ export function ComputationSign({
               onChange={(e) => setCounterAmount(e.target.value)}
               required
               className="mono"
+            />
+          </div>
+          <div>
+            <Label htmlFor="counterMessage">Note (optional)</Label>
+            <Textarea
+              id="counterMessage"
+              rows={2}
+              value={counterMessage}
+              onChange={(e) => setCounterMessage(e.target.value)}
+              placeholder="Explain why you're requesting this amount…"
             />
           </div>
           <Button type="submit" variant="secondary" loading={countering}>

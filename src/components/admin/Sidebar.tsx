@@ -296,7 +296,7 @@ const PORTAL_NAV_ITEMS: PortalNavItem[] = [
     modules: ["accounting_ar"],
     children: [
       { href: "/ar", label: "Masterlist", exact: true, matchPrefixes: ["/ar/masterlist"] },
-      { href: "/ar/dcr", label: "DCR queue" },
+      { href: "/ar/dcr", label: "DCRR queue" },
       { href: "/ar/history", label: "Posting history" },
     ],
   },
@@ -309,8 +309,8 @@ const PORTAL_NAV_ITEMS: PortalNavItem[] = [
       { href: "/collector", label: "Overview", exact: true },
       { href: "/collector/accounts", label: "Accounts" },
       { href: "/collector/proofs", label: "Payment proofs" },
-      { href: "/collector/dcr", label: "DCR" },
-      { href: "/collector/dcr/history", label: "DCR history" },
+      { href: "/collector/dcr", label: "DCRR" },
+      { href: "/collector/dcr/history", label: "DCRR history" },
       { href: "/collector/history", label: "History" },
       { href: "/collector/closed-accounts", label: "Closed accounts" },
     ],
@@ -328,7 +328,7 @@ const PORTAL_NAV_ITEMS: PortalNavItem[] = [
         exact: true,
         matchPrefixes: ["/remedial/accounts"],
       },
-      { href: "/remedial/dcr", label: "DCR" },
+      { href: "/remedial/dcr", label: "DCRR" },
     ],
   },
 ];
