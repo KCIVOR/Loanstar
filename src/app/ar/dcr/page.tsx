@@ -45,6 +45,10 @@ type DcrRow = {
   dcr_items: Array<{
     id?: string;
     amount: number;
+    status?: "pending" | "posted" | "rejected";
+    deposit_reference?: string | null;
+    deposit_amount?: number | null;
+    posted_at?: string | null;
     payments: {
       id?: string;
       reference_no: string | null;
@@ -240,14 +244,14 @@ export default function ArDcrPage() {
     void load();
   }, [load]);
 
-  async function reject(dcrId: string) {
+  async function reject(itemId: string) {
     const reason = rejectReason.trim();
     if (!reason) return;
     setRejecting(true);
     setError(null);
     setMessage(null);
     try {
-      const res = await fetch(`/api/ar/dcr/${dcrId}/reject`, {
+      const res = await fetch(`/api/ar/dcr/items/${itemId}/reject`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ reason }),
@@ -260,7 +264,7 @@ export default function ArDcrPage() {
       }
       setRejectId(null);
       setRejectReason("");
-      setMessage("DCRR rejected — the collector and affected borrowers were notified.");
+      setMessage("Payment rejected — the collector and borrower were notified. Other items on this DCRR are unaffected.");
       await load({ silent: true });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Reject failed");
@@ -293,15 +297,15 @@ export default function ArDcrPage() {
     }
   }
 
-  async function reconcile(dcrId: string) {
-    const ref = depositRef[dcrId]?.trim();
-    const amount = Number(depositAmt[dcrId]);
+  async function reconcile(itemId: string) {
+    const ref = depositRef[itemId]?.trim();
+    const amount = Number(depositAmt[itemId]);
     if (!ref || !amount) return;
-    setReconciling(dcrId);
+    setReconciling(itemId);
     setError(null);
     setMessage(null);
     try {
-      const res = await fetch(`/api/ar/dcr/${dcrId}/reconcile`, {
+      const res = await fetch(`/api/ar/dcr/items/${itemId}/reconcile`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ depositReference: ref, depositAmount: amount }),
@@ -315,15 +319,15 @@ export default function ArDcrPage() {
       setConfirmId(null);
       setDepositRef((prev) => {
         const next = { ...prev };
-        delete next[dcrId];
+        delete next[itemId];
         return next;
       });
       setDepositAmt((prev) => {
         const next = { ...prev };
-        delete next[dcrId];
+        delete next[itemId];
         return next;
       });
-      setMessage("DCRR posted — payments marked Paid.");
+      setMessage("Payment posted — marked Paid. Other items on this DCRR are unaffected.");
       await load({ silent: true });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed");
@@ -373,15 +377,14 @@ export default function ArDcrPage() {
   const activeFilterCount =
     (waitingFilter !== "all" ? 1 : 0) + (segmentFilter !== "all" ? 1 : 0);
 
-  const confirmDcr = confirmId
-    ? queue.find((d) => d.id === confirmId) ?? null
+  const confirmItem = confirmId
+    ? (queue
+        .flatMap((d) => d.dcr_items ?? [])
+        .find((item) => item.id === confirmId) ?? null)
     : null;
-  const confirmTotal = confirmDcr
-    ? (confirmDcr.dcr_items ?? []).reduce(
-        (sum, item) => sum + Number(item.amount ?? 0),
-        0,
-      )
-    : 0;
+  const confirmBorrowerName =
+    confirmItem?.payments?.masterlist?.borrower_name ?? "this borrower";
+  const confirmAmount = Number(confirmItem?.amount ?? 0);
 
   return (
     <div>
@@ -723,6 +726,9 @@ export default function ArDcrPage() {
                         <Th>Payment ref</Th>
                         <Th>Date</Th>
                         <Th>Proof</Th>
+                        {viewStatus === "submitted" ? (
+                          <Th className="min-w-[280px]">Reconcile</Th>
+                        ) : null}
                       </tr>
                     </thead>
                     <tbody>
@@ -789,6 +795,96 @@ export default function ArDcrPage() {
                                 <span className="text-ink-400">—</span>
                               )}
                             </Td>
+                            {viewStatus === "submitted" ? (
+                              <Td>
+                                {item.status === "posted" ? (
+                                  <div>
+                                    <Badge variant="success" dot>
+                                      Posted
+                                    </Badge>
+                                    {item.deposit_reference ? (
+                                      <div className="mt-1 mono text-xs text-ink-400">
+                                        Ref {item.deposit_reference}
+                                      </div>
+                                    ) : null}
+                                  </div>
+                                ) : item.status === "rejected" ? (
+                                  <Badge variant="danger" dot>
+                                    Rejected
+                                  </Badge>
+                                ) : item.id ? (
+                                  (() => {
+                                    const itemId = item.id;
+                                    const itemAmount = Number(item.amount ?? 0);
+                                    const amountMismatch =
+                                      depositAmt[itemId] &&
+                                      Number(depositAmt[itemId]) !== itemAmount;
+                                    return (
+                                      <div className="flex flex-col gap-1.5">
+                                        <Input
+                                          aria-label={`Bank deposit reference — ${name}`}
+                                          placeholder="Deposit ref *"
+                                          value={depositRef[itemId] ?? ""}
+                                          onChange={(e) =>
+                                            setDepositRef((prev) => ({
+                                              ...prev,
+                                              [itemId]: e.target.value,
+                                            }))
+                                          }
+                                          className="mono"
+                                        />
+                                        <div className="flex items-center gap-1.5">
+                                          <Input
+                                            aria-label={`Deposit amount — ${name}`}
+                                            type="number"
+                                            step="0.01"
+                                            placeholder={formatMoney(itemAmount)}
+                                            value={depositAmt[itemId] ?? ""}
+                                            onChange={(e) =>
+                                              setDepositAmt((prev) => ({
+                                                ...prev,
+                                                [itemId]: e.target.value,
+                                              }))
+                                            }
+                                            className={cn(
+                                              "mono w-28",
+                                              amountMismatch && "border-warning",
+                                            )}
+                                          />
+                                          <Button
+                                            size="sm"
+                                            loading={reconciling === itemId}
+                                            disabled={
+                                              !depositRef[itemId]?.trim() ||
+                                              !Number(depositAmt[itemId])
+                                            }
+                                            onClick={() => setConfirmId(itemId)}
+                                          >
+                                            Post
+                                          </Button>
+                                          <Button
+                                            type="button"
+                                            size="sm"
+                                            variant="danger-soft"
+                                            onClick={() => {
+                                              setRejectReason("");
+                                              setRejectId(itemId);
+                                            }}
+                                          >
+                                            Reject
+                                          </Button>
+                                        </div>
+                                        {amountMismatch ? (
+                                          <p className="text-xs text-warning">
+                                            Doesn&apos;t match ₱{formatMoney(itemAmount)}
+                                          </p>
+                                        ) : null}
+                                      </div>
+                                    );
+                                  })()
+                                ) : null}
+                              </Td>
+                            ) : null}
                           </tr>
                         );
                       })}
@@ -796,72 +892,6 @@ export default function ArDcrPage() {
                   </Table>
                 </div>
 
-                {viewStatus === "submitted" ? (
-                  <div className="flex flex-wrap items-end gap-2 border-t border-line-soft pt-4">
-                    <div className="min-w-[220px] flex-1">
-                      <Label htmlFor={`deposit-${dcr.id}`} required>
-                        Bank deposit reference
-                      </Label>
-                      <Input
-                        id={`deposit-${dcr.id}`}
-                        placeholder="Deposit slip / bank ref"
-                        value={depositRef[dcr.id] ?? ""}
-                        onChange={(e) =>
-                          setDepositRef((prev) => ({
-                            ...prev,
-                            [dcr.id]: e.target.value,
-                          }))
-                        }
-                        className="mono"
-                      />
-                    </div>
-                    <div className="min-w-[180px]">
-                      <Label htmlFor={`deposit-amt-${dcr.id}`} required>
-                        Deposit amount
-                      </Label>
-                      <Input
-                        id={`deposit-amt-${dcr.id}`}
-                        type="number"
-                        step="0.01"
-                        placeholder={formatMoney(batchTotal)}
-                        value={depositAmt[dcr.id] ?? ""}
-                        onChange={(e) =>
-                          setDepositAmt((prev) => ({
-                            ...prev,
-                            [dcr.id]: e.target.value,
-                          }))
-                        }
-                        className="mono"
-                      />
-                      {depositAmt[dcr.id] &&
-                      Number(depositAmt[dcr.id]) !== batchTotal ? (
-                        <p className="mt-1 text-xs text-warning">
-                          Does not match DCRR total ₱{formatMoney(batchTotal)}
-                        </p>
-                      ) : null}
-                    </div>
-                    <Button
-                      loading={reconciling === dcr.id}
-                      disabled={
-                        !depositRef[dcr.id]?.trim() ||
-                        !Number(depositAmt[dcr.id])
-                      }
-                      onClick={() => setConfirmId(dcr.id)}
-                    >
-                      Post / Paid
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="danger-soft"
-                      onClick={() => {
-                        setRejectReason("");
-                        setRejectId(dcr.id);
-                      }}
-                    >
-                      Reject
-                    </Button>
-                  </div>
-                ) : null}
               </Card>
             );
           })}
@@ -898,11 +928,11 @@ export default function ArDcrPage() {
 
       <ConfirmDialog
         open={confirmId !== null}
-        title="Post this DCRR?"
+        title="Post this payment?"
         message={
-          confirmDcr
-            ? `This posts ₱${formatMoney(confirmTotal)} against deposit reference “${depositRef[confirmDcr.id]?.trim() ?? ""}” and marks the included payments as Paid. This cannot be undone from this screen.`
-            : "Post this DCRR to the ledger?"
+          confirmItem
+            ? `This posts ₱${formatMoney(confirmAmount)} for ${confirmBorrowerName} against deposit reference “${depositRef[confirmId ?? ""]?.trim() ?? ""}” and marks it Paid. Other items on the same DCRR are unaffected. This cannot be undone from this screen.`
+            : "Post this payment to the ledger?"
         }
         confirmLabel="Yes, post / Paid"
         loading={reconciling === confirmId}
@@ -914,7 +944,7 @@ export default function ArDcrPage() {
 
       <Modal
         open={rejectId !== null}
-        title="Reject this DCRR?"
+        title="Reject this payment?"
         onClose={() => {
           if (rejecting) return;
           setRejectId(null);
@@ -946,9 +976,10 @@ export default function ArDcrPage() {
         }
       >
         <p className="mb-3 text-sm text-ink-600">
-          The collector who submitted this DCRR and every affected borrower
-          will be notified. Its payments stay confirmed and become available
-          to re-batch onto a new DCRR — nothing is deleted.
+          The collector who submitted this DCRR and the affected borrower
+          will be notified. This payment becomes available to re-batch onto
+          a new DCRR — nothing is deleted. Other items on this DCRR are
+          unaffected.
         </p>
         <Label htmlFor="rejectReason" required>
           Reason
@@ -958,7 +989,7 @@ export default function ArDcrPage() {
           value={rejectReason}
           onChange={(e) => setRejectReason(e.target.value)}
           rows={3}
-          placeholder="What's wrong with this DCRR?"
+          placeholder="What's wrong with this payment?"
         />
       </Modal>
     </div>

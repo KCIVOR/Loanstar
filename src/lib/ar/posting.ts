@@ -566,6 +566,344 @@ export async function rejectDcr(
   };
 }
 
+/**
+ * Posts a single dcr_item: allocates it against open installments, records
+ * the posting(s), updates the schedule/masterlist balance, and marks the
+ * payment posted. Shared by the whole-DCR reconcile path and the per-item
+ * reconcile path — the actual ledger mechanics are identical either way,
+ * only the deposit-reference/amount bookkeeping differs by caller.
+ */
+async function postSingleDcrItem(
+  supabase: SupabaseClient,
+  dcrId: string,
+  item: { id: string; payment_id: string; amount: number },
+  actorId: string,
+  now: string,
+) {
+  const { data: payment } = await supabase
+    .from("payments")
+    .select("id, masterlist_id, amount, status")
+    .eq("id", item.payment_id)
+    .single();
+
+  if (!payment || payment.status === "posted") {
+    return;
+  }
+
+  const { data: storedAllocations } = await supabase
+    .from("dcr_item_allocations")
+    .select("amortization_schedule_id, amount")
+    .eq("dcr_item_id", item.id);
+
+  let allocationLines: AllocationLine[];
+  if (storedAllocations?.length) {
+    allocationLines = storedAllocations.map((row) => ({
+      amortizationScheduleId: row.amortization_schedule_id as string | null,
+      amount: Number(row.amount),
+    }));
+  } else {
+    const openInstallments = await fetchOpenInstallments(
+      supabase,
+      payment.masterlist_id as string,
+    );
+    allocationLines = computeAutoAllocation(
+      Number(item.amount),
+      openInstallments,
+    );
+  }
+
+  for (const line of allocationLines) {
+    await supabase.from("postings").insert({
+      dcr_id: dcrId,
+      payment_id: payment.id,
+      masterlist_id: payment.masterlist_id,
+      amortization_schedule_id: line.amortizationScheduleId,
+      amount: line.amount,
+      posted_by: actorId,
+      posted_at: now,
+    });
+
+    if (line.amortizationScheduleId) {
+      const { data: schedule } = await supabase
+        .from("amortization_schedules")
+        .select("id, amount_due, amount_paid, penalty_amount, status")
+        .eq("id", line.amortizationScheduleId)
+        .single();
+
+      if (schedule) {
+        const totalDue =
+          Number(schedule.amount_due) + Number(schedule.penalty_amount ?? 0);
+        const newPaid = Number(schedule.amount_paid) + Number(line.amount);
+        const paid = newPaid >= totalDue;
+
+        await supabase
+          .from("amortization_schedules")
+          .update({
+            amount_paid: newPaid,
+            status: paid ? "paid" : "partial",
+            paid_at: paid ? now : null,
+          })
+          .eq("id", schedule.id);
+      }
+    }
+  }
+
+  await supabase
+    .from("payments")
+    .update({
+      status: "posted",
+      reviewed_by: actorId,
+      reviewed_at: now,
+      flagged_reason: null,
+      flagged_at: null,
+    })
+    .eq("id", payment.id);
+
+  const { data: ml } = await supabase
+    .from("masterlist")
+    .select("outstanding_balance")
+    .eq("id", payment.masterlist_id)
+    .single();
+
+  const newBalance = Math.max(
+    0,
+    halfUp(Number(ml?.outstanding_balance ?? 0) - Number(item.amount)),
+  );
+
+  await supabase
+    .from("masterlist")
+    .update({
+      outstanding_balance: newBalance,
+      account_status: newBalance <= 0 ? "paid" : "active",
+    })
+    .eq("id", payment.masterlist_id);
+}
+
+/**
+ * Reconciles one line item within a submitted DCRR independently of the
+ * others — each borrower's payment gets its own deposit reference/amount
+ * and its own accept, instead of requiring one shared deposit that covers
+ * every item in the batch. Sibling items keep whatever status they're in;
+ * once every item on the DCR has been resolved (posted or rejected), the
+ * parent `dcr` row's own status is updated for collector-side visibility.
+ */
+export async function reconcileDcrItem(
+  supabase: SupabaseClient,
+  dcrItemId: string,
+  actorId: string,
+  input: {
+    depositReference: string;
+    depositAmount: number;
+    depositProofPath?: string | null;
+  },
+) {
+  const { data: item } = await supabase
+    .from("dcr_items")
+    .select("id, dcr_id, payment_id, amount, status")
+    .eq("id", dcrItemId)
+    .single();
+
+  if (!item) {
+    throw new Error("DCRR line item not found");
+  }
+  if (item.status !== "pending") {
+    throw new Error("This line item was already processed");
+  }
+
+  const { data: dcr } = await supabase
+    .from("dcr")
+    .select("id, status")
+    .eq("id", item.dcr_id)
+    .single();
+
+  if (!dcr || dcr.status !== "submitted") {
+    throw new Error("DCRR must be submitted before reconciliation");
+  }
+
+  // The confirmed bank deposit must match THIS item's amount — a mismatch
+  // means the report and the bank disagree on this specific payment, so it
+  // doesn't post. Other items on the same DCR are unaffected.
+  const itemAmount = halfUp(Number(item.amount));
+  if (halfUp(input.depositAmount) !== itemAmount) {
+    throw new Error(
+      `Deposit amount ${input.depositAmount.toFixed(2)} does not match this line item's amount ${itemAmount.toFixed(2)} — verify the bank deposit before posting`,
+    );
+  }
+
+  const now = new Date().toISOString();
+
+  await postSingleDcrItem(
+    supabase,
+    item.dcr_id as string,
+    { id: item.id as string, payment_id: item.payment_id as string, amount: itemAmount },
+    actorId,
+    now,
+  );
+
+  const admin = createServiceClient();
+  const { error: itemError } = await admin
+    .from("dcr_items")
+    .update({
+      status: "posted",
+      deposit_reference: input.depositReference,
+      deposit_amount: itemAmount,
+      posted_by: actorId,
+      posted_at: now,
+    })
+    .eq("id", dcrItemId);
+
+  if (itemError) {
+    throw new Error(itemError.message);
+  }
+
+  await settleDcrStatusIfComplete(admin, item.dcr_id as string, actorId, now);
+
+  return { status: "posted" as const };
+}
+
+/**
+ * Rejects one line item within a submitted DCRR — frees its payment for
+ * re-batching onto a new draft, same as whole-DCR rejection, but leaves
+ * every other item on this DCR untouched. Snapshot is appended onto the
+ * parent `dcr.rejected_items` array so AR/Collector history keeps a full
+ * record even though the row itself is removed (dcr_items_payment_id_unique
+ * requires the row gone before the payment can be re-batched).
+ */
+export async function rejectDcrItem(
+  supabase: SupabaseClient,
+  dcrItemId: string,
+  actorId: string,
+  reason: string,
+) {
+  const { data: item, error: itemFetchError } = await supabase
+    .from("dcr_items")
+    .select(
+      `
+      id,
+      dcr_id,
+      amount,
+      payment_id,
+      status,
+      payments (
+        id,
+        reference_no,
+        payment_date,
+        amount,
+        masterlist_id,
+        storage_path,
+        file_name,
+        notes,
+        loan_application_id,
+        masterlist ( borrower_name, loan_account_no, segment )
+      )
+    `,
+    )
+    .eq("id", dcrItemId)
+    .single();
+
+  if (itemFetchError || !item) {
+    throw new Error("DCRR line item not found");
+  }
+  if (item.status !== "pending") {
+    throw new Error("This line item was already processed");
+  }
+
+  const { data: dcr } = await supabase
+    .from("dcr")
+    .select("id, status, collector_user_id, rejected_items")
+    .eq("id", item.dcr_id)
+    .single();
+
+  if (!dcr || dcr.status !== "submitted") {
+    throw new Error("DCRR must be submitted before it can be rejected");
+  }
+
+  const now = new Date().toISOString();
+  const admin = createServiceClient();
+
+  const priorSnapshot = (dcr.rejected_items as unknown[]) ?? [];
+  const { error: snapshotError } = await admin
+    .from("dcr")
+    .update({
+      rejected_items: [
+        ...priorSnapshot,
+        { id: item.id, amount: item.amount, payments: item.payments, rejectedAt: now, reason },
+      ],
+    })
+    .eq("id", item.dcr_id);
+  if (snapshotError) {
+    throw new Error(snapshotError.message);
+  }
+
+  const { error: flagError } = await admin
+    .from("payments")
+    .update({ flagged_reason: reason, flagged_at: now })
+    .eq("id", item.payment_id);
+  if (flagError) {
+    throw new Error(flagError.message);
+  }
+
+  // Delete (not soft-status "rejected") — same dcr_items_payment_id_unique
+  // constraint reasoning as whole-DCR rejection: the row must be gone
+  // before this payment can be re-batched onto a new draft.
+  const { error: deleteError } = await admin
+    .from("dcr_items")
+    .delete()
+    .eq("id", dcrItemId);
+  if (deleteError) {
+    throw new Error(deleteError.message);
+  }
+
+  await settleDcrStatusIfComplete(admin, item.dcr_id as string, actorId, now);
+
+  const paymentsRaw = item.payments as
+    | { loan_application_id?: string | null }
+    | { loan_application_id?: string | null }[]
+    | null;
+  const paymentRow = Array.isArray(paymentsRaw) ? paymentsRaw[0] : paymentsRaw;
+
+  return {
+    status: "rejected" as const,
+    collectorUserId: dcr.collector_user_id as string,
+    loanApplicationId: (paymentRow?.loan_application_id as string) ?? null,
+  };
+}
+
+/**
+ * Once every remaining dcr_item on a DCR has left "pending" (each was
+ * individually posted or rejected), roll the parent dcr.status forward so
+ * it drops out of AR's active queue: "reconciled" if anything posted,
+ * "rejected" only if every item ended up rejected. Left at "submitted"
+ * while any item is still pending.
+ */
+async function settleDcrStatusIfComplete(
+  admin: SupabaseClient,
+  dcrId: string,
+  actorId: string,
+  now: string,
+) {
+  const { data: remaining } = await admin
+    .from("dcr_items")
+    .select("status")
+    .eq("dcr_id", dcrId);
+
+  const rows = remaining ?? [];
+  if (rows.some((row) => row.status === "pending")) {
+    return;
+  }
+
+  const anyPosted = rows.some((row) => row.status === "posted");
+
+  await admin
+    .from("dcr")
+    .update(
+      anyPosted
+        ? { status: "reconciled", reconciled_by: actorId, reconciled_at: now }
+        : { status: "rejected", rejected_by: actorId, rejected_at: now },
+    )
+    .eq("id", dcrId);
+}
+
 export async function reconcileAndPostDcr(
   supabase: SupabaseClient,
   dcrId: string,
@@ -609,105 +947,13 @@ export async function reconcileAndPostDcr(
   const now = new Date().toISOString();
 
   for (const item of items) {
-    const { data: payment } = await supabase
-      .from("payments")
-      .select("id, masterlist_id, amount, status")
-      .eq("id", item.payment_id)
-      .single();
-
-    if (!payment || payment.status === "posted") {
-      continue;
-    }
-
-    const { data: storedAllocations } = await supabase
-      .from("dcr_item_allocations")
-      .select("amortization_schedule_id, amount")
-      .eq("dcr_item_id", item.id);
-
-    let allocationLines: AllocationLine[];
-    if (storedAllocations?.length) {
-      allocationLines = storedAllocations.map((row) => ({
-        amortizationScheduleId: row.amortization_schedule_id as string | null,
-        amount: Number(row.amount),
-      }));
-    } else {
-      const openInstallments = await fetchOpenInstallments(
-        supabase,
-        payment.masterlist_id as string,
-      );
-      allocationLines = computeAutoAllocation(
-        Number(item.amount),
-        openInstallments,
-      );
-    }
-
-    for (const line of allocationLines) {
-      await supabase.from("postings").insert({
-        dcr_id: dcrId,
-        payment_id: payment.id,
-        masterlist_id: payment.masterlist_id,
-        amortization_schedule_id: line.amortizationScheduleId,
-        amount: line.amount,
-        posted_by: actorId,
-        posted_at: now,
-      });
-
-      if (line.amortizationScheduleId) {
-        const { data: schedule } = await supabase
-          .from("amortization_schedules")
-          .select("id, amount_due, amount_paid, penalty_amount, status")
-          .eq("id", line.amortizationScheduleId)
-          .single();
-
-        if (schedule) {
-          const totalDue =
-            Number(schedule.amount_due) +
-            Number(schedule.penalty_amount ?? 0);
-          const newPaid =
-            Number(schedule.amount_paid) + Number(line.amount);
-          const paid = newPaid >= totalDue;
-
-          await supabase
-            .from("amortization_schedules")
-            .update({
-              amount_paid: newPaid,
-              status: paid ? "paid" : "partial",
-              paid_at: paid ? now : null,
-            })
-            .eq("id", schedule.id);
-        }
-      }
-    }
-
-    await supabase
-      .from("payments")
-      .update({
-        status: "posted",
-        reviewed_by: actorId,
-        reviewed_at: now,
-        flagged_reason: null,
-        flagged_at: null,
-      })
-      .eq("id", payment.id);
-
-    const { data: ml } = await supabase
-      .from("masterlist")
-      .select("outstanding_balance")
-      .eq("id", payment.masterlist_id)
-      .single();
-
-    const newBalance = Math.max(
-      0,
-      halfUp(Number(ml?.outstanding_balance ?? 0) - Number(item.amount)),
+    await postSingleDcrItem(
+      supabase,
+      dcrId,
+      { id: item.id, payment_id: item.payment_id, amount: Number(item.amount) },
+      actorId,
+      now,
     );
-
-    await supabase
-      .from("masterlist")
-      .update({
-        outstanding_balance: newBalance,
-        account_status: newBalance <= 0 ? "paid" : "active",
-      })
-      .eq("id", payment.masterlist_id);
   }
 
   await supabase

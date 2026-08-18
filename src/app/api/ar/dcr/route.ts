@@ -19,6 +19,10 @@ export async function GET(request: Request) {
         dcr_items (
           id,
           amount,
+          status,
+          deposit_reference,
+          deposit_amount,
+          posted_at,
           payments (
             id,
             reference_no,
