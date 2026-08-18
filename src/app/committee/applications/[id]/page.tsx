@@ -1972,7 +1972,6 @@ export default function CommitteeApplicationPage() {
             <div className="flex flex-wrap gap-2">
               <Button
                 loading={saving}
-                disabled={!data.borrower?.userId}
                 onClick={() => setConfirmAction("approve")}
               >
                 Approve loan
@@ -1993,28 +1992,20 @@ export default function CommitteeApplicationPage() {
                   Hold
                 </Button>
               ) : null}
-              {!data.borrower?.userId ? (
-                <Button
-                  type="button"
-                  variant="outline"
-                  loading={approvingWithoutSign}
-                  onClick={() => setConfirmApproveWithoutSign(true)}
-                >
-                  Approve without borrower&apos;s sign
-                </Button>
-              ) : null}
+              <Button
+                type="button"
+                variant="outline"
+                loading={approvingWithoutSign}
+                onClick={() => setConfirmApproveWithoutSign(true)}
+              >
+                Approve without borrower&apos;s sign
+              </Button>
             </div>
-            {!data.borrower?.userId ? (
-              <p className="mt-2 text-xs text-ink-400">
-                Borrower has no portal account — use &ldquo;Approve without
-                borrower&apos;s sign&rdquo; instead of plain Approve.
-              </p>
-            ) : null}
 
             <ConfirmDialog
               open={confirmApproveWithoutSign}
               title="Approve without borrower's sign?"
-              message="Approves the loan, discloses the terms, and signs the computation in-branch on the borrower's behalf, all in one step — skipping CSA's separate disclose click and the borrower's own portal signature. Only use this when the borrower has no portal account and has approved the terms in person. This queues the file for LRA immediately."
+              message="Approves the loan, discloses the terms, and signs the computation in-branch on the borrower's behalf, all in one step — skipping CSA's separate disclose click and the borrower's own portal signature. Only use this when the borrower has approved the terms in person (with or without a portal account). This queues the file for LRA immediately."
               confirmLabel="Yes, approve and proceed to LRA"
               cancelLabel="Cancel"
               variant="accent"

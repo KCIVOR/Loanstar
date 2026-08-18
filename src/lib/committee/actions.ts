@@ -284,14 +284,13 @@ export async function executeFinalAction(
 }
 
 /**
- * Committee-side fast track for a borrower with no portal account: approve,
- * disclose, and witness-sign in one click, instead of the normal three
- * separate actions across Committee → CSA (disclose) → borrower/CSA (sign).
- * Deliberately refuses to run when the borrower has a linked account — that
- * borrower must still see the disclosed terms and sign for themselves via
- * the normal executeFinalAction + discloseTerms + portal-sign path, which
- * this function never touches. Votes/majority still go through
- * executeFinalAction's own preconditions unchanged.
+ * Committee-side fast track: approve, disclose, and witness-sign in one
+ * click, instead of the normal three separate actions across Committee →
+ * CSA (disclose) → borrower/CSA (sign). Available regardless of whether the
+ * borrower has a portal account — same rationale as CSA's own witness-sign
+ * buttons: sometimes the borrower is on-site and it's faster for staff to
+ * confirm in person than to hand them the portal. Votes/majority still go
+ * through executeFinalAction's own preconditions unchanged.
  */
 export async function approveDiscloseAndWitnessSign(
   supabase: SupabaseClient,
@@ -299,23 +298,6 @@ export async function approveDiscloseAndWitnessSign(
   actorId: string,
   options?: { comment?: string },
 ): Promise<{ status: string }> {
-  const { data: application, error: appError } = await supabase
-    .from("loan_applications")
-    .select("borrowers ( user_id )")
-    .eq("id", applicationId)
-    .single();
-
-  if (appError || !application) {
-    throw new Error("Application not found");
-  }
-
-  const borrowerRaw = application.borrowers;
-  const borrower = Array.isArray(borrowerRaw) ? borrowerRaw[0] : borrowerRaw;
-  if (borrower?.user_id) {
-    throw new Error(
-      "Borrower has a portal account — disclose and let them sign normally instead of fast-tracking.",
-    );
-  }
 
   const result = await executeFinalAction(supabase, applicationId, actorId, "approve", options);
   await discloseTerms(
