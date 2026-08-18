@@ -97,8 +97,9 @@ export default function CollectorDcrHistoryPage() {
   const [dcrs, setDcrs] = useState<DcrRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<DcrListStatusFilter>("all");
-  const [dateSortDir, setDateSortDir] = useState<"asc" | "desc" | null>(null);
+  const [dateSortDir, setDateSortDir] = useState<"asc" | "desc">("desc");
   const [viewMode, setViewMode] = useState<HistoryViewMode>("list");
   const [filterPanelOpen, setFilterPanelOpen] = useState(false);
   const [page, setPage] = useState(1);
@@ -126,13 +127,10 @@ export default function CollectorDcrHistoryPage() {
 
   useEffect(() => {
     setPage(1);
-  }, [statusFilter, pageSize, dateSortDir]);
+  }, [search, statusFilter, pageSize, dateSortDir]);
 
   function toggleDateSort() {
-    setDateSortDir((prev) => {
-      if (prev === null) return "desc";
-      return prev === "asc" ? "desc" : "asc";
-    });
+    setDateSortDir((prev) => (prev === "asc" ? "desc" : "asc"));
   }
 
   function setStatus(raw: string) {
@@ -146,13 +144,17 @@ export default function CollectorDcrHistoryPage() {
   const kpi = useMemo(() => computeDcrListKpis(recentRows), [recentRows]);
 
   const filtered = useMemo(() => {
-    const statused = recentRows.filter((dcr) =>
-      passesDcrListStatusFilter(dcr.status, statusFilter),
-    );
-    return dateSortDir === null
-      ? statused
-      : sortDcrsByDate(statused, dateSortDir);
-  }, [recentRows, statusFilter, dateSortDir]);
+    const term = search.trim().toLowerCase();
+    const statused = recentRows.filter((dcr) => {
+      if (!passesDcrListStatusFilter(dcr.status, statusFilter)) return false;
+      if (!term) return true;
+      return (
+        dcr.id.toLowerCase().includes(term) ||
+        dcr.status.toLowerCase().includes(term)
+      );
+    });
+    return sortDcrsByDate(statused, dateSortDir);
+  }, [recentRows, statusFilter, search, dateSortDir]);
 
   const safePageSize = clampDcrListPageSize(pageSize);
   const totalCount = filtered.length;
@@ -214,6 +216,29 @@ export default function CollectorDcrHistoryPage() {
 
       <div className="card mb-4" style={{ overflow: "visible" }}>
         <div className="tbl-toolbar" style={{ padding: "13px 14px" }}>
+          <div className="gsearch" style={{ maxWidth: 300, flex: 1, minWidth: 190 }}>
+            <span className="icon">
+              <svg
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth={2.2}
+                strokeLinecap="round"
+                aria-hidden
+              >
+                <circle cx="11" cy="11" r="7" />
+                <path d="m21 21-4.3-4.3" />
+              </svg>
+            </span>
+            <input
+              className="input"
+              style={{ height: 37, paddingRight: 12, borderRadius: "var(--r-md)" }}
+              placeholder="Search DCRR ID or status…"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
+          </div>
+
           <div className="active-pill-row">
             {statusFilter !== "all" ? (
               <span className="active-pill">
@@ -335,7 +360,7 @@ export default function CollectorDcrHistoryPage() {
       ) : totalCount === 0 ? (
         <EmptyState
           title="No matching DCRRs"
-          description="Try a different status filter."
+          description="Try a different search term or status filter."
           showMark={false}
         />
       ) : viewMode === "grid" ? (
@@ -387,11 +412,9 @@ export default function CollectorDcrHistoryPage() {
                 <Th num>Total</Th>
                 <Th className="sortable" onClick={toggleDateSort}>
                   Created / Submitted
-                  {dateSortDir ? (
-                    <span className="arr">
-                      {dateSortDir === "asc" ? "▲" : "▼"}
-                    </span>
-                  ) : null}
+                  <span className="arr">
+                    {dateSortDir === "asc" ? "▲" : "▼"}
+                  </span>
                 </Th>
                 <Th>Reason</Th>
               </tr>

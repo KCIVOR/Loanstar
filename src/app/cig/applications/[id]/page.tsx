@@ -191,6 +191,15 @@ export default function CigApplicationPage() {
   const [borrower, setBorrower] = useState<BorrowerProfile | null>(null);
   const [verification, setVerification] = useState<VerificationData | null>(null);
   const [showCiForm, setShowCiForm] = useState(false);
+  // CiReferencesFormModal seeds its internal draft once, on mount, from
+  // `saved` — by design, so a user's in-progress edits never get clobbered
+  // by an incidental parent re-render (see the modal's buildInitialDraft
+  // comment). The dev-only autofill button bypasses the form entirely and
+  // writes straight to `verification` while the modal may already be open,
+  // so that one-time seed goes stale. Bumping this key forces a clean
+  // remount — the same "fresh mount" path the modal already relies on —
+  // so autofill actually shows up instead of writing into the void.
+  const [ciFormKey, setCiFormKey] = useState(0);
   const [showApplicationForm, setShowApplicationForm] = useState(false);
   const [showEditApplicationForm, setShowEditApplicationForm] = useState(false);
   const [showFieldVisitForm, setShowFieldVisitForm] = useState(false);
@@ -1917,6 +1926,7 @@ export default function CigApplicationPage() {
           </div>
           {showCiForm && segment !== "sme" ? (
             <CiReferencesFormModal
+              key={ciFormKey}
               open={showCiForm}
               onClose={() => setShowCiForm(false)}
               borrower={borrower}
@@ -2168,11 +2178,13 @@ export default function CigApplicationPage() {
         actions={[
           {
             label: "Fill CI Report",
-            onClick: () =>
+            onClick: () => {
               setVerification((prev) => ({
                 ...(prev as VerificationData),
                 ...fakeVerificationPatch(segment, isReloan),
-              })),
+              }));
+              setCiFormKey((k) => k + 1);
+            },
           },
           ...(borrower
             ? [

@@ -121,6 +121,7 @@ export function mapComputationRow(row: Record<string, unknown>) {
     computedBy: row.computed_by as string | null,
     signedAt: row.signed_at as string | null,
     signedBy: row.signed_by as string | null,
+    witnessedBy: row.witnessed_by as string | null,
     isActive: Boolean(row.is_active),
     createdAt: row.created_at as string,
   };

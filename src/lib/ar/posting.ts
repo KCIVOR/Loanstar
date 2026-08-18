@@ -10,6 +10,7 @@ import {
 } from "@/lib/ar/schedule";
 import { isActiveDcrStatus } from "@/lib/collector/desk";
 import { halfUp } from "@/lib/computation/money";
+import { createServiceClient } from "@/lib/supabase/server";
 
 export type OpenInstallment = {
   id: string;
@@ -524,13 +525,28 @@ export async function rejectDcr(
     throw new Error(updateError.message);
   }
 
-  const { error: deleteError } = await supabase
+  // dcr_items RLS only allows the owning collector to write while
+  // dcr.status = 'draft' — both conditions are already false here (status
+  // was just flipped to 'rejected' above, and the actor is AR, not the
+  // collector). The session client's delete would silently affect zero
+  // rows, leaving a stale dcr_items row that then blocks re-adding the same
+  // payment to a new draft via dcr_items_payment_id_unique. Use the service
+  // client for this specific write, and verify the count so a future RLS
+  // change can't reintroduce the same silent no-op.
+  const admin = createServiceClient();
+  const { data: deletedItems, error: deleteError } = await admin
     .from("dcr_items")
     .delete()
-    .eq("dcr_id", dcrId);
+    .eq("dcr_id", dcrId)
+    .select("id");
 
   if (deleteError) {
     throw new Error(deleteError.message);
+  }
+  if ((deletedItems?.length ?? 0) !== (items ?? []).length) {
+    throw new Error(
+      `Expected to delete ${(items ?? []).length} dcr_items but removed ${deletedItems?.length ?? 0}`,
+    );
   }
 
   const paymentIds = (items ?? [])

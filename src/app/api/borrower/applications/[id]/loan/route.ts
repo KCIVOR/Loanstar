@@ -113,6 +113,13 @@ export async function GET(_request: Request, ctx: { params: Promise<{ id: string
       .select("*")
       .eq("loan_application_id", id)
       .order("created_at", { ascending: false });
+    const borrowerSafePayments = (payments ?? []).map((payment) => {
+      const { uploaded_by: uploadedBy, ...borrowerSafePayment } = payment;
+      return {
+        ...borrowerSafePayment,
+        uploadedByStaff: Boolean(uploadedBy && uploadedBy !== user.id),
+      };
+    });
 
     const { data: postings } = await supabase
       .from("postings")
@@ -138,7 +145,7 @@ export async function GET(_request: Request, ctx: { params: Promise<{ id: string
 
     return jsonOk({
       loan: masterlist,
-      payments: payments ?? [],
+      payments: borrowerSafePayments,
       postings: postings ?? [],
       pdcChecks: pdcChecks ?? [],
     });

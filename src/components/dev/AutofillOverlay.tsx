@@ -8,15 +8,24 @@ export type AutofillAction = {
 };
 
 /**
- * Dev-only floating button that reveals a menu of fake-data autofill
- * actions. Never renders in production — this exists purely so staff
- * testing this app locally don't have to hand-type CI reports and
- * application forms while exercising a flow.
+ * Floating button that reveals a menu of fake-data autofill actions — lets
+ * staff fill CI reports and application forms without hand-typing while
+ * exercising a flow (e.g. during a live client demo).
+ *
+ * Always on outside production. In production it stays OFF by default —
+ * real borrowers must never see a "fill with fake data" button on their
+ * own application — and only renders if NEXT_PUBLIC_ENABLE_AUTOFILL=true
+ * is explicitly set for that deployment. Set it only for the duration of a
+ * demo/staging deployment, then unset it — don't leave it on permanently
+ * for the live production site.
  */
 export function AutofillOverlay({ actions }: { actions: AutofillAction[] }) {
   const [open, setOpen] = useState(false);
 
-  if (process.env.NODE_ENV === "production") return null;
+  const enabled =
+    process.env.NODE_ENV !== "production" ||
+    process.env.NEXT_PUBLIC_ENABLE_AUTOFILL === "true";
+  if (!enabled) return null;
   if (actions.length === 0) return null;
 
   return (

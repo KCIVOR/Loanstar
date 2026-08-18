@@ -9,6 +9,7 @@ const variants = {
   secondary: "btn-secondary",
   outline: "btn-outline",
   ghost: "btn-ghost",
+  "ghost-inv": "btn-ghost-inv",
   danger: "btn-danger",
   "danger-soft": "btn-danger-soft",
   success: "btn-accent",

@@ -1,4 +1,5 @@
 import { handleApiError, jsonOk } from "@/lib/api/handler";
+import { fetchAccountPostings } from "@/lib/collection/account-postings";
 import { nextOpenInstallment, type ScheduleLite } from "@/lib/collector/desk";
 import {
   ForbiddenError,
@@ -150,10 +151,38 @@ export async function GET(_request: Request, { params }: RouteParams) {
     const { data: payments } = await supabase
       .from("payments")
       .select(
-        "id, reference_no, payment_date, amount, status, channel, notes, created_at",
+        "id, reference_no, payment_date, amount, status, channel, notes, created_at, uploaded_by",
       )
       .eq("masterlist_id", id)
       .order("payment_date", { ascending: true });
+
+    const uploaderIds = Array.from(
+      new Set(
+        (payments ?? [])
+          .map((payment) => payment.uploaded_by as string | null)
+          .filter((uploaderId): uploaderId is string => Boolean(uploaderId)),
+      ),
+    );
+    const uploaderNameById = new Map<string, string>();
+    if (uploaderIds.length > 0) {
+      const admin = createServiceClient();
+      const { data: profiles } = await admin
+        .from("profiles")
+        .select("id, full_name, email")
+        .in("id", uploaderIds);
+      for (const profile of profiles ?? []) {
+        uploaderNameById.set(
+          profile.id as string,
+          (profile.full_name as string) || (profile.email as string),
+        );
+      }
+    }
+    const paymentsWithUploaderNames = (payments ?? []).map((payment) => ({
+      ...payment,
+      uploadedByName: payment.uploaded_by
+        ? (uploaderNameById.get(payment.uploaded_by as string) ?? null)
+        : null,
+    }));
 
     // Remedial has no RLS grant on pdc_checks; scope a service-role read to
     // this account's release file so LRA check numbers reach the ledger.
@@ -161,6 +190,8 @@ export async function GET(_request: Request, { params }: RouteParams) {
       releaseFileId: (data.release_file_id as string | null) ?? null,
       loanApplicationId: (data.loan_application_id as string | null) ?? null,
     });
+
+    const postings = await fetchAccountPostings(id);
 
     const scheduleRows = (
       Array.isArray(data.amortization_schedules)
@@ -210,7 +241,8 @@ export async function GET(_request: Request, { params }: RouteParams) {
           paidAt: (row.paid_at as string | null) ?? null,
         }))
         .sort((a, b) => a.installmentNo - b.installmentNo),
-      payments: payments ?? [],
+      payments: paymentsWithUploaderNames,
+      postings,
       pdcChecks,
     });
   } catch (error) {

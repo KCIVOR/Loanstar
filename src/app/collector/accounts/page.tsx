@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 
 import {
@@ -8,7 +9,6 @@ import {
 } from "@/components/collector/CollectorKpi";
 import { ContactLogModal } from "@/components/collector/ContactLogModal";
 import { DemandLetterModal } from "@/components/collector/DemandLetterModal";
-import { RecordPaymentModal } from "@/components/collector/RecordPaymentModal";
 import {
   DateRangeFilter,
   ViewModeToggle,
@@ -180,8 +180,6 @@ export default function CollectorAccountsPage() {
     useState<CollectorQueueMappedRow | null>(null);
   const [demandModalFor, setDemandModalFor] =
     useState<CollectorQueueMappedRow | null>(null);
-  const [recordPaymentModalFor, setRecordPaymentModalFor] =
-    useState<CollectorQueueMappedRow | null>(null);
 
   useEffect(() => {
     const timer = setTimeout(() => setDebouncedSearch(search), 300);
@@ -273,6 +271,12 @@ export default function CollectorAccountsPage() {
   function renderActionButtons(acc: CollectorQueueMappedRow) {
     return (
       <div className="flex flex-nowrap items-center justify-end gap-1.5 whitespace-nowrap">
+        <Link
+          href={`/collector/accounts/${acc.id}/case-file`}
+          className="btn btn-secondary btn-sm"
+        >
+          Case file
+        </Link>
         <Button
           variant="secondary"
           size="sm"
@@ -287,13 +291,12 @@ export default function CollectorAccountsPage() {
         >
           Log contact
         </Button>
-        <Button
-          variant="secondary"
-          size="sm"
-          onClick={() => setRecordPaymentModalFor(acc)}
+        <Link
+          href={`/collector/accounts/${acc.id}/record-payment`}
+          className="btn btn-secondary btn-sm"
         >
           Record payment
-        </Button>
+        </Link>
       </div>
     );
   }
@@ -746,16 +749,6 @@ export default function CollectorAccountsPage() {
         />
       ) : null}
 
-      {recordPaymentModalFor ? (
-        <RecordPaymentModal
-          open={recordPaymentModalFor !== null}
-          borrowerName={recordPaymentModalFor.borrowerName}
-          masterlistId={recordPaymentModalFor.id}
-          borrowerId={recordPaymentModalFor.borrowerId}
-          onClose={() => setRecordPaymentModalFor(null)}
-          onRecorded={() => void load()}
-        />
-      ) : null}
     </div>
   );
 }

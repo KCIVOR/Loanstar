@@ -143,7 +143,7 @@ export function ComputationSign({
         terms.
       </p>
 
-      <div className="mb-4 grid gap-2 sm:grid-cols-2">
+      <div className="mb-4 grid gap-x-8 gap-y-2 sm:grid-cols-2">
         {computation.lineItems.map((item) => {
           const isKey = KEY_AMOUNT_KEYS.has(item.key);
           return (

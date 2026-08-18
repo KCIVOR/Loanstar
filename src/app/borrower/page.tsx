@@ -250,7 +250,15 @@ export default function BorrowerDashboardPage() {
         setDocsSummary(null);
       }
 
-      const loanApp = apps.find((a) => LOAN_STATUSES.includes(a.status));
+      // Prefer a still-open loan over an already paid-off one — a borrower
+      // can carry both (e.g. one paid-off loan plus a newer active one), and
+      // picking whichever was created most recently would surface the
+      // wrong "current loan" summary once a newer loan happens to be the
+      // one that's already closed out.
+      const loanApp =
+        apps.find(
+          (a) => LOAN_STATUSES.includes(a.status) && a.status !== "paid_off",
+        ) ?? apps.find((a) => LOAN_STATUSES.includes(a.status));
       if (loanApp) {
         try {
           const loanRes = await fetch(

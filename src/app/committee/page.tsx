@@ -335,7 +335,7 @@ export default function CommitteeDashboardPage() {
       const bTime = b.verification?.forwardedAt
         ? new Date(b.verification.forwardedAt).getTime()
         : 0;
-      return aTime - bTime;
+      return bTime - aTime;
     });
   }, [rows, sortKey]);
 

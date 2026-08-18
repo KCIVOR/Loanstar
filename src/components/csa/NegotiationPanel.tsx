@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 
-import { Alert, Badge, Button, Card } from "@/components/ui";
+import { Alert, Badge, Button, Card, ConfirmDialog } from "@/components/ui";
 
 const NEGOTIATION_BADGE_VARIANT: Record<string, "success" | "warning" | "navy" | "neutral"> = {
   negotiating: "warning",
@@ -39,6 +39,8 @@ export function NegotiationPanel({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
+  const [witnessSigning, setWitnessSigning] = useState(false);
+  const [confirmWitnessSign, setConfirmWitnessSign] = useState(false);
 
   if (!negotiation && status !== "approved") {
     return null;
@@ -61,6 +63,31 @@ export function NegotiationPanel({
       setError(err instanceof Error ? err.message : "Disclosure failed");
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function handleWitnessSign() {
+    setWitnessSigning(true);
+    setError(null);
+    setMessage(null);
+    try {
+      const res = await fetch(
+        `/api/csa/applications/${applicationId}/computation/witness-sign`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ confirm: true }),
+        },
+      );
+      const body = (await res.json()) as { error?: string };
+      if (!res.ok) throw new Error(body.error ?? "Witness-sign failed");
+      setConfirmWitnessSign(false);
+      setMessage("Signed in-branch — queued for LRA.");
+      onUpdated();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Witness-sign failed");
+    } finally {
+      setWitnessSigning(false);
     }
   }
 
@@ -151,6 +178,27 @@ export function NegotiationPanel({
             <Button loading={saving} onClick={() => void handleDisclose()}>
               Disclose terms to borrower
             </Button>
+          ) : null}
+          {negotiation.status === "awaiting_signature" ? (
+            <>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setConfirmWitnessSign(true)}
+              >
+                Proceed without borrower&apos;s sign
+              </Button>
+              <ConfirmDialog
+                open={confirmWitnessSign}
+                title="Proceed without borrower's sign?"
+                message="Confirm the borrower reviewed and approved the disclosed computation in person (no portal account, or signing in-branch instead). This records you as the witness and queues the file for LRA."
+                confirmLabel="Yes, proceed"
+                cancelLabel="Cancel"
+                loading={witnessSigning}
+                onConfirm={() => void handleWitnessSign()}
+                onCancel={() => setConfirmWitnessSign(false)}
+              />
+            </>
           ) : null}
         </div>
       ) : (

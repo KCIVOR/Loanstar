@@ -423,7 +423,11 @@ export default function BorrowerApplicationPage() {
   );
 
   const termsSection = (
-    <div key="terms" className="flex flex-col gap-6">
+    // ComputationSign and NegotiationLog each already carry their own
+    // Card mb-6 — a gap-6 parent (the pattern used elsewhere on this page,
+    // e.g. intakeChecklist) would double the space between them. No gap
+    // class here; the children's own margins do the spacing.
+    <div key="terms" className="flex flex-col">
       <ComputationSign
         applicationId={application.id}
         applicationStatus={application.status}

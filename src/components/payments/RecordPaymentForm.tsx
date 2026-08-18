@@ -1,15 +1,16 @@
 "use client";
 
-import { FormEvent, useState } from "react";
+import { type FormEvent, useState } from "react";
 
 import {
   Alert,
   Button,
+  Card,
   FileDropzone,
   Input,
   Label,
-  Modal,
   Select,
+  Textarea,
 } from "@/components/ui";
 import { DOCUMENT_BUCKET } from "@/lib/constants";
 import {
@@ -24,27 +25,20 @@ const PROOF_ACCEPT =
 
 type Channel = "bank_deposit" | "check" | "pos_cash";
 
-type RecordPaymentModalProps = {
-  open: boolean;
-  borrowerName: string;
-  masterlistId: string;
-  borrowerId: string;
-  onClose: () => void;
-  onRecorded: () => void;
-};
-
-export function RecordPaymentModal({
-  open,
-  borrowerName,
+export function RecordPaymentForm({
   masterlistId,
   borrowerId,
-  onClose,
   onRecorded,
-}: RecordPaymentModalProps) {
+}: {
+  masterlistId: string;
+  borrowerId: string;
+  onRecorded: () => void | Promise<void>;
+}) {
   const [amount, setAmount] = useState("");
   const [paymentDate, setPaymentDate] = useState("");
   const [referenceNo, setReferenceNo] = useState("");
   const [channel, setChannel] = useState<Channel>("bank_deposit");
+  const [notes, setNotes] = useState("");
   const [proofFile, setProofFile] = useState<File | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -54,6 +48,7 @@ export function RecordPaymentModal({
     setPaymentDate("");
     setReferenceNo("");
     setChannel("bank_deposit");
+    setNotes("");
     setProofFile(null);
     setError(null);
   }
@@ -75,10 +70,11 @@ export function RecordPaymentModal({
     setProofFile(file);
   }
 
-  async function submit(e?: FormEvent) {
-    e?.preventDefault();
+  async function submit(event: FormEvent) {
+    event.preventDefault();
     setSaving(true);
     setError(null);
+
     try {
       const parsedAmount = Number(amount);
       if (!paymentDate || !Number.isFinite(parsedAmount) || parsedAmount <= 0) {
@@ -94,6 +90,7 @@ export function RecordPaymentModal({
         paymentDate: string;
         referenceNo: string;
         channel: Channel;
+        notes?: string;
         storagePath?: string;
         fileName?: string;
         mimeType?: string;
@@ -103,21 +100,13 @@ export function RecordPaymentModal({
         paymentDate,
         referenceNo: referenceNo.trim(),
         channel,
+        notes: notes.trim() || undefined,
       };
 
       if (proofFile) {
         if (!borrowerId) {
           throw new Error("Missing borrower id for payment proof upload");
         }
-        if (proofFile.type && !isAllowedPaymentProofMime(proofFile.type)) {
-          throw new Error(
-            "Unsupported file type. Use PDF, JPG, PNG, WebP, or HEIC.",
-          );
-        }
-        if (proofFile.size > MAX_PROOF_BYTES) {
-          throw new Error("File must be 10MB or smaller.");
-        }
-
         const storagePath = buildPaymentProofStoragePath(
           borrowerId,
           String(Date.now()),
@@ -134,61 +123,46 @@ export function RecordPaymentModal({
         if (proofFile.type) payload.mimeType = proofFile.type;
       }
 
-      const res = await fetch("/api/collector/payments", {
+      const response = await fetch("/api/collector/payments", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
-      if (!res.ok) {
-        const body = (await res.json().catch(() => null)) as {
+      if (!response.ok) {
+        const body = (await response.json().catch(() => null)) as {
           error?: string;
         } | null;
         throw new Error(body?.error ?? "Failed to record payment");
       }
+
       reset();
-      onRecorded();
-      onClose();
+      await onRecorded();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed");
+      setError(err instanceof Error ? err.message : "Failed to record payment");
     } finally {
       setSaving(false);
     }
   }
 
   return (
-    <Modal
-      open={open}
-      title={`Record payment — ${borrowerName}`}
-      className="!max-w-2xl"
-      onClose={() => {
-        reset();
-        onClose();
-      }}
-      footer={
-        <>
-          <Button variant="ghost" onClick={onClose} disabled={saving}>
-            Cancel
-          </Button>
-          <Button loading={saving} onClick={() => void submit()}>
-            Record payment
-          </Button>
-        </>
-      }
-    >
+    <Card>
+      <div className="mb-5">
+        <h2 className="font-display text-lg font-semibold text-navy-900">
+          Record payment
+        </h2>
+        <p className="mt-1 text-sm text-ink-500">
+          Use this for in-person or branch payments the borrower cannot submit
+          through the portal.
+        </p>
+      </div>
+
       {error ? (
-        <div className="mb-4">
-          <Alert variant="danger">{error}</Alert>
-        </div>
-      ) : (
-        <div className="mb-4">
-          <Alert variant="info">
-            Use this for in-person or branch payments the borrower cannot
-            submit through the portal. Amount, payment date, and reference
-            number are required.
-          </Alert>
-        </div>
-      )}
-      <form onSubmit={(e) => void submit(e)} className="space-y-6">
+        <Alert variant="danger" className="mb-5">
+          {error}
+        </Alert>
+      ) : null}
+
+      <form onSubmit={submit} className="space-y-6">
         <section>
           <h3 className="mb-3 font-display text-base font-semibold text-navy-900">
             Payment details
@@ -203,7 +177,7 @@ export function RecordPaymentModal({
                   step="0.01"
                   min="0.01"
                   value={amount}
-                  onChange={(e) => setAmount(e.target.value)}
+                  onChange={(event) => setAmount(event.target.value)}
                   required
                   mono
                 />
@@ -214,7 +188,7 @@ export function RecordPaymentModal({
               <Input
                 type="date"
                 value={paymentDate}
-                onChange={(e) => setPaymentDate(e.target.value)}
+                onChange={(event) => setPaymentDate(event.target.value)}
                 required
               />
             </div>
@@ -222,7 +196,7 @@ export function RecordPaymentModal({
               <Label required>Reference no.</Label>
               <Input
                 value={referenceNo}
-                onChange={(e) => setReferenceNo(e.target.value)}
+                onChange={(event) => setReferenceNo(event.target.value)}
                 placeholder="Bank reference / receipt no."
                 required
                 className="mono"
@@ -232,12 +206,24 @@ export function RecordPaymentModal({
               <Label>Channel</Label>
               <Select
                 value={channel}
-                onChange={(e) => setChannel(e.target.value as Channel)}
+                onChange={(event) =>
+                  setChannel(event.target.value as Channel)
+                }
               >
                 <option value="bank_deposit">Bank deposit</option>
                 <option value="check">Check</option>
                 <option value="pos_cash">POS / Cash</option>
               </Select>
+            </div>
+            <div className="sm:col-span-2">
+              <Label>Remarks (optional)</Label>
+              <Textarea
+                value={notes}
+                onChange={(event) => setNotes(event.target.value)}
+                maxLength={1000}
+                rows={3}
+                placeholder="Anything about this branch or in-person payment"
+              />
             </div>
           </div>
         </section>
@@ -269,7 +255,13 @@ export function RecordPaymentModal({
             </p>
           ) : null}
         </section>
+
+        <div className="flex justify-end">
+          <Button type="submit" loading={saving}>
+            Record payment
+          </Button>
+        </div>
       </form>
-    </Modal>
+    </Card>
   );
 }

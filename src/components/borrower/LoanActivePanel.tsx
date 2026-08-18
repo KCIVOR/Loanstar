@@ -76,6 +76,7 @@ type PaymentRow = {
   notes: string | null;
   flagged_reason: string | null;
   flagged_at: string | null;
+  uploadedByStaff?: boolean;
 };
 
 type PostingRow = {
@@ -478,6 +479,11 @@ export function LoanActivePanel({
                     {p.channel.replace(/_/g, " ")}
                     {p.reference_no ? ` · Ref ${p.reference_no}` : ""}
                   </p>
+                  {p.uploadedByStaff ? (
+                    <p className="mt-1 text-xs text-ink-500">
+                      Recorded by Loanstar staff
+                    </p>
+                  ) : null}
                   {flagged ? (
                     <p className="mt-1 text-danger">
                       Returned for correction: {p.flagged_reason}

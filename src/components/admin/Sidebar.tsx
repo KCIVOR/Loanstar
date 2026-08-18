@@ -8,6 +8,10 @@ import { usePathname } from "next/navigation";
 import { LoanStarLogo, LoanStarMark } from "@/components/ui";
 import { cn } from "@/components/ui/cn";
 import { usePermissions } from "@/hooks/usePermissions";
+import {
+  resolveActiveChildHref,
+  type NavChildMatch,
+} from "@/lib/nav/active-nav";
 import { resolveHomePath } from "@/lib/permissions/home";
 import type { ModuleSlug } from "@/lib/permissions/types";
 
@@ -201,13 +205,8 @@ const NAV_ITEMS: Array<{
   { href: "/admin/email-templates", label: "Decision Emails", icon: "emailTest", module: "system_config" },
 ];
 
-type PortalNavChild = {
-  href: string;
+type PortalNavChild = NavChildMatch & {
   label: string;
-  /** Match only this path (and optional prefixes below). */
-  exact?: boolean;
-  /** Extra path prefixes that count as active for this child. */
-  matchPrefixes?: string[];
 };
 
 type PortalNavItem = {
@@ -298,6 +297,7 @@ const PORTAL_NAV_ITEMS: PortalNavItem[] = [
       { href: "/ar", label: "Masterlist", exact: true, matchPrefixes: ["/ar/masterlist"] },
       { href: "/ar/dcr", label: "DCRR queue" },
       { href: "/ar/history", label: "Posting history" },
+      { href: "/ar/rounding-writeoffs", label: "Rounding write-offs" },
     ],
   },
   {
@@ -332,14 +332,6 @@ const PORTAL_NAV_ITEMS: PortalNavItem[] = [
     ],
   },
 ];
-
-function childIsActive(pathname: string, child: PortalNavChild) {
-  if (child.exact) {
-    if (pathname === child.href) return true;
-    return (child.matchPrefixes ?? []).some((p) => pathname.startsWith(p));
-  }
-  return pathname.startsWith(child.href);
-}
 
 function NavLink({
   href,
@@ -397,6 +389,9 @@ function PortalNavGroup({
 }) {
   const inSection = pathname.startsWith(item.href);
   const hasChildren = Boolean(item.children?.length);
+  const activeChildHref = hasChildren
+    ? resolveActiveChildHref(pathname, item.children!)
+    : null;
   /* When expanded with children, only the matching child is highlighted. */
   const parentActive = hasChildren
     ? collapsed && inSection
@@ -424,7 +419,7 @@ function PortalNavGroup({
               key={child.href + child.label}
               href={child.href}
               label={child.label}
-              active={childIsActive(pathname, child)}
+              active={child.href === activeChildHref}
               collapsed={false}
               onNavClick={onNavClick}
               child

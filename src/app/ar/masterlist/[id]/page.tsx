@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useCallback, useEffect, useState } from "react";
+import Link from "next/link";
 import { useParams } from "next/navigation";
 
 import { AccountLedger } from "@/components/ledger/AccountLedger";
@@ -51,6 +52,7 @@ type PaymentRow = {
   storage_path?: string | null;
   file_name?: string | null;
   created_at?: string;
+  uploadedByName?: string | null;
 };
 
 type ScheduleRow = {
@@ -921,6 +923,11 @@ export default function ArMasterlistDetailPage() {
                     ? ` · Ref ${payment.reference_no}`
                     : ""}
                 </p>
+                {payment.uploadedByName ? (
+                  <p className="mt-1 text-xs text-ink-500">
+                    Recorded by {payment.uploadedByName}
+                  </p>
+                ) : null}
               </div>
             ))}
           </div>
@@ -928,9 +935,17 @@ export default function ArMasterlistDetailPage() {
       </Card>
 
       <Card className="mb-6">
-        <h2 className="mb-1 font-display text-lg font-semibold text-navy-900">
-          Rounding write-offs
-        </h2>
+        <div className="mb-1 flex items-center justify-between gap-3">
+          <h2 className="font-display text-lg font-semibold text-navy-900">
+            Rounding write-offs
+          </h2>
+          <Link
+            href="/ar/rounding-writeoffs"
+            className="text-sm text-teal-700 hover:underline"
+          >
+            View full history →
+          </Link>
+        </div>
         <p className="mb-3 text-sm text-ink-500">
           Small remainders closed as rounding differences — logged with who
           performed each write-off.

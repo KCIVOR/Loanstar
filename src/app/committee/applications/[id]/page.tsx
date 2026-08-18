@@ -337,6 +337,9 @@ export default function CommitteeApplicationPage() {
   const [confirmAction, setConfirmAction] = useState<
     "approve" | "deny" | "hold" | null
   >(null);
+  const [confirmApproveWithoutSign, setConfirmApproveWithoutSign] =
+    useState(false);
+  const [approvingWithoutSign, setApprovingWithoutSign] = useState(false);
   const [resendOpen, setResendOpen] = useState(false);
   const [resending, setResending] = useState(false);
   const [decisionComment, setDecisionComment] = useState("");
@@ -443,6 +446,34 @@ export default function CommitteeApplicationPage() {
       setError(err instanceof Error ? err.message : "Action failed");
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function handleApproveWithoutSign() {
+    setApprovingWithoutSign(true);
+    setMessage(null);
+    setError(null);
+    try {
+      const res = await fetch(
+        `/api/committee/applications/${applicationId}/approve-without-sign`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            comment: decisionComment.trim() || undefined,
+          }),
+        },
+      );
+      const body = (await res.json()) as { error?: string };
+      if (!res.ok) throw new Error(body.error ?? "Action failed");
+      setMessage("Approved, disclosed, and signed in-branch — queued for LRA.");
+      setDecisionComment("");
+      setConfirmApproveWithoutSign(false);
+      await load({ silent: true });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Action failed");
+    } finally {
+      setApprovingWithoutSign(false);
     }
   }
 
@@ -1941,6 +1972,7 @@ export default function CommitteeApplicationPage() {
             <div className="flex flex-wrap gap-2">
               <Button
                 loading={saving}
+                disabled={!data.borrower?.userId}
                 onClick={() => setConfirmAction("approve")}
               >
                 Approve loan
@@ -1961,7 +1993,35 @@ export default function CommitteeApplicationPage() {
                   Hold
                 </Button>
               ) : null}
+              {!data.borrower?.userId ? (
+                <Button
+                  type="button"
+                  variant="outline"
+                  loading={approvingWithoutSign}
+                  onClick={() => setConfirmApproveWithoutSign(true)}
+                >
+                  Approve without borrower&apos;s sign
+                </Button>
+              ) : null}
             </div>
+            {!data.borrower?.userId ? (
+              <p className="mt-2 text-xs text-ink-400">
+                Borrower has no portal account — use &ldquo;Approve without
+                borrower&apos;s sign&rdquo; instead of plain Approve.
+              </p>
+            ) : null}
+
+            <ConfirmDialog
+              open={confirmApproveWithoutSign}
+              title="Approve without borrower's sign?"
+              message="Approves the loan, discloses the terms, and signs the computation in-branch on the borrower's behalf, all in one step — skipping CSA's separate disclose click and the borrower's own portal signature. Only use this when the borrower has no portal account and has approved the terms in person. This queues the file for LRA immediately."
+              confirmLabel="Yes, approve and proceed to LRA"
+              cancelLabel="Cancel"
+              variant="accent"
+              loading={approvingWithoutSign}
+              onConfirm={() => void handleApproveWithoutSign()}
+              onCancel={() => setConfirmApproveWithoutSign(false)}
+            />
 
             <ConfirmDialog
               open={confirmAction !== null}

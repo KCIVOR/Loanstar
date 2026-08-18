@@ -46,6 +46,7 @@ const recordSchema = z.object({
   storagePath: z.string().optional(),
   fileName: z.string().optional(),
   mimeType: z.string().optional(),
+  notes: z.string().trim().max(1000).optional(),
 });
 
 type Scope = "desk" | "dcr" | "history";
@@ -266,6 +267,7 @@ export async function POST(request: Request) {
         channel: body.channel,
         storage_path: body.storagePath ?? null,
         file_name: body.fileName ?? null,
+        notes: body.notes || null,
         status: "confirmed",
         uploaded_by: user.id,
         reviewed_by: user.id,
@@ -289,6 +291,7 @@ export async function POST(request: Request) {
         amount: body.amount,
         channel: body.channel,
         status: "confirmed",
+        hasNotes: Boolean(body.notes),
         bucket: DOCUMENT_BUCKET,
       },
     });

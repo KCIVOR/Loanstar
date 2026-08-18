@@ -130,7 +130,7 @@ export default function CsaLeadsPage() {
   const [waitingFilter, setWaitingFilter] =
     useState<CsaLeadsWaitingBucket>("all");
   const [referredSortDir, setReferredSortDir] = useState<"asc" | "desc" | null>(
-    null,
+    "desc",
   );
   const [viewMode, setViewMode] = useState<HistoryViewMode>("list");
   const [filterPanelOpen, setFilterPanelOpen] = useState(false);

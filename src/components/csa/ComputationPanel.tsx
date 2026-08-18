@@ -43,6 +43,7 @@ type Computation = {
   lineItems: Array<{ key: string; label: string; amount: number }>;
   coverageWarning: boolean;
   signedAt: string | null;
+  witnessedBy: string | null;
   loanTypeName: string | null;
   loanTypeId?: string | null;
 };
@@ -427,7 +428,11 @@ export function ComputationPanel({
                     : "var(--warning)",
                 }}
               />
-              {computation.signedAt ? "Signed by borrower" : "Awaiting signature"}
+              {computation.signedAt
+                ? computation.witnessedBy
+                  ? "Signed in-branch (witnessed by staff)"
+                  : "Signed by borrower"
+                : "Awaiting signature"}
             </span>
             {computation.signedAt ? (
               <b className="font-normal text-navy-200" style={{ fontSize: 11.5 }}>

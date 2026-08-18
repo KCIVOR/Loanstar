@@ -21,6 +21,7 @@ import {
   Textarea,
 } from "@/components/ui";
 import { ComputationPanel } from "@/components/csa/ComputationPanel";
+import { ConnectBorrowerAccountPanel } from "@/components/csa/ConnectBorrowerAccountPanel";
 import { NegotiationPanel } from "@/components/csa/NegotiationPanel";
 import { ApplicantProfileFields } from "@/components/borrowers/ApplicantProfileFields";
 import { AutofillOverlay } from "@/components/dev/AutofillOverlay";
@@ -101,6 +102,7 @@ type ApplicationWorkspace = {
     lineItems: Array<{ key: string; label: string; amount: number }>;
     coverageWarning: boolean;
     signedAt: string | null;
+    witnessedBy: string | null;
     loanTypeName: string | null;
   } | null;
   endorseReadiness: EndorseReadiness;
@@ -242,10 +244,12 @@ export default function CsaApplicationPage() {
   const [error, setError] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [witnessSigning, setWitnessSigning] = useState(false);
   const [showApplicationForm, setShowApplicationForm] = useState(false);
   const [confirmOrientation, setConfirmOrientation] = useState(false);
   const [confirmInterview, setConfirmInterview] = useState(false);
   const [confirmClearHold, setConfirmClearHold] = useState(false);
+  const [confirmWitnessSign, setConfirmWitnessSign] = useState(false);
   const [interviewNotes, setInterviewNotes] = useState("");
 
   const load = useCallback(
@@ -409,6 +413,31 @@ export default function CsaApplicationPage() {
       setActionError(err instanceof Error ? err.message : "Endorse failed");
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function handleWitnessSign() {
+    setWitnessSigning(true);
+    setActionError(null);
+    try {
+      const res = await fetch(
+        `/api/csa/applications/${applicationId}/computation/witness-sign`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ confirm: true }),
+        },
+      );
+      const body = (await res.json()) as { error?: string };
+      if (!res.ok) {
+        throw new Error(body.error ?? "Witness-sign failed");
+      }
+      setConfirmWitnessSign(false);
+      await load({ silent: true });
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : "Witness-sign failed");
+    } finally {
+      setWitnessSigning(false);
     }
   }
 
@@ -1199,6 +1228,13 @@ export default function CsaApplicationPage() {
           </>
         ) : null}
 
+        {!data.borrower?.userId ? (
+          <ConnectBorrowerAccountPanel
+            applicationId={applicationId}
+            onConnected={() => void load({ silent: true })}
+          />
+        ) : null}
+
         <ComputationPanel
           applicationId={applicationId}
           loanTypeId={data.details?.loanTypeId ?? null}
@@ -1290,13 +1326,34 @@ export default function CsaApplicationPage() {
           </div>
           {editable ? (
             <div className="space-y-4">
-              <Button
-                loading={saving}
-                disabled={!data.endorseReadiness.ready}
-                onClick={() => void handleEndorse()}
-              >
-                Endorse to CIG
-              </Button>
+              <div className="flex flex-wrap gap-3">
+                <Button
+                  loading={saving}
+                  disabled={!data.endorseReadiness.ready}
+                  onClick={() => void handleEndorse()}
+                >
+                  Endorse to CIG
+                </Button>
+                {data.computation && !data.computation.signedAt ? (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => setConfirmWitnessSign(true)}
+                  >
+                    Proceed without borrower&apos;s sign
+                  </Button>
+                ) : null}
+              </div>
+              <ConfirmDialog
+                open={confirmWitnessSign}
+                title="Proceed without borrower's sign?"
+                message="Confirm the borrower reviewed and approved this computation in person (no portal account, or signing in-branch instead). This records you as the witness."
+                confirmLabel="Yes, proceed"
+                cancelLabel="Cancel"
+                loading={witnessSigning}
+                onConfirm={() => void handleWitnessSign()}
+                onCancel={() => setConfirmWitnessSign(false)}
+              />
               {data.application.status === "on_hold" ? (
                 <div className="space-y-2 border-t border-line-soft pt-4">
                   <p className="text-sm text-ink-600">

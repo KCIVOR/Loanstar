@@ -1,15 +1,15 @@
 "use client";
 
+import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 
-import { RecordPaymentModal } from "@/components/collector/RecordPaymentModal";
+import { OriginationPacketPanel } from "@/components/collection/OriginationPacketPanel";
 import { AccountLedger } from "@/components/ledger/AccountLedger";
 import {
   Alert,
   Badge,
   Breadcrumbs,
-  Button,
   EmptyState,
   PageHeader,
   Spinner,
@@ -21,11 +21,11 @@ import {
   masterlistEmploymentLabels,
   masterlistSecondaryIdentity,
 } from "@/lib/ar/masterlist-display";
+import { type LedgerPdcCheck } from "@/lib/ledger/build-account-ledger-rows";
 import {
-  buildAccountLedgerRows,
-  checkNumbersByInstallmentNo,
-  type LedgerPdcCheck,
-} from "@/lib/ledger/build-account-ledger-rows";
+  buildDeskLedgerRows,
+  type DeskLedgerPosting,
+} from "@/lib/ledger/desk-ledger";
 import {
   severityLabel,
   severityVariant,
@@ -78,6 +78,7 @@ type PaymentRow = {
   channel: string;
   notes: string | null;
   created_at: string;
+  uploadedByName?: string | null;
 };
 
 function formatMoney(value: number) {
@@ -112,10 +113,10 @@ export default function RemedialAccountPage() {
   const [account, setAccount] = useState<Account | null>(null);
   const [schedules, setSchedules] = useState<ScheduleRow[]>([]);
   const [payments, setPayments] = useState<PaymentRow[]>([]);
+  const [postings, setPostings] = useState<DeskLedgerPosting[]>([]);
   const [pdcChecks, setPdcChecks] = useState<LedgerPdcCheck[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [recordPaymentOpen, setRecordPaymentOpen] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -127,11 +128,13 @@ export default function RemedialAccountPage() {
         account: Account;
         schedules: ScheduleRow[];
         payments: PaymentRow[];
+        postings?: DeskLedgerPosting[];
         pdcChecks?: LedgerPdcCheck[];
       };
       setAccount(data.account);
       setSchedules(data.schedules ?? []);
       setPayments(data.payments ?? []);
+      setPostings(data.postings ?? []);
       setPdcChecks(data.pdcChecks ?? []);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load");
@@ -155,31 +158,11 @@ export default function RemedialAccountPage() {
     manning_agency: account.manningAgency,
     vessel_name: account.vesselName,
   });
-  const checkNoByInstallment = checkNumbersByInstallmentNo(pdcChecks);
-  const ledgerRows = buildAccountLedgerRows({
-    openingDebit:
-      account.totalLoan > 0
-        ? account.totalLoan
-        : schedules.reduce((sum, row) => sum + Number(row.amountDue ?? 0), 0),
-    schedules: schedules.map((row) => ({
-      id: row.id,
-      dueDate: row.dueDate,
-      target: Number(row.amountDue ?? 0),
-      penalty: Number(row.penaltyAmount ?? 0),
-      installmentNo: row.installmentNo,
-      checkNo: checkNoByInstallment.get(row.installmentNo) ?? null,
-      status: row.status,
-    })),
-    // No postings under remedial RLS — credits are payment rows; Due/Target/Penalty stay blank until schedule join is available.
-    payments: payments.map((pay) => ({
-      id: pay.id,
-      paymentDate: pay.payment_date,
-      amount: Number(pay.amount ?? 0),
-      referenceNo: pay.reference_no,
-      channel: pay.channel,
-      status: pay.status,
-      scheduleId: null,
-    })),
+  const ledgerRows = buildDeskLedgerRows({
+    totalLoan: account.totalLoan,
+    schedules,
+    postings,
+    pdcChecks,
   });
 
   return (
@@ -360,14 +343,34 @@ export default function RemedialAccountPage() {
         )}
       </section>
 
+      {account ? (
+        <section className="mb-8">
+          <h2 className="mb-3 font-display text-lg font-semibold text-navy-900">
+            Origination packet
+          </h2>
+          <p className="mb-3 text-sm text-ink-500">
+            Read-only — borrower/CSA attachments, CSA intake summary, and CIG
+            report for this assigned account.
+          </p>
+          <OriginationPacketPanel
+            masterlistId={account.id}
+            caseFileApiBase={`/api/remedial/accounts/${account.id}/case-file`}
+            mode="fetch"
+          />
+        </section>
+      ) : null}
+
       <section>
         <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
           <h2 className="font-display text-lg font-semibold text-navy-900">
             Payment history
           </h2>
-          <Button onClick={() => setRecordPaymentOpen(true)}>
+          <Link
+            href={`/remedial/accounts/${account.id}/record-payment`}
+            className="btn btn-primary"
+          >
             Record payment
-          </Button>
+          </Link>
         </div>
         {payments.length === 0 ? (
           <EmptyState
@@ -397,6 +400,11 @@ export default function RemedialAccountPage() {
                           {pay.notes}
                         </div>
                       ) : null}
+                      {pay.uploadedByName ? (
+                        <div className="mt-1 whitespace-normal text-xs font-normal text-ink-500">
+                          Recorded by {pay.uploadedByName}
+                        </div>
+                      ) : null}
                     </Td>
                     <Td className="mono">{formatDate(pay.payment_date)}</Td>
                     <Td>{pay.channel.replaceAll("_", " ")}</Td>
@@ -416,14 +424,6 @@ export default function RemedialAccountPage() {
         )}
       </section>
 
-      <RecordPaymentModal
-        open={recordPaymentOpen}
-        borrowerName={account.borrowerName}
-        masterlistId={account.id}
-        borrowerId={account.borrowerId ?? ""}
-        onClose={() => setRecordPaymentOpen(false)}
-        onRecorded={() => void load()}
-      />
     </div>
   );
 }

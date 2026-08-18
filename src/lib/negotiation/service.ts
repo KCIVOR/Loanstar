@@ -1,7 +1,9 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { createHash } from "crypto";
 
 import { appendStatusHistory } from "@/lib/applications/status";
-import { persistComputation } from "@/lib/csa/computation";
+import { writeAuditEvent } from "@/lib/audit/writer";
+import { getActiveComputation, persistComputation } from "@/lib/csa/computation";
 import type { InputMode } from "@/lib/computation/types";
 import { createServiceClient } from "@/lib/supabase/server";
 
@@ -192,6 +194,7 @@ export async function discloseTerms(
   applicationId: string,
   actorId: string,
   notes?: string,
+  statusNote = "CSA disclosed approved terms",
 ) {
   const negotiation = await getNegotiation(supabase, applicationId);
   if (!negotiation) {
@@ -211,6 +214,7 @@ export async function discloseTerms(
     signed_at: null,
     signed_by: null,
     signature_hash: null,
+    witnessed_by: null,
   };
   const { error: clearError } = negotiation.activeComputationId
     ? await admin
@@ -244,7 +248,7 @@ export async function discloseTerms(
 
   await appendStatusHistory(admin, applicationId, "awaiting_confirmation", {
     actorId,
-    note: "CSA disclosed approved terms",
+    note: statusNote,
   });
 
   return getNegotiation(supabase, applicationId);
@@ -491,6 +495,107 @@ export async function queueForLra(
     actorId,
     note,
   });
+}
+
+/**
+ * CSA in-branch witness-sign — covers a borrower who has no portal account
+ * (or is simply on-site and it's faster than handing them the portal).
+ * Mirrors the borrower's own sign action in
+ * api/borrower/applications/[id]/computation/route.ts, but `signed_by` still
+ * records the borrower (their linked user_id, or null for a walk-in) — the
+ * CSA staffer performing the witness action is recorded separately in
+ * `witnessed_by`, never in `signed_by`. Same two checkpoints as the borrower
+ * path: intake-stage first signature (no negotiation row yet) and
+ * post-disclosure signature (negotiation.status === "awaiting_signature",
+ * which also queues the file for LRA).
+ */
+export async function witnessSignComputation(
+  supabase: SupabaseClient,
+  applicationId: string,
+  witnessedById: string,
+) {
+  const negotiation = await getNegotiation(supabase, applicationId);
+
+  if (negotiation && negotiation.status !== "awaiting_signature") {
+    throw new Error("Approved terms must be disclosed before you can sign");
+  }
+
+  const computation = await getActiveComputation(supabase, applicationId);
+  if (!computation) {
+    throw new Error("No computation available to sign");
+  }
+
+  const admin = createServiceClient();
+
+  if (computation.signedAt) {
+    // Same stale-signature situation the borrower route guards against: RLS
+    // can leave signed_at set from an intake-era signature while negotiation
+    // has since moved back to awaiting_signature after disclose. Clear and
+    // continue rather than reject.
+    if (negotiation?.status === "awaiting_signature") {
+      const { error: clearError } = await admin
+        .from("computations")
+        .update({ signed_at: null, signed_by: null, signature_hash: null, witnessed_by: null })
+        .eq("id", computation.id);
+      if (clearError) {
+        throw new Error(clearError.message);
+      }
+    } else {
+      throw new Error("Computation already signed");
+    }
+  }
+
+  const { data: appRow } = await supabase
+    .from("loan_applications")
+    .select("borrowers ( user_id )")
+    .eq("id", applicationId)
+    .single();
+  const borrowerRaw = appRow?.borrowers;
+  const borrower = Array.isArray(borrowerRaw) ? borrowerRaw[0] : borrowerRaw;
+
+  const signatureHash = createHash("sha256")
+    .update(JSON.stringify(computation))
+    .digest("hex");
+  const signedAt = new Date().toISOString();
+
+  const { error: updateError } = await admin
+    .from("computations")
+    .update({
+      signed_at: signedAt,
+      signed_by: (borrower?.user_id as string | null) ?? null,
+      witnessed_by: witnessedById,
+      signature_hash: signatureHash,
+    })
+    .eq("id", computation.id);
+
+  if (updateError) {
+    throw new Error(updateError.message);
+  }
+
+  if (negotiation && negotiation.status === "awaiting_signature") {
+    await queueForLra(
+      supabase,
+      applicationId,
+      computation.id,
+      witnessedById,
+      "CSA witness-signed computation in-branch — queued for LRA",
+    );
+  }
+
+  await writeAuditEvent({
+    actorId: witnessedById,
+    moduleSlug: "computation",
+    action: "execute_trigger",
+    entityType: "computation",
+    entityId: computation.id,
+    afterData: {
+      applicationId,
+      signatureHash,
+      trigger: "csa_witness_sign_computation",
+    },
+  });
+
+  return { signedAt, witnessedBy: witnessedById };
 }
 
 /**

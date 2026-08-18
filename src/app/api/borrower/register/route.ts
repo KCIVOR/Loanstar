@@ -3,12 +3,6 @@ import { createClient as createSupabaseClient } from "@supabase/supabase-js";
 import { z } from "zod";
 
 import { mapBorrowerRow, type Address } from "@/lib/borrowers/types";
-import {
-  buildClaimProfilePatch,
-  classifyBorrowerForRegistration,
-  normalizeBorrowerEmail,
-  type ClaimableBorrowerRow,
-} from "@/lib/borrowers/claim";
 import { handleApiError, jsonOk } from "@/lib/api/handler";
 import { getRequestIp } from "@/lib/permissions/server";
 import { createServiceClient } from "@/lib/supabase/server";
@@ -90,31 +84,8 @@ export async function POST(request: Request) {
   try {
     const body = registerSchema.parse(await request.json());
     const service = createServiceClient();
-    const email = normalizeBorrowerEmail(body.email);
+    const email = body.email.trim().toLowerCase();
     const origin = new URL(request.url).origin;
-
-    const { data: existingRows, error: lookupError } = await service
-      .from("borrowers")
-      .select(
-        "id, user_id, email, first_name, middle_name, last_name, suffix, date_of_birth, place_of_birth, citizenship, civil_status, gender, mobile_phone, landline",
-      )
-      .ilike("email", email);
-
-    if (lookupError) {
-      throw new Error(lookupError.message);
-    }
-
-    const existing = (existingRows ?? []).find(
-      (row) => normalizeBorrowerEmail(row.email as string) === email,
-    ) as ClaimableBorrowerRow | undefined;
-
-    const classification = classifyBorrowerForRegistration(existing);
-    if (classification === "already_claimed") {
-      return NextResponse.json(
-        { error: "An account with this email already exists." },
-        { status: 409 },
-      );
-    }
 
     // Supabase Auth sends the confirmation email when "Confirm email" is
     // enabled in Authentication → Providers → Email (not Resend).
@@ -150,69 +121,36 @@ export async function POST(request: Request) {
     const confirmationSent = requiresEmailConfirmation;
 
     let borrower: Record<string, unknown> | null = null;
-    const claimed = classification === "claimable";
 
     try {
-      if (claimed && existing) {
-        const patch = buildClaimProfilePatch(existing, {
-          userId,
-          firstName: body.firstName,
-          middleName: body.middleName,
-          lastName: body.lastName,
-          suffix: body.suffix,
-          dateOfBirth: body.dateOfBirth,
-          placeOfBirth: body.placeOfBirth,
-          citizenship: body.citizenship,
-          civilStatus: body.civilStatus,
-          gender: body.gender,
-          mobilePhone: body.mobilePhone,
-          landline: body.landline,
-        });
+      const { data: created, error: borrowerError } = await service
+        .from("borrowers")
+        .insert({
+          user_id: userId,
+          email,
+          first_name: body.firstName,
+          middle_name: body.middleName ?? null,
+          last_name: body.lastName,
+          suffix: body.suffix ?? null,
+          date_of_birth: body.dateOfBirth ?? null,
+          place_of_birth: body.placeOfBirth ?? null,
+          citizenship: body.citizenship ?? "Filipino",
+          civil_status: body.civilStatus ?? null,
+          gender: body.gender ?? null,
+          mobile_phone: body.mobilePhone ?? null,
+          landline: body.landline ?? null,
+          present_address: (body.presentAddress ?? {}) as Address,
+          permanent_address: (body.permanentAddress ?? {}) as Address,
+        })
+        .select("*")
+        .single();
 
-        const { data: updated, error: updateError } = await service
-          .from("borrowers")
-          .update(patch)
-          .eq("id", existing.id)
-          .is("user_id", null)
-          .select("*")
-          .single();
-
-        if (updateError || !updated) {
-          throw new Error(
-            updateError?.message ?? "Failed to claim borrower profile",
-          );
-        }
-        borrower = updated;
-      } else {
-        const { data: created, error: borrowerError } = await service
-          .from("borrowers")
-          .insert({
-            user_id: userId,
-            email,
-            first_name: body.firstName,
-            middle_name: body.middleName ?? null,
-            last_name: body.lastName,
-            suffix: body.suffix ?? null,
-            date_of_birth: body.dateOfBirth ?? null,
-            place_of_birth: body.placeOfBirth ?? null,
-            citizenship: body.citizenship ?? "Filipino",
-            civil_status: body.civilStatus ?? null,
-            gender: body.gender ?? null,
-            mobile_phone: body.mobilePhone ?? null,
-            landline: body.landline ?? null,
-            present_address: (body.presentAddress ?? {}) as Address,
-            permanent_address: (body.permanentAddress ?? {}) as Address,
-          })
-          .select("*")
-          .single();
-
-        if (borrowerError || !created) {
-          throw new Error(
-            borrowerError?.message ?? "Failed to create borrower profile",
-          );
-        }
-        borrower = created;
+      if (borrowerError || !created) {
+        throw new Error(
+          borrowerError?.message ?? "Failed to create borrower profile",
+        );
       }
+      borrower = created;
 
       const { data: borrowerRole } = await service
         .from("roles")
@@ -231,13 +169,8 @@ export async function POST(request: Request) {
         }
       }
     } catch (profileError) {
-      if (borrower?.id && !claimed) {
+      if (borrower?.id) {
         await service.from("borrowers").delete().eq("id", borrower.id);
-      } else if (claimed && existing) {
-        await service
-          .from("borrowers")
-          .update({ user_id: null })
-          .eq("id", existing.id);
       }
       await service.auth.admin.deleteUser(userId);
       throw profileError;
@@ -256,7 +189,6 @@ export async function POST(request: Request) {
       afterData: {
         borrowerNo: borrower.borrower_no,
         email,
-        claimed,
         confirmationSent,
         requiresEmailConfirmation,
         provider: "supabase_auth",
@@ -266,7 +198,6 @@ export async function POST(request: Request) {
     return jsonOk(
       {
         borrower: mapBorrowerRow(borrower as never),
-        claimed,
         requiresEmailConfirmation,
         confirmationSent,
       },

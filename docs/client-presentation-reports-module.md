@@ -255,7 +255,7 @@ into a board meeting or an email in seconds.*
 
 ---
 
-## Part 7 — What's Coming Next: The Assistant Panel
+## Part 7 — What's Coming Next: The AI Assistant
 
 **Purpose:** Set expectations for where this is heading, and leave them with
 something to look forward to.
@@ -264,21 +264,66 @@ something to look forward to.
 
 > "One last thing — you'll notice a button labeled 'Assistant' near the top
 > of the page. Clicking it opens a panel on the right, and right now it's a
-> placeholder — it's not answering questions yet.
+> placeholder — it's not connected to anything yet, and it can't answer
+> questions today.
 >
-> But it's already built to eventually let anyone simply *type a question*
-> — like 'why did collections drop last month?' or 'which loan cohort is
-> riskiest right now?' — and get an answer pulled directly from this same
-> live data, instead of having to read every chart yourself.
->
-> All the groundwork for that is already in place — every number on this
-> page already comes with a plain-English description of what it means
-> and how it's calculated, which is exactly what's needed to plug in an
-> assistant like that. It's the natural next step for this page."
+> It's there because it shows you where this page is headed — a future
+> where anyone can simply *type a question* — like 'why did collections
+> drop last month?' or 'which loan cohort is riskiest right now?' — and get
+> an answer pulled directly from this same live data, instead of having to
+> read every chart yourself. That's the vision. Let me walk you through
+> what it'll actually take to get there."
 
 **Why it matters:** *This shows the roadmap, not just the current state —
 the dashboard they're looking at today is a foundation, not a finished
 ceiling.*
+
+### The Plan for the AI Assistant
+
+**Purpose:** If the CEO asks "okay, when is that ready?" or "why isn't it
+working yet?" — this gives you a clear, honest answer, and sets the right
+expectation: the foundation has to be finished first, before the AI itself
+gets built.
+
+**Say:**
+
+> "I want to be straightforward with you about where this actually stands,
+> because I'd rather set the right expectation now than overpromise.
+>
+> **The foundation for this is not finished yet — and that has to happen
+> first, before we build the AI assistant itself.** Think of it like
+> construction: you don't put up the walls before the ground is properly
+> prepared. Right now, we've laid one important piece of that groundwork —
+> every number on this dashboard already has a clear, written definition
+> of what it means and how it's calculated. But that's only one piece.
+>
+> Before we can safely connect an AI on top of this, a few more
+> foundational things still need to be in place:
+>
+> - **Making sure the data it would learn from is clean and trustworthy
+>   across the board** — not just on this one page, but wherever the AI
+>   would eventually need to look.
+> - **Deciding, carefully, what the AI is allowed to see and say** —
+>   especially since this involves financial and borrower information. We
+>   want firm guardrails in place before it ever answers a real question,
+>   not after.
+> - **Testing it thoroughly for accuracy** before anyone relies on it —
+>   so the first time you or your team use it, it already works
+>   correctly, instead of us fixing mistakes in front of you.
+>
+> Once that foundation is properly in place, building the actual assistant
+> becomes much faster and much safer. That's the honest order of
+> operations: **foundation first, then the AI feature on top of it** — not
+> the other way around.
+>
+> So today, what you're seeing is the placeholder and the first building
+> block. The AI itself is the next project, and we're being deliberate
+> about it precisely because it's going to be handling real financial
+> data — yours."
+
+**Why it matters:** *This is an honest, credible answer instead of an
+overpromise — and it actually reflects well on us: it shows we won't bolt
+AI onto real financial data carelessly.*
 
 ---
 

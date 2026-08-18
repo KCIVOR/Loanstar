@@ -90,6 +90,34 @@ export async function GET(_request: Request, { params }: RouteParams) {
       .eq("masterlist_id", id)
       .order("created_at", { ascending: false });
 
+    const uploaderIds = Array.from(
+      new Set(
+        (payments ?? [])
+          .map((payment) => payment.uploaded_by as string | null)
+          .filter((uploaderId): uploaderId is string => Boolean(uploaderId)),
+      ),
+    );
+    const uploaderNameById = new Map<string, string>();
+    if (uploaderIds.length > 0) {
+      const admin = createServiceClient();
+      const { data: uploaderProfiles } = await admin
+        .from("profiles")
+        .select("id, full_name, email")
+        .in("id", uploaderIds);
+      for (const profile of uploaderProfiles ?? []) {
+        uploaderNameById.set(
+          profile.id as string,
+          (profile.full_name as string) || (profile.email as string),
+        );
+      }
+    }
+    const paymentsWithUploaderNames = (payments ?? []).map((payment) => ({
+      ...payment,
+      uploadedByName: payment.uploaded_by
+        ? (uploaderNameById.get(payment.uploaded_by as string) ?? null)
+        : null,
+    }));
+
     const { data: postings } = await supabase
       .from("postings")
       .select(
@@ -176,7 +204,7 @@ export async function GET(_request: Request, { params }: RouteParams) {
 
     return jsonOk({
       record: { ...data, application_status: applicationStatus },
-      payments: payments ?? [],
+      payments: paymentsWithUploaderNames,
       postings: postings ?? [],
       pdcChecks,
       roundingWriteoffThreshold,
