@@ -1058,6 +1058,7 @@ body {
   margin-top: 8px;
   font-variant-numeric: tabular-nums;
   letter-spacing: -0.01em;
+  overflow-wrap: anywhere;
 }
 .stat .d {
   font-size: 12.5px;
@@ -2660,6 +2661,20 @@ table.tbl {
 .table-wrap.is-compact table.tbl thead th { padding:8px 12px; font-size:10px; }
 .table-wrap.is-compact table.tbl tbody td { padding:7px 12px; }
 .table-wrap.is-compact table.tbl .badge { height:20px; font-size:10.5px; padding:0 8px; }
+
+/* Ledger: keep the wrap at the card width and scroll the wide table inside it.
+   min-width must live on the <table>, not .table-wrap — otherwise the scroll
+   container itself grows and overflows the parent card. */
+.table-wrap.is-ledger {
+  min-width: 0;
+  max-width: 100%;
+}
+.table-wrap.is-ledger table.tbl {
+  min-width: 1060px;
+}
+.table-wrap.is-ledger table.tbl tbody td {
+  white-space: nowrap;
+}
 
 /* ---- advanced forms ---- */
 .otp {

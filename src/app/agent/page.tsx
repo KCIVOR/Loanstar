@@ -72,22 +72,28 @@ const STATUS_CHIPS: Array<{ id: StatusFilter; label: string }> = [
   { id: "converted", label: "Converted" },
 ];
 
-type SegmentFilter = "all" | "seafarer" | "sme";
+type SegmentFilter = "all" | "seafarer" | "sme" | "individual";
 
 const SEGMENT_CHIPS: Array<{ id: SegmentFilter; label: string }> = [
   { id: "all", label: "All" },
   { id: "seafarer", label: "Seafarer" },
   { id: "sme", label: "SME" },
+  { id: "individual", label: "Individual" },
 ];
 
-function segmentCell(segment: "sme" | "seafarer" | null | undefined) {
-  if (segment !== "sme" && segment !== "seafarer") {
+function segmentCell(
+  segment: "sme" | "seafarer" | "individual" | null | undefined,
+) {
+  if (segment !== "sme" && segment !== "seafarer" && segment !== "individual") {
     return <span className="text-ink-400">—</span>;
   }
-  const isSme = segment === "sme";
+  const variant =
+    segment === "sme" ? "navy" : segment === "individual" ? "warning" : "teal";
+  const label =
+    segment === "sme" ? "SME" : segment === "individual" ? "Individual" : "Seafarer";
   return (
-    <Badge variant={isSme ? "navy" : "teal"} dot>
-      {isSme ? "SME" : "Seafarer"}
+    <Badge variant={variant} dot>
+      {label}
     </Badge>
   );
 }
@@ -524,7 +530,12 @@ export default function AgentPipelinePage() {
             ) : null}
             {segmentFilter !== "all" ? (
               <span className="active-pill">
-                Segment: {segmentFilter === "sme" ? "SME" : "Seafarer"}
+                Segment:{" "}
+                {segmentFilter === "sme"
+                  ? "SME"
+                  : segmentFilter === "individual"
+                    ? "Individual"
+                    : "Seafarer"}
                 <button
                   type="button"
                   aria-label="Clear segment filter"

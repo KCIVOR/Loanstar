@@ -42,11 +42,24 @@ const EMPTY_KPI: RoundingWriteoffKpiCounts = { total: 0, totalAmount: 0 };
 
 type Performer = { id: string; name: string };
 
-function segmentBadge(segment: "sme" | "seafarer" | null) {
-  const isSme = segment === "sme";
+function segmentBadge(segment: "sme" | "seafarer" | "individual" | null) {
+  if (segment === "sme") {
+    return (
+      <Badge variant="navy" dot>
+        SME
+      </Badge>
+    );
+  }
+  if (segment === "individual") {
+    return (
+      <Badge variant="warning" dot>
+        Individual
+      </Badge>
+    );
+  }
   return (
-    <Badge variant={isSme ? "navy" : "teal"} dot>
-      {isSme ? "SME" : "Seafarer"}
+    <Badge variant="teal" dot>
+      Seafarer
     </Badge>
   );
 }

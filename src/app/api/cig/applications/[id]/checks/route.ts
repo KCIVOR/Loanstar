@@ -45,7 +45,12 @@ export async function GET(_request: Request, { params }: RouteParams) {
 
     // Phase 7.1 provisional: CIG mappings remain Seafarer-only until client
     // confirms nfis/mf/lslg for SME — SME apps get an empty check list.
-    const segment = app.segment === "sme" ? "sme" : "seafarer";
+    // Individual has no mapping rows either (2026-08-19) — same empty-by-design
+    // auto-pass, not a coercion into Seafarer's POEA/Marina checks.
+    const segment =
+      app.segment === "sme" || app.segment === "individual"
+        ? app.segment
+        : "seafarer";
 
     const { data: mappings, error: mapError } = await supabase
       .from("stage_check_mapping")
@@ -119,7 +124,10 @@ export async function POST(request: Request, { params }: RouteParams) {
       .maybeSingle();
     assertChecksRecordingAllowed(
       getCigSequenceState(verification, checksBefore.complete, {
-        segment: appRow?.segment === "sme" ? "sme" : "seafarer",
+        segment:
+          appRow?.segment === "sme" || appRow?.segment === "individual"
+            ? appRow.segment
+            : "seafarer",
         isReloan: Boolean(appRow?.is_reloan),
       }),
     );
@@ -134,7 +142,10 @@ export async function POST(request: Request, { params }: RouteParams) {
       return NextResponse.json({ error: "Unknown check type" }, { status: 400 });
     }
 
-    const segment = appRow?.segment === "sme" ? "sme" : "seafarer";
+    const segment =
+      appRow?.segment === "sme" || appRow?.segment === "individual"
+        ? appRow.segment
+        : "seafarer";
     const { data: mapping, error: mapError } = await supabase
       .from("stage_check_mapping")
       .select("id")

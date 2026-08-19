@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="en" xmlns="http://www.w3.org/1999/xhtml">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta http-equiv="X-UA-Compatible" content="ie=edge" />
+  <title>Confirm your LoanStar account</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link
+    rel="stylesheet"
+    href="https://fonts.googleapis.com/css2?family=Sora:wght@600;700;800&family=Public+Sans:wght@400;500;600;700&display=swap"
+  />
+  <style>
+    body, table, td, div, p, a { -webkit-text-size-adjust: 100%; -ms-text-size-adjust: 100%; }
+    table, td { mso-table-lspace: 0; mso-table-rspace: 0; }
+    img { -ms-interpolation-mode: nearest-neighbor; border: 0; outline: 0; text-decoration: none; display: block; }
+    body {
+      font-family: "Public Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", "Helvetica Neue", sans-serif;
+      font-size: 15px;
+      line-height: 1.6;
+      color: #1c2a41;
+      background-color: #eef1f6;
+      margin: 0;
+      padding: 0;
+    }
+    a { color: #0d9488; }
+    @media only screen and (max-width: 600px) {
+      .container { border-radius: 0 !important; }
+      .px { padding-left: 24px !important; padding-right: 24px !important; }
+      .hero-text { font-size: 21px !important; }
+      .cta-button { display: block !important; width: 100% !important; box-sizing: border-box !important; }
+      .stack { display: block !important; width: 100% !important; }
+      .num-cell { padding-bottom: 18px !important; }
+    }
+  </style>
+</head>
+<body>
+  <div style="display:none;max-height:0;overflow:hidden;opacity:0;mso-hide:all;">
+    Confirm your email to activate your LoanStar account — link expires in 24 hours.
+  </div>
+
+  <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background-color:#eef1f6;">
+    <tr>
+      <td align="center" style="padding: 32px 16px;">
+        <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="600" class="container"
+          style="max-width:600px; width:100%; background-color:#ffffff; border-radius:14px; overflow:hidden; border:1px solid #e2e7f0;">
+
+          <!-- Top utility bar -->
+          <tr>
+            <td style="background-color:#0a1d3d; padding:10px 32px;" class="px">
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+                <tr>
+                  <td style="font-family:'Public Sans',sans-serif; font-size:11px; letter-spacing:0.06em; color:#8fa3c9; text-transform:uppercase;">
+                    Secure account setup
+                  </td>
+                  <td align="right" style="font-family:'Public Sans',sans-serif; font-size:11px; color:#8fa3c9;">
+                    loanstar.ph
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+
+          <!-- Header / brand -->
+          <tr>
+            <td style="background-color:#0c2247; padding:28px 32px 26px 32px;" class="px">
+              <img
+                src="https://acopcwlhkovssjnrqygk.supabase.co/storage/v1/object/public/branding/logo.png?v=3"
+                alt="LoanStar"
+                height="30"
+                style="height:30px; width:auto;"
+              />
+            </td>
+          </tr>
+
+          <!-- Accent divider -->
+          <tr>
+            <td style="line-height:0; font-size:0;">
+              <div style="height:4px; background:linear-gradient(90deg,#0d9488 0%,#14b8a6 35%,#1a407d 100%);"></div>
+            </td>
+          </tr>
+
+          <!-- Content -->
+          <tr>
+            <td class="px" style="padding: 40px 32px 8px 32px;">
+              <table role="presentation" cellpadding="0" cellspacing="0" border="0">
+                <tr>
+                  <td style="background-color:#e7f5f3; border-radius:20px; padding:5px 12px;">
+                    <span style="font-family:'Public Sans',sans-serif; font-size:11px; font-weight:700; letter-spacing:0.05em; color:#0a7d71; text-transform:uppercase;">
+                      Confirm your email
+                    </span>
+                  </td>
+                </tr>
+              </table>
+
+              <p class="hero-text" style="font-family:'Sora',sans-serif; font-size:25px; font-weight:700; line-height:1.35; color:#0f1e38; margin:18px 0 14px 0;">
+                Confirm your LoanStar account
+              </p>
+
+              <p style="font-size:15px; line-height:1.65; color:#54637e; margin:0 0 8px 0;">
+                Your account for <strong style="color:#1c2a41;">{{ .Email }}</strong> is ready on LoanStar,
+                our loan origination and portfolio management platform. Confirm your email address
+                to activate it and sign in.
+              </p>
+            </td>
+          </tr>
+
+          <!-- CTA -->
+          <tr>
+            <td class="px" style="padding: 20px 32px 36px 32px;">
+              <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">
+                <tr>
+                  <td>
+                    <a href="{{ .ConfirmationURL }}" class="cta-button"
+                      style="display:inline-block; background-color:#0d9488; color:#ffffff; text-decoration:none;
+                        padding:14px 34px; border-radius:8px; font-family:'Public Sans',sans-serif; font-size:15px;
+                        font-weight:700; box-shadow:0 1px 2px rgba(13,148,136,0.35);">
+                      Confirm my email →
+                    </a>
+                  </td>
+                </tr>
+              </table>
+              <p style="font-size:12.5px; color:#8590a6; margin:14px 0 0 0;">
+                This link expires in 24 hours and can only be used once.
+              </p>
+            </td>
+          </tr>
+
+          <!-- Fallback link -->
+          <tr>
+            <td class="px" style="padding: 22px 32px 36px 32px;">
+              <p style="font-size:12.5px; line-height:1.6; color:#8590a6; margin:0;">
+                Button not working? Paste this link into your browser:<br />
+                <a href="{{ .ConfirmationURL }}" style="color:#0d9488; text-decoration:none; word-break:break-all;">{{ .ConfirmationURL }}</a>
+              </p>
+            </td>
+          </tr>
+
+          <!-- Footer -->
+          <tr>
+            <td style="background-color:#f6f8fb; padding:26px 32px; border-top:1px solid #e2e7f0;" class="px">
+              <p style="font-size:12.5px; line-height:1.6; color:#7c879c; margin:0 0 10px 0;">
+                Didn't expect this? You can ignore this email — no account will be created without
+                confirming the link above. Questions? Write to
+                <a href="mailto:support@loanstar.ph" style="color:#0d9488; text-decoration:none; font-weight:600;">support@loanstar.ph</a>.
+              </p>
+              <p style="font-size:11.5px; color:#a4adbd; margin:0;">
+                © 2026 LoanStar Philippines, Inc. · Makati City, Philippines
+              </p>
+            </td>
+          </tr>
+
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>

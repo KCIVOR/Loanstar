@@ -112,7 +112,10 @@ export async function GET(_request: Request, { params }: RouteParams) {
         status: app.status,
         statusLabel: formatStatusLabel(app.status),
         blocker: app.blocker,
-        segment: app.segment === "sme" ? "sme" : "seafarer",
+        segment:
+          app.segment === "sme" || app.segment === "individual"
+            ? app.segment
+            : "seafarer",
         entityType:
           app.entity_type === "individual" || app.entity_type === "corporate"
             ? app.entity_type

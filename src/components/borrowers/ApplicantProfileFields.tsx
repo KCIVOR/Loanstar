@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Button, Card, Checkbox, Input, Label, PhoneInput, Select } from "@/components/ui";
+import { Button, Card, Checkbox, FacebookLinkField, Input, Label, PhoneInput, Select } from "@/components/ui";
 import type {
   BusinessBankAccount,
   BusinessInfo,
@@ -307,8 +307,11 @@ export function ApplicantProfileFields({
   emailEditable?: boolean;
   /** View-only — disables all inputs (e.g. CIG reviewing CSA/borrower form). */
   readOnly?: boolean;
-  /** Loan segment — SME hides seafarer manning/allottee and shows business_info. */
-  segment?: "seafarer" | "sme";
+  /** Loan segment — SME hides seafarer manning/allottee and shows business_info.
+   * Individual hides both — no business, no maritime employment, just the
+   * common personal/financial sections (confirmed 2026-08-19: no extra data
+   * collection for Individual, not even when they own a side business). */
+  segment?: "seafarer" | "sme" | "individual";
   entityType?: "individual" | "corporate" | null;
 }) {
   const onChange = (next: BorrowerProfile) => {
@@ -316,6 +319,7 @@ export function ApplicantProfileFields({
     onChangeProp(next);
   };
   const isSme = segment === "sme";
+  const isSeafarer = segment === "seafarer";
   const isCorporate = isSme && entityType === "corporate";
   const isIndividualSme = isSme && entityType === "individual";
   const biz = profile.businessInfo ?? {};
@@ -385,7 +389,7 @@ export function ApplicantProfileFields({
               value={biz.salesAgent ?? ""}
               onChange={(v) => setBiz({ salesAgent: v })}
             />
-          ) : (
+          ) : isSeafarer ? (
             <Field
               id="rank"
               label="Rank"
@@ -397,6 +401,10 @@ export function ApplicantProfileFields({
                 })
               }
             />
+          ) : (
+            // Individual: neither a business (no salesAgent/businessInfo) nor a
+            // vessel (no rank) applies — confirmed 2026-08-19, no extra field.
+            <div aria-hidden className="hidden sm:block" />
           )}
         </FieldRow>
         <FieldRow>
@@ -416,6 +424,11 @@ export function ApplicantProfileFields({
         </FieldRow>
       </Card>
 
+      {isSme ? (
+        <h3 className="mb-2 mt-6 font-display text-sm font-semibold uppercase tracking-wide text-navy-500">
+          Individual / Representative Application
+        </h3>
+      ) : null}
       <Card>
         <h2 className={CARD_TITLE}>I. Personal information</h2>
         <div className="mb-3 grid gap-3 sm:grid-cols-3">
@@ -615,11 +628,11 @@ export function ApplicantProfileFields({
             disabled={!emailEditable}
           />
           <div className="grid grid-cols-2 gap-3">
-            <Field
+            <FacebookLinkField
               id="fb"
-              label="FB"
               value={contact.facebook ?? ""}
               onChange={(v) => setProfileData({ facebook: v })}
+              disabled={readOnly}
             />
             <SelectField
               id="education"
@@ -632,6 +645,11 @@ export function ApplicantProfileFields({
         </FieldRow>
       </Card>
 
+      {isSme ? (
+        <h3 className="mb-2 mt-6 font-display text-sm font-semibold uppercase tracking-wide text-navy-500">
+          Business Application
+        </h3>
+      ) : null}
       {isSme ? (
         <Card>
           <h2 className={CARD_TITLE}>
@@ -807,7 +825,7 @@ export function ApplicantProfileFields({
         </Card>
       ) : null}
 
-      {!isSme ? (
+      {isSeafarer ? (
       <Card>
         <h2 className={CARD_TITLE}>II. Manning agency</h2>
         <FieldRow>
@@ -1295,9 +1313,8 @@ export function ApplicantProfileFields({
               })
             }
           />
-          <Field
+          <FacebookLinkField
             id="all_facebook"
-            label="Facebook"
             value={profile.allottee.facebook ?? ""}
             onChange={(v) =>
               onChange({
@@ -1305,6 +1322,7 @@ export function ApplicantProfileFields({
                 allottee: { ...profile.allottee, facebook: v } as AllotteeInfo,
               })
             }
+            disabled={readOnly}
           />
         </FieldRow>
         <Field

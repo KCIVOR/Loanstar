@@ -3,11 +3,13 @@ import Link from "next/link";
 import { DonutMini, RankedBarMini } from "@/components/dashboard/charts";
 import { CATEGORY_COLORS, CHART } from "@/components/dashboard/charts/theme";
 import { peso, pct } from "@/components/dashboard/widgets/format";
+import { SegmentBadge } from "@/components/reports/SegmentBadge";
 import { Badge, Button, Card, EmptyState, KpiCard, Table, Td, Th } from "@/components/ui";
 import { downloadCsv } from "@/lib/reports/csv";
 import { getMetric } from "@/lib/reports/metrics/registry";
 import type { OriginationSeries, StuckFile } from "@/lib/reports/metrics/origination";
 import type { MetricValue } from "@/lib/reports/metrics/types";
+import { collateralLabel, segmentLabel } from "@/lib/reports/segments";
 
 function formatByUnit(id: string, value: number): string {
   const def = getMetric(id);
@@ -38,6 +40,19 @@ function OriginationKpi({ id, metrics, alertAboveThreshold }: { id: string; metr
   return <KpiCard label={def.label} value={formatByUnit(id, metric.value)} alert={alert} />;
 }
 
+export function OriginationKpis({ metrics }: { metrics: MetricValue[] }) {
+  return (
+    <div className="mb-4 grid grid-cols-2 gap-3.5 lg:grid-cols-3">
+      <OriginationKpi id="origination.conversionRate" metrics={metrics} />
+      <OriginationKpi id="origination.approvalRate" metrics={metrics} />
+      <OriginationKpi id="origination.avgTimeToDecision" metrics={metrics} />
+      <OriginationKpi id="origination.slaBreaches" metrics={metrics} alertAboveThreshold={5} />
+      <OriginationKpi id="origination.avgApprovedAmount" metrics={metrics} />
+      <OriginationKpi id="origination.avgTerm" metrics={metrics} />
+    </div>
+  );
+}
+
 export function OriginationPanel({
   metrics,
   series,
@@ -51,6 +66,11 @@ export function OriginationPanel({
   const denialData = series.denialReasons.map((row) => ({ reason: row.reason, count: row.count }));
   const cancellationData = series.cancellationReasons.map((row) => ({ reason: row.reason, count: row.count }));
   const mixData = series.mixBySegment.map((row, i) => ({
+    name: row.name,
+    value: row.value,
+    color: CATEGORY_COLORS[i % CATEGORY_COLORS.length],
+  }));
+  const collateralMixData = (series.mixByCollateral ?? []).map((row, i) => ({
     name: row.name,
     value: row.value,
     color: CATEGORY_COLORS[i % CATEGORY_COLORS.length],
@@ -79,6 +99,8 @@ export function OriginationPanel({
                 applicationNo: f.applicationNo,
                 borrowerName: f.borrowerName,
                 status: f.status,
+                segment: segmentLabel(f.segment),
+                collateral: collateralLabel(f.collateralType),
                 daysInStatus: f.daysInStatus,
                 targetDays: f.targetDays,
               })),
@@ -89,14 +111,7 @@ export function OriginationPanel({
         </Button>
       </div>
 
-      <div className="mb-4 grid grid-cols-2 gap-3.5 lg:grid-cols-3">
-        <OriginationKpi id="origination.conversionRate" metrics={metrics} />
-        <OriginationKpi id="origination.approvalRate" metrics={metrics} />
-        <OriginationKpi id="origination.avgTimeToDecision" metrics={metrics} />
-        <OriginationKpi id="origination.slaBreaches" metrics={metrics} alertAboveThreshold={5} />
-        <OriginationKpi id="origination.avgApprovedAmount" metrics={metrics} />
-        <OriginationKpi id="origination.avgTerm" metrics={metrics} />
-      </div>
+      <OriginationKpis metrics={metrics} />
 
       <Card className="mb-6">
         <h3 className="mb-3 font-display text-base font-semibold text-navy-900">
@@ -114,6 +129,8 @@ export function OriginationPanel({
               <tr>
                 <Th>Application</Th>
                 <Th>Borrower</Th>
+                <Th>Segment</Th>
+                <Th>Collateral</Th>
                 <Th>Stage</Th>
                 <Th num>Days in stage</Th>
                 <Th num>Target</Th>
@@ -128,6 +145,10 @@ export function OriginationPanel({
                     </Link>
                   </Td>
                   <Td>{f.borrowerName ?? "—"}</Td>
+                  <Td>
+                    <SegmentBadge segment={f.segment} />
+                  </Td>
+                  <Td>{collateralLabel(f.collateralType)}</Td>
                   <Td>{f.status.replaceAll("_", " ")}</Td>
                   <Td num className="mono text-danger">
                     {f.daysInStatus}d
@@ -140,6 +161,7 @@ export function OriginationPanel({
             </tbody>
           </Table>
         )}
+        <p className="mt-3 text-xs text-ink-400">Opening a file requires Intake access.</p>
       </Card>
 
       <div className="grid gap-6 lg:grid-cols-2">
@@ -227,6 +249,17 @@ export function OriginationPanel({
           </h3>
           {mixData.length ? (
             <DonutMini data={mixData} height={160} showLegend />
+          ) : (
+            <p className="text-sm text-ink-400">No applications yet.</p>
+          )}
+        </Card>
+
+        <Card>
+          <h3 className="mb-3 font-display text-base font-semibold text-navy-900">
+            Mix by collateral
+          </h3>
+          {collateralMixData.length ? (
+            <DonutMini data={collateralMixData} height={160} showLegend />
           ) : (
             <p className="text-sm text-ink-400">No applications yet.</p>
           )}

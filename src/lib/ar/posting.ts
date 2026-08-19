@@ -149,16 +149,19 @@ export async function getPenaltyRate(
   const { data } = await supabase
     .from("config_settings")
     .select("key, value")
-    .in("key", ["penalty_rate", "penalty_rate_sme"]);
+    .in("key", ["penalty_rate", "penalty_rate_sme", "penalty_rate_individual"]);
 
   let seafarer = 0.05;
   let sme = 0.05;
+  let individual = 0.05;
   for (const row of data ?? []) {
     if (row.key === "penalty_rate") seafarer = parseRate(row.value, 0.05);
     if (row.key === "penalty_rate_sme") sme = parseRate(row.value, 0.05);
+    if (row.key === "penalty_rate_individual")
+      individual = parseRate(row.value, 0.05);
   }
 
-  return resolvePenaltyRate(segment, { seafarer, sme });
+  return resolvePenaltyRate(segment, { seafarer, sme, individual });
 }
 
 async function getAgingThresholds(

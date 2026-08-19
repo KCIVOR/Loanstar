@@ -17,7 +17,7 @@ type BriefingSignProps = {
 
 /**
  * Read-only briefing status: the briefing is conducted at the branch and
- * checked off by the Collection Head, not signed from the portal.
+ * checked off by the Briefer, not signed from the portal.
  */
 export function BriefingSign({ applicationId }: BriefingSignProps) {
   const [checklist, setChecklist] = useState<BriefingItem[]>([]);

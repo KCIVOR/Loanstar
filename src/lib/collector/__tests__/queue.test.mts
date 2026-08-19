@@ -16,7 +16,9 @@ import {
   computeCollectorQueueKpis,
   inFirstPaymentBounds,
   passesAgingFilter,
+  passesSegmentFilter,
   sanitizeSearchTerm,
+  segmentFilterSpec,
   sortCollectorQueue,
   type CollectorAgingFilter,
   type CollectorQueueMappedRow,
@@ -548,5 +550,19 @@ describe("computeCollectorQueueKpis", () => {
       agingCritical: 2,
       totalBalance: 175,
     });
+  });
+});
+
+describe("segmentFilterSpec / passesSegmentFilter (Phase 12)", () => {
+  it("recognizes individual as a distinct segment, not a fallback to all", () => {
+    assert.equal(segmentFilterSpec("individual"), "individual");
+    assert.equal(segmentFilterSpec("sme"), "sme");
+    assert.equal(segmentFilterSpec("bogus"), "all");
+  });
+
+  it("passesSegmentFilter matches individual rows only under the individual spec", () => {
+    assert.equal(passesSegmentFilter("individual", "individual"), true);
+    assert.equal(passesSegmentFilter("seafarer", "individual"), false);
+    assert.equal(passesSegmentFilter("individual", "all"), true);
   });
 });

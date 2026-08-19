@@ -1,5 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
+import { ValidationError } from "@/lib/api/errors";
+
 import { readyReleaseBlocker, type ReleasePath } from "./constants";
 
 export const EMPLOYMENT_CONTRACT_SLUG = "contract";
@@ -18,7 +20,7 @@ export function isEmploymentContractStatus(
 
 export function assertEmploymentContractForRelease(present: boolean): void {
   if (!present) {
-    throw new Error(EMPLOYMENT_CONTRACT_MISSING_ERROR);
+    throw new ValidationError(EMPLOYMENT_CONTRACT_MISSING_ERROR);
   }
 }
 
@@ -40,7 +42,7 @@ export function assertLraIntakeUploadAllowed(
       documentTypeSlug,
     )
   ) {
-    throw new Error(
+    throw new ValidationError(
       `LRA may only upload the employment contract (slug '${EMPLOYMENT_CONTRACT_SLUG}') at intake stage`,
     );
   }
@@ -63,8 +65,12 @@ export async function hasEmploymentContractUploaded(
   if (appError) {
     throw new Error(appError.message);
   }
-  if (application?.segment === "sme") {
-    // SME intake checklist has no employment-contract-equivalent requirement today.
+  if (application?.segment === "sme" || application?.segment === "individual") {
+    // SME and Individual intake checklists have no employment-contract-
+    // equivalent requirement (Individual's checklist tops out at valid IDs /
+    // payslip-COE / business docs / bank statement — no "contract" document
+    // type exists for it to upload, so this must auto-pass like SME does or
+    // Individual release is permanently blocked).
     return true;
   }
 

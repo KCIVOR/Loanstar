@@ -25,14 +25,16 @@ type DocumentType = {
   name: string;
 };
 
-type LoanSegment = "seafarer" | "sme";
+type LoanSegment = "seafarer" | "sme" | "individual";
 type EntityTypeFilter = "" | "individual" | "corporate";
+type CollateralTypeFilter = "" | "none" | "car_refinancing" | "real_estate";
 
 type ChecklistItem = {
   id: string;
   stage: string;
   segment: LoanSegment;
   entityType: "individual" | "corporate" | null;
+  collateralType: "none" | "car_refinancing" | "real_estate" | null;
   isRequired: boolean;
   isOptionalFlag: boolean;
   sortOrder: number;
@@ -43,6 +45,7 @@ export default function ChecklistsAdminPage() {
   const [stage, setStage] = useState<string>("intake");
   const [segment, setSegment] = useState<LoanSegment>("seafarer");
   const [entityType, setEntityType] = useState<EntityTypeFilter>("");
+  const [collateralType, setCollateralType] = useState<CollateralTypeFilter>("");
   const [items, setItems] = useState<ChecklistItem[]>([]);
   const [allItems, setAllItems] = useState<ChecklistItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -62,6 +65,9 @@ export default function ChecklistsAdminPage() {
       } else {
         stageParams.set("entityType", "none");
       }
+      if (segment !== "seafarer") {
+        stageParams.set("collateralType", collateralType || "none");
+      }
 
       const [stageRes, allRes] = await Promise.all([
         fetch(`/api/admin/stage-checklists?${stageParams.toString()}`),
@@ -77,7 +83,7 @@ export default function ChecklistsAdminPage() {
     } finally {
       setLoading(false);
     }
-  }, [stage, segment, entityType]);
+  }, [stage, segment, entityType, collateralType]);
 
   useEffect(() => {
     void load();
@@ -112,6 +118,8 @@ export default function ChecklistsAdminPage() {
           sortOrder: items.length + 1,
           segment,
           entityType: segment === "sme" ? entityType || null : null,
+          collateralType:
+            segment !== "seafarer" ? collateralType || "none" : null,
         }),
       });
       if (!res.ok) {
@@ -148,6 +156,7 @@ export default function ChecklistsAdminPage() {
           sortOrder: item.sortOrder,
           segment: item.segment,
           entityType: item.entityType,
+          collateralType: item.collateralType,
         }),
       });
       if (!res.ok) throw new Error("Failed to update item");
@@ -188,7 +197,7 @@ export default function ChecklistsAdminPage() {
         </div>
       ) : null}
 
-      <Card className="mb-6 grid gap-4 sm:grid-cols-3">
+      <Card className="mb-6 grid gap-4 sm:grid-cols-4">
         <div>
           <Label htmlFor="stage">Stage</Label>
           <Select
@@ -212,12 +221,14 @@ export default function ChecklistsAdminPage() {
             onChange={(e) => {
               const next = e.target.value as LoanSegment;
               setSegment(next);
-              if (next === "seafarer") setEntityType("");
+              if (next !== "sme") setEntityType("");
+              if (next === "seafarer") setCollateralType("");
             }}
             className="mt-1"
           >
             <option value="seafarer">Seafarer</option>
             <option value="sme">SME</option>
+            <option value="individual">Individual</option>
           </Select>
         </div>
         <div>
@@ -234,6 +245,22 @@ export default function ChecklistsAdminPage() {
             <option value="corporate">Corporate</option>
           </Select>
         </div>
+        <div>
+          <Label htmlFor="collateralType">Collateral</Label>
+          <Select
+            id="collateralType"
+            value={collateralType}
+            onChange={(e) =>
+              setCollateralType(e.target.value as CollateralTypeFilter)
+            }
+            className="mt-1"
+            disabled={segment === "seafarer"}
+          >
+            <option value="">Clean (no collateral)</option>
+            <option value="car_refinancing">Car Refinancing</option>
+            <option value="real_estate">Real Estate</option>
+          </Select>
+        </div>
       </Card>
 
       {loading ? (
@@ -243,8 +270,9 @@ export default function ChecklistsAdminPage() {
           <Card className="mb-6">
             <h2 className="mb-3 font-display text-lg font-semibold text-navy-900">
               Checklist items — {stage.replace(/_/g, " ")} / {segment}
-              {segment === "sme"
-                ? ` / ${entityType || "common"}`
+              {segment === "sme" ? ` / ${entityType || "common"}` : ""}
+              {segment !== "seafarer"
+                ? ` / ${collateralType || "clean"}`
                 : ""}
             </h2>
             {items.length === 0 ? (
@@ -259,6 +287,7 @@ export default function ChecklistsAdminPage() {
                   <tr>
                     <Th>Document</Th>
                     <Th>Entity</Th>
+                    <Th>Collateral</Th>
                     <Th>Required</Th>
                     <Th num>Order</Th>
                     <Th>Actions</Th>
@@ -271,6 +300,7 @@ export default function ChecklistsAdminPage() {
                         {item.documentType?.name ?? "—"}
                       </Td>
                       <Td>{item.entityType ?? "common"}</Td>
+                      <Td>{item.collateralType ?? "all"}</Td>
                       <Td>
                         {item.isRequired ? (
                           <Badge variant="warning">Required</Badge>

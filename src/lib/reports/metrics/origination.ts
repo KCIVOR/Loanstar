@@ -1,10 +1,20 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
+import { approvalRatePct } from "@/lib/reports/approval-rate";
 import {
   computeSlaBreachesFromHistories,
   computeTatFromHistories,
   TAT_PAIRS,
 } from "@/lib/reports/aggregates";
+
+import {
+  asCollateralType,
+  asLoanSegment,
+  collateralLabel,
+  segmentLabel,
+  type CollateralType,
+  type LoanSegment,
+} from "@/lib/reports/segments";
 
 import type { Period } from "./types";
 import type { MetricDef, MetricValue } from "./types";
@@ -24,7 +34,8 @@ export const ORIGINATION_METRIC_DEFS: MetricDef[] = [
     id: "origination.approvalRate",
     label: "Approval rate",
     description: "Of applications Committee has decided on, the share approved rather than denied.",
-    formula: "COUNT(status = 'approved') ÷ COUNT(status IN ('approved','denied'))",
+    formula:
+      "COUNT(applications Committee approved, including those that later moved to LRA/release/active/paid off) ÷ COUNT(those + denied)",
     unit: "percent",
     direction: "up_good",
     theme: "origination",
@@ -92,6 +103,7 @@ export type OriginationSeries = {
   denialReasons: Array<{ reason: string; count: number }>;
   cancellationReasons: Array<{ reason: string; count: number }>;
   mixBySegment: Array<{ name: string; value: number }>;
+  mixByCollateral: Array<{ name: string; value: number }>;
 };
 
 export type StuckFile = {
@@ -101,6 +113,8 @@ export type StuckFile = {
   status: string;
   daysInStatus: number;
   targetDays: number;
+  segment: LoanSegment | null;
+  collateralType: CollateralType;
 };
 
 export type OriginationMetrics = {
@@ -123,6 +137,7 @@ export type ApplicationRow = {
   status: string;
   status_history: Array<{ status: string; at: string }> | null;
   segment: string | null;
+  collateral_type?: string | null;
   created_at: string;
 };
 
@@ -196,7 +211,7 @@ export async function computeOriginationMetrics(
   ] = await Promise.all([
     supabase
       .from("loan_applications")
-      .select("id, application_no, status, status_history, segment, created_at"),
+      .select("id, application_no, status, status_history, segment, collateral_type, created_at"),
     supabase
       .from("leads")
       .select("id", { count: "exact", head: true })
@@ -228,10 +243,6 @@ export async function computeOriginationMetrics(
 
   // --- Funnel -------------------------------------------------------------
   const funnel = buildFunnel(apps, totalLeads ?? 0);
-
-  // --- Approval rate --------------------------------------------------------
-  const approvedCount = apps.filter((a) => a.status === "approved").length;
-  const deniedCount = apps.filter((a) => a.status === "denied").length;
 
   // --- TAT vs target / SLA breaches -----------------------------------------
   const tat = computeTatFromHistories(histories);
@@ -275,16 +286,19 @@ export async function computeOriginationMetrics(
     cancellationCounts.set(reason, (cancellationCounts.get(reason) ?? 0) + 1);
   }
 
-  // --- Mix by segment (full coverage; loan_type_name is null pre-release) ---
+  // --- Mix by segment / collateral (full coverage; loan_type_name is null pre-release) ---
   const segmentCounts = new Map<string, number>();
+  const collateralCounts = new Map<CollateralType, number>();
   for (const app of apps) {
-    const key = app.segment ?? "Unassigned";
-    segmentCounts.set(key, (segmentCounts.get(key) ?? 0) + 1);
+    const segmentKey = app.segment ?? "Unassigned";
+    segmentCounts.set(segmentKey, (segmentCounts.get(segmentKey) ?? 0) + 1);
+    const collateralKey = asCollateralType(app.collateral_type);
+    collateralCounts.set(collateralKey, (collateralCounts.get(collateralKey) ?? 0) + 1);
   }
 
   const metrics: MetricValue[] = [
     metric("origination.conversionRate", pctOf(releasedInPeriodCount ?? 0, leadsCreatedInPeriod ?? 0)),
-    metric("origination.approvalRate", pctOf(approvedCount, approvedCount + deniedCount)),
+    metric("origination.approvalRate", approvalRatePct(apps)),
     metric("origination.avgTimeToDecision", decisionStep?.averageDays ?? 0),
     metric("origination.slaBreaches", totalBreaches),
     metric("origination.avgApprovedAmount", avgApprovedAmount),
@@ -335,6 +349,8 @@ export async function computeOriginationMetrics(
           status: app.status,
           daysInStatus: Math.round(daysInStatus * 10) / 10,
           targetDays: target,
+          segment: asLoanSegment(app.segment),
+          collateralType: asCollateralType(app.collateral_type),
         });
       }
     }
@@ -352,7 +368,11 @@ export async function computeOriginationMetrics(
         count,
       })),
       mixBySegment: Array.from(segmentCounts.entries()).map(([name, value]) => ({
-        name: name === "sme" ? "SME" : name === "seafarer" ? "Seafarer" : name,
+        name: segmentLabel(name),
+        value,
+      })),
+      mixByCollateral: Array.from(collateralCounts.entries()).map(([name, value]) => ({
+        name: collateralLabel(name),
         value,
       })),
     },

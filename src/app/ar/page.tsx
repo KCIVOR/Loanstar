@@ -80,7 +80,7 @@ type QueueRow = {
 type SortKey = "priority" | "balance" | "borrower" | "status";
 type StatusFilter = "all" | "active" | "paid" | "default" | "remedial";
 type AgingFilter = "all" | "current" | "1-30" | "31-60" | "61-90" | "91+";
-type SegmentFilter = "all" | "seafarer" | "sme";
+type SegmentFilter = "all" | "seafarer" | "sme" | "individual";
 
 const PAGE_SIZE_OPTIONS = MASTERLIST_QUEUE_PAGE_SIZES;
 
@@ -118,6 +118,7 @@ const SEGMENT_CHIPS: Array<{ id: SegmentFilter; label: string }> = [
   { id: "all", label: "All" },
   { id: "seafarer", label: "Seafarer" },
   { id: "sme", label: "SME" },
+  { id: "individual", label: "Individual" },
 ];
 
 function accountStatusVariant(
@@ -241,10 +242,23 @@ function agingFilterLabel(filter: AgingFilter): string {
 }
 
 function segmentBadge(segment: string | null | undefined) {
-  const isSme = segment === "sme";
+  if (segment === "sme") {
+    return (
+      <Badge variant="navy" dot>
+        SME
+      </Badge>
+    );
+  }
+  if (segment === "individual") {
+    return (
+      <Badge variant="warning" dot>
+        Individual
+      </Badge>
+    );
+  }
   return (
-    <Badge variant={isSme ? "navy" : "teal"} dot>
-      {isSme ? "SME" : "Seafarer"}
+    <Badge variant="teal" dot>
+      Seafarer
     </Badge>
   );
 }
@@ -701,7 +715,7 @@ export default function ArDashboardPage() {
             ) : null}
             {segmentFilter !== "all" ? (
               <span className="active-pill">
-                Segment: {segmentFilter === "sme" ? "SME" : "Seafarer"}
+                Segment: {segmentFilter === "sme" ? "SME" : segmentFilter === "individual" ? "Individual" : "Seafarer"}
                 <button
                   type="button"
                   aria-label="Clear segment filter"

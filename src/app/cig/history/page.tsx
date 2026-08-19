@@ -76,19 +76,33 @@ const FINDING_CHIPS: Array<{ id: CigRecentFindingFilter; label: string }> = [
 ];
 
 const SEGMENT_CHIPS: Array<{
-  id: "all" | "seafarer" | "sme";
+  id: "all" | "seafarer" | "sme" | "individual";
   label: string;
 }> = [
   { id: "all", label: "All" },
   { id: "seafarer", label: "Seafarer" },
   { id: "sme", label: "SME" },
+  { id: "individual", label: "Individual" },
 ];
 
-function segmentBadge(segment: "sme" | "seafarer" | null) {
-  const isSme = segment === "sme";
+function segmentBadge(segment: "sme" | "seafarer" | "individual" | null) {
+  if (segment === "sme") {
+    return (
+      <Badge variant="navy" dot>
+        SME
+      </Badge>
+    );
+  }
+  if (segment === "individual") {
+    return (
+      <Badge variant="warning" dot>
+        Individual
+      </Badge>
+    );
+  }
   return (
-    <Badge variant={isSme ? "navy" : "teal"} dot>
-      {isSme ? "SME" : "Seafarer"}
+    <Badge variant="teal" dot>
+      Seafarer
     </Badge>
   );
 }
@@ -140,7 +154,7 @@ function buildHistoryQuery(params: {
   page: number;
   pageSize: number;
   finding?: CigRecentFindingFilter;
-  segment?: "all" | "seafarer" | "sme";
+  segment?: "all" | "seafarer" | "sme" | "individual";
 }): string {
   const qs = new URLSearchParams();
   if (params.search.trim()) qs.set("search", params.search.trim());
@@ -422,7 +436,7 @@ function ForwardedHistoryPanel() {
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [finding, setFinding] = useState<CigRecentFindingFilter>("all");
   const [segmentFilter, setSegmentFilter] = useState<
-    "all" | "seafarer" | "sme"
+    "all" | "seafarer" | "sme" | "individual"
   >("all");
   const [dateRange, setDateRange] = useState<DateRangeValue>(DEFAULT_DATE_RANGE);
   const [viewMode, setViewMode] = useState<HistoryViewMode>("list");
@@ -563,7 +577,7 @@ function ForwardedHistoryPanel() {
             ) : null}
             {segmentFilter !== "all" ? (
               <span className="active-pill">
-                {segmentFilter === "sme" ? "SME" : "Seafarer"}
+                {segmentFilter === "sme" ? "SME" : segmentFilter === "individual" ? "Individual" : "Seafarer"}
                 <button
                   type="button"
                   aria-label="Clear segment filter"
@@ -781,7 +795,7 @@ function ReturnedHistoryPanel() {
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [segmentFilter, setSegmentFilter] = useState<
-    "all" | "seafarer" | "sme"
+    "all" | "seafarer" | "sme" | "individual"
   >("all");
   const [dateRange, setDateRange] = useState<DateRangeValue>(DEFAULT_DATE_RANGE);
   const [viewMode, setViewMode] = useState<HistoryViewMode>("list");
@@ -893,7 +907,7 @@ function ReturnedHistoryPanel() {
           <>
             {segmentFilter !== "all" ? (
               <span className="active-pill">
-                {segmentFilter === "sme" ? "SME" : "Seafarer"}
+                {segmentFilter === "sme" ? "SME" : segmentFilter === "individual" ? "Individual" : "Seafarer"}
                 <button
                   type="button"
                   aria-label="Clear segment filter"

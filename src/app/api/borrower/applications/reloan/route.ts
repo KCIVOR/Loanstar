@@ -41,14 +41,23 @@ async function getOwnBorrower(userId: string) {
 function readSegmentBody(value: unknown): {
   segment?: string | null;
   entityType?: string | null;
+  collateralType?: string | null;
 } {
   if (!value || typeof value !== "object") return {};
   const record = value as Record<string, unknown>;
   const segment = typeof record.segment === "string" ? record.segment : undefined;
   const entityType =
     typeof record.entityType === "string" ? record.entityType : undefined;
-  return { segment, entityType };
+  const collateralType =
+    typeof record.collateralType === "string" ? record.collateralType : undefined;
+  return { segment, entityType, collateralType };
 }
+
+const VALID_COLLATERAL_TYPES = new Set([
+  "none",
+  "car_refinancing",
+  "real_estate",
+]);
 
 export async function POST(request: Request) {
   try {
@@ -120,6 +129,17 @@ export async function POST(request: Request) {
 
     const { segment, entityType } = resolved.scope;
 
+    const collateralType: "none" | "car_refinancing" | "real_estate" =
+      body.collateralType && VALID_COLLATERAL_TYPES.has(body.collateralType)
+        ? (body.collateralType as "car_refinancing" | "real_estate")
+        : "none";
+    if (segment === "seafarer" && collateralType !== "none") {
+      return NextResponse.json(
+        { error: "Seafarer applications cannot carry collateral" },
+        { status: 400 },
+      );
+    }
+
     const { data: application, error: applicationError } = await supabase
       .from("loan_applications")
       .insert({
@@ -137,6 +157,7 @@ export async function POST(request: Request) {
         parent_application_id: isReloan ? (latestApp?.id ?? null) : null,
         segment,
         entity_type: entityType,
+        collateral_type: collateralType,
       })
       .select(
         "id, status, status_history, is_reloan, parent_application_id, created_at, segment, entity_type",
@@ -157,7 +178,7 @@ export async function POST(request: Request) {
       "intake",
       application.id,
       borrower.id,
-      { segment, entityType },
+      { segment, entityType, collateralType },
     );
 
     await writeAuditEvent({
@@ -174,7 +195,7 @@ export async function POST(request: Request) {
         status: "draft",
         segment,
         entityType,
-        segmentInheritedFromParent: segment === "sme",
+        segmentInheritedFromParent: segment === "sme" || segment === "individual",
       },
     });
 

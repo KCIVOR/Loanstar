@@ -75,6 +75,7 @@ const SEGMENT_CHIPS: Array<{ id: CollectorSegmentFilter; label: string }> = [
   { id: "all", label: "All" },
   { id: "seafarer", label: "Seafarer" },
   { id: "sme", label: "SME" },
+  { id: "individual", label: "Individual" },
 ];
 
 const IconLayers = (
@@ -114,11 +115,24 @@ function agingChipLabel(filter: CollectorAgingFilter): string {
   return AGING_CHIPS.find((chip) => chip.id === filter)?.label ?? filter;
 }
 
-function segmentBadge(segment: "sme" | "seafarer") {
-  const isSme = segment === "sme";
+function segmentBadge(segment: "sme" | "seafarer" | "individual") {
+  if (segment === "sme") {
+    return (
+      <Badge variant="navy" dot>
+        SME
+      </Badge>
+    );
+  }
+  if (segment === "individual") {
+    return (
+      <Badge variant="warning" dot>
+        Individual
+      </Badge>
+    );
+  }
   return (
-    <Badge variant={isSme ? "navy" : "teal"} dot>
-      {isSme ? "SME" : "Seafarer"}
+    <Badge variant="teal" dot>
+      Seafarer
     </Badge>
   );
 }
@@ -272,10 +286,10 @@ export default function CollectorAccountsPage() {
     return (
       <div className="flex flex-nowrap items-center justify-end gap-1.5 whitespace-nowrap">
         <Link
-          href={`/collector/accounts/${acc.id}/case-file`}
+          href={`/collector/accounts/${acc.id}/loan-file`}
           className="btn btn-secondary btn-sm"
         >
-          Case file
+          Loan File
         </Link>
         <Button
           variant="secondary"
@@ -467,7 +481,7 @@ export default function CollectorAccountsPage() {
             ) : null}
             {segmentFilter !== "all" ? (
               <span className="active-pill">
-                Segment: {segmentFilter === "sme" ? "SME" : "Seafarer"}
+                Segment: {segmentFilter === "sme" ? "SME" : segmentFilter === "individual" ? "Individual" : "Seafarer"}
                 <button
                   type="button"
                   aria-label="Clear segment filter"

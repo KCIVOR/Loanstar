@@ -6,7 +6,7 @@ export type CommitteeHistoryRow = {
   id: string;
   applicationId: string;
   applicationNo: string | null;
-  segment: "sme" | "seafarer" | null;
+  segment: "sme" | "seafarer" | "individual" | null;
   borrower: {
     borrowerNo: string;
     firstName: string;
@@ -31,7 +31,7 @@ export type CommitteeHistorySortKey =
 export type CommitteeHistoryQueryParams = {
   search?: string;
   action?: CommitteeDecisionAction | "all";
-  segment?: "all" | "seafarer" | "sme";
+  segment?: "all" | "seafarer" | "sme" | "individual";
   from?: string | null;
   to?: string | null;
   sortKey?: CommitteeHistorySortKey;
@@ -318,8 +318,10 @@ export async function getCommitteeDecisionHistory(
       | null;
 
     const segmentRaw = app?.segment as string | null | undefined;
-    const segment: "sme" | "seafarer" | null =
-      segmentRaw === "sme" || segmentRaw === "seafarer" ? segmentRaw : null;
+    const segment: "sme" | "seafarer" | "individual" | null =
+      segmentRaw === "sme" || segmentRaw === "seafarer" || segmentRaw === "individual"
+        ? segmentRaw
+        : null;
 
     return {
       id: row.id as string,

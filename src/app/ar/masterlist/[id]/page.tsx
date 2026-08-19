@@ -386,7 +386,9 @@ export default function ArMasterlistDetailPage() {
   const applicationStatus = String(record.application_status ?? "");
   const remedialFlag = Boolean(record.remedial_flag);
   const segment =
-    record.segment === "sme" ? "sme" : ("seafarer" as const);
+    record.segment === "sme" || record.segment === "individual"
+      ? (record.segment as "sme" | "individual")
+      : ("seafarer" as const);
   const employmentLabels = masterlistEmploymentLabels(segment);
   const manningAgency = (record.manning_agency as string | null) ?? null;
   const vesselName = (record.vessel_name as string | null) ?? null;
@@ -535,8 +537,8 @@ export default function ArMasterlistDetailPage() {
       />
 
       <div className="mb-6 flex flex-wrap items-center gap-2">
-        <Badge variant={segment === "sme" ? "navy" : "teal"} dot>
-          {segment === "sme" ? "SME" : "Seafarer"}
+        <Badge variant={segment === "sme" ? "navy" : segment === "individual" ? "warning" : "teal"} dot>
+          {segment === "sme" ? "SME" : segment === "individual" ? "Individual" : "Seafarer"}
         </Badge>
         <Badge variant={accountStatusVariant(accountStatus)} dot>
           {accountStatus || "—"}
@@ -837,7 +839,7 @@ export default function ArMasterlistDetailPage() {
         </Card>
       )}
 
-      <Card className="mb-6">
+      <Card className="mb-6 min-w-0">
         <h2 className="mb-1 font-display text-lg font-semibold text-navy-900">
           Account ledger
         </h2>

@@ -87,12 +87,13 @@ const STATUS_CHIPS: Array<{ id: CommitteeStatusFilter; label: string }> = [
 ];
 
 const SEGMENT_CHIPS: Array<{
-  id: "all" | "seafarer" | "sme";
+  id: "all" | "seafarer" | "sme" | "individual";
   label: string;
 }> = [
   { id: "all", label: "All" },
   { id: "seafarer", label: "Seafarer" },
   { id: "sme", label: "SME" },
+  { id: "individual", label: "Individual" },
 ];
 
 const iconProps = {
@@ -169,11 +170,24 @@ function queueBorrowerName(app: QueueItem): string {
     : "Unknown borrower";
 }
 
-function segmentBadge(segment: "sme" | "seafarer" | null) {
-  const isSme = segment === "sme";
+function segmentBadge(segment: "sme" | "seafarer" | "individual" | null) {
+  if (segment === "sme") {
+    return (
+      <Badge variant="navy" dot>
+        SME
+      </Badge>
+    );
+  }
+  if (segment === "individual") {
+    return (
+      <Badge variant="warning" dot>
+        Individual
+      </Badge>
+    );
+  }
   return (
-    <Badge variant={isSme ? "navy" : "teal"} dot>
-      {isSme ? "SME" : "Seafarer"}
+    <Badge variant="teal" dot>
+      Seafarer
     </Badge>
   );
 }
@@ -204,7 +218,7 @@ function findingBadge(finding: string | null | undefined) {
 function buildQueueQuery(params: {
   search: string;
   statusFilter: CommitteeStatusFilter;
-  segment: "all" | "seafarer" | "sme";
+  segment: "all" | "seafarer" | "sme" | "individual";
   dateRange: DateRangeValue;
   sortKey: SortKey;
   sortDir: "asc" | "desc";
@@ -243,7 +257,7 @@ export default function CommitteeDashboardPage() {
   const [statusFilter, setStatusFilter] =
     useState<CommitteeStatusFilter>("all");
   const [segmentFilter, setSegmentFilter] = useState<
-    "all" | "seafarer" | "sme"
+    "all" | "seafarer" | "sme" | "individual"
   >("all");
   const [dateRange, setDateRange] = useState<DateRangeValue>(DEFAULT_DATE_RANGE);
   const [viewMode, setViewMode] = useState<HistoryViewMode>("list");

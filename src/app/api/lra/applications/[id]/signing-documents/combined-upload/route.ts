@@ -97,7 +97,9 @@ export async function POST(request: Request, { params }: RouteParams) {
     // signing stage and tag each with that stage — no UI stage-pick needed.
     const signingStages = releaseStagesForPaths(releasePaths);
     const scope = {
-      segment: (app.segment === "sme" ? "sme" : "seafarer") as "seafarer" | "sme",
+      segment: (app.segment === "sme" || app.segment === "individual"
+        ? app.segment
+        : "seafarer") as "seafarer" | "sme" | "individual",
       entityType:
         app.entity_type === "individual" || app.entity_type === "corporate"
           ? (app.entity_type as "individual" | "corporate")

@@ -22,7 +22,7 @@ import { requireModulePermission } from "@/lib/permissions/server";
 import { createClient, createServiceClient } from "@/lib/supabase/server";
 
 const RANGE_PRESETS = new Set(["30d", "90d", "all", "custom"]);
-const SEGMENT_FILTERS = new Set(["all", "seafarer", "sme"]);
+const SEGMENT_FILTERS = new Set(["all", "seafarer", "sme", "individual"]);
 const SORT_KEYS = new Set<CollectorQueueSortKey>([
   "priority",
   "balance",
@@ -183,7 +183,10 @@ export async function GET(request: Request) {
         borrowerName: row.borrower_name,
         borrowerNo: row.borrower_no,
         loanAccountNo: row.loan_account_no,
-        segment: row.segment === "sme" ? "sme" : "seafarer",
+        segment:
+          row.segment === "sme" || row.segment === "individual"
+            ? row.segment
+            : "seafarer",
         manningAgency: (row.manning_agency as string | null) ?? null,
         vesselName: (row.vessel_name as string | null) ?? null,
         outstandingBalance: Number(row.outstanding_balance ?? 0),

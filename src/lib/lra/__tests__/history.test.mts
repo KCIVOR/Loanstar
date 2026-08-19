@@ -5,6 +5,7 @@ import {
   RELEASE_PATHS,
   RELEASED_LOANS_PAGE_SIZES,
   clampReleasedLoansPageSize,
+  passesHistorySegmentFilter,
   releasePathFilterSpec,
 } from "../history";
 
@@ -36,5 +37,43 @@ describe("releasePathFilterSpec", () => {
     for (const path of RELEASE_PATHS) {
       assert.equal(releasePathFilterSpec(path), path, path);
     }
+  });
+});
+
+describe("passesHistorySegmentFilter", () => {
+  it("matches individual rows only under the individual filter — regression guard for the broken embedded .eq()", () => {
+    assert.equal(
+      passesHistorySegmentFilter({ segment: "individual" }, "individual"),
+      true,
+    );
+    assert.equal(
+      passesHistorySegmentFilter({ segment: "seafarer" }, "individual"),
+      false,
+    );
+    assert.equal(
+      passesHistorySegmentFilter({ segment: "sme" }, "individual"),
+      false,
+    );
+  });
+
+  it("'all' matches every segment including null", () => {
+    assert.equal(passesHistorySegmentFilter({ segment: "sme" }, "all"), true);
+    assert.equal(
+      passesHistorySegmentFilter({ segment: "seafarer" }, "all"),
+      true,
+    );
+    assert.equal(passesHistorySegmentFilter({ segment: null }, "all"), true);
+  });
+
+  it("a null segment never matches a concrete filter", () => {
+    assert.equal(
+      passesHistorySegmentFilter({ segment: null }, "individual"),
+      false,
+    );
+    assert.equal(passesHistorySegmentFilter({ segment: null }, "sme"), false);
+    assert.equal(
+      passesHistorySegmentFilter({ segment: null }, "seafarer"),
+      false,
+    );
   });
 });

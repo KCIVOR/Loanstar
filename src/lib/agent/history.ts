@@ -6,7 +6,7 @@ export type ClosedLeadRow = {
   businessName: string | null;
   applicationId: string | null;
   applicationNo: string | null;
-  segment: "sme" | "seafarer" | null;
+  segment: "sme" | "seafarer" | "individual" | null;
   convertedAt: string;
 };
 
@@ -14,7 +14,7 @@ export type ClosedLeadsSortKey = "borrower" | "business" | "convertedAt";
 
 export type ClosedLeadsQueryParams = {
   search?: string;
-  segment?: "all" | "seafarer" | "sme";
+  segment?: "all" | "seafarer" | "sme" | "individual";
   from?: string | null;
   to?: string | null;
   sortKey?: ClosedLeadsSortKey;
@@ -134,8 +134,10 @@ export async function getClosedLeadsHistory(
     const appRaw = row.loan_applications;
     const app = Array.isArray(appRaw) ? appRaw[0] : appRaw;
     const segmentRaw = app?.segment as string | null | undefined;
-    const segment: "sme" | "seafarer" | null =
-      segmentRaw === "sme" || segmentRaw === "seafarer" ? segmentRaw : null;
+    const segment: "sme" | "seafarer" | "individual" | null =
+      segmentRaw === "sme" || segmentRaw === "seafarer" || segmentRaw === "individual"
+        ? segmentRaw
+        : null;
 
     return {
       id: row.id as string,

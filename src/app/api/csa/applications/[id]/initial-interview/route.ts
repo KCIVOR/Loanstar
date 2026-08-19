@@ -64,7 +64,10 @@ export async function POST(request: Request, { params }: RouteParams) {
     const formCompleteness = assessApplicationFormCompleteness(
       borrowerRow ? mapBorrowerRow(borrowerRow) : null,
       {
-        segment: application.segment === "sme" ? "sme" : "seafarer",
+        segment:
+          application.segment === "sme" || application.segment === "individual"
+            ? application.segment
+            : "seafarer",
         entityType:
           application.entity_type === "individual" ||
           application.entity_type === "corporate"
@@ -72,7 +75,10 @@ export async function POST(request: Request, { params }: RouteParams) {
             : null,
       },
     );
-    const segment = application.segment === "sme" ? "sme" : "seafarer";
+    const segment =
+      application.segment === "sme" || application.segment === "individual"
+        ? application.segment
+        : "seafarer";
     const nclRecorded = await isScreeningRecorded(supabase, id, segment);
 
     try {

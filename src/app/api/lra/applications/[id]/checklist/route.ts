@@ -38,7 +38,9 @@ export async function GET(request: Request, { params }: RouteParams) {
     }
 
     const scope = {
-      segment: (app.segment === "sme" ? "sme" : "seafarer") as "seafarer" | "sme",
+      segment: (app.segment === "sme" || app.segment === "individual"
+        ? app.segment
+        : "seafarer") as "seafarer" | "sme" | "individual",
       entityType:
         app.entity_type === "individual" || app.entity_type === "corporate"
           ? (app.entity_type as "individual" | "corporate")

@@ -150,6 +150,7 @@ const verificationRow: PacketVerificationRow = {
   bi_notes: "n",
   cm_departure_date: null,
   cm_salary: 1000,
+  cm_basic_salary: 600,
   cm_position: "OS",
   cm_contract_status: "active",
   cm_fit_to_work: true,
@@ -219,9 +220,30 @@ describe("mapPacketVerificationRow", () => {
     assert.equal(mapped?.finding, "positive");
     assert.equal(mapped?.findingNotes, "ok");
     assert.equal(mapped?.cmSalary, 1000);
+    assert.equal(mapped?.cmBasicSalary, 600);
     assert.equal(mapped?.biDetailsConfirmed, false);
     assert.equal(mapped?.cmManningAgencyName, "Agency");
     assert.equal(mapped?.forwardedAt, "2026-01-01T00:00:00Z");
+  });
+
+  it("maps CM and REM inspection JSON so Collector/Remedial can show the forms CIG filled", () => {
+    const mapped = mapPacketVerificationRow({
+      ...verificationRow,
+      cm_inspection: {
+        account: { accountName: "Juan Dela Cruz" },
+        orCrDetails: { plateNumber: "ABC 1234" },
+        verifiedBy: "CIG (Seed)",
+      },
+      rem_inspection: {
+        account: { accountName: "Maria Santos" },
+        titleDetails: { registeredOwnerAtTitle: "Maria Santos" },
+        verifiedBy: "CIG (Seed)",
+      },
+    } as PacketVerificationRow);
+
+    assert.equal(mapped?.cmInspection?.account?.accountName, "Juan Dela Cruz");
+    assert.equal(mapped?.cmInspection?.orCrDetails?.plateNumber, "ABC 1234");
+    assert.equal(mapped?.remInspection?.account?.accountName, "Maria Santos");
   });
 
   it("emits exactly the evidence fields Committee returns — no votes or completeness", () => {
@@ -229,7 +251,10 @@ describe("mapPacketVerificationRow", () => {
     assert.ok(mapped);
     for (const key of Object.keys(mapped)) {
       assert.ok(
-        committeeRouteSource.includes(`${key}: verification.`),
+        committeeRouteSource.includes(`${key}: verification.`) ||
+          (key === "cmInspection" || key === "remInspection"
+            ? committeeRouteSource.includes("mapCommitteeCollateralInspections")
+            : false),
         `Committee route does not expose verification field '${key}'`,
       );
     }
@@ -469,6 +494,7 @@ describe("loadOriginationPacket", () => {
     assert.equal(packet.application.segment, "seafarer");
     assert.equal(packet.application.entityType, "individual");
     assert.equal(packet.application.isReloan, false);
+    assert.equal(packet.application.collateralType, "none");
     assert.equal(packet.borrower.name, "Juan Dela Cruz");
     assert.equal(packet.borrower.profile?.email, "juan@example.com");
     assert.equal(packet.csaSummary.privacyOrientationByName, "CSA One");
@@ -483,6 +509,34 @@ describe("loadOriginationPacket", () => {
     assert.equal(packet.csaScreening.slug, "ncl");
     assert.equal(packet.csaScreening.result, "pass");
     assert.equal(packet.verification?.finding, "positive");
+  });
+
+  it("exposes car refinancing collateral so the packet can open CM Inspection", async () => {
+    const packet = await loadOriginationPacket(
+      packetClient({
+        application: {
+          id: "app-1",
+          application_no: "APP-0001",
+          status: "for_approval",
+          segment: "sme",
+          entity_type: "corporate",
+          collateral_type: "car_refinancing",
+          is_reloan: true,
+          blocker: null,
+          privacy_orientation_at: null,
+          privacy_orientation_by: null,
+          initial_interview_at: null,
+          initial_interview_notes: null,
+          initial_interview_by: null,
+          endorsed_at: null,
+          endorsed_by: null,
+          status_history: [],
+        },
+      }),
+      collectorCtx,
+    );
+    assert.equal(packet.application.segment, "sme");
+    assert.equal(packet.application.collateralType, "car_refinancing");
   });
 
   it("loads the full borrower profile only for the assigned account borrower", async () => {
@@ -533,6 +587,8 @@ describe("OriginationPacketPanel full read-only forms", () => {
   it("renders application and full CI form launchers", () => {
     assert.match(packetPanelSource, /View application form/);
     assert.match(packetPanelSource, /View full CI &amp; References Form/);
+    assert.match(packetPanelSource, /View full CM Inspection/);
+    assert.match(packetPanelSource, /View full REM Inspection/);
     assert.match(packetPanelSource, /<ApplicantProfileFields/);
     assert.match(packetPanelSource, /<CiReferencesFormModal/);
     assert.match(packetPanelSource, /readOnly/);
@@ -558,7 +614,9 @@ describe("loadIntakeChecklistForApplication", () => {
                 is_required: true,
                 is_optional_flag: false,
                 sort_order: 1,
+                segment: "seafarer",
                 entity_type: null,
+                collateral_type: null,
                 document_types: { id: "dt-1", slug: "passport", name: "Passport" },
               },
             ],

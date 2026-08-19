@@ -27,7 +27,8 @@ export type MasterlistQueueQueryParams = {
   statusFilter?: string;
   agingFilter?: string;
   birStatusFilter?: string;
-  segmentFilter?: "all" | "seafarer" | "sme";
+  segmentFilter?: "all" | "seafarer" | "sme" | "individual";
+  portfolioFilter?: string;
   from?: string | null;
   to?: string | null;
   sortKey?: MasterlistQueueSortKey;
@@ -118,6 +119,21 @@ export function birStatusFilterSpec(filter: string): BirStatusFilterSpec {
   return { mode: "eq", code: filter };
 }
 
+const UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+export type PortfolioFilterSpec =
+  | { mode: "all" }
+  | { mode: "unset" }
+  | { mode: "eq"; portfolioId: string };
+
+export function portfolioFilterSpec(filter: string): PortfolioFilterSpec {
+  if (!filter || filter === "all") return { mode: "all" };
+  if (filter === "unset") return { mode: "unset" };
+  if (UUID_RE.test(filter)) return { mode: "eq", portfolioId: filter };
+  return { mode: "all" };
+}
+
 /**
  * Pure needs-attention predicate — mirrors `src/app/ar/page.tsx`.
  * Remedial flag, or aging bucket that is neither "current" nor empty
@@ -178,6 +194,7 @@ export async function getMasterlistQueue(
     agingFilter = "all",
     birStatusFilter = "all",
     segmentFilter = "all",
+    portfolioFilter = "all",
     from = null,
     to = null,
     sortKey,
@@ -215,6 +232,13 @@ export async function getMasterlistQueue(
 
   if (segmentFilter !== "all") {
     query = query.eq("segment", segmentFilter);
+  }
+
+  const portfolioSpec = portfolioFilterSpec(portfolioFilter);
+  if (portfolioSpec.mode === "eq") {
+    query = query.eq("portfolio_id", portfolioSpec.portfolioId);
+  } else if (portfolioSpec.mode === "unset") {
+    query = query.is("portfolio_id", null);
   }
 
   if (from) {

@@ -25,7 +25,7 @@ import { ConnectBorrowerAccountPanel } from "@/components/csa/ConnectBorrowerAcc
 import { NegotiationPanel } from "@/components/csa/NegotiationPanel";
 import { ApplicantProfileFields } from "@/components/borrowers/ApplicantProfileFields";
 import { AutofillOverlay } from "@/components/dev/AutofillOverlay";
-import { fakeBorrowerProfile } from "@/lib/dev/fake-data";
+import { fakeBorrowerProfile, fakeRemark } from "@/lib/dev/fake-data";
 import { DocumentChecklist } from "@/components/DocumentChecklist";
 import {
   formatStatusLabel,
@@ -62,7 +62,7 @@ type ApplicationWorkspace = {
     status: string;
     statusLabel: string;
     blocker: string | null;
-    segment: "seafarer" | "sme";
+    segment: "seafarer" | "sme" | "individual";
     entityType: "individual" | "corporate" | null;
     isReloan: boolean;
     createdAt: string;
@@ -1416,24 +1416,37 @@ export default function CsaApplicationPage() {
           onUpdated={() => void load({ silent: true })}
         />
       </div>
-      {data.borrower ? (
-        <AutofillOverlay
-          actions={[
-            {
-              label: "Fill Application Form",
-              onClick: () =>
-                setData({
-                  ...data,
-                  borrower: fakeBorrowerProfile(
-                    data.application.segment ?? "seafarer",
-                    data.application.entityType ?? null,
-                    data.borrower!,
-                  ),
-                }),
+      <AutofillOverlay
+        actions={[
+          ...(data.borrower
+            ? [
+                {
+                  label: "Fill Application Form",
+                  onClick: () =>
+                    setData({
+                      ...data,
+                      borrower: fakeBorrowerProfile(
+                        data.application.segment ?? "seafarer",
+                        data.application.entityType ?? null,
+                        data.borrower!,
+                      ),
+                    }),
+                },
+              ]
+            : []),
+          {
+            label: "Fill CSA notes",
+            onClick: () => {
+              setInterviewNotes(fakeRemark("interview"));
+              setScreening((prev) => ({
+                ...prev,
+                notes: fakeRemark("screening"),
+              }));
+              setHoldReason(fakeRemark("hold"));
             },
-          ]}
-        />
-      ) : null}
+          },
+        ]}
+      />
     </div>
   );
 }

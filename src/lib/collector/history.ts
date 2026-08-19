@@ -7,7 +7,7 @@ export type CollectorClosedAccountRow = {
   loanAccountNo: string | null;
   borrowerName: string;
   borrowerNo: string;
-  segment: "sme" | "seafarer" | null;
+  segment: "sme" | "seafarer" | "individual" | null;
   outstandingBalance: number;
   closedAt: string;
 };
@@ -16,7 +16,7 @@ export type CollectorClosedAccountSortKey = "borrower" | "account" | "closedAt";
 
 export type CollectorClosedAccountsQueryParams = {
   search?: string;
-  segment?: "all" | "seafarer" | "sme";
+  segment?: "all" | "seafarer" | "sme" | "individual";
   from?: string | null;
   to?: string | null;
   sortKey?: CollectorClosedAccountSortKey;
@@ -35,7 +35,7 @@ export type CollectorTurnedOverRow = {
   loanAccountNo: string | null;
   borrowerName: string;
   borrowerNo: string;
-  segment: "sme" | "seafarer" | null;
+  segment: "sme" | "seafarer" | "individual" | null;
   turnedOverAt: string;
   turnoverReason: string;
 };
@@ -44,7 +44,7 @@ export type CollectorTurnedOverSortKey = "borrower" | "account" | "turnedOverAt"
 
 export type CollectorTurnedOverQueryParams = {
   search?: string;
-  segment?: "all" | "seafarer" | "sme";
+  segment?: "all" | "seafarer" | "sme" | "individual";
   from?: string | null;
   to?: string | null;
   sortKey?: CollectorTurnedOverSortKey;
@@ -185,8 +185,10 @@ export async function getCollectorClosedAccountsHistory(
     if (!closedAt) return [];
 
     const segmentRaw = row.segment as string | null | undefined;
-    const segment: "sme" | "seafarer" | null =
-      segmentRaw === "sme" || segmentRaw === "seafarer" ? segmentRaw : null;
+    const segment: "sme" | "seafarer" | "individual" | null =
+      segmentRaw === "sme" || segmentRaw === "seafarer" || segmentRaw === "individual"
+        ? segmentRaw
+        : null;
 
     return [
       {
@@ -372,8 +374,10 @@ export async function getCollectorTurnedOverHistory(
     const masterlist = firstJoin(row.masterlist);
 
     const segmentRaw = masterlist?.segment as string | null | undefined;
-    const segment: "sme" | "seafarer" | null =
-      segmentRaw === "sme" || segmentRaw === "seafarer" ? segmentRaw : null;
+    const segment: "sme" | "seafarer" | "individual" | null =
+      segmentRaw === "sme" || segmentRaw === "seafarer" || segmentRaw === "individual"
+        ? segmentRaw
+        : null;
 
     return [
       {

@@ -72,3 +72,25 @@ export function needsRevisionSubtitle(
   }
   return `Needs revision · ${fileBit}`;
 }
+
+export function confirmableDocumentIds(
+  items: Array<{ documentId: string | null; status: DocumentStatus | null }>,
+): string[] {
+  return items
+    .filter((item) => item.documentId && item.status === "uploaded")
+    .map((item) => item.documentId as string);
+}
+
+export function canShowConfirmAllAction(
+  opts: { hasConfirmApi: boolean; confirmableCount: number } & Pick<
+    ChecklistActionOpts,
+    "readOnly" | "flagsOnly"
+  >,
+): boolean {
+  return (
+    opts.hasConfirmApi &&
+    !opts.readOnly &&
+    !opts.flagsOnly &&
+    opts.confirmableCount > 0
+  );
+}

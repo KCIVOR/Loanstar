@@ -4,8 +4,9 @@
  */
 export function penaltyRateConfigKey(
   segment: string | null | undefined,
-): "penalty_rate" | "penalty_rate_sme" {
+): "penalty_rate" | "penalty_rate_sme" | "penalty_rate_individual" {
   if (segment === "sme") return "penalty_rate_sme";
+  if (segment === "individual") return "penalty_rate_individual";
   if (segment === "seafarer") return "penalty_rate";
   throw new Error(
     `masterlist.segment is missing or unknown (${segment ?? "null"}) — cannot choose penalty rate; backfill segment before aging`,
@@ -14,9 +15,10 @@ export function penaltyRateConfigKey(
 
 export function resolvePenaltyRate(
   segment: string | null | undefined,
-  rates: { seafarer: number; sme: number },
+  rates: { seafarer: number; sme: number; individual: number },
 ): number {
-  return penaltyRateConfigKey(segment) === "penalty_rate_sme"
-    ? rates.sme
-    : rates.seafarer;
+  const key = penaltyRateConfigKey(segment);
+  if (key === "penalty_rate_sme") return rates.sme;
+  if (key === "penalty_rate_individual") return rates.individual;
+  return rates.seafarer;
 }

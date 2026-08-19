@@ -23,7 +23,7 @@ const WORK_FILTERS = new Set([
   "documents",
   "negotiation",
 ]);
-const SEGMENT_FILTERS = new Set(["all", "seafarer", "sme"]);
+const SEGMENT_FILTERS = new Set(["all", "seafarer", "sme", "individual"]);
 const RANGE_PRESETS = new Set(["30d", "90d", "all", "custom"]);
 const SORT_KEYS = new Set([
   "borrower",
@@ -47,7 +47,7 @@ export async function GET(request: Request) {
     const segmentRaw = searchParams.get("segment") ?? "all";
     const segmentFilter = (
       SEGMENT_FILTERS.has(segmentRaw) ? segmentRaw : "all"
-    ) as "all" | "seafarer" | "sme";
+    ) as "all" | "seafarer" | "sme" | "individual";
 
     // Active queue defaults to All time (must not hide old-but-still-open items).
     const rangeRaw = searchParams.get("range") ?? "all";

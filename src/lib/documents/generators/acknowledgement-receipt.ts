@@ -78,7 +78,12 @@ export async function generateAcknowledgementReceipt(
     },
     borrowerProfile,
     releasePath,
-    { segment: app.segment === "sme" ? "sme" : "seafarer" },
+    {
+      segment:
+        app.segment === "sme" || app.segment === "individual"
+          ? app.segment
+          : "seafarer",
+    },
   );
 
   // Template-specific alias for the released amount.

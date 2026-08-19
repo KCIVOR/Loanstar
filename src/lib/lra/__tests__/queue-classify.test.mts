@@ -61,7 +61,7 @@ test("awaiting_signatures buckets as setup (LRA-facilitated signing)", () => {
   );
 });
 
-test("awaiting_briefing buckets as briefing (Collection Head check-off)", () => {
+test("awaiting_briefing buckets as briefing (Briefer check-off)", () => {
   assert.equal(
     lraQueueBucket(
       item({

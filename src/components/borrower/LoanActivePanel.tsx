@@ -313,7 +313,7 @@ export function LoanActivePanel({
   });
 
   return (
-    <Card className="mb-6">
+    <Card className="mb-6 min-w-0">
       <h2 className="mb-2 font-display text-lg font-semibold text-navy-900">
         {isPaidOff ? "Paid off" : "Loan active"}
       </h2>

@@ -31,9 +31,11 @@ export default function ConfigPage() {
 
   const [penaltyRate, setPenaltyRate] = useState("");
   const [penaltyRateSme, setPenaltyRateSme] = useState("");
+  const [penaltyRateIndividual, setPenaltyRateIndividual] = useState("");
   const [coverageRatio, setCoverageRatio] = useState("");
   const [committeeSize, setCommitteeSize] = useState("");
   const [committeeSizeSme, setCommitteeSizeSme] = useState("");
+  const [committeeSizeIndividual, setCommitteeSizeIndividual] = useState("");
   const [aging30, setAging30] = useState("");
   const [aging60, setAging60] = useState("");
   const [aging90, setAging90] = useState("");
@@ -57,6 +59,11 @@ export default function ConfigPage() {
   const [smtpPassword, setSmtpPassword] = useState("");
   const [smtpFrom, setSmtpFrom] = useState("");
 
+  const [reportsAiEnabled, setReportsAiEnabled] = useState(false);
+  const [reportsAiApiKey, setReportsAiApiKey] = useState("");
+  const [reportsAiModel, setReportsAiModel] = useState("gpt-4o-mini");
+  const [testingReportsAi, setTestingReportsAi] = useState(false);
+
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
@@ -69,9 +76,13 @@ export default function ConfigPage() {
       for (const s of data.settings) {
         if (s.key === "penalty_rate") setPenaltyRate(String(s.value));
         if (s.key === "penalty_rate_sme") setPenaltyRateSme(String(s.value));
+        if (s.key === "penalty_rate_individual")
+          setPenaltyRateIndividual(String(s.value));
         if (s.key === "coverage_ratio") setCoverageRatio(String(s.value));
         if (s.key === "committee_size") setCommitteeSize(String(s.value));
         if (s.key === "committee_size_sme") setCommitteeSizeSme(String(s.value));
+        if (s.key === "committee_size_individual")
+          setCommitteeSizeIndividual(String(s.value));
         if (s.key === "aging_thresholds" && typeof s.value === "object") {
           const v = s.value as Record<string, number>;
           setAging30(String(v["30"] ?? ""));
@@ -99,6 +110,12 @@ export default function ConfigPage() {
         if (s.key === "smtp_user") setSmtpUser(String(s.value ?? ""));
         if (s.key === "smtp_password") setSmtpPassword(String(s.value ?? ""));
         if (s.key === "smtp_from") setSmtpFrom(String(s.value ?? ""));
+        if (s.key === "reports_ai_enabled") setReportsAiEnabled(Boolean(s.value));
+        if (s.key === "reports_ai_api_key") setReportsAiApiKey(String(s.value ?? ""));
+        if (s.key === "reports_ai_model") {
+          const model = String(s.value ?? "").trim();
+          setReportsAiModel(model || "gpt-4o-mini");
+        }
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load");
@@ -137,9 +154,11 @@ export default function ConfigPage() {
         body: JSON.stringify({
           penalty_rate: Number(penaltyRate),
           penalty_rate_sme: Number(penaltyRateSme),
+          penalty_rate_individual: Number(penaltyRateIndividual),
           coverage_ratio: Number(coverageRatio),
           committee_size: Number(committeeSize),
           committee_size_sme: Number(committeeSizeSme),
+          committee_size_individual: Number(committeeSizeIndividual),
           aging_thresholds: {
             "30": Number(aging30),
             "60": Number(aging60),
@@ -159,6 +178,9 @@ export default function ConfigPage() {
           smtp_user: smtpUser,
           smtp_password: smtpPassword,
           smtp_from: smtpFrom,
+          reports_ai_enabled: reportsAiEnabled,
+          reports_ai_api_key: reportsAiApiKey,
+          reports_ai_model: reportsAiModel,
         }),
       });
       if (!res.ok) {
@@ -203,13 +225,31 @@ export default function ConfigPage() {
     }
   }
 
+  async function handleReportsAiTest() {
+    setTestingReportsAi(true);
+    setError(null);
+    setMessage(null);
+    try {
+      const res = await fetch("/api/admin/reports-ai/test", { method: "POST" });
+      const body = (await res.json()) as { error?: string; ok?: boolean; model?: string };
+      if (!res.ok) throw new Error(body.error ?? "LoanBot test failed");
+      setMessage(
+        `OpenAI connection succeeded (${body.model ?? reportsAiModel})`,
+      );
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "LoanBot test failed");
+    } finally {
+      setTestingReportsAi(false);
+    }
+  }
+
   if (loading) return <Spinner />;
 
   return (
     <div>
       <PageHeader
         title="System Config"
-        description="Penalty rate, coverage ratio, aging thresholds, SMS (Twilio), and Email (SMTP)"
+        description="Penalty rate, coverage ratio, aging thresholds, SMS (Twilio), Email (SMTP), and LoanBot"
       />
 
       {error ? (
@@ -269,6 +309,26 @@ export default function ConfigPage() {
               </p>
             </div>
             <div>
+              <Label htmlFor="penalty-individual" required>
+                Penalty rate — Individual (decimal)
+              </Label>
+              <Input
+                id="penalty-individual"
+                type="number"
+                step="0.001"
+                min="0"
+                max="1"
+                required
+                value={penaltyRateIndividual}
+                onChange={(e) => setPenaltyRateIndividual(e.target.value)}
+                className="mono"
+              />
+              <p className="mt-1 text-xs text-ink-400">
+                {settings.find((s) => s.key === "penalty_rate_individual")
+                  ?.description ?? "Maximum penalty rate per month (Individual)"}
+              </p>
+            </div>
+            <div>
               <Label htmlFor="coverage" required>
                 Coverage ratio (decimal)
               </Label>
@@ -322,6 +382,27 @@ export default function ConfigPage() {
                 {settings.find((s) => s.key === "committee_size_sme")
                   ?.description ??
                   "Number of committee members required to cast a vote before a final decision can be made (SME)"}
+              </p>
+            </div>
+            <div>
+              <Label htmlFor="committee-size-individual" required>
+                Committee size — Individual (approvers required)
+              </Label>
+              <Input
+                id="committee-size-individual"
+                type="number"
+                step="1"
+                min="1"
+                max="15"
+                required
+                value={committeeSizeIndividual}
+                onChange={(e) => setCommitteeSizeIndividual(e.target.value)}
+                className="mono"
+              />
+              <p className="mt-1 text-xs text-ink-400">
+                {settings.find((s) => s.key === "committee_size_individual")
+                  ?.description ??
+                  "Number of committee members required to cast a vote before a final decision can be made (Individual)"}
               </p>
             </div>
             <div>
@@ -644,6 +725,61 @@ export default function ConfigPage() {
               <Link href="/admin/email-test" className="btn btn-secondary">
                 Open email test
               </Link>
+            </div>
+          </div>
+        </Card>
+
+        <Card>
+          <h2 className="mb-1 font-display text-lg font-semibold text-navy-900">
+            LoanBot (OpenAI)
+          </h2>
+          <p className="mb-4 text-sm text-ink-500">
+            Save before Test connection — the test reads the key from the
+            database, not the unsaved input. Enable only after a key works. Key
+            is masked after save — leave the masked value unchanged to keep the
+            existing key. Committee and other reports:view roles never see the
+            key.
+          </p>
+          <div className="max-w-md space-y-4">
+            <label className="flex items-center gap-2 text-sm text-ink-800">
+              <input
+                type="checkbox"
+                checked={reportsAiEnabled}
+                onChange={(e) => setReportsAiEnabled(e.target.checked)}
+              />
+              Enable LoanBot
+            </label>
+            <div>
+              <Label htmlFor="reports-ai-key">API key</Label>
+              <Input
+                id="reports-ai-key"
+                type="password"
+                value={reportsAiApiKey}
+                onChange={(e) => setReportsAiApiKey(e.target.value)}
+                className="mono"
+                autoComplete="new-password"
+              />
+            </div>
+            <div>
+              <Label htmlFor="reports-ai-model">Model</Label>
+              <Input
+                id="reports-ai-model"
+                value={reportsAiModel}
+                onChange={(e) => setReportsAiModel(e.target.value)}
+                placeholder="gpt-4o-mini"
+                className="mono"
+                autoComplete="off"
+              />
+            </div>
+            <div className="border-t border-line-soft pt-4">
+              <Button
+                type="button"
+                variant="secondary"
+                loading={testingReportsAi}
+                onClick={() => void handleReportsAiTest()}
+              >
+                Test connection
+              </Button>
             </div>
           </div>
         </Card>

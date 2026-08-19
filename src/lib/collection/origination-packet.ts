@@ -10,6 +10,11 @@ import {
   type BorrowerRow,
 } from "@/lib/borrowers/types";
 import { COLLECTOR_QUEUE_ACCOUNT_STATUS } from "@/lib/collector/queue";
+import {
+  mapCommitteeCollateralInspections,
+  resolveCommitteeCollateralType,
+  type CommitteeCollateralType,
+} from "@/lib/committee/ci-report";
 import { csaScreeningCheckSlug } from "@/lib/csa/sme-duplication";
 import {
   getCompletionSummary,
@@ -34,12 +39,13 @@ const VERIFICATION_SELECT = `
   finding, finding_notes, forwarded_at, completed_at,
   field_completeness_ok, field_completeness_notes,
   bi_identity_confirmed, bi_purpose_confirmed, bi_details_confirmed, bi_notes,
-  cm_departure_date, cm_salary, cm_position, cm_contract_status, cm_fit_to_work, cm_notes,
+  cm_departure_date, cm_salary, cm_basic_salary, cm_position, cm_contract_status, cm_fit_to_work, cm_notes,
   cm_manager_name, cm_manager_position, cm_manager_contact, cm_manning_agency_name, cm_joining_port,
   pic_verification, reference_verifications, verification_checklist,
   pic_payment_preference, pic_demeanor, pic_rating, pic_rating_reason,
   cif_verified_by, cif_verified_date,
-  field_visit, sme_reloan_verification
+  field_visit, sme_reloan_verification,
+  cm_inspection, rem_inspection
 `;
 
 const BORROWER_PROFILE_SELECT = `
@@ -65,6 +71,7 @@ export type PacketVerificationRow = {
   bi_notes: string | null;
   cm_departure_date: string | null;
   cm_salary: number | null;
+  cm_basic_salary: number | null;
   cm_position: string | null;
   cm_contract_status: string | null;
   cm_fit_to_work: boolean | null;
@@ -85,6 +92,8 @@ export type PacketVerificationRow = {
   cif_verified_date: string | null;
   field_visit: unknown;
   sme_reloan_verification: unknown;
+  cm_inspection?: unknown | null;
+  rem_inspection?: unknown | null;
 };
 
 export type PacketVerification = {
@@ -100,6 +109,7 @@ export type PacketVerification = {
   biNotes: string | null;
   cmDepartureDate: string | null;
   cmSalary: number | null;
+  cmBasicSalary: number | null;
   cmPosition: string | null;
   cmContractStatus: string | null;
   cmFitToWork: boolean | null;
@@ -120,6 +130,8 @@ export type PacketVerification = {
   cifVerifiedDate: string | null;
   fieldVisit: unknown;
   smeReloanVerification: unknown;
+  cmInspection: unknown;
+  remInspection: unknown;
 };
 
 /**
@@ -145,6 +157,7 @@ export function mapPacketVerificationRow(
     biNotes: row.bi_notes,
     cmDepartureDate: row.cm_departure_date,
     cmSalary: row.cm_salary,
+    cmBasicSalary: row.cm_basic_salary,
     cmPosition: row.cm_position,
     cmContractStatus: row.cm_contract_status,
     cmFitToWork: row.cm_fit_to_work,
@@ -165,6 +178,7 @@ export function mapPacketVerificationRow(
     cifVerifiedDate: row.cif_verified_date,
     fieldVisit: row.field_visit,
     smeReloanVerification: row.sme_reloan_verification,
+    ...mapCommitteeCollateralInspections(row),
   };
 }
 
@@ -178,12 +192,14 @@ export function documentBelongsToApplication(
   );
 }
 
+export type CaseSegment = "seafarer" | "sme" | "individual";
+
 export type MasterlistCaseContext = {
   masterlistId: string;
   loanApplicationId: string;
   borrowerId: string | null;
   borrowerName: string | null;
-  segment: "seafarer" | "sme";
+  segment: CaseSegment;
 };
 
 type MasterlistCaseRow = {
@@ -200,7 +216,10 @@ function toCaseContext(row: MasterlistCaseRow): MasterlistCaseContext {
     loanApplicationId: row.loan_application_id as string,
     borrowerId: row.borrower_id ?? null,
     borrowerName: row.borrower_name ?? null,
-    segment: row.segment === "sme" ? "sme" : "seafarer",
+    segment:
+      row.segment === "sme" || row.segment === "individual"
+        ? row.segment
+        : "seafarer",
   };
 }
 
@@ -287,9 +306,10 @@ export type OriginationPacket = {
     applicationNo: string | null;
     status: string;
     statusLabel: string;
-    segment: "seafarer" | "sme";
+    segment: CaseSegment;
     entityType: "individual" | "corporate" | null;
     isReloan: boolean;
+    collateralType: CommitteeCollateralType;
     blocker: string | null;
   };
   borrower: {
@@ -328,7 +348,7 @@ export async function loadOriginationPacket(
     .select(
       `
       id, application_no, status, segment, blocker,
-      entity_type, is_reloan,
+      entity_type, is_reloan, collateral_type,
       privacy_orientation_at, privacy_orientation_by,
       initial_interview_at, initial_interview_notes, initial_interview_by,
       endorsed_at, endorsed_by, status_history
@@ -430,13 +450,19 @@ export async function loadOriginationPacket(
       applicationNo: (application.application_no as string | null) ?? null,
       status: application.status as string,
       statusLabel: formatStatusLabel(String(application.status)),
-      segment: application.segment === "sme" ? "sme" : "seafarer",
+      segment:
+        application.segment === "sme" || application.segment === "individual"
+          ? (application.segment as "sme" | "individual")
+          : "seafarer",
       entityType:
         application.entity_type === "individual" ||
         application.entity_type === "corporate"
           ? application.entity_type
           : null,
       isReloan: Boolean(application.is_reloan),
+      collateralType: resolveCommitteeCollateralType(
+        application.collateral_type as string | null,
+      ),
       blocker: (application.blocker as string | null) ?? null,
     },
     borrower: {

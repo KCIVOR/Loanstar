@@ -3,6 +3,8 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { SEQUENTIAL_RAMP } from "@/components/dashboard/charts/theme";
 import { halfUp } from "@/lib/computation/money";
 
+import { segmentLabel } from "@/lib/reports/segments";
+
 import type { MetricDef, MetricValue } from "./types";
 
 export const RISK_METRIC_DEFS: MetricDef[] = [
@@ -196,7 +198,7 @@ export async function computeRiskMetrics(supabase: SupabaseClient): Promise<Risk
     segmentTotals.set(key, (segmentTotals.get(key) ?? 0) + r.outstanding_balance);
   }
   const concentrationBySegment = Array.from(segmentTotals.entries()).map(([name, value]) => ({
-    name: name === "sme" ? "SME" : name === "seafarer" ? "Seafarer" : name,
+    name: segmentLabel(name),
     value,
   }));
 

@@ -15,7 +15,7 @@ export type CommitteeQueueItem = {
   applicationNo: string | null;
   status: string;
   isReloan: boolean;
-  segment: "sme" | "seafarer" | null;
+  segment: "sme" | "seafarer" | "individual" | null;
   createdAt: string;
   updatedAt: string;
   tatDays: number | null;
@@ -35,7 +35,7 @@ export type CommitteeQueueItem = {
 export type CommitteeQueueQueryParams = {
   search?: string;
   statusFilter?: CommitteeStatusFilter;
-  segment?: "all" | "seafarer" | "sme";
+  segment?: "all" | "seafarer" | "sme" | "individual";
   from?: string | null;
   to?: string | null;
   sortKey?: CommitteeQueueSortKey;
@@ -252,8 +252,10 @@ export async function getCommitteeQueue(
       (verification?.forwarded_at as string | null | undefined) ?? null;
 
     const segmentRaw = row.segment as string | null;
-    const segment: "sme" | "seafarer" | null =
-      segmentRaw === "sme" || segmentRaw === "seafarer" ? segmentRaw : null;
+    const segment: "sme" | "seafarer" | "individual" | null =
+      segmentRaw === "sme" || segmentRaw === "seafarer" || segmentRaw === "individual"
+        ? segmentRaw
+        : null;
 
     return {
       id: row.id as string,

@@ -2,7 +2,7 @@
 
 import { Fragment, useState } from "react";
 
-import { Badge, Table, Td, Th } from "@/components/ui";
+import { Badge, Table, Td, Th, cn } from "@/components/ui";
 import type { AccountLedgerRow } from "@/lib/ledger/build-account-ledger-rows";
 import {
   formatLedgerDateCell,
@@ -88,11 +88,11 @@ export function AccountLedger({
   const items = groupRows(rows);
 
   return (
-    <div className={className}>
+    <div className={cn("min-w-0 max-w-full", className)}>
       {caption ? (
         <p className="mb-3 text-sm text-ink-500">{caption}</p>
       ) : null}
-      <Table className="is-compact min-w-[1060px]">
+      <Table className="is-compact is-ledger">
         <thead>
           <tr>
             <Th>Check No.</Th>

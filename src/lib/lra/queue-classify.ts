@@ -17,7 +17,7 @@ const SETUP_RELEASE_STATUSES = new Set([
   "ready_generate",
   "awaiting_signatures",
 ]);
-// awaiting_briefing waits on the Collection Head's check-off.
+// awaiting_briefing waits on the Briefer's check-off.
 const BRIEFING_RELEASE_STATUSES = new Set(["awaiting_briefing"]);
 
 export function isCompletedLraQueueItem(

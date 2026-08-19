@@ -91,7 +91,7 @@ export const WORKFLOW_TRIGGERS: WorkflowTrigger[] = [
   },
   {
     id: "collector_briefing_ack",
-    name: "Collection Head briefing check-off",
+    name: "Briefer briefing check-off",
     module: "collection",
     requiredPermission: "execute_trigger",
     preconditions: [

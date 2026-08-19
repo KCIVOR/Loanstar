@@ -12,7 +12,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
  * granted only to `super_admin`, `ar`, and `committee` — none of which are
  * individually account-scoped (AR sees the whole book, Committee reviews
  * every application) — so no caller of this dashboard is scoped by it yet.
- * If a scoped role (e.g. Collector, Collection Head) is later granted
+ * If a scoped role (e.g. Collector, Briefer) is later granted
  * `reports:view`, call this from the dashboard route and pass the result
  * into each `compute*Metrics` function's masterlist/application queries as
  * an explicit `.in("id", scopedIds)` filter — never by reverting to the

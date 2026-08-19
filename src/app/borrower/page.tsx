@@ -80,8 +80,9 @@ type LoanSummary = {
 const LOAN_STATUSES = ["released", "closed", "loan_active", "paid_off"];
 const HISTORY_PAGE_SIZE = 5;
 
-type StartSegment = "seafarer" | "sme";
+type StartSegment = "seafarer" | "sme" | "individual";
 type StartEntityType = "individual" | "corporate";
+type StartCollateralType = "none" | "car_refinancing" | "real_estate";
 
 function formatMoney(value: number) {
   return value.toLocaleString("en-PH", {
@@ -186,6 +187,8 @@ export default function BorrowerDashboardPage() {
   const [pickerSegment, setPickerSegment] = useState<StartSegment>("seafarer");
   const [pickerEntityType, setPickerEntityType] =
     useState<StartEntityType>("individual");
+  const [pickerCollateralType, setPickerCollateralType] =
+    useState<StartCollateralType>("none");
   const [confirmDeleteDraft, setConfirmDeleteDraft] = useState(false);
   const [deleteDraftLoading, setDeleteDraftLoading] = useState(false);
   const [historySearch, setHistorySearch] = useState("");
@@ -318,6 +321,7 @@ export default function BorrowerDashboardPage() {
   async function handleStartApplication(body?: {
     segment: StartSegment;
     entityType?: StartEntityType;
+    collateralType?: StartCollateralType;
   }) {
     setStartAppLoading(true);
     setError(null);
@@ -350,7 +354,10 @@ export default function BorrowerDashboardPage() {
   function handleStartClick() {
     if (appKind === "reloan") {
       const latest = applications[0];
-      const segment = latest?.segment === "sme" ? "sme" : "seafarer";
+      const segment =
+        latest?.segment === "sme" || latest?.segment === "individual"
+          ? latest.segment
+          : "seafarer";
       setPickerSegment(segment);
       setPickerEntityType(
         segment === "sme"
@@ -359,18 +366,29 @@ export default function BorrowerDashboardPage() {
             : "individual"
           : "individual",
       );
+      setPickerCollateralType("none");
     } else {
       setPickerSegment("seafarer");
       setPickerEntityType("individual");
+      setPickerCollateralType("none");
     }
     setShowSegmentPicker(true);
+  }
+
+  function handlePickerSegmentChange(next: StartSegment) {
+    setPickerSegment(next);
+    if (next === "seafarer") setPickerCollateralType("none");
   }
 
   function handleConfirmSegmentPicker() {
     void handleStartApplication(
       pickerSegment === "sme"
-        ? { segment: "sme", entityType: pickerEntityType }
-        : { segment: "seafarer" },
+        ? {
+            segment: "sme",
+            entityType: pickerEntityType,
+            collateralType: pickerCollateralType,
+          }
+        : { segment: pickerSegment, collateralType: pickerCollateralType },
     );
   }
 
@@ -1008,11 +1026,12 @@ export default function BorrowerDashboardPage() {
               id="start-segment"
               value={pickerSegment}
               onChange={(e) =>
-                setPickerSegment(e.target.value as StartSegment)
+                handlePickerSegmentChange(e.target.value as StartSegment)
               }
             >
               <option value="seafarer">Seafarer</option>
               <option value="sme">SME (Small &amp; Medium Enterprise)</option>
+              <option value="individual">Individual</option>
             </Select>
           </div>
           {pickerSegment === "sme" ? (
@@ -1028,8 +1047,29 @@ export default function BorrowerDashboardPage() {
                 }
                 required
               >
-                <option value="individual">Individual</option>
-                <option value="corporate">Corporate</option>
+                <option value="individual">Individual (Sole Proprietorship)</option>
+                <option value="corporate">Corporate (Partnership/Corporation)</option>
+              </Select>
+            </div>
+          ) : null}
+          {pickerSegment === "sme" || pickerSegment === "individual" ? (
+            <div>
+              <Label htmlFor="start-collateral-type" required>
+                Collateral
+              </Label>
+              <Select
+                id="start-collateral-type"
+                value={pickerCollateralType}
+                onChange={(e) =>
+                  setPickerCollateralType(
+                    e.target.value as StartCollateralType,
+                  )
+                }
+                required
+              >
+                <option value="none">Clean (no collateral)</option>
+                <option value="car_refinancing">Car Refinancing</option>
+                <option value="real_estate">Real Estate</option>
               </Select>
             </div>
           ) : null}

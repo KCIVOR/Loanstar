@@ -13,6 +13,10 @@ import { getCommitteeSize } from "@/lib/committee/committee-size";
 import { computeTatDays, computeVoteTally } from "@/lib/committee/votes";
 import { getCommitteeAssessment } from "@/lib/committee/assessment";
 import { getCommitteeCompleteness } from "@/lib/committee/completeness";
+import {
+  mapCommitteeCollateralInspections,
+  resolveCommitteeCollateralType,
+} from "@/lib/committee/ci-report";
 import { getApplicationForStaff } from "@/lib/csa/application";
 import { getActiveComputation } from "@/lib/csa/computation";
 import { csaScreeningCheckSlug } from "@/lib/csa/sme-duplication";
@@ -46,12 +50,13 @@ export async function GET(_request: Request, { params }: RouteParams) {
         finding, finding_notes, forwarded_at, completed_at, is_complete,
         field_completeness_ok, field_completeness_notes,
         bi_identity_confirmed, bi_purpose_confirmed, bi_details_confirmed, bi_notes,
-        cm_departure_date, cm_salary, cm_position, cm_contract_status, cm_fit_to_work, cm_notes,
+        cm_departure_date, cm_salary, cm_basic_salary, cm_position, cm_contract_status, cm_fit_to_work, cm_notes,
         cm_manager_name, cm_manager_position, cm_manager_contact, cm_manning_agency_name, cm_joining_port,
         pic_verification, reference_verifications, verification_checklist,
         pic_payment_preference, pic_demeanor, pic_rating, pic_rating_reason,
         cif_verified_by, cif_verified_date,
-        field_visit, sme_reloan_verification
+        field_visit, sme_reloan_verification,
+        cm_inspection, rem_inspection
       `,
       )
       .eq("loan_application_id", id)
@@ -195,12 +200,18 @@ export async function GET(_request: Request, { params }: RouteParams) {
         statusLabel: formatStatusLabel(application.status),
         blocker: application.blocker,
         isReloan: application.is_reloan,
-        segment: application.segment === "sme" ? "sme" : "seafarer",
+        segment:
+          application.segment === "sme" || application.segment === "individual"
+            ? application.segment
+            : "seafarer",
         entityType:
           application.entity_type === "individual" ||
           application.entity_type === "corporate"
             ? application.entity_type
             : null,
+        collateralType: resolveCommitteeCollateralType(
+          application.collateral_type as string | null,
+        ),
         statusHistory: application.status_history,
         canDecide:
           (application.status === "for_approval" ||
@@ -226,6 +237,7 @@ export async function GET(_request: Request, { params }: RouteParams) {
             biNotes: verification.bi_notes,
             cmDepartureDate: verification.cm_departure_date,
             cmSalary: verification.cm_salary,
+            cmBasicSalary: verification.cm_basic_salary,
             cmPosition: verification.cm_position,
             cmContractStatus: verification.cm_contract_status,
             cmFitToWork: verification.cm_fit_to_work,
@@ -246,6 +258,7 @@ export async function GET(_request: Request, { params }: RouteParams) {
             cifVerifiedDate: verification.cif_verified_date,
             fieldVisit: verification.field_visit,
             smeReloanVerification: verification.sme_reloan_verification,
+            ...mapCommitteeCollateralInspections(verification),
           }
         : null,
       completeness,

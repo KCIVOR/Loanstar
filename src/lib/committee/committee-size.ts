@@ -8,8 +8,9 @@ import { DEFAULT_COMMITTEE_SIZE } from "./votes";
  */
 export function committeeSizeConfigKey(
   segment: string | null | undefined,
-): "committee_size" | "committee_size_sme" {
+): "committee_size" | "committee_size_sme" | "committee_size_individual" {
   if (segment === "sme") return "committee_size_sme";
+  if (segment === "individual") return "committee_size_individual";
   if (segment === "seafarer") return "committee_size";
   throw new Error(
     `loan_applications.segment is missing or unknown (${segment ?? "null"}) — cannot choose committee size`,
@@ -18,11 +19,12 @@ export function committeeSizeConfigKey(
 
 export function resolveCommitteeSize(
   segment: string | null | undefined,
-  sizes: { seafarer: number; sme: number },
+  sizes: { seafarer: number; sme: number; individual: number },
 ): number {
-  return committeeSizeConfigKey(segment) === "committee_size_sme"
-    ? sizes.sme
-    : sizes.seafarer;
+  const key = committeeSizeConfigKey(segment);
+  if (key === "committee_size_sme") return sizes.sme;
+  if (key === "committee_size_individual") return sizes.individual;
+  return sizes.seafarer;
 }
 
 /**
@@ -46,10 +48,11 @@ export async function getCommitteeSize(
   const { data } = await supabase
     .from("config_settings")
     .select("key, value")
-    .in("key", ["committee_size", "committee_size_sme"]);
+    .in("key", ["committee_size", "committee_size_sme", "committee_size_individual"]);
 
   let seafarer = DEFAULT_COMMITTEE_SIZE;
   let sme = DEFAULT_COMMITTEE_SIZE;
+  let individual = DEFAULT_COMMITTEE_SIZE;
   for (const row of data ?? []) {
     const n = Number(row.value);
     if (row.key === "committee_size" && Number.isFinite(n) && n >= 1) {
@@ -58,6 +61,9 @@ export async function getCommitteeSize(
     if (row.key === "committee_size_sme" && Number.isFinite(n) && n >= 1) {
       sme = Math.floor(n);
     }
+    if (row.key === "committee_size_individual" && Number.isFinite(n) && n >= 1) {
+      individual = Math.floor(n);
+    }
   }
-  return resolveCommitteeSize(segment, { seafarer, sme });
+  return resolveCommitteeSize(segment, { seafarer, sme, individual });
 }

@@ -3,7 +3,7 @@ import type { BorrowerProfile } from "@/lib/borrowers/types";
 
 import { COMPANY_NAME, formatDate, formatMoney, joinAddress } from "./shared";
 
-export type ApplicationFormSegment = "seafarer" | "sme";
+export type ApplicationFormSegment = "seafarer" | "sme" | "individual";
 export type ApplicationFormEntityType = "individual" | "corporate";
 
 export type ApplicationFormSlug =
@@ -24,9 +24,22 @@ export function resolveApplicationFormSlug(input: {
   segment?: string | null;
   entityType?: string | null;
 }): ResolveApplicationFormSlugResult {
-  const segment = input.segment === "sme" ? "sme" : "seafarer";
+  const segment =
+    input.segment === "sme" || input.segment === "individual"
+      ? input.segment
+      : "seafarer";
   if (segment === "seafarer") {
     return { ok: true, slug: "application_form" };
+  }
+  if (segment === "individual") {
+    // No Individual-segment application-form template exists yet (Phase 4/10
+    // territory) — fail loudly rather than silently printing the Seafarer
+    // template with wrong labels for a personal-loan applicant.
+    return {
+      ok: false,
+      error:
+        "No application form template exists yet for the Individual segment.",
+    };
   }
   if (input.entityType === "individual") {
     return { ok: true, slug: "application_form_sme_individual" };

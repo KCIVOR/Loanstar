@@ -38,7 +38,7 @@ export type LraQueueItem = {
   applicationId: string;
   computationId: string;
   queuedAt: string;
-  segment: "sme" | "seafarer" | null;
+  segment: "sme" | "seafarer" | "individual" | null;
   application: {
     applicationNo: string | null;
     status: string;
@@ -60,7 +60,7 @@ export type LraQueueQueryParams = {
   search?: string;
   scope?: LraQueueScope;
   statusFilter?: string;
-  segmentFilter?: "all" | "seafarer" | "sme";
+  segmentFilter?: "all" | "seafarer" | "sme" | "individual";
   from?: string | null;
   to?: string | null;
   sortKey?: LraQueueSortKey;
@@ -266,8 +266,10 @@ function mapQueueRow(row: RawQueueRow): LraQueueItem {
   const releaseRaw = app?.release_files;
   const releaseFile = Array.isArray(releaseRaw) ? releaseRaw[0] : releaseRaw;
   const segmentRaw = app?.segment ?? null;
-  const segment: "sme" | "seafarer" | null =
-    segmentRaw === "sme" || segmentRaw === "seafarer" ? segmentRaw : null;
+  const segment: "sme" | "seafarer" | "individual" | null =
+    segmentRaw === "sme" || segmentRaw === "seafarer" || segmentRaw === "individual"
+      ? segmentRaw
+      : null;
 
   return {
     applicationId: row.loan_application_id,
@@ -323,7 +325,7 @@ function passesStatusFilter(
 /** Null segment never matches a concrete Seafarer/SME filter. */
 export function passesSegmentFilter(
   item: LraQueueItem,
-  segment: "all" | "seafarer" | "sme",
+  segment: "all" | "seafarer" | "sme" | "individual",
 ): boolean {
   if (segment === "all") return true;
   return item.segment === segment;

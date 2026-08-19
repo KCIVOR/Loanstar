@@ -13,7 +13,7 @@ export type RemedialQueueMappedRow = {
   borrowerName: string;
   borrowerNo: string;
   loanAccountNo: string | null;
-  segment: "sme" | "seafarer";
+  segment: "sme" | "seafarer" | "individual";
   manningAgency: string | null;
   vesselName: string | null;
   outstandingBalance: number;
@@ -68,14 +68,19 @@ export function passesSeverity(
   return severity === spec.severity;
 }
 
-export const REMEDIAL_SEGMENT_FILTERS = ["all", "seafarer", "sme"] as const;
+export const REMEDIAL_SEGMENT_FILTERS = [
+  "all",
+  "seafarer",
+  "sme",
+  "individual",
+] as const;
 
 export type RemedialSegmentFilter =
   (typeof REMEDIAL_SEGMENT_FILTERS)[number];
 
-/** Map a raw segment query param to Seafarer/SME, else `"all"`. */
+/** Map a raw segment query param to Seafarer/SME/Individual, else `"all"`. */
 export function segmentFilterSpec(raw: string): RemedialSegmentFilter {
-  if (raw === "seafarer" || raw === "sme") return raw;
+  if (raw === "seafarer" || raw === "sme" || raw === "individual") return raw;
   return "all";
 }
 

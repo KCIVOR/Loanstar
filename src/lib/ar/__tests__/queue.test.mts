@@ -8,6 +8,7 @@ import {
   birStatusFilterSpec,
   clampMasterlistQueuePageSize,
   needsAttention,
+  portfolioFilterSpec,
   statusFilterSpec,
   sumOutstandingBalances,
 } from "../queue";
@@ -111,6 +112,19 @@ describe("statusFilterSpec / agingFilterSpec", () => {
       mode: "eq",
       code: "A1",
     });
+  });
+});
+
+describe("portfolioFilterSpec", () => {
+  it("maps all / empty / unset / uuid / junk", () => {
+    assert.deepEqual(portfolioFilterSpec(""), { mode: "all" });
+    assert.deepEqual(portfolioFilterSpec("all"), { mode: "all" });
+    assert.deepEqual(portfolioFilterSpec("unset"), { mode: "unset" });
+    assert.deepEqual(
+      portfolioFilterSpec("30afcd77-b1d5-4933-9fb6-710baa736249"),
+      { mode: "eq", portfolioId: "30afcd77-b1d5-4933-9fb6-710baa736249" },
+    );
+    assert.deepEqual(portfolioFilterSpec("Portfolio A"), { mode: "all" });
   });
 });
 

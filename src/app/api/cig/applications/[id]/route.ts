@@ -188,6 +188,7 @@ const patchSchema = z.object({
       picInterviewNotes: z.string().nullable().optional(),
       cmDepartureDate: z.string().optional(),
       cmSalary: z.number().nullable().optional(),
+      cmBasicSalary: z.number().nullable().optional(),
       cmPosition: z.string().optional(),
       cmContractStatus: z.string().optional(),
       cmFitToWork: z.boolean().optional(),
@@ -221,6 +222,8 @@ const patchSchema = z.object({
         })
         .optional(),
       smeReloanVerification: z.record(z.string(), z.unknown()).optional(),
+      cmInspection: z.record(z.string(), z.unknown()).optional(),
+      remInspection: z.record(z.string(), z.unknown()).optional(),
     })
     .optional(),
 });
@@ -228,11 +231,17 @@ const patchSchema = z.object({
 function verificationScope(application: {
   segment?: string | null;
   is_reloan?: boolean | null;
+  collateral_type?: string | null;
 }) {
   return {
-    segment:
-      application.segment === "sme" ? ("sme" as const) : ("seafarer" as const),
+    segment: (application.segment === "sme" || application.segment === "individual"
+      ? application.segment
+      : "seafarer") as "seafarer" | "sme" | "individual",
     isReloan: Boolean(application.is_reloan),
+    collateralType: (application.collateral_type === "car_refinancing" ||
+    application.collateral_type === "real_estate"
+      ? application.collateral_type
+      : "none") as "none" | "car_refinancing" | "real_estate",
   };
 }
 
@@ -364,6 +373,7 @@ export async function GET(_request: Request, { params }: RouteParams) {
           application.entity_type === "corporate"
             ? application.entity_type
             : null,
+        collateralType: scope.collateralType,
         isReloan: scope.isReloan,
         privacyOrientationAt:
           (application.privacy_orientation_at as string | null) ?? null,

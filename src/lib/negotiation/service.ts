@@ -360,7 +360,10 @@ async function persistOverrideComputation(
     .select("segment")
     .eq("id", applicationId)
     .maybeSingle();
-  const segment = appRow?.segment === "sme" ? "sme" : "seafarer";
+  const segment =
+    appRow?.segment === "sme" || appRow?.segment === "individual"
+      ? appRow.segment
+      : "seafarer";
 
   const saved = await persistComputation(supabase, {
     loanApplicationId: applicationId,

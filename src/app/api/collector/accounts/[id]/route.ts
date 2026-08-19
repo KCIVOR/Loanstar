@@ -110,7 +110,10 @@ export async function GET(_request: Request, { params }: RouteParams) {
         borrowerNo: (data.borrower_no as string | null) ?? null,
         borrowerId: (data.borrower_id as string | null) ?? null,
         loanAccountNo: (data.loan_account_no as string | null) ?? null,
-        segment: data.segment === "sme" ? "sme" : "seafarer",
+        segment:
+          data.segment === "sme" || data.segment === "individual"
+            ? data.segment
+            : "seafarer",
         outstandingBalance: Number(data.outstanding_balance ?? 0),
         accountStatus: String(data.account_status ?? "active"),
         totalLoan: Number(data.total_loan ?? 0),

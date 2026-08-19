@@ -27,7 +27,7 @@ import {
 } from "@/lib/collector/format";
 import { halfUp } from "@/lib/computation/money";
 
-type SegmentFilter = "all" | "seafarer" | "sme";
+type SegmentFilter = "all" | "seafarer" | "sme" | "individual";
 
 type MasterlistJoin = {
   borrower_name: string;
@@ -85,13 +85,27 @@ const SEGMENT_CHIPS: Array<{ id: SegmentFilter; label: string }> = [
   { id: "all", label: "All" },
   { id: "seafarer", label: "Seafarer" },
   { id: "sme", label: "SME" },
+  { id: "individual", label: "Individual" },
 ];
 
 function segmentBadge(segment: string | null | undefined) {
-  const isSme = segment === "sme";
+  if (segment === "sme") {
+    return (
+      <Badge variant="navy" dot>
+        SME
+      </Badge>
+    );
+  }
+  if (segment === "individual") {
+    return (
+      <Badge variant="warning" dot>
+        Individual
+      </Badge>
+    );
+  }
   return (
-    <Badge variant={isSme ? "navy" : "teal"} dot>
-      {isSme ? "SME" : "Seafarer"}
+    <Badge variant="teal" dot>
+      Seafarer
     </Badge>
   );
 }

@@ -1,6 +1,7 @@
 /**
- * Dev-only fake data generators for the CI Report and Application Form
- * autofill overlay. Never imported outside dev-gated components — see
+ * Dev-only fake data generators for the autofill overlay (CI report,
+ * application form, CM/REM inspection, CSA notes, rejection remarks).
+ * Never imported outside dev-gated components — see
  * src/components/dev/AutofillOverlay.tsx.
  */
 import type { BorrowerProfile, Dependent, Reference } from "@/lib/borrowers/types";
@@ -11,6 +12,13 @@ import type {
   CreditReference,
   TradeParty,
 } from "@/lib/borrowers/business-info";
+import type {
+  CmInspection,
+  CollateralChecklistItem,
+  CollateralConditionItem,
+  CollateralYesNoItem,
+  RemInspection,
+} from "@/lib/cig/collateral-inspection";
 import type {
   FieldVisit,
   SmeReloanVerification,
@@ -121,7 +129,7 @@ function fakeAddress() {
   };
 }
 
-function fakeReferences(segment: "seafarer" | "sme"): Reference[] {
+function fakeReferences(segment: "seafarer" | "sme" | "individual"): Reference[] {
   return Array.from({ length: 2 }, () => {
     const { firstName, lastName } = fullName();
     return {
@@ -150,7 +158,7 @@ function fakeDependents(): Dependent[] {
 
 /** Full BorrowerProfile fill for the Application Form (CSA intake / CIG edit / borrower's own). */
 export function fakeBorrowerProfile(
-  segment: "seafarer" | "sme",
+  segment: "seafarer" | "sme" | "individual",
   entityType: "individual" | "corporate" | null,
   base: BorrowerProfile,
 ): BorrowerProfile {
@@ -554,8 +562,306 @@ function fakeSmeReloanVerification(): SmeReloanVerification {
   };
 }
 
+export type FakeRemarkKind =
+  | "generic"
+  | "interview"
+  | "screening"
+  | "hold"
+  | "returnToCsa"
+  | "rejection"
+  | "revision"
+  | "callback"
+  | "decision"
+  | "vote"
+  | "assessment"
+  | "cancel"
+  | "inspection"
+  | "signing";
+
+const REMARKS: Record<FakeRemarkKind, string[]> = {
+  generic: [
+    "Reviewed and consistent with the file. No additional issues noted.",
+    "Details confirmed. Ready to proceed.",
+  ],
+  interview: [
+    "Client interviewed in person. Confirmed identity, loan purpose, and repayment source. No red flags noted.",
+    "Initial interview completed. Client understood the terms and confirmed the declared income and references.",
+  ],
+  screening: [
+    "Screening completed. No matching derogatory records on file.",
+    "Name and identifiers checked against the list. Clear to proceed.",
+  ],
+  hold: [
+    "On hold pending missing documents and borrower clarification.",
+    "File incomplete — waiting on revised IDs before endorsement.",
+  ],
+  returnToCsa: [
+    "Please complete the missing documents and re-endorse once the file is whole.",
+    "Computation packet is incomplete. Kindly update the missing items and return to CIG.",
+  ],
+  rejection: [
+    "Unable to proceed — supporting documents do not match the declared details.",
+    "Rejected: amount and dates on the proof do not match the ledger.",
+  ],
+  revision: [
+    "Please re-upload a clearer copy. Current file is cropped and unreadable at the edges.",
+    "Document is expired. Upload a valid replacement dated within the last 6 months.",
+  ],
+  callback: [
+    "Borrower asked to call back after shift. Retry in the afternoon.",
+    "No answer on first attempt. Scheduled follow-up with PIC.",
+  ],
+  decision: [
+    "Deny — capacity and character findings do not support the requested amount.",
+    "Hold — waiting on CIG to complete the collateral inspection before deciding.",
+  ],
+  vote: [
+    "Agree with CIG finding. Character and capacity look sufficient for this amount.",
+    "Concerns on coverage; still voting to proceed given the collateral and track record.",
+  ],
+  assessment: [
+    "Consistent with the CI report. No material adverse findings in this factor.",
+    "Acceptable for this ticket size based on the file in front of us.",
+  ],
+  cancel: [
+    "Borrower withdrew the application. Cancel and close the file.",
+    "Duplicate filing. Cancelling this ticket; the earlier application remains active.",
+  ],
+  inspection: [
+    "Inspected on site. Condition matches the declared details.",
+    "Present and functional at time of inspection.",
+  ],
+  signing: [
+    "All remaining signing papers scanned in one file after the in-branch session.",
+    "Borrower signed in branch; combined upload covers the outstanding checklist items.",
+  ],
+};
+
+export function fakeRemark(kind: FakeRemarkKind = "generic"): string {
+  return pick(REMARKS[kind]);
+}
+
+export function inferRemarkKind(haystack: string): FakeRemarkKind {
+  const s = haystack.toLowerCase();
+  if (/interview/.test(s)) return "interview";
+  if (/screen|ncl|duplicat/.test(s)) return "screening";
+  if (/\bhold\b/.test(s)) return "hold";
+  if (/return|note for csa/.test(s)) return "returnToCsa";
+  if (/reject|deny|denial|what's wrong/.test(s)) return "rejection";
+  if (/revision|what needs/.test(s)) return "revision";
+  if (/callback/.test(s)) return "callback";
+  if (/decision|basis for/.test(s)) return "decision";
+  if (/vote/.test(s)) return "vote";
+  if (/character|capacity|capital|conditions/.test(s)) return "assessment";
+  if (/cancel/.test(s)) return "cancel";
+  if (/sign/.test(s)) return "signing";
+  if (/remark/.test(s)) return "inspection";
+  return "generic";
+}
+
+function workingItem(remarks?: string): CollateralChecklistItem {
+  return {
+    working: true,
+    notWorking: false,
+    remarks: remarks ?? fakeRemark("inspection"),
+  };
+}
+
+function yesItem(remarks?: string): CollateralYesNoItem {
+  return { yes: true, no: false, remarks: remarks ?? "Present." };
+}
+
+function noItem(remarks?: string): CollateralYesNoItem {
+  return { yes: false, no: true, remarks: remarks ?? "Not equipped." };
+}
+
+function goodItem(remarks?: string): CollateralConditionItem {
+  return {
+    good: true,
+    fair: false,
+    poor: false,
+    remarks: remarks ?? "Good condition, no visible defects.",
+  };
+}
+
+const CM_CHECKLIST_KEYS: Array<keyof NonNullable<CmInspection["vehiclesChecklist"]>> = [
+  "wipers",
+  "battery",
+  "coolant",
+  "radio",
+  "sideMirror",
+  "windows",
+  "lighter",
+  "aircon",
+  "headLights",
+  "high",
+  "low",
+  "cabinLights",
+  "shocksAbsorber",
+  "brakeFluid",
+  "horn",
+  "doors",
+];
+
+const CM_CONDITION_KEYS: Array<keyof NonNullable<CmInspection["vehiclesCondition"]>> = [
+  "engine",
+  "bumper",
+  "body",
+  "grills",
+  "bodySecond",
+  "fender",
+  "paint",
+  "floorMatting",
+  "indoorRoofCeiling",
+  "upholster",
+  "differentialBox",
+];
+
+const VEHICLE_MAKES = ["Toyota Vios", "Honda Civic", "Mitsubishi Mirage", "Nissan Almera", "Suzuki Ertiga"];
+const INSURERS = ["Malayan Insurance", "Pioneer Insurance", "Standard Insurance", "AXA Philippines"];
+
+export function fakeCmInspection(opts?: {
+  accountName?: string;
+  address?: string;
+  verifierName?: string;
+}): CmInspection {
+  const owner = opts?.accountName ?? `${pick(FIRST_NAMES)} ${pick(LAST_NAMES)}`;
+  const address = opts?.address ?? `${num(1, 999)} ${pick(STREETS)}, ${pick(CITIES)}`;
+  const vehiclesChecklist = Object.fromEntries(
+    CM_CHECKLIST_KEYS.map((key) => [key, workingItem()]),
+  ) as NonNullable<CmInspection["vehiclesChecklist"]>;
+  const vehiclesCondition = Object.fromEntries(
+    CM_CONDITION_KEYS.map((key) => [key, goodItem()]),
+  ) as NonNullable<CmInspection["vehiclesCondition"]>;
+
+  return {
+    account: { accountName: owner, address },
+    orCrDetails: {
+      mvFile: `${num(1000, 9999)}-${num(100000000, 999999999)}`,
+      plateNumber: `${pick(["ABC", "NCA", "UAA", "NBA"])} ${num(1000, 9999)}`,
+      engineNo: `${pick(["4G15", "2NR", "L15B"])}${num(100000, 999999)}`,
+      chasisNo: `MM${pick(["DA", "DA"])}${num(10000000, 99999999)}`,
+    },
+    registration: {
+      registeredOwner: owner,
+      addressRegistered: address,
+      encumberedTo: pick(["None", "BDO", "Toyota Financial"]),
+      ltoAddress: `LTO ${pick(CITIES)}`,
+      orNo: String(num(10000000, 99999999)),
+      orDate: pastDate(0, 1),
+      amount: num(1500, 8500),
+    },
+    insurance: {
+      insurer: pick(INSURERS),
+      amountInsured: num(400000, 900000),
+      typeOfCoverage: pick(["Comprehensive", "CTPL", "Own Damage"]),
+    },
+    odometerDuringInspection: num(15000, 120000),
+    vehiclesChecklist,
+    others: {
+      keys: {
+        remote: yesItem("Remote working, 2 keys presented."),
+        ignition: yesItem("Ignition key present."),
+        keyless: noItem("Not a keyless unit."),
+      },
+      speedometer: {
+        analog: yesItem("Analog cluster working."),
+        digital: noItem("No digital cluster."),
+      },
+      steeringWheel: {
+        power: yesItem("Power steering functional."),
+        nonePower: noItem(),
+      },
+      tires: {
+        ordinary: yesItem("Factory-type tires, even wear."),
+        mags: noItem(),
+        threadOfTiresPercent: num(55, 85),
+        remarks: "Tread still serviceable. No sidewall damage.",
+      },
+    },
+    vehiclesCondition,
+    verifiedBy: opts?.verifierName || `${pick(FIRST_NAMES)} ${pick(LAST_NAMES)}`,
+  };
+}
+
+export function fakeRemInspection(opts?: {
+  accountName?: string;
+  address?: string;
+  verifierName?: string;
+}): RemInspection {
+  const owner = opts?.accountName ?? `${pick(FIRST_NAMES)} ${pick(LAST_NAMES)}`;
+  const address = opts?.address ?? `${num(1, 999)} ${pick(STREETS)}, ${pick(CITIES)}`;
+  return {
+    account: { accountName: owner, address },
+    titleDetails: {
+      registeredOwnerAtTitle: owner,
+      yearRegister: String(new Date().getFullYear() - num(2, 20)),
+      addressRegisteredAtTitle: address,
+      annotatedAtTitle: [
+        "No adverse annotation at time of inspection.",
+        "Title presented matches the declared owner.",
+        "",
+        "",
+        "",
+      ],
+    },
+    insurance: {
+      insurer: pick(INSURERS),
+      amountInsured: num(1500000, 8000000),
+      typeOfCoverage: pick(["Fire", "Fire and lightning", "Allied perils"]),
+    },
+    checklist: {
+      paint: workingItem("Exterior paint intact."),
+      cr: workingItem("Certificate of title / CR presented."),
+      rooms: workingItem("Rooms as declared, occupied."),
+      furnitures: workingItem("Basic furnishings present."),
+      additionalItems: [
+        { label: "Roof", working: true, notWorking: false, remarks: "No leaks reported." },
+        { label: "Fence / gate", working: true, notWorking: false, remarks: "Perimeter secured." },
+      ],
+    },
+    others: [
+      "Property occupied by the registered owner.",
+      "Access road is paved and passable year-round.",
+      "No informal settlers on the lot at inspection.",
+      "",
+      "",
+    ],
+    verifiedBy: opts?.verifierName || `${pick(FIRST_NAMES)} ${pick(LAST_NAMES)}`,
+  };
+}
+
+export function fakeCommitteeAssessment() {
+  return {
+    characterNotes:
+      "References and CIG interview support a cooperative borrower with no character red flags.",
+    capacityNotes:
+      "Declared income and coverage ratio can service the proposed amortization.",
+    capitalNotes:
+      "Equity / collateral position is adequate for this ticket size.",
+    conditionsNotes:
+      "Terms as computed. No special conditions beyond standard post-approval requirements.",
+  };
+}
+
 /** Full CI report fill: everything `assessVerificationCompleteness` checks for the given scope. */
-export function fakeVerificationPatch(segment: "seafarer" | "sme", isReloan: boolean) {
+export function fakeVerificationPatch(
+  segment: "seafarer" | "sme" | "individual",
+  isReloan: boolean,
+  opts?: {
+    collateralType?: "none" | "car_refinancing" | "real_estate";
+    accountName?: string;
+    address?: string;
+    verifierName?: string;
+  },
+) {
+  const inspection =
+    opts?.collateralType === "car_refinancing"
+      ? { cmInspection: fakeCmInspection(opts) }
+      : opts?.collateralType === "real_estate"
+        ? { remInspection: fakeRemInspection(opts) }
+        : {};
+
   const base = {
     fieldCompletenessOk: true,
     fieldCompletenessNotes: "All fields verified complete and consistent.",
@@ -565,6 +871,7 @@ export function fakeVerificationPatch(segment: "seafarer" | "sme", isReloan: boo
     biNotes: "Identity, purpose, and details confirmed via phone interview.",
     finding: "positive" as const,
     findingNotes: "No derogatory findings. Recommended to proceed.",
+    ...inspection,
   };
 
   if (segment === "sme") {
@@ -583,6 +890,7 @@ export function fakeVerificationPatch(segment: "seafarer" | "sme", isReloan: boo
     picInterviewNotes: "PIC interviewed by phone, confirmed relationship and details.",
     cmDepartureDate: futureDate(10, 90),
     cmSalary: num(800, 2500),
+    cmBasicSalary: num(400, 1500),
     cmPosition: pick(RANKS),
     cmContractStatus: pick(["Active", "Signed", "Pending deployment"]),
     cmFitToWork: true,

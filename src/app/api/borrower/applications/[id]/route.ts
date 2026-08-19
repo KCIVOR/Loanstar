@@ -77,7 +77,10 @@ export async function GET(_request: Request, { params }: RouteParams) {
         parentApplicationId: application.parent_application_id,
         createdAt: application.created_at,
         updatedAt: application.updated_at,
-        segment: application.segment === "sme" ? "sme" : "seafarer",
+        segment:
+          application.segment === "sme" || application.segment === "individual"
+            ? application.segment
+            : "seafarer",
         entityType:
           application.entity_type === "individual" ||
           application.entity_type === "corporate"

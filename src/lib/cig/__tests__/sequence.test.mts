@@ -39,6 +39,7 @@ function emptyVerification(
     picInterviewNotes: null,
     cmDepartureDate: null,
     cmSalary: null,
+    cmBasicSalary: null,
     cmPosition: null,
     cmContractStatus: null,
     cmFitToWork: null,
@@ -256,6 +257,50 @@ describe("getCigSequenceState", () => {
     assert.equal(state.current, "forward");
     assert.equal(state.unlocked.forward, true);
     assert.equal(state.completed.finding, true);
+  });
+});
+
+describe("getCigSequenceState — Individual segment (no Crewing manager step)", () => {
+  it("S1–S3 complete (CI & References only) → jumps straight to S5/finding, crewing auto-completes", () => {
+    const state = getCigSequenceState(s3Complete(), true, {
+      segment: "individual",
+    });
+    assert.equal(state.completed.ci_references, true);
+    assert.equal(state.completed.crewing_manager, true);
+    assert.equal(state.unlocked.finding, true);
+    assert.equal(state.current, "finding");
+  });
+
+  it("crewing manager fields are never required for Individual completeness", () => {
+    const verification = s3Complete({ finding: "positive" });
+    const assessed = assessVerificationCompleteness(verification, true, [], {
+      segment: "individual",
+    });
+    assert.equal(assessed.complete, true);
+    assert.ok(
+      !assessed.missing.some((m) => /crewing manager/i.test(m)),
+      `expected no crewing-manager gaps, got: ${assessed.missing.join(", ")}`,
+    );
+  });
+
+  it("Individual still requires CI & References Form fields (unlike SME's Field Visit swap)", () => {
+    const verification = s1Complete({ finding: "positive" });
+    const assessed = assessVerificationCompleteness(verification, true, [], {
+      segment: "individual",
+    });
+    assert.equal(assessed.complete, false);
+    assert.ok(assessed.missing.some((m) => /PIC name/i.test(m)));
+  });
+
+  it("Seafarer still requires crewing manager fields (regression guard)", () => {
+    const verification = s3Complete({ finding: "positive" });
+    const assessed = assessVerificationCompleteness(verification, true, [], {
+      segment: "seafarer",
+    });
+    assert.equal(assessed.complete, false);
+    assert.ok(
+      assessed.missing.some((m) => /crewing manager position/i.test(m)),
+    );
   });
 });
 

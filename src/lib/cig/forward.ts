@@ -4,6 +4,7 @@ import { appendStatusHistory } from "@/lib/applications/status";
 import { notifyBorrowerForApplication } from "@/lib/notifications/write";
 
 import type { FieldVisit, SmeReloanVerification } from "./field-visit";
+import type { CmInspection, RemInspection } from "./collateral-inspection";
 import {
   assessVerificationCompleteness,
   getCigChecksComplete,
@@ -39,7 +40,7 @@ export async function forwardToCommittee(
 
   const { data: appRow } = await supabase
     .from("loan_applications")
-    .select("segment, is_reloan")
+    .select("segment, is_reloan, collateral_type")
     .eq("id", applicationId)
     .maybeSingle();
 
@@ -49,8 +50,16 @@ export async function forwardToCommittee(
     checks.complete,
     checks.missing,
     {
-      segment: appRow?.segment === "sme" ? "sme" : "seafarer",
+      segment:
+        appRow?.segment === "sme" || appRow?.segment === "individual"
+          ? appRow.segment
+          : "seafarer",
       isReloan: Boolean(appRow?.is_reloan),
+      collateralType:
+        appRow?.collateral_type === "car_refinancing" ||
+        appRow?.collateral_type === "real_estate"
+          ? appRow.collateral_type
+          : "none",
     },
   );
 
@@ -117,6 +126,7 @@ export type VerificationPatch = Partial<{
   picInterviewNotes: string | null;
   cmDepartureDate: string;
   cmSalary: number | null;
+  cmBasicSalary: number | null;
   cmPosition: string;
   cmContractStatus: string;
   cmFitToWork: boolean;
@@ -141,6 +151,8 @@ export type VerificationPatch = Partial<{
   findingNotes: string | null;
   fieldVisit: FieldVisit;
   smeReloanVerification: SmeReloanVerification;
+  cmInspection: CmInspection;
+  remInspection: RemInspection;
 }>;
 
 export function patchToRow(patch: VerificationPatch): Record<string, unknown> {
@@ -177,6 +189,9 @@ export function patchToRow(patch: VerificationPatch): Record<string, unknown> {
   }
   if (patch.cmSalary !== undefined) {
     row.cm_salary = patch.cmSalary;
+  }
+  if (patch.cmBasicSalary !== undefined) {
+    row.cm_basic_salary = patch.cmBasicSalary;
   }
   if (patch.cmPosition !== undefined) {
     row.cm_position = patch.cmPosition;
@@ -249,6 +264,12 @@ export function patchToRow(patch: VerificationPatch): Record<string, unknown> {
   }
   if (patch.smeReloanVerification !== undefined) {
     row.sme_reloan_verification = patch.smeReloanVerification;
+  }
+  if (patch.cmInspection !== undefined) {
+    row.cm_inspection = patch.cmInspection;
+  }
+  if (patch.remInspection !== undefined) {
+    row.rem_inspection = patch.remInspection;
   }
   return row;
 }

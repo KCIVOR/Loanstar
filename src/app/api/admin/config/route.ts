@@ -14,9 +14,11 @@ import { createClient } from "@/lib/supabase/server";
 const CONFIG_KEYS = [
   "penalty_rate",
   "penalty_rate_sme",
+  "penalty_rate_individual",
   "coverage_ratio",
   "committee_size",
   "committee_size_sme",
+  "committee_size_individual",
   "aging_thresholds",
   "bir_status_codes",
   "rounding_writeoff_threshold",
@@ -33,9 +35,17 @@ const CONFIG_KEYS = [
   "smtp_user",
   "smtp_password",
   "smtp_from",
+  "reports_ai_enabled",
+  "reports_ai_api_key",
+  "reports_ai_model",
 ] as const;
 
-const SECRET_KEYS = new Set(["twilio_auth_token", "cron_secret", "smtp_password"]);
+const SECRET_KEYS = new Set([
+  "twilio_auth_token",
+  "cron_secret",
+  "smtp_password",
+  "reports_ai_api_key",
+]);
 
 function maskSettings(
   rows: Array<{ key: string; value: unknown; description: string | null; updated_at: string }>,
@@ -71,9 +81,11 @@ export async function GET() {
 const patchConfigSchema = z.object({
   penalty_rate: z.number().min(0).max(1).optional(),
   penalty_rate_sme: z.number().min(0).max(1).optional(),
+  penalty_rate_individual: z.number().min(0).max(1).optional(),
   coverage_ratio: z.number().min(0).max(1).optional(),
   committee_size: z.number().int().min(1).max(15).optional(),
   committee_size_sme: z.number().int().min(1).max(15).optional(),
+  committee_size_individual: z.number().int().min(1).max(15).optional(),
   aging_thresholds: z
     .object({
       "30": z.number().int().positive(),
@@ -96,6 +108,9 @@ const patchConfigSchema = z.object({
   smtp_user: z.string().optional(),
   smtp_password: z.string().optional(),
   smtp_from: z.string().optional(),
+  reports_ai_enabled: z.boolean().optional(),
+  reports_ai_api_key: z.string().optional(),
+  reports_ai_model: z.string().min(1).max(80).optional(),
 });
 
 export async function PATCH(request: Request) {
@@ -116,6 +131,12 @@ export async function PATCH(request: Request) {
     if (body.penalty_rate_sme !== undefined) {
       updates.push({ key: "penalty_rate_sme", value: body.penalty_rate_sme });
     }
+    if (body.penalty_rate_individual !== undefined) {
+      updates.push({
+        key: "penalty_rate_individual",
+        value: body.penalty_rate_individual,
+      });
+    }
     if (body.coverage_ratio !== undefined) {
       updates.push({ key: "coverage_ratio", value: body.coverage_ratio });
     }
@@ -124,6 +145,12 @@ export async function PATCH(request: Request) {
     }
     if (body.committee_size_sme !== undefined) {
       updates.push({ key: "committee_size_sme", value: body.committee_size_sme });
+    }
+    if (body.committee_size_individual !== undefined) {
+      updates.push({
+        key: "committee_size_individual",
+        value: body.committee_size_individual,
+      });
     }
     if (body.aging_thresholds !== undefined) {
       updates.push({ key: "aging_thresholds", value: body.aging_thresholds });
@@ -187,6 +214,21 @@ export async function PATCH(request: Request) {
     }
     if (body.smtp_from !== undefined) {
       updates.push({ key: "smtp_from", value: body.smtp_from.trim() });
+    }
+    if (body.reports_ai_enabled !== undefined) {
+      updates.push({ key: "reports_ai_enabled", value: body.reports_ai_enabled });
+    }
+    if (shouldApplySecretPatch(body.reports_ai_api_key)) {
+      updates.push({
+        key: "reports_ai_api_key",
+        value: body.reports_ai_api_key!.trim(),
+      });
+    }
+    if (body.reports_ai_model !== undefined) {
+      updates.push({
+        key: "reports_ai_model",
+        value: body.reports_ai_model.trim(),
+      });
     }
 
     for (const update of updates) {

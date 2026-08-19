@@ -29,7 +29,7 @@ const STAGE_FILTERS = new Set([
   "docs_ready",
 ]);
 const STATUS_FILTERS = new Set(["all", "open", "converted"]);
-const SEGMENT_FILTERS = new Set(["all", "seafarer", "sme"]);
+const SEGMENT_FILTERS = new Set(["all", "seafarer", "sme", "individual"]);
 
 /**
  * Param-driven agent leads queue → `{ rows, totalCount, kpi }`.
@@ -52,7 +52,7 @@ export async function GET(request: Request) {
     const segmentRaw = searchParams.get("segment") ?? "all";
     const segmentFilter = (
       SEGMENT_FILTERS.has(segmentRaw) ? segmentRaw : "all"
-    ) as "all" | "seafarer" | "sme";
+    ) as "all" | "seafarer" | "sme" | "individual";
 
     // Active queue defaults to All time (must not hide old-but-still-open leads).
     const rangeRaw = searchParams.get("range") ?? "all";

@@ -17,6 +17,13 @@ export function masterlistEmploymentLabels(
   if (segment === "sme") {
     return { employer: "Company", secondary: "Nature of business" };
   }
+  if (segment === "individual") {
+    // Individual has neither a business nor a manning agency/vessel —
+    // resolveMasterlistEmploymentFields returns null/null for this segment,
+    // so these labels are never populated; keep neutral labels rather than
+    // showing "Manning agency"/"Vessel" for a personal loan.
+    return { employer: "Employer", secondary: "Occupation" };
+  }
   return { employer: "Manning agency", secondary: "Vessel" };
 }
 

@@ -137,6 +137,18 @@ describe("hasEmploymentContractUploaded", () => {
     assert.deepEqual(stub.getQueriedTables(), ["loan_applications"]);
   });
 
+  it("returns true for Individual without querying document_types or documents", async () => {
+    const stub = makeHasContractStub({ segment: "individual" });
+
+    const result = await hasEmploymentContractUploaded(
+      stub.supabase,
+      "app-individual-1",
+    );
+
+    assert.equal(result, true);
+    assert.deepEqual(stub.getQueriedTables(), ["loan_applications"]);
+  });
+
   it("returns false for seafarer with no matching documents row", async () => {
     const stub = makeHasContractStub({
       segment: "seafarer",

@@ -8,13 +8,45 @@ export type DocumentStatus =
   | "confirmed"
   | "needs_revision";
 
-export type ChecklistSegment = "seafarer" | "sme";
+export type ChecklistSegment = "seafarer" | "sme" | "individual";
 export type ChecklistEntityType = "individual" | "corporate";
+/** Collateral is orthogonal to segment/entity type — SME and Individual only
+ * (Seafarer never carries collateral, confirmed 2026-08-19). NULL on a
+ * stage_checklists row means "applies regardless of collateral choice," same
+ * semantics as entity_type's NULL = common-to-both. */
+export type ChecklistCollateralType = "none" | "car_refinancing" | "real_estate";
 
 export type ChecklistScope = {
   segment?: ChecklistSegment;
   entityType?: ChecklistEntityType | null;
+  collateralType?: ChecklistCollateralType | null;
 };
+
+/**
+ * Merge a caller-supplied scope onto the application's loaded scope.
+ * Callers that only pass segment/entityType used to silently force
+ * collateralType to "none", which hid OR/CR and title extras.
+ */
+export function overlayChecklistScope(
+  loaded: {
+    segment: ChecklistSegment;
+    entityType: ChecklistEntityType | null;
+    collateralType: ChecklistCollateralType;
+  },
+  override?: ChecklistScope,
+): {
+  segment: ChecklistSegment;
+  entityType: ChecklistEntityType | null;
+  collateralType: ChecklistCollateralType;
+} {
+  if (!override?.segment) return loaded;
+  return {
+    segment: override.segment,
+    entityType:
+      override.entityType !== undefined ? override.entityType : loaded.entityType,
+    collateralType: override.collateralType ?? loaded.collateralType,
+  };
+}
 
 export type ChecklistItem = {
   documentTypeId: string;
@@ -51,6 +83,7 @@ type StageChecklistRow = {
   is_optional_flag: boolean;
   sort_order: number;
   entity_type: string | null;
+  collateral_type: string | null;
   document_types: {
     id: string;
     slug: string;
@@ -78,22 +111,30 @@ type DocumentRow = {
 
 /** Pure filter used by DB query post-processing and unit tests. */
 export function rowMatchesChecklistScope(
-  row: { segment: string | null; entity_type: string | null },
+  row: { segment: string | null; entity_type: string | null; collateral_type?: string | null },
   segment: ChecklistSegment,
   entityType: ChecklistEntityType | null,
+  collateralType?: ChecklistCollateralType | null,
 ): boolean {
   if (row.segment !== segment) return false;
-  if (row.entity_type == null) return true;
-  return entityType != null && row.entity_type === entityType;
+  if (row.entity_type != null && row.entity_type !== entityType) return false;
+  if (row.collateral_type != null && row.collateral_type !== (collateralType ?? "none")) {
+    return false;
+  }
+  return true;
 }
 
 export async function loadChecklistScope(
   supabase: SupabaseClient,
   applicationId: string,
-): Promise<{ segment: ChecklistSegment; entityType: ChecklistEntityType | null }> {
+): Promise<{
+  segment: ChecklistSegment;
+  entityType: ChecklistEntityType | null;
+  collateralType: ChecklistCollateralType;
+}> {
   const { data, error } = await supabase
     .from("loan_applications")
-    .select("segment, entity_type")
+    .select("segment, entity_type, collateral_type")
     .eq("id", applicationId)
     .single();
 
@@ -103,27 +144,34 @@ export async function loadChecklistScope(
     );
   }
 
-  const segment: ChecklistSegment = data.segment === "sme" ? "sme" : "seafarer";
+  const segment: ChecklistSegment =
+    data.segment === "sme" || data.segment === "individual"
+      ? data.segment
+      : "seafarer";
   const entityType: ChecklistEntityType | null =
     data.entity_type === "individual" || data.entity_type === "corporate"
       ? data.entity_type
       : null;
+  const collateralType: ChecklistCollateralType =
+    data.collateral_type === "car_refinancing" ||
+    data.collateral_type === "real_estate"
+      ? data.collateral_type
+      : "none";
 
-  return { segment, entityType };
+  return { segment, entityType, collateralType };
 }
 
 async function resolveChecklistScope(
   supabase: SupabaseClient,
   applicationId: string,
   scope?: ChecklistScope,
-): Promise<{ segment: ChecklistSegment; entityType: ChecklistEntityType | null }> {
-  if (scope?.segment) {
-    return {
-      segment: scope.segment,
-      entityType: scope.entityType ?? null,
-    };
-  }
-  return loadChecklistScope(supabase, applicationId);
+): Promise<{
+  segment: ChecklistSegment;
+  entityType: ChecklistEntityType | null;
+  collateralType: ChecklistCollateralType;
+}> {
+  const loaded = await loadChecklistScope(supabase, applicationId);
+  return overlayChecklistScope(loaded, scope);
 }
 
 export async function getStageChecklist(
@@ -132,13 +180,18 @@ export async function getStageChecklist(
   applicationId: string,
   scope?: ChecklistScope,
 ): Promise<ChecklistItem[]> {
-  const { segment, entityType } = await resolveChecklistScope(
+  const { segment, entityType, collateralType } = await resolveChecklistScope(
     supabase,
     applicationId,
     scope,
   );
 
-  let checklistQuery = supabase
+  // Fetch broadly (stage + segment only) and filter entity_type/collateral_type
+  // in JS via rowMatchesChecklistScope — this table's row count per stage is
+  // small, and chaining multiple .or() calls on top of each other for a third
+  // dimension risks the same PostgREST .or() fragility already flagged
+  // elsewhere in this codebase (see src/lib/ar/history.ts).
+  const { data: rawChecklistRows, error: checklistError } = await supabase
     .from("stage_checklists")
     .select(
       `
@@ -147,7 +200,9 @@ export async function getStageChecklist(
       is_required,
       is_optional_flag,
       sort_order,
+      segment,
       entity_type,
+      collateral_type,
       document_types ( id, slug, name )
     `,
     )
@@ -155,19 +210,13 @@ export async function getStageChecklist(
     .eq("segment", segment)
     .order("sort_order");
 
-  if (entityType) {
-    checklistQuery = checklistQuery.or(
-      `entity_type.is.null,entity_type.eq.${entityType}`,
-    );
-  } else {
-    checklistQuery = checklistQuery.is("entity_type", null);
-  }
-
-  const { data: checklistRows, error: checklistError } = await checklistQuery;
-
   if (checklistError) {
     throw new Error(`Failed to load stage checklist: ${checklistError.message}`);
   }
+
+  const checklistRows = (rawChecklistRows ?? []).filter((row) =>
+    rowMatchesChecklistScope(row, segment, entityType, collateralType),
+  );
 
   const { data: documentRows, error: documentsError } = await supabase
     .from("documents")
@@ -186,7 +235,7 @@ export async function getStageChecklist(
     documentsByType.set(doc.document_type_id, doc);
   }
 
-  return ((checklistRows ?? []) as StageChecklistRow[]).map((row) => {
+  return (checklistRows as StageChecklistRow[]).map((row) => {
     const docType = Array.isArray(row.document_types)
       ? row.document_types[0]
       : row.document_types;
@@ -220,33 +269,29 @@ export async function ensureDocumentSlots(
   borrowerId: string,
   scope?: ChecklistScope,
 ): Promise<void> {
-  const { segment, entityType } = await resolveChecklistScope(
+  const { segment, entityType, collateralType } = await resolveChecklistScope(
     supabase,
     applicationId,
     scope,
   );
 
-  let checklistQuery = supabase
+  // Same broad-fetch-then-JS-filter approach as getStageChecklist — avoids
+  // chaining a third .or() dimension on this table.
+  const { data: rawChecklistRows, error: checklistError } = await supabase
     .from("stage_checklists")
-    .select("document_type_id, entity_type")
+    .select("document_type_id, segment, entity_type, collateral_type")
     .eq("stage", stage)
     .eq("segment", segment);
-
-  if (entityType) {
-    checklistQuery = checklistQuery.or(
-      `entity_type.is.null,entity_type.eq.${entityType}`,
-    );
-  } else {
-    checklistQuery = checklistQuery.is("entity_type", null);
-  }
-
-  const { data: checklistRows, error: checklistError } = await checklistQuery;
 
   if (checklistError) {
     throw new Error(`Failed to load checklist for slots: ${checklistError.message}`);
   }
 
-  if (!checklistRows?.length) return;
+  const checklistRows = (rawChecklistRows ?? []).filter((row) =>
+    rowMatchesChecklistScope(row, segment, entityType, collateralType),
+  );
+
+  if (!checklistRows.length) return;
 
   const { data: existingDocs, error: existingError } = await supabase
     .from("documents")

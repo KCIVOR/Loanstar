@@ -90,14 +90,19 @@ export function passesAgingFilter(
   return bucket === spec;
 }
 
-export const COLLECTOR_SEGMENT_FILTERS = ["all", "seafarer", "sme"] as const;
+export const COLLECTOR_SEGMENT_FILTERS = [
+  "all",
+  "seafarer",
+  "sme",
+  "individual",
+] as const;
 
 export type CollectorSegmentFilter =
   (typeof COLLECTOR_SEGMENT_FILTERS)[number];
 
-/** Map a raw segment query param to Seafarer/SME, else `"all"`. */
+/** Map a raw segment query param to Seafarer/SME/Individual, else `"all"`. */
 export function segmentFilterSpec(raw: string): CollectorSegmentFilter {
-  if (raw === "seafarer" || raw === "sme") return raw;
+  if (raw === "seafarer" || raw === "sme" || raw === "individual") return raw;
   return "all";
 }
 

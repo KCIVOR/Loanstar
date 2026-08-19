@@ -1,5 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
+import { ValidationError } from "@/lib/api/errors";
+
 import type { ReleaseFileStatus, ReleasePath } from "./constants";
 
 export const PDC_PHYSICAL_COLLECT_BLOCKER =
@@ -50,16 +52,16 @@ export function canConfirmPdcCollection(ctx: PdcCollectContext): boolean {
 
 export function assertCanConfirmPdcCollection(ctx: PdcCollectContext): void {
   if (!ctx.releasePaths?.includes("with_pdc")) {
-    throw new Error(PDC_COLLECT_PATH_ERROR);
+    throw new ValidationError(PDC_COLLECT_PATH_ERROR);
   }
   if (!isPostSignForPdcCollect(ctx.status)) {
-    throw new Error(PDC_COLLECT_STATUS_ERROR);
+    throw new ValidationError(PDC_COLLECT_STATUS_ERROR);
   }
   if (ctx.pdcCheckCount < 1) {
-    throw new Error(PDC_COLLECT_EMPTY_ERROR);
+    throw new ValidationError(PDC_COLLECT_EMPTY_ERROR);
   }
   if (ctx.pdcCollectedAt) {
-    throw new Error(PDC_COLLECT_ALREADY_ERROR);
+    throw new ValidationError(PDC_COLLECT_ALREADY_ERROR);
   }
 }
 
@@ -75,7 +77,7 @@ export function assertPdcCollectedForClose(input: {
 }): void {
   if (!closeRequiresPdcCollection(input.releasePaths)) return;
   if (!input.pdcCollectedAt) {
-    throw new Error(PDC_COLLECT_CLOSE_ERROR);
+    throw new ValidationError(PDC_COLLECT_CLOSE_ERROR);
   }
 }
 

@@ -3,7 +3,9 @@ import { describe, it } from "node:test";
 
 import {
   canShowConfirmAction,
+  canShowConfirmAllAction,
   canShowRequestRevisionAction,
+  confirmableDocumentIds,
   needsRevisionSubtitle,
 } from "../checklist-actions";
 
@@ -69,5 +71,53 @@ describe("needsRevisionSubtitle", () => {
       /Needs revision: Blurry passport/,
     );
     assert.match(needsRevisionSubtitle("Blurry passport", "pass.pdf"), /pass\.pdf/);
+  });
+});
+
+describe("confirmableDocumentIds", () => {
+  it("returns ids for uploaded rows only", () => {
+    assert.deepEqual(
+      confirmableDocumentIds([
+        { documentId: "u1", status: "uploaded" },
+        { documentId: "c1", status: "confirmed" },
+        { documentId: null, status: "pending" },
+        { documentId: "r1", status: "needs_revision" },
+      ]),
+      ["u1"],
+    );
+  });
+});
+
+describe("canShowConfirmAllAction", () => {
+  it("shows when confirm API is wired and at least one uploaded row exists", () => {
+    assert.equal(
+      canShowConfirmAllAction({
+        hasConfirmApi: true,
+        confirmableCount: 2,
+      }),
+      true,
+    );
+    assert.equal(
+      canShowConfirmAllAction({
+        hasConfirmApi: true,
+        confirmableCount: 0,
+      }),
+      false,
+    );
+    assert.equal(
+      canShowConfirmAllAction({
+        hasConfirmApi: false,
+        confirmableCount: 2,
+      }),
+      false,
+    );
+    assert.equal(
+      canShowConfirmAllAction({
+        hasConfirmApi: true,
+        confirmableCount: 2,
+        readOnly: true,
+      }),
+      false,
+    );
   });
 });

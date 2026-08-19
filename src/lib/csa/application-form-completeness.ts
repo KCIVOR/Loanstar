@@ -7,7 +7,7 @@ export type ApplicationFormCompleteness = {
 };
 
 export type ApplicationFormScope = {
-  segment?: "seafarer" | "sme";
+  segment?: "seafarer" | "sme" | "individual";
   entityType?: "individual" | "corporate" | null;
 };
 
@@ -47,6 +47,20 @@ const SEAFARER_NULL_MISSING = [
   "Application form: manning agency name",
   "Application form: rank",
   "Application form: vessel",
+  "Application form: loan desired",
+  "Application form: requested terms",
+  "Application form: purpose of loan",
+  "Application form: present address",
+] as const;
+
+/** Individual has neither a business (SME) nor a manning agency/vessel (Seafarer) —
+ * same common identity + loan-intent fields as the other segments, minus both
+ * segment-specific blocks. */
+const INDIVIDUAL_NULL_MISSING = [
+  "Application form: first name",
+  "Application form: last name",
+  "Application form: mobile phone",
+  "Application form: email",
   "Application form: loan desired",
   "Application form: requested terms",
   "Application form: purpose of loan",
@@ -108,6 +122,12 @@ export function assessApplicationFormCompleteness(
         ],
       };
     }
+    if (segment === "individual") {
+      return {
+        complete: false,
+        missing: [...INDIVIDUAL_NULL_MISSING],
+      };
+    }
     return {
       complete: false,
       missing: [...SEAFARER_NULL_MISSING],
@@ -140,7 +160,7 @@ export function assessApplicationFormCompleteness(
         missing.push(check.label);
       }
     }
-  } else {
+  } else if (segment === "seafarer") {
     if (!isFilledString(profile.manningAgency?.name)) {
       missing.push("Application form: manning agency name");
     }
@@ -151,6 +171,8 @@ export function assessApplicationFormCompleteness(
       missing.push("Application form: vessel");
     }
   }
+  // segment === "individual": no business, no manning/vessel — only the
+  // common identity + loan-intent fields below apply.
 
   if (!isFilledString(profileDataString(profile.profileData, "loanDesired"))) {
     missing.push("Application form: loan desired");

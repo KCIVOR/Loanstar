@@ -11,6 +11,7 @@ import {
   Button,
   Card,
   ConfirmDialog,
+  FacebookLinkText,
   Input,
   Label,
   PageHeader,
@@ -22,6 +23,8 @@ import {
 } from "@/components/ui";
 import { DocumentChecklist } from "@/components/DocumentChecklist";
 import { ApplicantProfileFields } from "@/components/borrowers/ApplicantProfileFields";
+import { AutofillOverlay } from "@/components/dev/AutofillOverlay";
+import { fakeCommitteeAssessment, fakeRemark } from "@/lib/dev/fake-data";
 import {
   NegotiationLog,
   type NegotiationLogMessage,
@@ -32,6 +35,8 @@ import {
 } from "@/components/cig/CiReferencesFormModal";
 import { FieldVisitForm } from "@/components/cig/FieldVisitForm";
 import { SmeReloanVerificationForm } from "@/components/cig/SmeReloanVerificationForm";
+import { CmInspectionForm } from "@/components/cig/CmInspectionForm";
+import { RemInspectionForm } from "@/components/cig/RemInspectionForm";
 import { statusBadgeVariant } from "@/lib/applications/status";
 import { buildPipelineSteps } from "@/lib/applications/pipeline";
 import type { StatusHistoryEntry } from "@/lib/applications/status";
@@ -51,6 +56,12 @@ import {
   type FieldVisit,
   type SmeReloanVerification,
 } from "@/lib/cig/field-visit";
+import {
+  assessCmInspectionRequired,
+  assessRemInspectionRequired,
+  type CmInspection,
+  type RemInspection,
+} from "@/lib/cig/collateral-inspection";
 import type { BorrowerProfile } from "@/lib/borrowers/types";
 import { CSA_ONLY_INTAKE_SLUGS } from "@/lib/documents/csa-only-intake";
 
@@ -62,8 +73,9 @@ type CommitteeDetail = {
     statusLabel: string;
     blocker: string | null;
     isReloan: boolean;
-    segment: "seafarer" | "sme";
+    segment: "seafarer" | "sme" | "individual";
     entityType: "individual" | "corporate" | null;
+    collateralType: "none" | "car_refinancing" | "real_estate";
     statusHistory: StatusHistoryEntry[] | null;
     canDecide: boolean;
     votesNeeded: number;
@@ -85,6 +97,7 @@ type CommitteeDetail = {
     biNotes: string | null;
     cmDepartureDate: string | null;
     cmSalary: number | null;
+    cmBasicSalary: number | null;
     cmPosition: string | null;
     cmContractStatus: string | null;
     cmFitToWork: boolean | null;
@@ -105,6 +118,8 @@ type CommitteeDetail = {
     cifVerifiedDate: string | null;
     fieldVisit: FieldVisit | null;
     smeReloanVerification: SmeReloanVerification | null;
+    cmInspection: CmInspection | null;
+    remInspection: RemInspection | null;
   } | null;
   completeness: {
     ready: boolean;
@@ -352,6 +367,8 @@ export default function CommitteeApplicationPage() {
   const [voteComment, setVoteComment] = useState("");
   const [showCiForm, setShowCiForm] = useState(false);
   const [showFieldVisitForm, setShowFieldVisitForm] = useState(false);
+  const [showCmInspectionForm, setShowCmInspectionForm] = useState(false);
+  const [showRemInspectionForm, setShowRemInspectionForm] = useState(false);
   const [showApplicationForm, setShowApplicationForm] = useState(false);
   const [assessmentForm, setAssessmentForm] = useState({
     characterNotes: "",
@@ -612,6 +629,7 @@ export default function CommitteeApplicationPage() {
         ? data.latestAction?.comment
         : null;
   const isSme = data.application.segment === "sme";
+  const isIndividual = data.application.segment === "individual";
 
   return (
     <div>
@@ -627,8 +645,8 @@ export default function CommitteeApplicationPage() {
         description={data.application.applicationNo ?? undefined}
         actions={
           <div className="flex flex-wrap items-center gap-2">
-            <Badge variant={isSme ? "navy" : "teal"} dot>
-              {isSme ? "SME" : "Seafarer"}
+            <Badge variant={isSme ? "navy" : isIndividual ? "warning" : "teal"} dot>
+              {isSme ? "SME" : isIndividual ? "Individual" : "Seafarer"}
             </Badge>
             <Badge variant={statusBadgeVariant(data.application.status)}>
               {data.application.statusLabel}
@@ -990,6 +1008,26 @@ export default function CommitteeApplicationPage() {
                   </Button>
                 </>
               )}
+              {data.application.collateralType === "car_refinancing" ? (
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => setShowCmInspectionForm(true)}
+                >
+                  View full CM Inspection
+                </Button>
+              ) : null}
+              {data.application.collateralType === "real_estate" ? (
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => setShowRemInspectionForm(true)}
+                >
+                  View full REM Inspection
+                </Button>
+              ) : null}
             </div>
           </div>
           {data.verification.finding ? (
@@ -1048,6 +1086,7 @@ export default function CommitteeApplicationPage() {
 
           {data.application.segment !== "sme" ? (
             <>
+          {data.application.segment === "seafarer" ? (
           <div className="mt-4 border-t border-line-soft pt-4">
             <div className="text-xs font-semibold uppercase tracking-wide text-ink-500">
               Crewing manager
@@ -1068,9 +1107,15 @@ export default function CommitteeApplicationPage() {
                   : "—"}
               </p>
               <p>
-                <span className="text-ink-400">Salary:</span>{" "}
+                <span className="text-ink-400">Total Salary:</span>{" "}
                 {data.verification.cmSalary != null
                   ? `₱${formatMoney(data.verification.cmSalary)}`
+                  : "—"}
+              </p>
+              <p>
+                <span className="text-ink-400">Basic Salary:</span>{" "}
+                {data.verification.cmBasicSalary != null
+                  ? `₱${formatMoney(data.verification.cmBasicSalary)}`
                   : "—"}
               </p>
               <p>
@@ -1101,6 +1146,7 @@ export default function CommitteeApplicationPage() {
               <p className="mt-2 text-sm text-ink-700">{data.verification.cmNotes}</p>
             ) : null}
           </div>
+          ) : null}
 
           {/* CI & References Form summary + full modal (CI AND REFERENCES FORM 1) */}
           <div className="mt-4 border-t border-line-soft pt-4">
@@ -1255,9 +1301,15 @@ export default function CommitteeApplicationPage() {
                       </p>
                       {ref.otherContactNumber || ref.facebookAccount ? (
                         <p className="text-xs text-ink-400">
-                          {[ref.otherContactNumber, ref.facebookAccount]
-                            .filter(Boolean)
-                            .join(" · ")}
+                          {ref.otherContactNumber ? (
+                            <span>{ref.otherContactNumber}</span>
+                          ) : null}
+                          {ref.otherContactNumber && ref.facebookAccount
+                            ? " · "
+                            : null}
+                          {ref.facebookAccount ? (
+                            <FacebookLinkText value={ref.facebookAccount} />
+                          ) : null}
                         </p>
                       ) : null}
                       {ref.remarks ? (
@@ -1454,6 +1506,125 @@ export default function CommitteeApplicationPage() {
               )}
             </div>
           )}
+
+          {data.application.collateralType === "car_refinancing" ? (
+            <div className="mt-4 border-t border-line-soft pt-4">
+              <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+                <div className="text-xs font-semibold uppercase tracking-wide text-ink-500">
+                  CM Inspection — vehicle collateral
+                </div>
+                <Badge
+                  variant={
+                    assessCmInspectionRequired(data.verification.cmInspection)
+                      .complete
+                      ? "success"
+                      : "warning"
+                  }
+                >
+                  {assessCmInspectionRequired(data.verification.cmInspection)
+                    .complete
+                    ? "Complete"
+                    : "In progress"}
+                </Badge>
+              </div>
+              {data.verification.cmInspection ? (
+                <div className="mt-2 grid gap-x-4 gap-y-1 text-sm text-ink-700 sm:grid-cols-2">
+                  <p>
+                    <span className="text-ink-400">Account:</span>{" "}
+                    {displayText(data.verification.cmInspection.account?.accountName)}
+                  </p>
+                  <p>
+                    <span className="text-ink-400">Plate number:</span>{" "}
+                    {displayText(
+                      data.verification.cmInspection.orCrDetails?.plateNumber,
+                    )}
+                  </p>
+                  <p>
+                    <span className="text-ink-400">Engine no:</span>{" "}
+                    {displayText(data.verification.cmInspection.orCrDetails?.engineNo)}
+                  </p>
+                  <p>
+                    <span className="text-ink-400">Chassis no:</span>{" "}
+                    {displayText(data.verification.cmInspection.orCrDetails?.chasisNo)}
+                  </p>
+                  <p>
+                    <span className="text-ink-400">Registered owner:</span>{" "}
+                    {displayText(
+                      data.verification.cmInspection.registration?.registeredOwner,
+                    )}
+                  </p>
+                  <p>
+                    <span className="text-ink-400">Encumbered to:</span>{" "}
+                    {displayText(
+                      data.verification.cmInspection.registration?.encumberedTo,
+                    )}
+                  </p>
+                  <p>
+                    <span className="text-ink-400">Verified by:</span>{" "}
+                    {displayText(data.verification.cmInspection.verifiedBy)}
+                  </p>
+                </div>
+              ) : (
+                <p className="mt-1 text-sm text-ink-400">Not recorded.</p>
+              )}
+            </div>
+          ) : null}
+
+          {data.application.collateralType === "real_estate" ? (
+            <div className="mt-4 border-t border-line-soft pt-4">
+              <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+                <div className="text-xs font-semibold uppercase tracking-wide text-ink-500">
+                  REM Inspection — property collateral
+                </div>
+                <Badge
+                  variant={
+                    assessRemInspectionRequired(data.verification.remInspection)
+                      .complete
+                      ? "success"
+                      : "warning"
+                  }
+                >
+                  {assessRemInspectionRequired(data.verification.remInspection)
+                    .complete
+                    ? "Complete"
+                    : "In progress"}
+                </Badge>
+              </div>
+              {data.verification.remInspection ? (
+                <div className="mt-2 grid gap-x-4 gap-y-1 text-sm text-ink-700 sm:grid-cols-2">
+                  <p>
+                    <span className="text-ink-400">Account:</span>{" "}
+                    {displayText(
+                      data.verification.remInspection.account?.accountName,
+                    )}
+                  </p>
+                  <p>
+                    <span className="text-ink-400">Registered owner at title:</span>{" "}
+                    {displayText(
+                      data.verification.remInspection.titleDetails
+                        ?.registeredOwnerAtTitle,
+                    )}
+                  </p>
+                  <p>
+                    <span className="text-ink-400">Year registered:</span>{" "}
+                    {displayText(
+                      data.verification.remInspection.titleDetails?.yearRegister,
+                    )}
+                  </p>
+                  <p>
+                    <span className="text-ink-400">Address:</span>{" "}
+                    {displayText(data.verification.remInspection.account?.address)}
+                  </p>
+                  <p>
+                    <span className="text-ink-400">Verified by:</span>{" "}
+                    {displayText(data.verification.remInspection.verifiedBy)}
+                  </p>
+                </div>
+              ) : (
+                <p className="mt-1 text-sm text-ink-400">Not recorded.</p>
+              )}
+            </div>
+          ) : null}
         </Card>
       ) : null}
 
@@ -1501,6 +1672,48 @@ export default function CommitteeApplicationPage() {
         </Modal>
       ) : null}
 
+      {data.verification &&
+      showCmInspectionForm &&
+      data.application.collateralType === "car_refinancing" ? (
+        <Modal
+          open={showCmInspectionForm}
+          onClose={() => setShowCmInspectionForm(false)}
+          title="CM Inspection"
+          className="!max-w-4xl"
+        >
+          <div className="max-h-[65vh] overflow-y-auto pr-1">
+            <CmInspectionForm
+              value={data.verification.cmInspection}
+              onChange={() => undefined}
+              onSave={() => undefined}
+              verifierName=""
+              readOnly
+            />
+          </div>
+        </Modal>
+      ) : null}
+
+      {data.verification &&
+      showRemInspectionForm &&
+      data.application.collateralType === "real_estate" ? (
+        <Modal
+          open={showRemInspectionForm}
+          onClose={() => setShowRemInspectionForm(false)}
+          title="REM Inspection"
+          className="!max-w-4xl"
+        >
+          <div className="max-h-[65vh] overflow-y-auto pr-1">
+            <RemInspectionForm
+              value={data.verification.remInspection}
+              onChange={() => undefined}
+              onSave={() => undefined}
+              verifierName=""
+              readOnly
+            />
+          </div>
+        </Modal>
+      ) : null}
+
       {data.borrower ? (
         <DocumentChecklist
           applicationId={applicationId}
@@ -1512,8 +1725,10 @@ export default function CommitteeApplicationPage() {
           title="Borrower attachments"
           description={
             data.application.segment === "sme"
-              ? "Read-only — business registration, permits, financial statements, and other intake files uploaded by the borrower."
-              : "Read-only — Passport, Seaman's Book, Contract, IDs, and House Sketch uploaded by the borrower."
+              ? "Read-only — business registration, permits, financial statements, and collateral files (OR/CR or title) when this loan has collateral."
+              : data.application.segment === "individual"
+                ? "Read-only — IDs, income proof, and collateral files uploaded by the borrower."
+                : "Read-only — Passport, Seaman's Book, Contract, IDs, and House Sketch uploaded by the borrower."
           }
           excludeSlugs={CSA_ONLY_INTAKE_SLUGS}
         />
@@ -2256,6 +2471,19 @@ export default function CommitteeApplicationPage() {
           ) : null}
         </Card>
       ) : null}
+      <AutofillOverlay
+        actions={[
+          {
+            label: "Fill committee remarks",
+            onClick: () => {
+              setVoteComment(fakeRemark("vote"));
+              setDecisionComment(fakeRemark("decision"));
+              setRevisitComment(fakeRemark("returnToCsa"));
+              setAssessmentForm(fakeCommitteeAssessment());
+            },
+          },
+        ]}
+      />
     </div>
   );
 }

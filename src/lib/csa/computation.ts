@@ -17,8 +17,9 @@ import { createServiceClient } from "@/lib/supabase/server";
 
 export type PersistComputationInput = {
   loanApplicationId: string;
-  /** Application segment — selects SF vs SME engine. Defaults to seafarer. */
-  segment?: "seafarer" | "sme" | null;
+  /** Application segment — selects SF vs SME engine. Individual reuses the SME
+   * engine (confirmed 2026-08-19 — same calculator, same rates). Defaults to seafarer. */
+  segment?: "seafarer" | "sme" | "individual" | null;
   loanTypeId?: string | null;
   loanTypeName?: string | null;
   inputMode: InputMode;
@@ -131,10 +132,13 @@ export async function persistComputation(
   supabase: SupabaseClient,
   input: PersistComputationInput,
 ) {
-  const segment = input.segment === "sme" ? "sme" : "seafarer";
+  const segment =
+    input.segment === "sme" || input.segment === "individual"
+      ? input.segment
+      : "seafarer";
 
   let result: SfComputeResult;
-  if (segment === "sme") {
+  if (segment === "sme" || segment === "individual") {
     // Loan Desired mode: CSA `amount` is treated as loan_desired (extraction §4).
     // SF inputMode is still stored for DB CHECK compatibility; it does not drive SME math.
     const sme = computeSmeLoan({
@@ -211,7 +215,8 @@ export async function persistComputation(
       addon_months: result.addonMonths,
       pf_rate: input.pfRate,
       interest_rate: input.interestRate,
-      security_fee_rate: segment === "sme" ? 0 : input.securityFeeRate,
+      security_fee_rate:
+        segment === "sme" || segment === "individual" ? 0 : input.securityFeeRate,
       loan_type_id: input.loanTypeId ?? null,
       loan_type_name: input.loanTypeName ?? null,
       other_deductions: result.otherDeductions,

@@ -16,8 +16,10 @@ import { DOCUMENT_BUCKET } from "@/lib/constants";
 import type { ChecklistItem as ApiChecklistItem } from "@/lib/documents/checklist";
 import {
   canShowConfirmAction,
+  canShowConfirmAllAction,
   canShowRequestRevisionAction,
   canShowSignAction,
+  confirmableDocumentIds,
   needsRevisionSubtitle,
   uploadedAwaitingSubtitle,
 } from "@/lib/documents/checklist-actions";
@@ -159,6 +161,8 @@ export function DocumentChecklist({
     null,
   );
   const [confirming, setConfirming] = useState(false);
+  const [confirmAllOpen, setConfirmAllOpen] = useState(false);
+  const [confirmingAll, setConfirmingAll] = useState(false);
   const [revisingItem, setRevisingItem] = useState<ApiChecklistItem | null>(
     null,
   );
@@ -213,6 +217,13 @@ export function DocumentChecklist({
     if (exclude.has(item.documentTypeSlug)) return false;
     if (include && !include.has(item.documentTypeSlug)) return false;
     return true;
+  });
+  const confirmableIds = confirmableDocumentIds(visibleItems);
+  const showConfirmAll = canShowConfirmAllAction({
+    hasConfirmApi: Boolean(confirmApiPath),
+    confirmableCount: confirmableIds.length,
+    readOnly,
+    flagsOnly,
   });
   const doneCount = visibleItems.filter(
     (item) => ciState(item, flagsOnly) === "ok",
@@ -361,6 +372,41 @@ export function DocumentChecklist({
       setError(err instanceof Error ? err.message : "Failed to confirm");
     } finally {
       setConfirming(false);
+    }
+  }
+
+  async function handleConfirmAll() {
+    if (!confirmApiPath) return;
+    setConfirmingAll(true);
+    setError(null);
+    try {
+      for (const id of confirmableIds) {
+        const res = await fetch(confirmApiPath(id), {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({}),
+        });
+        if (!res.ok) {
+          const body = (await res.json().catch(() => null)) as {
+            error?: string;
+          } | null;
+          throw new Error(body?.error ?? "Failed to confirm document");
+        }
+        setItems((prev) =>
+          prev.map((row) =>
+            row.documentId === id ? { ...row, status: "confirmed" } : row,
+          ),
+        );
+      }
+      setConfirmAllOpen(false);
+      if (!initialItems) {
+        await load({ silent: true });
+      }
+      onUploadComplete?.();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to confirm");
+    } finally {
+      setConfirmingAll(false);
     }
   }
 
@@ -546,6 +592,20 @@ export function DocumentChecklist({
           {error ? (
             <div className="mb-3">
               <Alert>{error}</Alert>
+            </div>
+          ) : null}
+
+          {showConfirmAll ? (
+            <div className="mb-3">
+              <Button
+                type="button"
+                variant="secondary"
+                size="sm"
+                loading={confirmingAll}
+                onClick={() => setConfirmAllOpen(true)}
+              >
+                Confirm all
+              </Button>
             </div>
           ) : null}
 
@@ -749,6 +809,17 @@ export function DocumentChecklist({
         loading={confirming}
         onConfirm={() => void handleConfirm()}
         onCancel={() => setConfirmingItem(null)}
+      />
+
+      <ConfirmDialog
+        open={confirmAllOpen}
+        title="Confirm all uploaded documents?"
+        message="Mark all uploaded documents in this list as reviewed and complete? This counts them toward the endorsement checklist. Documents that are not uploaded yet, or that need revision, are not included."
+        confirmLabel="Yes, confirm all"
+        cancelLabel="Cancel"
+        loading={confirmingAll}
+        onConfirm={() => void handleConfirmAll()}
+        onCancel={() => setConfirmAllOpen(false)}
       />
 
       <Modal

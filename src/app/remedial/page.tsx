@@ -66,6 +66,7 @@ const SEGMENT_CHIPS: Array<{ id: RemedialSegmentFilter; label: string }> = [
   { id: "all", label: "All" },
   { id: "seafarer", label: "Seafarer" },
   { id: "sme", label: "SME" },
+  { id: "individual", label: "Individual" },
 ];
 
 const iconProps = {
@@ -159,11 +160,24 @@ function severityChipLabel(filter: SeverityFilter): string {
   return SEVERITY_CHIPS.find((chip) => chip.id === filter)?.label ?? filter;
 }
 
-function segmentBadge(segment: "sme" | "seafarer") {
-  const isSme = segment === "sme";
+function segmentBadge(segment: "sme" | "seafarer" | "individual") {
+  if (segment === "sme") {
+    return (
+      <Badge variant="navy" dot>
+        SME
+      </Badge>
+    );
+  }
+  if (segment === "individual") {
+    return (
+      <Badge variant="warning" dot>
+        Individual
+      </Badge>
+    );
+  }
   return (
-    <Badge variant={isSme ? "navy" : "teal"} dot>
-      {isSme ? "SME" : "Seafarer"}
+    <Badge variant="teal" dot>
+      Seafarer
     </Badge>
   );
 }
@@ -503,7 +517,7 @@ export default function RemedialQueuePage() {
             ) : null}
             {segmentFilter !== "all" ? (
               <span className="active-pill">
-                Segment: {segmentFilter === "sme" ? "SME" : "Seafarer"}
+                Segment: {segmentFilter === "sme" ? "SME" : segmentFilter === "individual" ? "Individual" : "Seafarer"}
                 <button
                   type="button"
                   aria-label="Clear segment filter"

@@ -7,9 +7,11 @@ import {
   clampRemedialQueuePageSize,
   computeRemedialQueueKpis,
   inTurnedOverBounds,
+  passesSegmentFilter,
   passesSeverity,
   remedialSearchPredicate,
   sanitizeSearchTerm,
+  segmentFilterSpec,
   severityFilterSpec,
   sortRemedialQueue,
   type RemedialQueueMappedRow,
@@ -372,5 +374,19 @@ describe("inTurnedOverBounds", () => {
       inTurnedOverBounds("2026-08-02T00:00:00", null, "2026-08-01"),
       false,
     );
+  });
+});
+
+describe("segmentFilterSpec / passesSegmentFilter (Phase 12)", () => {
+  it("recognizes individual as a distinct segment, not a fallback to all", () => {
+    assert.equal(segmentFilterSpec("individual"), "individual");
+    assert.equal(segmentFilterSpec("sme"), "sme");
+    assert.equal(segmentFilterSpec("bogus"), "all");
+  });
+
+  it("passesSegmentFilter matches individual rows only under the individual spec", () => {
+    assert.equal(passesSegmentFilter("individual", "individual"), true);
+    assert.equal(passesSegmentFilter("seafarer", "individual"), false);
+    assert.equal(passesSegmentFilter("individual", "all"), true);
   });
 });

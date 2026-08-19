@@ -44,7 +44,9 @@ async function assertOwnApplication(userId: string, applicationId: string) {
   return {
     id: data.id as string,
     borrowerId: data.borrower_id as string,
-    segment: (data.segment === "sme" ? "sme" : "seafarer") as "seafarer" | "sme",
+    segment: (data.segment === "sme" || data.segment === "individual"
+      ? data.segment
+      : "seafarer") as "seafarer" | "sme" | "individual",
     entityType:
       data.entity_type === "individual" || data.entity_type === "corporate"
         ? (data.entity_type as "individual" | "corporate")

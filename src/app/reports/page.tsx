@@ -1,12 +1,14 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 
-import { Alert, Badge, Button, Card, Input, KpiCard, PageHeader, SegmentedControl, Spinner } from "@/components/ui";
-import { formatStatusLabel } from "@/lib/applications/status";
-import { ASSISTANT_PANEL_WIDTH, AssistantDrawer } from "@/components/reports/AssistantDrawer";
+import { Alert, Button, KpiCard, PageHeader, Spinner } from "@/components/ui";
+import { AssistantDrawer } from "@/components/reports/AssistantDrawer";
+import { setAssistantOpen, useAssistantWidth } from "@/components/reports/assistant/width";
 import { MoneyPanel } from "@/components/reports/MoneyPanel";
-import { OriginationPanel } from "@/components/reports/OriginationPanel";
+import { OriginationKpis } from "@/components/reports/OriginationPanel";
 import { RiskPanel } from "@/components/reports/RiskPanel";
 import { StaffPanel } from "@/components/reports/StaffPanel";
 import type { MoneySeries } from "@/lib/reports/metrics/money";
@@ -14,7 +16,7 @@ import type { OriginationSeries, StuckFile } from "@/lib/reports/metrics/origina
 import type { RiskSeries } from "@/lib/reports/metrics/risk";
 import type { StaffSeries } from "@/lib/reports/metrics/staff";
 import type { MetricValue, Period } from "@/lib/reports/metrics/types";
-import { PERIOD_PRESETS, presetPeriod, type PeriodPreset } from "@/lib/reports/period";
+import { parsePeriod, presetPeriod } from "@/lib/reports/period";
 
 type Dashboard = {
   period: Period;
@@ -62,20 +64,19 @@ function money(v: number) {
   });
 }
 
-type CustomPreset = "custom";
-
 export default function ReportsDashboardPage() {
+  const searchParams = useSearchParams();
   const [data, setData] = useState<Dashboard | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [preset, setPreset] = useState<PeriodPreset | CustomPreset>("mtd");
-  const [customPeriod, setCustomPeriod] = useState<Period>(() => presetPeriod("mtd"));
-  const [assistantOpen, setAssistantOpen] = useState(false);
+  const { open: assistantOpen } = useAssistantWidth();
 
-  const activePeriod = useMemo(
-    () => (preset === "custom" ? customPeriod : presetPeriod(preset)),
-    [preset, customPeriod],
-  );
+  const urlFrom = searchParams.get("from");
+  const urlTo = searchParams.get("to");
+  const activePeriod = useMemo<Period>(() => {
+    if (urlFrom && urlTo) return parsePeriod(new URLSearchParams({ from: urlFrom, to: urlTo }));
+    return presetPeriod("mtd");
+  }, [urlFrom, urlTo]);
 
   const load = useCallback(async (period: Period) => {
     setLoading(true);
@@ -95,6 +96,10 @@ export default function ReportsDashboardPage() {
     void load(activePeriod);
   }, [load, activePeriod]);
 
+  useEffect(() => {
+    return () => setAssistantOpen(false);
+  }, []);
+
   const pipelineTotal = useMemo(
     () => (data ? Object.values(data.pipeline).reduce((s, n) => s + n, 0) : 0),
     [data],
@@ -103,19 +108,14 @@ export default function ReportsDashboardPage() {
   if (loading && !data) return <Spinner />;
   if (!data) return <Alert>Reports unavailable.</Alert>;
 
-  const overdue91 = data.aging.bucket91_plus;
-  const maxAging = Math.max(
-    data.aging.current,
-    data.aging.bucket1_30,
-    data.aging.bucket31_60,
-    data.aging.bucket61_90,
-    data.aging.bucket91_plus,
-    1,
-  );
+  const collected = data.metrics.find((m) => m.id === "money.collected");
+  const periodQuery = `from=${activePeriod.from}&to=${activePeriod.to}`;
+  const accountsUnpaidHref = `/reports/accounts?view=loans&status=unpaid&${periodQuery}`;
+  const collectionsHref = `/reports/collections?${periodQuery}`;
+  const par30Href = `/reports/past-due?aging=par30&${periodQuery}`;
 
   return (
-    <div className="flex items-start">
-      <div className="min-w-0 flex-1">
+    <>
       {error ? (
         <div className="mb-4">
           <Alert>{error}</Alert>
@@ -142,8 +142,8 @@ export default function ReportsDashboardPage() {
               size="sm"
               className="no-print"
               aria-expanded={assistantOpen}
-              aria-label={assistantOpen ? "Close report assistant" : "Open report assistant"}
-              onClick={() => setAssistantOpen((o) => !o)}
+              aria-label={assistantOpen ? "Close LoanBot" : "Open LoanBot"}
+              onClick={() => setAssistantOpen(!assistantOpen)}
             >
               <svg
                 viewBox="0 0 24 24"
@@ -159,60 +159,33 @@ export default function ReportsDashboardPage() {
               >
                 <path d="M12 3v4M12 17v4M3 12h4M17 12h4M6.3 6.3l2.5 2.5M15.2 15.2l2.5 2.5M17.7 6.3l-2.5 2.5M8.8 15.2l-2.5 2.5" />
               </svg>
-              Assistant
+              LoanBot
             </Button>
           </div>
         }
       />
 
-      <Card className="no-print mb-6">
-        <div className="flex flex-wrap items-center gap-3">
-          <span className="text-xs font-medium text-ink-500">Period</span>
-          <SegmentedControl
-            value={preset}
-            onChange={setPreset}
-            disabled={loading}
-            options={[
-              ...PERIOD_PRESETS.map((p) => ({ value: p.id as PeriodPreset | CustomPreset, label: p.label })),
-              { value: "custom", label: "Custom" },
-            ]}
+      <div className="mb-6 grid min-w-0 grid-cols-2 gap-3.5 xl:grid-cols-4">
+        <KpiCard className="min-w-0" label="Pipeline applications" value={pipelineTotal} />
+        <Link href={accountsUnpaidHref} className="block min-w-0 no-underline">
+          <KpiCard className="min-w-0" label="Active loans" value={data.activeLoans} />
+        </Link>
+        <Link href={accountsUnpaidHref} className="block min-w-0 no-underline">
+          <KpiCard
+            className="min-w-0"
+            label="Portfolio outstanding"
+            value={money(data.aging.totalOutstanding)}
+            highlight
           />
-          {preset === "custom" ? (
-            <div className="flex items-center gap-2">
-              <Input
-                type="date"
-                value={customPeriod.from}
-                onChange={(e) => setCustomPeriod((p) => ({ ...p, from: e.target.value }))}
-                style={{ width: 150, height: 34 }}
-              />
-              <span className="text-xs text-ink-400">to</span>
-              <Input
-                type="date"
-                value={customPeriod.to}
-                onChange={(e) => setCustomPeriod((p) => ({ ...p, to: e.target.value }))}
-                style={{ width: 150, height: 34 }}
-              />
-            </div>
-          ) : null}
-          <span className="mono text-xs text-ink-400">
-            {activePeriod.from} → {activePeriod.to}
-          </span>
-        </div>
-      </Card>
-
-      <div className="mb-6 grid grid-cols-2 gap-3.5 lg:grid-cols-4">
-        <KpiCard label="Pipeline applications" value={pipelineTotal} />
-        <KpiCard label="Active loans" value={data.activeLoans} />
-        <KpiCard
-          label="Portfolio outstanding"
-          value={money(data.aging.totalOutstanding)}
-          highlight
-        />
-        <KpiCard
-          label="Posted collections"
-          value={money(data.income.totalPosted)}
-          highlight
-        />
+        </Link>
+        <Link href={collectionsHref} className="block min-w-0 no-underline">
+          <KpiCard
+            className="min-w-0"
+            label="Posted collections"
+            value={money(collected?.value ?? 0)}
+            highlight
+          />
+        </Link>
       </div>
 
       <div className="mb-6">
@@ -220,153 +193,32 @@ export default function ReportsDashboardPage() {
       </div>
 
       <div className="mb-6">
-        <RiskPanel metrics={data.metrics} series={data.series.risk} />
+        <RiskPanel metrics={data.metrics} series={data.series.risk} par30Href={par30Href} />
       </div>
 
       <div className="mb-6">
-        <OriginationPanel
-          metrics={data.metrics}
-          series={data.series.origination}
-          stuckFiles={data.stuckFiles}
-        />
+        <div className="mb-3 flex items-center justify-between">
+          <h2 className="font-display text-lg font-semibold text-navy-900">
+            Origination
+          </h2>
+          <Link
+            href={`/reports/pipeline?from=${activePeriod.from}&to=${activePeriod.to}`}
+            className="text-sm font-medium text-teal-700 hover:underline"
+          >
+            Open pipeline
+          </Link>
+        </div>
+        <OriginationKpis metrics={data.metrics} />
       </div>
 
       <div className="mb-6">
         <StaffPanel series={data.series.staff} />
       </div>
-
-      <div className="grid gap-6 lg:grid-cols-2">
-        <Card>
-          <h2 className="mb-3 font-display text-lg font-semibold text-navy-900">
-            Pipeline by stage
-          </h2>
-          <ul className="space-y-2 text-sm">
-            {Object.entries(data.pipeline)
-              .sort((a, b) => b[1] - a[1])
-              .map(([status, count]) => (
-                <li key={status} className="flex items-center justify-between">
-                  <span className="text-ink-500">{formatStatusLabel(status)}</span>
-                  <span className="mono font-medium text-ink-900">{count}</span>
-                </li>
-              ))}
-          </ul>
-        </Card>
-
-        <Card>
-          <h2 className="mb-3 font-display text-lg font-semibold text-navy-900">
-            Aging buckets
-          </h2>
-          <ul className="space-y-3 text-sm">
-            {[
-              { label: "Current", value: data.aging.current, tone: "success" as const },
-              { label: "1–30 days", value: data.aging.bucket1_30, tone: "info" as const },
-              { label: "31–60 days", value: data.aging.bucket31_60, tone: "warning" as const },
-              { label: "61–90 days", value: data.aging.bucket61_90, tone: "warning" as const },
-              { label: "90+ days", value: data.aging.bucket91_plus, tone: "danger" as const },
-            ].map((row) => (
-              <li key={row.label}>
-                <div className="mb-1 flex justify-between">
-                  <span className="text-ink-500">{row.label}</span>
-                  <span className="mono font-medium text-ink-900">{row.value}</span>
-                </div>
-                <div className="prog">
-                  <i
-                    className={
-                      row.tone === "success"
-                        ? ""
-                        : row.tone === "info"
-                          ? "bg-[var(--info)]"
-                          : row.tone === "warning"
-                            ? "bg-[var(--warning)]"
-                            : "bg-[var(--danger)]"
-                    }
-                    style={{ width: `${Math.max(4, (row.value / maxAging) * 100)}%` }}
-                  />
-                </div>
-              </li>
-            ))}
-          </ul>
-        </Card>
-
-        <Card>
-          <h2 className="mb-3 font-display text-lg font-semibold text-navy-900">
-            Income recognition
-          </h2>
-          <ul className="space-y-2 text-sm">
-            <li className="flex justify-between">
-              <span className="text-ink-500">Posted payments</span>
-              <span className="mono text-ink-900">{money(data.income.totalPosted)}</span>
-            </li>
-            <li className="flex justify-between">
-              <span className="text-ink-500">Penalties collected</span>
-              <span className="mono text-ink-900">{money(data.income.totalPenalties)}</span>
-            </li>
-            <li className="flex justify-between">
-              <span className="text-ink-500">Posting count</span>
-              <span className="mono text-ink-900">{data.income.paymentCount}</span>
-            </li>
-          </ul>
-        </Card>
-
-        <Card>
-          <h2 className="mb-3 font-display text-lg font-semibold text-navy-900">
-            Collection performance
-          </h2>
-          <ul className="space-y-2 text-sm">
-            <li className="flex justify-between">
-              <span className="text-ink-500">DCRRs awaiting AR</span>
-              <span className="mono text-ink-900">{data.collection.dcrsSubmitted}</span>
-            </li>
-            <li className="flex justify-between">
-              <span className="text-ink-500">DCRRs reconciled</span>
-              <span className="mono text-ink-900">{data.collection.dcrsReconciled}</span>
-            </li>
-            <li className="flex justify-between">
-              <span className="text-ink-500">Pending proofs</span>
-              <span className="mono text-ink-900">{data.collection.pendingProofs}</span>
-            </li>
-            <li className="flex justify-between">
-              <span className="text-ink-500">Posted payments</span>
-              <span className="mono text-ink-900">{data.collection.postedPayments}</span>
-            </li>
-          </ul>
-        </Card>
-      </div>
-
-      <Card className="mt-6">
-        <h2 className="mb-3 font-display text-lg font-semibold text-navy-900">
-          Turnaround time (TAT) by step
-        </h2>
-        <ul className="divide-y divide-line-soft text-sm">
-          {data.tat.map((row) => (
-            <li key={row.label} className="flex justify-between py-2.5">
-              <span className="text-ink-500">{row.label}</span>
-              <span className="mono text-ink-900">
-                {row.averageDays != null
-                  ? `${row.averageDays} days (n=${row.sampleCount})`
-                  : "—"}
-              </span>
-            </li>
-          ))}
-        </ul>
-        {overdue91 > 0 ? (
-          <div className="mt-4">
-            <Badge variant="danger">{overdue91} accounts at 90+ days overdue</Badge>
-          </div>
-        ) : null}
-      </Card>
-      </div>
-
-      <div
-        className="no-print"
-        style={{
-          flexShrink: 0,
-          width: assistantOpen ? ASSISTANT_PANEL_WIDTH : 0,
-          transition: "width 220ms cubic-bezier(0.22,1,0.36,1)",
-        }}
-        aria-hidden
+      <AssistantDrawer
+        open={assistantOpen}
+        onClose={() => setAssistantOpen(false)}
+        period={activePeriod}
       />
-      <AssistantDrawer open={assistantOpen} onClose={() => setAssistantOpen(false)} />
-    </div>
+    </>
   );
 }

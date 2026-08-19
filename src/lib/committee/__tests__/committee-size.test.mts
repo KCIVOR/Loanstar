@@ -15,6 +15,13 @@ describe("committeeSizeConfigKey", () => {
     assert.equal(committeeSizeConfigKey("sme"), "committee_size_sme");
   });
 
+  it("maps individual → committee_size_individual", () => {
+    assert.equal(
+      committeeSizeConfigKey("individual"),
+      "committee_size_individual",
+    );
+  });
+
   it("refuses NULL/unknown — must not silently mean Seafarer", () => {
     assert.throws(() => committeeSizeConfigKey(null), /missing or unknown/);
     assert.throws(
@@ -27,10 +34,11 @@ describe("committeeSizeConfigKey", () => {
 });
 
 describe("resolveCommitteeSize", () => {
-  const sizes = { seafarer: 3, sme: 1 };
+  const sizes = { seafarer: 3, sme: 1, individual: 1 };
 
   it("returns segment-specific sizes", () => {
     assert.equal(resolveCommitteeSize("seafarer", sizes), 3);
     assert.equal(resolveCommitteeSize("sme", sizes), 1);
+    assert.equal(resolveCommitteeSize("individual", sizes), 1);
   });
 });

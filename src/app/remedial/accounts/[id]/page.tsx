@@ -192,8 +192,8 @@ export default function RemedialAccountPage() {
       ) : null}
 
       <div className="mb-4 flex flex-wrap items-center gap-2">
-        <Badge variant={account.segment === "sme" ? "navy" : "teal"} dot>
-          {account.segment === "sme" ? "SME" : "Seafarer"}
+        <Badge variant={account.segment === "sme" ? "navy" : account.segment === "individual" ? "warning" : "teal"} dot>
+          {account.segment === "sme" ? "SME" : account.segment === "individual" ? "Individual" : "Seafarer"}
         </Badge>
         {account.manningAgency ? (
           <span className="text-sm text-ink-600">
@@ -322,7 +322,7 @@ export default function RemedialAccountPage() {
         </div>
       </div>
 
-      <section className="mb-8">
+      <section className="mb-8 min-w-0">
         <h2 className="mb-3 font-display text-lg font-semibold text-navy-900">
           Account ledger
         </h2>

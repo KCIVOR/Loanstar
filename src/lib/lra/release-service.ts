@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
+import { ValidationError } from "@/lib/api/errors";
 import { mapBorrowerRow, type BorrowerRow } from "@/lib/borrowers/types";
 import { getActiveComputation } from "@/lib/csa/computation";
 import { ensureDocumentSlots } from "@/lib/documents/checklist";
@@ -10,8 +11,10 @@ import { createServiceClient } from "@/lib/supabase/server";
 
 import { syncApplicationBlocker, mapReleaseFileRow } from "./blockers";
 import { loadBlriContext } from "./blri-data";
+import { unsignedGeneratedDocumentIds } from "./mark-all-signed";
 import {
   AUTO_GENERATED_SLUGS,
+  COLLATERAL_GENERATED_SLUGS,
   canRecordRelease,
   releaseStageForPath,
   type ReleasePath,
@@ -52,7 +55,7 @@ export async function getOrCreateReleaseFile(
     .maybeSingle();
 
   if (!queueRow) {
-    throw new Error("Application is not in the LRA queue");
+    throw new ValidationError("Application is not in the LRA queue");
   }
 
   const { data: created, error } = await supabase
@@ -90,7 +93,7 @@ export async function setReleasePaths(
   },
 ) {
   if (paths.length === 0) {
-    throw new Error("At least one release path is required");
+    throw new ValidationError("At least one release path is required");
   }
 
   const file = await getReleaseFile(supabase, releaseFileId);
@@ -100,13 +103,17 @@ export async function setReleasePaths(
 
   if (paths.includes("without_pdc")) {
     if (!options?.atmBankName?.trim()) {
-      throw new Error("ATM bank name is required for Without PDC path");
+      throw new ValidationError("ATM bank name is required for Without PDC path");
     }
     if (!options?.atmCardLast4?.trim() || options.atmCardLast4.length !== 4) {
-      throw new Error("ATM card last 4 digits are required for Without PDC path");
+      throw new ValidationError(
+        "ATM card last 4 digits are required for Without PDC path",
+      );
     }
     if (!options?.atmAccountNumber?.trim()) {
-      throw new Error("ATM account number is required for Without PDC path");
+      throw new ValidationError(
+        "ATM account number is required for Without PDC path",
+      );
     }
   }
 
@@ -121,7 +128,9 @@ export async function setReleasePaths(
   }
 
   const checklistScope = {
-    segment: (app.segment === "sme" ? "sme" : "seafarer") as "seafarer" | "sme",
+    segment: (app.segment === "sme" || app.segment === "individual"
+      ? app.segment
+      : "seafarer") as "seafarer" | "sme" | "individual",
     entityType:
       app.entity_type === "individual" || app.entity_type === "corporate"
         ? (app.entity_type as "individual" | "corporate")
@@ -210,7 +219,7 @@ export async function savePdcChecks(
   const file = await getReleaseFile(supabase, releaseFileId);
 
   if (!file.releasePaths.includes("with_pdc")) {
-    throw new Error("PDC encoding only applies to With PDC path");
+    throw new ValidationError("PDC encoding only applies to With PDC path");
   }
 
   const computation = await getActiveComputation(
@@ -222,7 +231,7 @@ export async function savePdcChecks(
   }
 
   if (checks.length !== computation.terms) {
-    throw new Error(
+    throw new ValidationError(
       `Number of checks must equal the loan term (${computation.terms})`,
     );
   }
@@ -230,18 +239,18 @@ export async function savePdcChecks(
   const normalizedChecks = checks.map((row) => {
     const checkNumber = row.checkNumber?.trim();
     if (!checkNumber) {
-      throw new Error("Check number is required for every PDC");
+      throw new ValidationError("Check number is required for every PDC");
     }
     const bankName = row.bankName.trim();
     if (!bankName) {
-      throw new Error("Bank/Branch is required for every PDC");
+      throw new ValidationError("Bank/Branch is required for every PDC");
     }
     return { ...row, checkNumber, bankName };
   });
 
   for (const row of normalizedChecks) {
     if (row.amount !== computation.monthlyAmortization) {
-      throw new Error(
+      throw new ValidationError(
         `Check amount must equal the monthly amortization (₱${computation.monthlyAmortization})`,
       );
     }
@@ -326,11 +335,11 @@ export async function generateReleaseDocuments(
   const releasePaths = releasePathsFromRow(row);
 
   if (releasePaths.length === 0) {
-    throw new Error("Release path must be selected first");
+    throw new ValidationError("Release path must be selected first");
   }
 
   if (!["ready_generate", "awaiting_signatures"].includes(file.status)) {
-    throw new Error("Documents cannot be generated at this stage");
+    throw new ValidationError("Documents cannot be generated at this stage");
   }
 
   const computation = await getActiveComputation(supabase, file.loanApplicationId);
@@ -344,18 +353,31 @@ export async function generateReleaseDocuments(
     releaseFileId,
   );
 
-  const slugs = [
-    ...new Set(releasePaths.flatMap((p) => AUTO_GENERATED_SLUGS[p])),
-  ];
   const { data: app } = await supabase
     .from("loan_applications")
-    .select("borrower_id, segment, borrowers (*)")
+    .select("borrower_id, segment, collateral_type, borrowers (*)")
     .eq("id", file.loanApplicationId)
     .single();
 
   if (!app?.borrower_id) {
     throw new Error("Borrower not found");
   }
+
+  const collateralType = app.collateral_type as
+    | "none"
+    | "car_refinancing"
+    | "real_estate"
+    | null;
+  const collateralSlugs =
+    collateralType === "car_refinancing" || collateralType === "real_estate"
+      ? COLLATERAL_GENERATED_SLUGS[collateralType]
+      : [];
+  const slugs = [
+    ...new Set([
+      ...releasePaths.flatMap((p) => AUTO_GENERATED_SLUGS[p]),
+      ...collateralSlugs,
+    ]),
+  ];
 
   // One merge context per selected path — voucher pairs need path-specific
   // disbursement fields; shared slugs are path-independent.
@@ -376,7 +398,9 @@ export async function generateReleaseDocuments(
     notaryFee: computation.notaryFee,
   };
   const segmentScope = {
-    segment: (app.segment === "sme" ? "sme" : "seafarer") as "sme" | "seafarer",
+    segment: (app.segment === "sme" || app.segment === "individual"
+      ? app.segment
+      : "seafarer") as "sme" | "seafarer" | "individual",
   };
   const contextByPath = new Map(
     releasePaths.map((p) => [
@@ -486,11 +510,11 @@ export async function witnessSignGeneratedDocument(
     .single();
 
   if (error || !doc || doc.is_finalized) {
-    throw new Error("Document not available for signing");
+    throw new ValidationError("Document not available for signing");
   }
 
   if (doc.signed_at) {
-    throw new Error("Document already signed");
+    throw new ValidationError("Document already signed");
   }
 
   const releaseFileRaw = doc.release_files;
@@ -499,7 +523,7 @@ export async function witnessSignGeneratedDocument(
     : releaseFileRaw;
 
   if (releaseFile?.status !== "awaiting_signatures") {
-    throw new Error("Release file is not in the signing stage");
+    throw new ValidationError("Release file is not in the signing stage");
   }
 
   // signed_by stays the borrower — it's their signature on the paper; the LRA
@@ -558,6 +582,43 @@ export async function witnessSignGeneratedDocument(
   return { signedAt, allSigned };
 }
 
+export async function witnessSignAllGeneratedDocuments(
+  supabase: SupabaseClient,
+  applicationId: string,
+  witnessedById: string,
+) {
+  const { data: releaseFile } = await supabase
+    .from("release_files")
+    .select("id, loan_application_id, status")
+    .eq("loan_application_id", applicationId)
+    .maybeSingle();
+
+  if (!releaseFile || releaseFile.status !== "awaiting_signatures") {
+    throw new ValidationError("Release file is not in the signing stage");
+  }
+
+  const { data: docs } = await supabase
+    .from("generated_documents")
+    .select("id, signed_at, is_finalized")
+    .eq("release_file_id", releaseFile.id);
+
+  const ids = unsignedGeneratedDocumentIds(docs ?? []);
+  if (ids.length === 0) {
+    throw new ValidationError("No unsigned documents");
+  }
+
+  let lastResult = { allSigned: false };
+  for (const id of ids) {
+    lastResult = await witnessSignGeneratedDocument(
+      supabase,
+      id,
+      witnessedById,
+    );
+  }
+
+  return { signedCount: ids.length, allSigned: lastResult.allSigned };
+}
+
 export async function unwitnessSignGeneratedDocument(
   supabase: SupabaseClient,
   documentId: string,
@@ -574,11 +635,11 @@ export async function unwitnessSignGeneratedDocument(
   }
 
   if (!doc.signed_at) {
-    throw new Error("Document is not signed");
+    throw new ValidationError("Document is not signed");
   }
 
   if (doc.is_finalized) {
-    throw new Error("Document not available for unsigning");
+    throw new ValidationError("Document not available for unsigning");
   }
 
   const releaseFileRaw = doc.release_files;
@@ -598,14 +659,14 @@ export async function unwitnessSignGeneratedDocument(
       .maybeSingle();
 
     if (briefing?.acknowledged_at) {
-      throw new Error(
+      throw new ValidationError(
         "Briefing has already been acknowledged — signature can no longer be undone",
       );
     }
 
     rolledBackToSigning = true;
   } else {
-    throw new Error(
+    throw new ValidationError(
       "Release file has moved past the signing stage — signature can no longer be undone",
     );
   }
@@ -653,7 +714,7 @@ export async function acknowledgeBriefing(
   const file = await getReleaseFile(supabase, releaseFileId);
 
   if (file.status !== "awaiting_briefing" && file.status !== "ready_release") {
-    throw new Error("Briefing not pending");
+    throw new ValidationError("Briefing not pending");
   }
 
   const { data: briefing, error: briefingError } = await supabase
@@ -672,7 +733,7 @@ export async function acknowledgeBriefing(
   // Collector may update briefings (briefings_collector_ack). Skip if already acked.
   if (!alreadySigned) {
     if (file.status !== "awaiting_briefing") {
-      throw new Error("Briefing not pending");
+      throw new ValidationError("Briefing not pending");
     }
 
     const checklist = Array.isArray(briefing.checklist)
@@ -845,7 +906,9 @@ export async function recordRelease(
     .maybeSingle();
 
   if (!canRecordRelease(file.status, briefing?.acknowledged_at as string | null)) {
-    throw new Error("Briefing must be signed by the borrower before release");
+    throw new ValidationError(
+      "Briefing must be signed by the borrower before release",
+    );
   }
 
   const eventType =
@@ -910,7 +973,7 @@ export async function closeRelease(
   const file = mapReleaseFileRow(row);
 
   if (file.status !== "released") {
-    throw new Error("Release must be recorded before closure");
+    throw new ValidationError("Release must be recorded before closure");
   }
 
   assertPdcCollectedForClose({
@@ -932,7 +995,7 @@ export async function closeRelease(
   const missing = missingSignedReleaseSlugs(signedDocs.keys());
   if (missing.length > 0) {
     const labels = signedReleaseSlugLabels(missing);
-    throw new Error(
+    throw new ValidationError(
       `Upload the following signed scan(s) on the release checklist before closing: ${labels.join(", ")}`,
     );
   }

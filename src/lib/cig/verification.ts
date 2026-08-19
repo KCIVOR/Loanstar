@@ -6,6 +6,12 @@ import {
   type FieldVisit,
   type SmeReloanVerification,
 } from "./field-visit";
+import {
+  assessCmInspectionRequired,
+  assessRemInspectionRequired,
+  type CmInspection,
+  type RemInspection,
+} from "./collateral-inspection";
 
 // CI & References Form types (loanstar/docs/cig-references-form-plan.md, Phase 2).
 // Field names/order follow CI AND REFERENCES FORM 1.xlsx, Sheet1.
@@ -144,7 +150,9 @@ export type VerificationRecord = {
   picPaymentReliability: string | null;
   picInterviewNotes: string | null;
   cmDepartureDate: string | null;
+  /** Labeled "Total Salary" in the UI. */
   cmSalary: number | null;
+  cmBasicSalary: number | null;
   cmPosition: string | null;
   cmContractStatus: string | null;
   cmFitToWork: boolean | null;
@@ -171,6 +179,10 @@ export type VerificationRecord = {
   fieldVisit: FieldVisit | null;
   /** SME re-loan lighter re-verification form. */
   smeReloanVerification: SmeReloanVerification | null;
+  /** Car Refinancing collateral inspection (SME or Individual). */
+  cmInspection: CmInspection | null;
+  /** Real Estate collateral inspection (SME or Individual). */
+  remInspection: RemInspection | null;
   finding: "positive" | "negative" | null;
   findingNotes: string | null;
   isComplete: boolean;
@@ -179,8 +191,17 @@ export type VerificationRecord = {
 };
 
 export type VerificationScope = {
-  segment?: "seafarer" | "sme" | null;
+  /** Individual reuses Seafarer's phone/reference verification (CI & References
+   * Form, confirmed 2026-08-18) but has NO Crewing manager step at all (confirmed
+   * 2026-08-19 — Individual has no manning agency/vessel to verify, so nothing
+   * replaces it; the sequence stage auto-completes like SME's does). Keep this
+   * a real 3-way segment, not a 2-way "sme vs everything else" coercion. */
+  segment?: "seafarer" | "sme" | "individual" | null;
   isReloan?: boolean | null;
+  /** Orthogonal to segment — SME and Individual only (Seafarer never carries
+   * collateral). Gates whether CM/REM Inspection completeness is required
+   * on top of the segment's own base verification (Phase 8.3). */
+  collateralType?: "none" | "car_refinancing" | "real_estate" | null;
 };
 
 export type VerificationCompleteness = {
@@ -215,6 +236,8 @@ export function mapVerificationRow(row: Record<string, unknown>): VerificationRe
     picInterviewNotes: (row.pic_interview_notes as string) ?? null,
     cmDepartureDate: (row.cm_departure_date as string) ?? null,
     cmSalary: row.cm_salary != null ? Number(row.cm_salary) : null,
+    cmBasicSalary:
+      row.cm_basic_salary != null ? Number(row.cm_basic_salary) : null,
     cmPosition: (row.cm_position as string) ?? null,
     cmContractStatus: (row.cm_contract_status as string) ?? null,
     cmFitToWork:
@@ -245,6 +268,8 @@ export function mapVerificationRow(row: Record<string, unknown>): VerificationRe
     fieldVisit: (row.field_visit as FieldVisit) ?? null,
     smeReloanVerification:
       (row.sme_reloan_verification as SmeReloanVerification) ?? null,
+    cmInspection: (row.cm_inspection as CmInspection) ?? null,
+    remInspection: (row.rem_inspection as RemInspection) ?? null,
     finding: (row.finding as VerificationRecord["finding"]) ?? null,
     findingNotes: (row.finding_notes as string) ?? null,
     isComplete: Boolean(row.is_complete),
@@ -355,11 +380,16 @@ export async function getCigChecksComplete(
     .select("segment")
     .eq("id", applicationId)
     .maybeSingle();
-  const segment = app?.segment === "sme" ? "sme" : "seafarer";
+  const segment =
+    app?.segment === "sme" || app?.segment === "individual"
+      ? app.segment
+      : "seafarer";
 
   // Phase 7.1 provisional: CIG mappings are Seafarer-only until client confirms
   // which of nfis/mf/lslg_denied_cancelled apply to SME. SME therefore has an
   // empty CIG check list (complete=true) — not a silent reuse of POEA/Marina.
+  // Individual has no stage_check_mapping rows either (2026-08-19) — same
+  // empty-by-design auto-pass, not a coercion into Seafarer's POEA/Marina checks.
   const { data: mappings, error: mapError } = await supabase
     .from("stage_check_mapping")
     .select("check_type_id, check_types ( id, slug, name )")
@@ -408,8 +438,15 @@ export function assessVerificationCompleteness(
   scope: VerificationScope = {},
 ): VerificationCompleteness {
   const missing: string[] = [...checksMissing];
-  const segment = scope.segment === "sme" ? "sme" : "seafarer";
+  const segment: "sme" | "seafarer" | "individual" =
+    scope.segment === "sme" || scope.segment === "individual"
+      ? scope.segment
+      : "seafarer";
   const isReloan = Boolean(scope.isReloan);
+  // Collateral is orthogonal to segment — SME and Individual both use the
+  // same CM/REM Inspection forms (Phase 8.3), layered on top of whichever
+  // base verification the segment requires, not a replacement for it.
+  const collateralType = scope.collateralType ?? "none";
 
   if (!verification) {
     missing.push("Verification form not started");
@@ -437,18 +474,22 @@ export function assessVerificationCompleteness(
       : assessFieldVisitRequired(verification.fieldVisit);
     missing.push(...smeForm.missing);
   } else {
-    if (!isFilled(verification.cmPosition)) {
-      missing.push("Crewing manager position required");
+    if (segment === "seafarer") {
+      if (!isFilled(verification.cmPosition)) {
+        missing.push("Crewing manager position required");
+      }
+      if (!isFilled(verification.cmContractStatus)) {
+        missing.push("Crewing manager contract status required");
+      }
+      if (!verification.cmDepartureDate) {
+        missing.push("Crewing manager departure date required");
+      }
+      if (verification.cmFitToWork == null) {
+        missing.push("Crewing manager fit-to-work status required");
+      }
     }
-    if (!isFilled(verification.cmContractStatus)) {
-      missing.push("Crewing manager contract status required");
-    }
-    if (!verification.cmDepartureDate) {
-      missing.push("Crewing manager departure date required");
-    }
-    if (verification.cmFitToWork == null) {
-      missing.push("Crewing manager fit-to-work status required");
-    }
+    // Individual has no Crewing manager step (confirmed 2026-08-19) — CI &
+    // References Form below is its only base-verification requirement.
 
     // CI & References Form (loanstar/docs/cig-references-form-plan.md, Phase 4) —
     // required subset only; the rest of Sheet1's fields are captured but not
@@ -495,6 +536,14 @@ export function assessVerificationCompleteness(
     }
   }
 
+  if (collateralType === "car_refinancing") {
+    const cm = assessCmInspectionRequired(verification.cmInspection);
+    missing.push(...cm.missing);
+  } else if (collateralType === "real_estate") {
+    const rem = assessRemInspectionRequired(verification.remInspection);
+    missing.push(...rem.missing);
+  }
+
   if (!verification.finding) {
     missing.push("Finding (positive/negative) required");
   }
@@ -511,13 +560,23 @@ export function assessVerificationCompleteness(
       ? assessSmeReloanRequired(verification.smeReloanVerification).complete
       : assessFieldVisitRequired(verification.fieldVisit).complete);
 
+  const collateralOk =
+    collateralType === "car_refinancing"
+      ? assessCmInspectionRequired(verification.cmInspection).complete
+      : collateralType === "real_estate"
+        ? assessRemInspectionRequired(verification.remInspection).complete
+        : true;
+
   const complete =
     isBorrowerReviewComplete(verification) &&
     checksComplete &&
     (segment === "sme"
       ? smeFormOk
-      : isCiReferencesComplete(verification) &&
-        isCrewingManagerComplete(verification)) &&
+      : segment === "individual"
+        ? isCiReferencesComplete(verification)
+        : isCiReferencesComplete(verification) &&
+          isCrewingManagerComplete(verification)) &&
+    collateralOk &&
     isFindingRecorded(verification);
 
   return { complete, missing };

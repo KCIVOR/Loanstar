@@ -7,7 +7,7 @@ export type CsaHistoryRow = {
   applicationNo: string | null;
   status: string;
   statusGroup: CsaHistoryStatusGroup;
-  segment: "sme" | "seafarer" | null;
+  segment: "sme" | "seafarer" | "individual" | null;
   borrower: {
     borrowerNo: string;
     firstName: string;
@@ -28,7 +28,7 @@ export type CsaHistorySortKey =
 export type CsaHistoryQueryParams = {
   search?: string;
   statusGroup?: CsaHistoryStatusGroup | "all";
-  segment?: "all" | "seafarer" | "sme";
+  segment?: "all" | "seafarer" | "sme" | "individual";
   from?: string | null;
   to?: string | null;
   sortKey?: CsaHistorySortKey;
@@ -312,8 +312,10 @@ export async function getCsaApplicationHistory(
     );
 
     const segmentRaw = row.segment as string | null;
-    const segment: "sme" | "seafarer" | null =
-      segmentRaw === "sme" || segmentRaw === "seafarer" ? segmentRaw : null;
+    const segment: "sme" | "seafarer" | "individual" | null =
+      segmentRaw === "sme" || segmentRaw === "seafarer" || segmentRaw === "individual"
+        ? segmentRaw
+        : null;
 
     return [
       {

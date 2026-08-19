@@ -228,3 +228,50 @@ describe("application form completeness SME Phase 3.6", () => {
     assert.deepEqual(withDefault.missing, withExplicit.missing);
   });
 });
+
+describe("application form completeness Individual (Phase 1.4)", () => {
+  it("does not require manning/rank/vessel or any business field for Individual", () => {
+    const profile = {
+      ...completeProfile(),
+      manningAgency: {},
+      picWork: {},
+      businessInfo: {},
+    };
+    const result = assessApplicationFormCompleteness(profile, {
+      segment: "individual",
+    });
+    assert.equal(result.complete, true);
+    assert.deepEqual(result.missing, []);
+  });
+
+  it("lists only the common identity + loan-intent fields for an empty Individual profile", () => {
+    const result = assessApplicationFormCompleteness(emptyProfile(), {
+      segment: "individual",
+    });
+    assert.equal(result.complete, false);
+    assert.deepEqual(result.missing, [
+      "Application form: first name",
+      "Application form: last name",
+      "Application form: mobile phone",
+      "Application form: email",
+      "Application form: loan desired",
+      "Application form: requested terms",
+      "Application form: purpose of loan",
+      "Application form: present address",
+    ]);
+    assert.ok(!result.missing.includes("Application form: manning agency name"));
+    assert.ok(!result.missing.includes("Application form: rank"));
+    assert.ok(!result.missing.includes("Application form: vessel"));
+  });
+
+  it("null-profile branch matches the populated-profile branch's missing set", () => {
+    const nullBranch = assessApplicationFormCompleteness(null, {
+      segment: "individual",
+    });
+    const populatedBranch = assessApplicationFormCompleteness(
+      emptyProfile(),
+      { segment: "individual" },
+    );
+    assert.deepEqual(nullBranch.missing, populatedBranch.missing);
+  });
+});

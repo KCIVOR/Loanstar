@@ -3,6 +3,7 @@ export { LoanStarMark, LoanStarLogo } from "./LoanStarMark";
 export { Button } from "./Button";
 export type { ButtonProps } from "./Button";
 export { Input } from "./Input";
+export { FacebookLinkField, FacebookLinkText } from "./FacebookLinkField";
 export { PhoneInput } from "./PhoneInput";
 export type { PhoneInputProps } from "./PhoneInput";
 export { Select } from "./Select";

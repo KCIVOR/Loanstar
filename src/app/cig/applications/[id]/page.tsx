@@ -32,10 +32,18 @@ import {
 import { EditApplicationFormModal } from "@/components/cig/EditApplicationFormModal";
 import { FieldVisitForm } from "@/components/cig/FieldVisitForm";
 import { SmeReloanVerificationForm } from "@/components/cig/SmeReloanVerificationForm";
+import { CmInspectionForm } from "@/components/cig/CmInspectionForm";
+import { RemInspectionForm } from "@/components/cig/RemInspectionForm";
 import { usePermissions } from "@/hooks/usePermissions";
 import { formatStatusLabel, statusBadgeVariant } from "@/lib/applications/status";
 import type { BorrowerProfile } from "@/lib/borrowers/types";
-import { fakeBorrowerProfile, fakeVerificationPatch } from "@/lib/dev/fake-data";
+import {
+  fakeBorrowerProfile,
+  fakeCmInspection,
+  fakeRemark,
+  fakeRemInspection,
+  fakeVerificationPatch,
+} from "@/lib/dev/fake-data";
 import { CSA_ONLY_INTAKE_SLUGS } from "@/lib/documents/csa-only-intake";
 import type {
   FieldVisit,
@@ -45,6 +53,14 @@ import {
   assessFieldVisitRequired,
   assessSmeReloanRequired,
 } from "@/lib/cig/field-visit";
+import type {
+  CmInspection,
+  RemInspection,
+} from "@/lib/cig/collateral-inspection";
+import {
+  assessCmInspectionRequired,
+  assessRemInspectionRequired,
+} from "@/lib/cig/collateral-inspection";
 import {
   buildCigWorkspaceSteps,
   cigChecksSummary,
@@ -76,6 +92,7 @@ type VerificationData = {
   picInterviewNotes: string | null;
   cmDepartureDate: string | null;
   cmSalary: number | null;
+  cmBasicSalary: number | null;
   cmPosition: string | null;
   cmContractStatus: string | null;
   cmFitToWork: boolean | null;
@@ -98,6 +115,8 @@ type VerificationData = {
   cifVerifiedDate: string | null;
   fieldVisit: FieldVisit | null;
   smeReloanVerification: SmeReloanVerification | null;
+  cmInspection: CmInspection | null;
+  remInspection: RemInspection | null;
   finding: "positive" | "negative" | null;
   findingNotes: string | null;
   forwardedAt: string | null;
@@ -176,6 +195,19 @@ function displayText(value: string | null | undefined): string {
   return trimmed ? trimmed : "—";
 }
 
+function borrowerInspectionAccount(borrower: BorrowerProfile | null) {
+  if (!borrower) return {};
+  const accountName = `${borrower.firstName} ${borrower.lastName}`.trim();
+  const address = [
+    borrower.presentAddress?.street,
+    borrower.presentAddress?.barangay,
+    borrower.presentAddress?.city,
+  ]
+    .filter(Boolean)
+    .join(", ");
+  return { accountName, address: address || undefined };
+}
+
 export default function CigApplicationPage() {
   const params = useParams();
   const router = useRouter();
@@ -203,6 +235,8 @@ export default function CigApplicationPage() {
   const [showApplicationForm, setShowApplicationForm] = useState(false);
   const [showEditApplicationForm, setShowEditApplicationForm] = useState(false);
   const [showFieldVisitForm, setShowFieldVisitForm] = useState(false);
+  const [showCmInspectionForm, setShowCmInspectionForm] = useState(false);
+  const [showRemInspectionForm, setShowRemInspectionForm] = useState(false);
   const [checks, setChecks] = useState<CheckItem[]>([]);
   const [completeness, setCompleteness] = useState<{ complete: boolean; missing: string[] }>({
     complete: false,
@@ -211,10 +245,15 @@ export default function CigApplicationPage() {
   const [sequence, setSequence] = useState<CigSequenceState>(FALLBACK_SEQUENCE);
   const [applicationStatus, setApplicationStatus] = useState("");
   const [applicationNo, setApplicationNo] = useState<string | null>(null);
-  const [segment, setSegment] = useState<"seafarer" | "sme">("seafarer");
+  const [segment, setSegment] = useState<"seafarer" | "sme" | "individual">(
+    "seafarer",
+  );
   const [entityType, setEntityType] = useState<"individual" | "corporate" | null>(
     null,
   );
+  const [collateralType, setCollateralType] = useState<
+    "none" | "car_refinancing" | "real_estate"
+  >("none");
   const [isReloan, setIsReloan] = useState(false);
   const [endorsedAt, setEndorsedAt] = useState<string | null>(null);
   const [callbackAt, setCallbackAt] = useState("");
@@ -270,8 +309,9 @@ export default function CigApplicationPage() {
           applicationNo: string | null;
           endorsedAt: string | null;
           endorsedByName?: string | null;
-          segment?: "seafarer" | "sme";
+          segment?: "seafarer" | "sme" | "individual";
           entityType?: "individual" | "corporate" | null;
+          collateralType?: "none" | "car_refinancing" | "real_estate";
           isReloan?: boolean;
           blocker?: string | null;
           privacyOrientationAt?: string | null;
@@ -304,9 +344,13 @@ export default function CigApplicationPage() {
       setApplicationStatus(appData.application.status);
       setApplicationNo(appData.application.applicationNo);
       setSegment(
-        appData.application.segment === "sme" ? "sme" : "seafarer",
+        appData.application.segment === "sme" ||
+          appData.application.segment === "individual"
+          ? appData.application.segment
+          : "seafarer",
       );
       setEntityType(appData.application.entityType ?? null);
+      setCollateralType(appData.application.collateralType ?? "none");
       setIsReloan(Boolean(appData.application.isReloan));
       setEndorsedAt(appData.application.endorsedAt);
       setBorrower(appData.borrower);
@@ -425,6 +469,9 @@ export default function CigApplicationPage() {
       }
       if (verification.cmSalary != null) {
         patch.cmSalary = verification.cmSalary;
+      }
+      if (verification.cmBasicSalary != null) {
+        patch.cmBasicSalary = verification.cmBasicSalary;
       }
       if (verification.cmPosition) {
         patch.cmPosition = verification.cmPosition;
@@ -1293,7 +1340,9 @@ export default function CigApplicationPage() {
                 {editable
                   ? segment === "sme"
                     ? "Complete sections in order: borrower review → checks → Field Visit → finding."
-                    : "Complete sections in order: borrower review → checks → CI & Refs → crewing → finding."
+                    : segment === "individual"
+                      ? "Complete sections in order: borrower review → checks → CI & Refs → finding."
+                      : "Complete sections in order: borrower review → checks → CI & Refs → crewing → finding."
                   : "Submitted to Committee — view only."}
               </p>
               <div
@@ -1645,7 +1694,7 @@ export default function CigApplicationPage() {
                   </Card>
                 ) : null}
 
-                {editable && ciUnlocked && !crewingUnlocked ? (
+                {segment === "seafarer" && editable && ciUnlocked && !crewingUnlocked ? (
                   <Card className="!bg-surface-2/40">
                     <p className="text-sm text-ink-500">
                       <b>Next:</b> Crewing manager unlocks when CI &amp;
@@ -1654,7 +1703,7 @@ export default function CigApplicationPage() {
                   </Card>
                 ) : null}
 
-                {crewingUnlocked ? (
+                {segment === "seafarer" && crewingUnlocked ? (
                   <Card>
                     <h2 className="mb-1 font-display text-lg font-semibold text-navy-900">
                       Crewing manager
@@ -1680,7 +1729,7 @@ export default function CigApplicationPage() {
                         />
                       </div>
                       <div>
-                        <Label htmlFor="cmSalary">Salary</Label>
+                        <Label htmlFor="cmSalary">Total Salary</Label>
                         <div className="affix">
                           <span className="add">₱</span>
                           <Input
@@ -1693,6 +1742,28 @@ export default function CigApplicationPage() {
                               setVerification({
                                 ...verification,
                                 cmSalary: e.target.value
+                                  ? Number(e.target.value)
+                                  : null,
+                              })
+                            }
+                            mono
+                          />
+                        </div>
+                      </div>
+                      <div>
+                        <Label htmlFor="cmBasicSalary">Basic Salary</Label>
+                        <div className="affix">
+                          <span className="add">₱</span>
+                          <Input
+                            id="cmBasicSalary"
+                            type="number"
+                            step="0.01"
+                            disabled={!editable}
+                            value={verification.cmBasicSalary ?? ""}
+                            onChange={(e) =>
+                              setVerification({
+                                ...verification,
+                                cmBasicSalary: e.target.value
                                   ? Number(e.target.value)
                                   : null,
                               })
@@ -1868,6 +1939,80 @@ export default function CigApplicationPage() {
               </>
             )}
 
+            {ciUnlocked && collateralType === "car_refinancing" ? (
+              <Card>
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <h2 className="mb-1 font-display text-lg font-semibold text-navy-900">
+                      CM Inspection
+                    </h2>
+                    <p className="mb-3 text-sm text-ink-500">
+                      {editable
+                        ? "Vehicle collateral inspection — Car Refinancing."
+                        : "Submitted to Committee — view only."}
+                    </p>
+                  </div>
+                  <Badge
+                    variant={
+                      assessCmInspectionRequired(verification.cmInspection)
+                        .complete
+                        ? "success"
+                        : "warning"
+                    }
+                  >
+                    {assessCmInspectionRequired(verification.cmInspection)
+                      .complete
+                      ? "Complete"
+                      : "In progress"}
+                  </Badge>
+                </div>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  onClick={() => setShowCmInspectionForm(true)}
+                >
+                  {editable ? "Open CM Inspection" : "View CM Inspection"}
+                </Button>
+              </Card>
+            ) : null}
+
+            {ciUnlocked && collateralType === "real_estate" ? (
+              <Card>
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <h2 className="mb-1 font-display text-lg font-semibold text-navy-900">
+                      REM Inspection
+                    </h2>
+                    <p className="mb-3 text-sm text-ink-500">
+                      {editable
+                        ? "Property collateral inspection — Real Estate."
+                        : "Submitted to Committee — view only."}
+                    </p>
+                  </div>
+                  <Badge
+                    variant={
+                      assessRemInspectionRequired(verification.remInspection)
+                        .complete
+                        ? "success"
+                        : "warning"
+                    }
+                  >
+                    {assessRemInspectionRequired(verification.remInspection)
+                      .complete
+                      ? "Complete"
+                      : "In progress"}
+                  </Badge>
+                </div>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  onClick={() => setShowRemInspectionForm(true)}
+                >
+                  {editable ? "Open REM Inspection" : "View REM Inspection"}
+                </Button>
+              </Card>
+            ) : null}
+
             {findingUnlocked ? (
               <Card>
                 <h2 className="mb-1 font-display text-lg font-semibold text-navy-900">
@@ -1999,6 +2144,56 @@ export default function CigApplicationPage() {
                     verifierName={verifierName}
                   />
                 )}
+              </div>
+            </Modal>
+          ) : null}
+
+          {showCmInspectionForm && collateralType === "car_refinancing" ? (
+            <Modal
+              open={showCmInspectionForm}
+              onClose={() => setShowCmInspectionForm(false)}
+              title="CM Inspection"
+              className="!max-w-4xl"
+            >
+              <div className="max-h-[65vh] overflow-y-auto pr-1">
+                <CmInspectionForm
+                  value={verification.cmInspection}
+                  onChange={(next) =>
+                    setVerification({ ...verification, cmInspection: next })
+                  }
+                  onSave={(next) => {
+                    setVerification({ ...verification, cmInspection: next });
+                    void saveVerification({ cmInspection: next });
+                  }}
+                  saving={saving}
+                  readOnly={!editable}
+                  verifierName={verifierName}
+                />
+              </div>
+            </Modal>
+          ) : null}
+
+          {showRemInspectionForm && collateralType === "real_estate" ? (
+            <Modal
+              open={showRemInspectionForm}
+              onClose={() => setShowRemInspectionForm(false)}
+              title="REM Inspection"
+              className="!max-w-4xl"
+            >
+              <div className="max-h-[65vh] overflow-y-auto pr-1">
+                <RemInspectionForm
+                  value={verification.remInspection}
+                  onChange={(next) =>
+                    setVerification({ ...verification, remInspection: next })
+                  }
+                  onSave={(next) => {
+                    setVerification({ ...verification, remInspection: next });
+                    void saveVerification({ remInspection: next });
+                  }}
+                  saving={saving}
+                  readOnly={!editable}
+                  verifierName={verifierName}
+                />
               </div>
             </Modal>
           ) : null}
@@ -2181,11 +2376,49 @@ export default function CigApplicationPage() {
             onClick: () => {
               setVerification((prev) => ({
                 ...(prev as VerificationData),
-                ...fakeVerificationPatch(segment, isReloan),
+                ...fakeVerificationPatch(segment, isReloan, {
+                  collateralType,
+                  verifierName,
+                  ...borrowerInspectionAccount(borrower),
+                }),
               }));
               setCiFormKey((k) => k + 1);
             },
           },
+          ...(collateralType === "car_refinancing"
+            ? [
+                {
+                  label: "Fill CM Inspection",
+                  onClick: () => {
+                    setVerification((prev) => ({
+                      ...(prev as VerificationData),
+                      cmInspection: fakeCmInspection({
+                        verifierName,
+                        ...borrowerInspectionAccount(borrower),
+                      }),
+                    }));
+                    setShowCmInspectionForm(true);
+                  },
+                },
+              ]
+            : []),
+          ...(collateralType === "real_estate"
+            ? [
+                {
+                  label: "Fill REM Inspection",
+                  onClick: () => {
+                    setVerification((prev) => ({
+                      ...(prev as VerificationData),
+                      remInspection: fakeRemInspection({
+                        verifierName,
+                        ...borrowerInspectionAccount(borrower),
+                      }),
+                    }));
+                    setShowRemInspectionForm(true);
+                  },
+                },
+              ]
+            : []),
           ...(borrower
             ? [
                 {
@@ -2195,6 +2428,14 @@ export default function CigApplicationPage() {
                 },
               ]
             : []),
+          {
+            label: "Fill CIG notes",
+            onClick: () => {
+              setReturnNote(fakeRemark("returnToCsa"));
+              setCallbackNotes(fakeRemark("callback"));
+              setCancelReason(fakeRemark("cancel"));
+            },
+          },
         ]}
       />
     </div>

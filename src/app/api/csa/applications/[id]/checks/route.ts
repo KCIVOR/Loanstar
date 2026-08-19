@@ -39,7 +39,10 @@ export async function GET(_request: Request, { params }: RouteParams) {
       throw new Error(appError?.message ?? "Application not found");
     }
 
-    const segment = app.segment === "sme" ? "sme" : "seafarer";
+    const segment =
+      app.segment === "sme" || app.segment === "individual"
+        ? app.segment
+        : "seafarer";
 
     const { data: mappings, error: mapError } = await supabase
       .from("stage_check_mapping")
@@ -115,7 +118,10 @@ export async function POST(request: Request, { params }: RouteParams) {
     const body = checkSchema.parse(await request.json());
     const supabase = await createClient();
     const application = await assertCsaCanEdit(supabase, id);
-    const segment = application.segment === "sme" ? "sme" : "seafarer";
+    const segment =
+      application.segment === "sme" || application.segment === "individual"
+        ? application.segment
+        : "seafarer";
     const expectedSlug = csaScreeningCheckSlug(segment);
 
     if (body.checkSlug !== expectedSlug) {

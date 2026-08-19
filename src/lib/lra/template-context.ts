@@ -7,7 +7,7 @@ import type { ReleasePath } from "./constants";
 
 /** Additive scope — omit or pass seafarer to keep Seafarer merge context unchanged. */
 export type ReleaseTemplateScope = {
-  segment?: "seafarer" | "sme" | null;
+  segment?: "seafarer" | "sme" | "individual" | null;
 };
 
 function smeBusinessSlots(businessInfo: BusinessInfo | undefined): {
@@ -117,20 +117,32 @@ export function buildReleaseTemplateContext(
   const disbursementCode = isCheck ? "1100115" : "1100110";
   const disbursementLabel = isCheck ? "Bank" : "CASH";
   const isSme = scope?.segment === "sme";
+  const isIndividual = scope?.segment === "individual";
   const sme = isSme ? smeBusinessSlots(borrower.businessInfo) : null;
 
   // Existing release templates bind manningAgency / principalShip — for SME,
   // fill those slots from business_info so published templates do not blank
-  // (Phase 8.3: one template + segment-conditional merge values).
+  // (Phase 8.3: one template + segment-conditional merge values). Individual
+  // has neither a business nor a manning agency/vessel — resolve both slots to
+  // empty strings (the file's own established convention for uncaptured
+  // fields) rather than guess placeholder content; Phase 10.3 needs the
+  // client's confirmation of what, if anything, these slots should show for
+  // a personal loan before this is filled in for real.
   const manningAgency = isSme
     ? (sme?.companyName ?? "")
-    : (borrower.manningAgency?.name ?? "");
+    : isIndividual
+      ? ""
+      : (borrower.manningAgency?.name ?? "");
   const principalShip = isSme
     ? (sme?.natureOfBusiness || sme?.businessAddress || "")
-    : (borrower.picWork?.vessel ?? "");
+    : isIndividual
+      ? ""
+      : (borrower.picWork?.vessel ?? "");
   const loanReceivableDescription = isSme
     ? "Loans Receivable - SME Loan"
-    : "Loans Receivable - Seafarer Loan";
+    : isIndividual
+      ? "Loans Receivable - Individual Loan"
+      : "Loans Receivable - Seafarer Loan";
 
   const accountingEntries: AccountingEntry[] = [
     {

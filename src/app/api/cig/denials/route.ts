@@ -3,7 +3,7 @@ import { getPendingDenialCalls } from "@/lib/cig/denials";
 import { requireModulePermission } from "@/lib/permissions/server";
 import { createClient } from "@/lib/supabase/server";
 
-const SEGMENT_FILTERS = new Set(["all", "seafarer", "sme"]);
+const SEGMENT_FILTERS = new Set(["all", "seafarer", "sme", "individual"]);
 
 /** Denied files waiting for CIG's courtesy call to the borrower. */
 export async function GET(request: Request) {
@@ -14,7 +14,7 @@ export async function GET(request: Request) {
     const segmentRaw = searchParams.get("segment") ?? "all";
     const segment = (
       SEGMENT_FILTERS.has(segmentRaw) ? segmentRaw : "all"
-    ) as "all" | "seafarer" | "sme";
+    ) as "all" | "seafarer" | "sme" | "individual";
 
     const supabase = await createClient();
     const denials = await getPendingDenialCalls(supabase, { segment });

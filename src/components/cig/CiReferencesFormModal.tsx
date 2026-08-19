@@ -7,6 +7,7 @@ import {
   Button,
   Card,
   Checkbox,
+  FacebookLinkField,
   Input,
   Label,
   Modal,
@@ -480,7 +481,12 @@ function ReferenceBlock({
         <Field label="Other Contact Number :" value={value.otherContactNumber ?? ""} onChange={(v) => set({ otherContactNumber: v })} />
       </div>
       <div className="mt-3">
-        <Field label="Facebook Account :" optTag="(Optional)" value={value.facebookAccount ?? ""} onChange={(v) => set({ facebookAccount: v })} />
+        <FacebookLinkField
+          label="Facebook link :"
+          optTag="(Optional)"
+          value={value.facebookAccount ?? ""}
+          onChange={(v) => set({ facebookAccount: v })}
+        />
       </div>
 
       <h4 className="mb-2 mt-4 font-display text-sm font-semibold uppercase tracking-wide text-navy-800">

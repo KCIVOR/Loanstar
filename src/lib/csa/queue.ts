@@ -19,7 +19,7 @@ export type CsaQueueItem = {
   status: string;
   blocker: string | null;
   isReloan: boolean;
-  segment: "sme" | "seafarer" | null;
+  segment: "sme" | "seafarer" | "individual" | null;
   createdAt: string;
   updatedAt: string;
   borrower: {
@@ -34,7 +34,7 @@ export type CsaQueueItem = {
 export type CsaQueueQueryParams = {
   search?: string;
   workFilter?: CsaWorkFilter;
-  segment?: "all" | "seafarer" | "sme";
+  segment?: "all" | "seafarer" | "sme" | "individual";
   from?: string | null;
   to?: string | null;
   sortKey?: CsaQueueSortKey;
@@ -290,8 +290,10 @@ export async function getCsaQueue(
     const borrowerRaw = row.borrowers;
     const borrower = Array.isArray(borrowerRaw) ? borrowerRaw[0] : borrowerRaw;
     const segmentRaw = row.segment as string | null;
-    const segment: "sme" | "seafarer" | null =
-      segmentRaw === "sme" || segmentRaw === "seafarer" ? segmentRaw : null;
+    const segment: "sme" | "seafarer" | "individual" | null =
+      segmentRaw === "sme" || segmentRaw === "seafarer" || segmentRaw === "individual"
+        ? segmentRaw
+        : null;
 
     return {
       id: row.id as string,

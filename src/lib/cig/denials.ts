@@ -6,7 +6,7 @@ export type DenialCallItem = {
   noticeId: string;
   applicationId: string;
   applicationNo: string | null;
-  segment: "sme" | "seafarer" | null;
+  segment: "sme" | "seafarer" | "individual" | null;
   deniedAt: string;
   borrower: {
     firstName: string;
@@ -17,17 +17,17 @@ export type DenialCallItem = {
 };
 
 export type DenialCallsQueryParams = {
-  segment?: "all" | "seafarer" | "sme";
+  segment?: "all" | "seafarer" | "sme" | "individual";
 };
 
-function mapSegment(raw: unknown): "sme" | "seafarer" | null {
-  return raw === "sme" || raw === "seafarer" ? raw : null;
+function mapSegment(raw: unknown): "sme" | "seafarer" | "individual" | null {
+  return raw === "sme" || raw === "seafarer" || raw === "individual" ? raw : null;
 }
 
 /** Segment chip filter — mirrors waiting-bucket `passesWaitingBucket` shape. */
 export function passesSegmentFilter(
   row: Pick<DenialCallItem, "segment">,
-  segment: "all" | "seafarer" | "sme",
+  segment: "all" | "seafarer" | "sme" | "individual",
 ): boolean {
   if (segment === "all") return true;
   return row.segment === segment;

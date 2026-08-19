@@ -53,7 +53,7 @@ export function EditApplicationFormModal({
   borrower: BorrowerProfile;
   applicationId: string;
   onSaved: () => Promise<void> | void;
-  segment?: "seafarer" | "sme";
+  segment?: "seafarer" | "sme" | "individual";
   entityType?: "individual" | "corporate" | null;
 }) {
   // Parent mounts this only while `open` is true, so each open is a fresh

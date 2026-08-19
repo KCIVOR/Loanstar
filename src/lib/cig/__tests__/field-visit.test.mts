@@ -93,6 +93,7 @@ function emptyVerification(
     picInterviewNotes: null,
     cmDepartureDate: null,
     cmSalary: null,
+    cmBasicSalary: null,
     cmPosition: null,
     cmContractStatus: null,
     cmFitToWork: null,

@@ -84,6 +84,7 @@ const CI_REFERENCES_KEYS: ReadonlySet<string> = new Set([
 const CREWING_MANAGER_KEYS: ReadonlySet<string> = new Set([
   "cmDepartureDate",
   "cmSalary",
+  "cmBasicSalary",
   "cmPosition",
   "cmContractStatus",
   "cmFitToWork",
@@ -124,7 +125,10 @@ export function getCigSequenceState(
   checksComplete: boolean,
   scope: VerificationScope = {},
 ): CigSequenceState {
-  const segment = scope.segment === "sme" ? "sme" : "seafarer";
+  const segment: "sme" | "seafarer" | "individual" =
+    scope.segment === "sme" || scope.segment === "individual"
+      ? scope.segment
+      : "seafarer";
   const s1 = isBorrowerReviewComplete(verification);
   const s2 = s1 && checksComplete;
 
@@ -133,6 +137,13 @@ export function getCigSequenceState(
   if (segment === "sme") {
     // Field Visit replaces PIC + Crewing (6.0.a). Crewing slot auto-completes.
     s3 = s2 && isSmeFieldStageComplete(verification, scope);
+    s4 = s3;
+  } else if (segment === "individual") {
+    // CI & References Form applies (reuses Seafarer's phone-verification
+    // approach, confirmed 2026-08-18), but Individual has no Crewing manager
+    // step at all (confirmed 2026-08-19 — no manning agency/vessel to verify).
+    // Crewing slot auto-completes, same pattern as SME's Field Visit above.
+    s3 = s2 && isCiReferencesComplete(verification);
     s4 = s3;
   } else {
     s3 = s2 && isCiReferencesComplete(verification);
@@ -226,7 +237,7 @@ export function assertChecksRecordingAllowed(state: CigSequenceState): void {
 
 export function cigSequenceStageLabel(
   stage: CigSequenceStage,
-  segment?: "seafarer" | "sme" | null,
+  segment?: "seafarer" | "sme" | "individual" | null,
 ): string {
   if (segment === "sme") {
     if (stage === "ci_references") return "Field Visit";

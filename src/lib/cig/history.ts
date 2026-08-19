@@ -19,7 +19,7 @@ export type CigScheduledCallback = {
   id: string;
   applicationId: string;
   applicationNo: string | null;
-  segment: "sme" | "seafarer" | null;
+  segment: "sme" | "seafarer" | "individual" | null;
   scheduledAt: string;
   notes: string | null;
   /** True when `scheduledAt <= now` (still unresolved). */
@@ -33,7 +33,7 @@ export type CigScheduledCallback = {
 };
 
 export type CigScheduledCallbacksQueryParams = {
-  segment?: "all" | "seafarer" | "sme";
+  segment?: "all" | "seafarer" | "sme" | "individual";
 };
 
 const RECENT_LIMIT = 100;
@@ -52,7 +52,7 @@ export type CigForwardedHistoryRow = {
   verificationId: string;
   applicationNo: string | null;
   status: string;
-  segment: "sme" | "seafarer" | null;
+  segment: "sme" | "seafarer" | "individual" | null;
   finding: "positive" | "negative" | null;
   forwardedAt: string | null;
   completedAt: string | null;
@@ -67,7 +67,7 @@ export type CigForwardedSortKey =
 export type CigForwardedQueryParams = {
   search?: string;
   finding?: CigRecentFindingFilter;
-  segment?: "all" | "seafarer" | "sme";
+  segment?: "all" | "seafarer" | "sme" | "individual";
   from?: string | null;
   to?: string | null;
   sortKey?: CigForwardedSortKey;
@@ -80,7 +80,7 @@ export type CigReturnedHistoryRow = {
   id: string;
   applicationId: string;
   applicationNo: string | null;
-  segment: "sme" | "seafarer" | null;
+  segment: "sme" | "seafarer" | "individual" | null;
   returnedAt: string;
   note: string | null;
   borrower: CigHistoryBorrower | null;
@@ -90,7 +90,7 @@ export type CigReturnedSortKey = "returnedAt" | "applicationNo" | "borrower";
 
 export type CigReturnedQueryParams = {
   search?: string;
-  segment?: "all" | "seafarer" | "sme";
+  segment?: "all" | "seafarer" | "sme" | "individual";
   from?: string | null;
   to?: string | null;
   sortKey?: CigReturnedSortKey;
@@ -215,8 +215,10 @@ const APPLICATION_BORROWER_EMBED = `
 
 function mapSegment(
   raw: unknown,
-): "sme" | "seafarer" | null {
-  return raw === "sme" || raw === "seafarer" ? raw : null;
+): "sme" | "seafarer" | "individual" | null {
+  return raw === "sme" || raw === "seafarer" || raw === "individual"
+    ? raw
+    : null;
 }
 
 export function cigRecentMatchesSearch(

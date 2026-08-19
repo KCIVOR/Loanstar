@@ -17,8 +17,9 @@ import {
 import { AutofillOverlay } from "@/components/dev/AutofillOverlay";
 import { parseBorrowerNameParts } from "@/lib/csa/leads";
 
-type LoanSegment = "seafarer" | "sme";
+type LoanSegment = "seafarer" | "sme" | "individual";
 type EntityType = "individual" | "corporate";
+type CollateralType = "none" | "car_refinancing" | "real_estate";
 
 function CsaNewApplicationForm() {
   const router = useRouter();
@@ -38,14 +39,23 @@ function CsaNewApplicationForm() {
   const [mobilePhone, setMobilePhone] = useState("");
   const [segment, setSegment] = useState<LoanSegment>("seafarer");
   const [entityType, setEntityType] = useState<EntityType>("individual");
+  const [collateralType, setCollateralType] = useState<CollateralType>("none");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const collateralEligible = segment === "sme" || segment === "individual";
+
+  function handleSegmentChange(next: LoanSegment) {
+    setSegment(next);
+    if (next === "seafarer") setCollateralType("none");
+  }
 
   function fillIntake(nextSegment: LoanSegment, nextEntityType: EntityType) {
     const rand = Math.floor(Math.random() * 100000);
     const names = { first: "Juan", last: "Dela Cruz" };
     setSegment(nextSegment);
     setEntityType(nextEntityType);
+    setCollateralType("none");
     setEmail(`autofill.${rand}@example.local`);
     setFirstName(names.first);
     setLastName(names.last);
@@ -66,6 +76,7 @@ function CsaNewApplicationForm() {
         mobilePhone: mobilePhone || undefined,
         segment,
         entityType: segment === "sme" ? entityType : undefined,
+        collateralType: collateralEligible ? collateralType : undefined,
       };
 
       const res = await fetch(
@@ -127,10 +138,11 @@ function CsaNewApplicationForm() {
             <Select
               id="segment"
               value={segment}
-              onChange={(e) => setSegment(e.target.value as LoanSegment)}
+              onChange={(e) => handleSegmentChange(e.target.value as LoanSegment)}
             >
               <option value="seafarer">Seafarer</option>
               <option value="sme">SME</option>
+              <option value="individual">Individual</option>
             </Select>
           </div>
           {segment === "sme" ? (
@@ -144,13 +156,32 @@ function CsaNewApplicationForm() {
                 onChange={(e) => setEntityType(e.target.value as EntityType)}
                 required
               >
-                <option value="individual">Individual</option>
-                <option value="corporate">Corporate</option>
+                <option value="individual">Individual (Sole Proprietorship)</option>
+                <option value="corporate">Corporate (Partnership/Corporation)</option>
               </Select>
             </div>
           ) : (
             <div aria-hidden className="hidden sm:block" />
           )}
+          {collateralEligible ? (
+            <div className="sm:col-span-2">
+              <Label htmlFor="collateralType" required>
+                Collateral
+              </Label>
+              <Select
+                id="collateralType"
+                value={collateralType}
+                onChange={(e) =>
+                  setCollateralType(e.target.value as CollateralType)
+                }
+                required
+              >
+                <option value="none">Clean (no collateral)</option>
+                <option value="car_refinancing">Car Refinancing</option>
+                <option value="real_estate">Real Estate</option>
+              </Select>
+            </div>
+          ) : null}
           <div className="sm:col-span-2">
             <Label htmlFor="email" required>
               Email
@@ -213,6 +244,7 @@ function CsaNewApplicationForm() {
           { label: "Fill: Seafarer", onClick: () => fillIntake("seafarer", "individual") },
           { label: "Fill: SME (Individual)", onClick: () => fillIntake("sme", "individual") },
           { label: "Fill: SME (Corporate)", onClick: () => fillIntake("sme", "corporate") },
+          { label: "Fill: Individual", onClick: () => fillIntake("individual", "individual") },
         ]}
       />
     </div>

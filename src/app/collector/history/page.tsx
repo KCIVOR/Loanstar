@@ -78,7 +78,7 @@ type DcrRow = {
 };
 
 type HistoryTab = "dcrs" | "payments";
-type SegmentFilter = "all" | "seafarer" | "sme";
+type SegmentFilter = "all" | "seafarer" | "sme" | "individual";
 type PayStatusFilter =
   | "all"
   | "confirmed"
@@ -112,6 +112,7 @@ const SEGMENT_CHIPS: Array<{ id: SegmentFilter; label: string }> = [
   { id: "all", label: "All" },
   { id: "seafarer", label: "Seafarer" },
   { id: "sme", label: "SME" },
+  { id: "individual", label: "Individual" },
 ];
 
 const RANGE_CHIPS: Array<{
@@ -157,10 +158,23 @@ const IconX = (
 );
 
 function segmentBadge(segment: string | null | undefined) {
-  const isSme = segment === "sme";
+  if (segment === "sme") {
+    return (
+      <Badge variant="navy" dot>
+        SME
+      </Badge>
+    );
+  }
+  if (segment === "individual") {
+    return (
+      <Badge variant="warning" dot>
+        Individual
+      </Badge>
+    );
+  }
   return (
-    <Badge variant={isSme ? "navy" : "teal"} dot>
-      {isSme ? "SME" : "Seafarer"}
+    <Badge variant="teal" dot>
+      Seafarer
     </Badge>
   );
 }
@@ -528,7 +542,7 @@ export default function CollectorHistoryPage() {
             ) : null}
             {tab === "payments" && segmentFilter !== "all" ? (
               <span className="active-pill">
-                Segment: {segmentFilter === "sme" ? "SME" : "Seafarer"}
+                Segment: {segmentFilter === "sme" ? "SME" : segmentFilter === "individual" ? "Individual" : "Seafarer"}
                 <button
                   type="button"
                   aria-label="Clear segment"

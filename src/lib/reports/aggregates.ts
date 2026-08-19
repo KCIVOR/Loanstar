@@ -240,7 +240,10 @@ export async function buildExecutiveSummary(
     buildAgingReport(supabase),
     buildIncomeReport(supabase),
     buildCollectionReport(supabase),
-    supabase.from("masterlist").select("id", { count: "exact", head: true }),
+    supabase
+      .from("masterlist")
+      .select("id", { count: "exact", head: true })
+      .in("account_status", ["active", "remedial"]),
     supabase.from("portfolios").select("id, name"),
   ]);
 

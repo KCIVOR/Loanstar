@@ -73,7 +73,7 @@ type ApplicationDetail = {
   createdAt: string;
   updatedAt: string;
   timeline: TimelineEntry[];
-  segment: "seafarer" | "sme";
+  segment: "seafarer" | "sme" | "individual";
   entityType: "individual" | "corporate" | null;
 };
 

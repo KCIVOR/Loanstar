@@ -57,6 +57,7 @@ export async function getApplicationForStaff(
       blocker,
       segment,
       entity_type,
+      collateral_type,
       is_reloan,
       parent_application_id,
       endorsed_at,
@@ -138,7 +139,10 @@ export async function getEndorseReadiness(
 ): Promise<EndorseReadiness> {
   const application = await getApplicationForStaff(supabase, applicationId);
   const checklist = await getStageChecklist(supabase, "intake", applicationId, {
-    segment: application.segment === "sme" ? "sme" : "seafarer",
+    segment:
+      application.segment === "sme" || application.segment === "individual"
+        ? application.segment
+        : "seafarer",
     entityType:
       application.entity_type === "individual" ||
       application.entity_type === "corporate"
@@ -149,7 +153,10 @@ export async function getEndorseReadiness(
   const checklistComplete =
     summary.required > 0 && summary.complete === summary.required;
 
-  const segment = application.segment === "sme" ? "sme" : "seafarer";
+  const segment =
+    application.segment === "sme" || application.segment === "individual"
+      ? application.segment
+      : "seafarer";
   const screeningSlug = csaScreeningCheckSlug(segment);
 
   const { data: screeningType } = await supabase
@@ -182,7 +189,7 @@ export async function getEndorseReadiness(
   const coverageEval = evaluateCoverageForEndorse(
     coverageRatio,
     coverageThreshold,
-    { segment: application.segment === "sme" ? "sme" : "seafarer" },
+    { segment },
   );
 
   const borrowerRaw = application.borrowers;
@@ -192,7 +199,10 @@ export async function getEndorseReadiness(
   const formCompleteness = assessApplicationFormCompleteness(
     borrowerRow ? mapBorrowerRow(borrowerRow) : null,
     {
-      segment: application.segment === "sme" ? "sme" : "seafarer",
+      segment:
+      application.segment === "sme" || application.segment === "individual"
+        ? application.segment
+        : "seafarer",
       entityType:
         application.entity_type === "individual" ||
         application.entity_type === "corporate"

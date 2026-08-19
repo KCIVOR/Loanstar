@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 
 import { AccountLedger } from "@/components/ledger/AccountLedger";
+import { AutofillOverlay } from "@/components/dev/AutofillOverlay";
 import { RecordPaymentForm } from "@/components/payments/RecordPaymentForm";
 import {
   Alert,
@@ -24,7 +25,7 @@ type Account = {
   borrowerNo: string | null;
   borrowerId: string | null;
   loanAccountNo: string | null;
-  segment: "seafarer" | "sme";
+  segment: "seafarer" | "sme" | "individual";
   outstandingBalance: number;
   accountStatus: string;
   totalLoan: number;
@@ -149,7 +150,7 @@ export function RecordPaymentPage({
         ];
 
   return (
-    <div>
+    <div className="min-w-0">
       <Breadcrumbs className="mb-3" items={breadcrumbs} />
       <PageHeader
         title={`Record payment — ${account.borrowerName}`}
@@ -157,8 +158,8 @@ export function RecordPaymentPage({
       />
 
       <div className="mb-5 flex flex-wrap items-center gap-2">
-        <Badge variant={account.segment === "sme" ? "navy" : "teal"} dot>
-          {account.segment === "sme" ? "SME" : "Seafarer"}
+        <Badge variant={account.segment === "sme" ? "navy" : account.segment === "individual" ? "warning" : "teal"} dot>
+          {account.segment === "sme" ? "SME" : account.segment === "individual" ? "Individual" : "Seafarer"}
         </Badge>
         <Badge variant="neutral">{account.accountStatus}</Badge>
       </div>
@@ -174,7 +175,7 @@ export function RecordPaymentPage({
         </Alert>
       ) : null}
 
-      <section className="mb-8">
+      <section className="mb-8 min-w-0">
         <h2 className="mb-2 font-display text-lg font-semibold text-navy-900">
           Account ledger
         </h2>
@@ -190,9 +191,7 @@ export function RecordPaymentPage({
             showMark={false}
           />
         ) : (
-          <div className="tbl-wrap">
-            <AccountLedger rows={ledgerRows} />
-          </div>
+          <AccountLedger rows={ledgerRows} />
         )}
       </section>
 
@@ -201,6 +200,7 @@ export function RecordPaymentPage({
         borrowerId={account.borrowerId ?? ""}
         onRecorded={handleRecorded}
       />
+      <AutofillOverlay />
     </div>
   );
 }

@@ -1,12 +1,36 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
+import { fetchAllRows } from "@/lib/reports/paginate";
 import { createServiceClient } from "@/lib/supabase/server";
+
+import {
+  buildAgentScorecard,
+  buildCigScorecard,
+  buildLraScorecard,
+  buildRemedialScorecard,
+  daysBetween,
+  mean,
+  withinPeriod,
+  type AgentScorecardRow,
+  type CheckRow,
+  type CigScorecardRow,
+  type LeadRow,
+  type LraScorecardRow,
+  type ReleaseFileRow,
+  type RemedialScorecardRow,
+  type TurnoverRow,
+  type VerificationRow,
+} from "./staff-scorecards";
+import type { Period } from "./types";
 
 export type CollectorScorecardRow = {
   collectorUserId: string;
   name: string;
   accountsHeld: number;
+  /** Scoped to the requested period when one is given, otherwise all-time. */
   amountCollected: number;
+  /** Always all-time, so the panel keeps a stable lifetime figure. */
+  amountCollectedAllTime: number;
   dcrsSubmitted: number;
   dcrsReconciled: number;
   dcrsRejected: number;
@@ -27,16 +51,11 @@ export type StaffSeries = {
   collectorScorecard: CollectorScorecardRow[];
   committeeParticipation: CommitteeParticipationRow[];
   proofBacklog: ProofBacklogBucket[];
+  agentScorecard: AgentScorecardRow[];
+  cigScorecard: CigScorecardRow[];
+  lraScorecard: LraScorecardRow[];
+  remedialScorecard: RemedialScorecardRow[];
 };
-
-function daysBetween(a: string, b: string): number {
-  return (new Date(b).getTime() - new Date(a).getTime()) / (1000 * 60 * 60 * 24);
-}
-
-function mean(values: number[]): number | null {
-  if (!values.length) return null;
-  return Math.round((values.reduce((s, v) => s + v, 0) / values.length) * 10) / 10;
-}
 
 async function resolveNames(userIds: string[]): Promise<Map<string, string>> {
   const nameById = new Map<string, string>();
@@ -54,58 +73,141 @@ async function resolveNames(userIds: string[]): Promise<Map<string, string>> {
   return nameById;
 }
 
-export async function computeStaffMetrics(supabase: SupabaseClient): Promise<StaffSeries> {
+type AssignmentRow = {
+  masterlist_id: string;
+  collector_user_id: string | null;
+  remedial_user_id: string | null;
+};
+type PostingRow = { masterlist_id: string; amount: number | null; posted_at: string | null };
+type DcrRow = {
+  collector_user_id: string | null;
+  status: string | null;
+  submitted_at: string | null;
+  reconciled_at: string | null;
+};
+type PaymentRow = { status: string | null; created_at: string | null };
+type VoteRow = { voter_id: string; voted_at: string | null; loan_application_id: string };
+type ApplicationRow = {
+  id: string;
+  status: string | null;
+  status_history: Array<{ status: string; at: string }> | null;
+};
+/**
+ * Staff performance across every team that touches a file.
+ *
+ * `period` is optional and backward compatible: without it this behaves exactly
+ * as it did when only collectors and Committee were covered. With it, the
+ * per-person figures answer "how did they do this period" instead of quietly
+ * reporting lifetime totals against a period-scoped page.
+ */
+export async function computeStaffMetrics(
+  supabase: SupabaseClient,
+  period?: Period,
+): Promise<StaffSeries> {
   const [
-    { data: assignments, error: assignError },
-    { data: postings, error: postingsError },
-    { data: dcrRows, error: dcrError },
-    { data: pendingProofs, error: proofsError },
-    { data: votes, error: votesError },
-    { data: applications, error: appsError },
+    assignments,
+    postings,
+    dcrRows,
+    payments,
+    votes,
+    applications,
+    leads,
+    verifications,
+    checks,
+    releaseFiles,
+    turnovers,
   ] = await Promise.all([
-    supabase.from("assignments").select("masterlist_id, collector_user_id"),
-    supabase.from("postings").select("masterlist_id, amount"),
-    supabase.from("dcr").select("collector_user_id, status, submitted_at, reconciled_at"),
-    supabase.from("payments").select("created_at").eq("status", "pending_verification"),
-    supabase.from("committee_votes").select("voter_id, voted_at, loan_application_id"),
-    supabase.from("loan_applications").select("id, status_history"),
+    fetchAllRows<AssignmentRow>(supabase, {
+      table: "assignments",
+      columns: "masterlist_id, collector_user_id, remedial_user_id",
+      order: "id",
+    }),
+    fetchAllRows<PostingRow>(supabase, {
+      table: "postings",
+      columns: "masterlist_id, amount, posted_at",
+      order: "id",
+    }),
+    fetchAllRows<DcrRow>(supabase, {
+      table: "dcr",
+      columns: "collector_user_id, status, submitted_at, reconciled_at",
+      order: "id",
+    }),
+    fetchAllRows<PaymentRow>(supabase, {
+      table: "payments",
+      columns: "status, created_at",
+      order: "id",
+    }),
+    fetchAllRows<VoteRow>(supabase, {
+      table: "committee_votes",
+      columns: "voter_id, voted_at, loan_application_id",
+      order: "id",
+    }),
+    fetchAllRows<ApplicationRow>(supabase, {
+      table: "loan_applications",
+      columns: "id, status, status_history",
+      order: "id",
+    }),
+    fetchAllRows<LeadRow>(supabase, {
+      table: "leads",
+      columns: "agent_user_id, application_id, created_at",
+      order: "id",
+    }),
+    fetchAllRows<VerificationRow>(supabase, {
+      table: "verifications",
+      columns: "completed_by, is_complete, created_at, completed_at",
+      order: "id",
+    }),
+    fetchAllRows<CheckRow>(supabase, {
+      table: "checks_recorded",
+      columns: "checked_by, result, checked_at",
+      order: "id",
+    }),
+    fetchAllRows<ReleaseFileRow>(supabase, {
+      table: "release_files",
+      columns: "assigned_to, status, created_at, updated_at",
+      order: "id",
+    }),
+    fetchAllRows<TurnoverRow>(supabase, {
+      table: "remedial_turnovers",
+      columns: "masterlist_id, to_remedial_user_id, confirmed_at",
+      order: "id",
+    }),
   ]);
-
-  if (assignError) throw new Error(assignError.message);
-  if (postingsError) throw new Error(postingsError.message);
-  if (dcrError) throw new Error(dcrError.message);
-  if (proofsError) throw new Error(proofsError.message);
-  if (votesError) throw new Error(votesError.message);
-  if (appsError) throw new Error(appsError.message);
 
   // --- Collector scorecard --------------------------------------------
   const collectorByMasterlist = new Map<string, string>();
   const accountsHeldByCollector = new Map<string, number>();
-  for (const row of assignments ?? []) {
-    const collectorId = row.collector_user_id as string | null;
+  for (const row of assignments) {
+    const collectorId = row.collector_user_id;
     if (!collectorId) continue;
-    collectorByMasterlist.set(row.masterlist_id as string, collectorId);
+    collectorByMasterlist.set(row.masterlist_id, collectorId);
     accountsHeldByCollector.set(collectorId, (accountsHeldByCollector.get(collectorId) ?? 0) + 1);
   }
 
   const collectedByCollector = new Map<string, number>();
-  for (const row of postings ?? []) {
-    const collectorId = collectorByMasterlist.get(row.masterlist_id as string);
+  const collectedAllTimeByCollector = new Map<string, number>();
+  for (const row of postings) {
+    const collectorId = collectorByMasterlist.get(row.masterlist_id);
     if (!collectorId) continue;
-    collectedByCollector.set(
+    const amount = Number(row.amount ?? 0);
+    collectedAllTimeByCollector.set(
       collectorId,
-      (collectedByCollector.get(collectorId) ?? 0) + Number(row.amount),
+      (collectedAllTimeByCollector.get(collectorId) ?? 0) + amount,
     );
+    if (withinPeriod(row.posted_at, period)) {
+      collectedByCollector.set(collectorId, (collectedByCollector.get(collectorId) ?? 0) + amount);
+    }
   }
 
   const dcrByCollector = new Map<
     string,
     { submitted: number; reconciled: number; rejected: number; cycleDays: number[] }
   >();
-  for (const row of dcrRows ?? []) {
-    const collectorId = row.collector_user_id as string | null;
-    const status = row.status as string;
+  for (const row of dcrRows) {
+    const collectorId = row.collector_user_id;
+    const status = row.status ?? "";
     if (!collectorId || status === "draft") continue;
+    if (!withinPeriod(row.submitted_at, period)) continue;
     const entry = dcrByCollector.get(collectorId) ?? {
       submitted: 0,
       reconciled: 0,
@@ -116,26 +218,65 @@ export async function computeStaffMetrics(supabase: SupabaseClient): Promise<Sta
     if (status === "reconciled") {
       entry.reconciled += 1;
       if (row.submitted_at && row.reconciled_at) {
-        entry.cycleDays.push(daysBetween(row.submitted_at as string, row.reconciled_at as string));
+        entry.cycleDays.push(daysBetween(row.submitted_at, row.reconciled_at));
       }
     }
     if (status === "rejected") entry.rejected += 1;
     dcrByCollector.set(collectorId, entry);
   }
 
+  // --- Committee participation -------------------------------------------
+  const forApprovalAtByApplication = new Map<string, string>();
+  const statusByApplication = new Map<string, string>();
+  for (const app of applications) {
+    statusByApplication.set(app.id, app.status ?? "");
+    const entry = (app.status_history ?? []).find((e) => e.status === "for_approval");
+    if (entry) forApprovalAtByApplication.set(app.id, entry.at);
+  }
+
+  const committeeByVoter = new Map<string, { votes: number; turnarounds: number[] }>();
+  for (const row of votes) {
+    if (!withinPeriod(row.voted_at, period)) continue;
+    const entry = committeeByVoter.get(row.voter_id) ?? { votes: 0, turnarounds: [] };
+    entry.votes += 1;
+    const forApprovalAt = forApprovalAtByApplication.get(row.loan_application_id);
+    if (forApprovalAt && row.voted_at) {
+      entry.turnarounds.push(daysBetween(forApprovalAt, row.voted_at));
+    }
+    committeeByVoter.set(row.voter_id, entry);
+  }
+
+  // --- One name lookup for every team -------------------------------------
+  const userIds = new Set<string>([
+    ...accountsHeldByCollector.keys(),
+    ...dcrByCollector.keys(),
+    ...committeeByVoter.keys(),
+  ]);
+  for (const row of assignments) if (row.remedial_user_id) userIds.add(row.remedial_user_id);
+  for (const row of leads) if (row.agent_user_id) userIds.add(row.agent_user_id);
+  for (const row of verifications) if (row.completed_by) userIds.add(row.completed_by);
+  for (const row of checks) if (row.checked_by) userIds.add(row.checked_by);
+  for (const row of releaseFiles) if (row.assigned_to) userIds.add(row.assigned_to);
+  for (const row of turnovers) if (row.to_remedial_user_id) userIds.add(row.to_remedial_user_id);
+  const names = await resolveNames(Array.from(userIds));
+
   const collectorIds = new Set<string>([
     ...accountsHeldByCollector.keys(),
     ...dcrByCollector.keys(),
   ]);
-  const collectorNames = await resolveNames(Array.from(collectorIds));
-
   const collectorScorecard: CollectorScorecardRow[] = Array.from(collectorIds).map((id) => {
-    const dcr = dcrByCollector.get(id) ?? { submitted: 0, reconciled: 0, rejected: 0, cycleDays: [] };
+    const dcr = dcrByCollector.get(id) ?? {
+      submitted: 0,
+      reconciled: 0,
+      rejected: 0,
+      cycleDays: [],
+    };
     return {
       collectorUserId: id,
-      name: collectorNames.get(id) ?? "Unknown",
+      name: names.get(id) ?? "Unknown",
       accountsHeld: accountsHeldByCollector.get(id) ?? 0,
       amountCollected: collectedByCollector.get(id) ?? 0,
+      amountCollectedAllTime: collectedAllTimeByCollector.get(id) ?? 0,
       dcrsSubmitted: dcr.submitted,
       dcrsReconciled: dcr.reconciled,
       dcrsRejected: dcr.rejected,
@@ -145,32 +286,11 @@ export async function computeStaffMetrics(supabase: SupabaseClient): Promise<Sta
   });
   collectorScorecard.sort((a, b) => b.amountCollected - a.amountCollected);
 
-  // --- Committee participation -------------------------------------------
-  const forApprovalAtByApplication = new Map<string, string>();
-  for (const app of applications ?? []) {
-    const history = (app.status_history as Array<{ status: string; at: string }> | null) ?? [];
-    const entry = history.find((e) => e.status === "for_approval");
-    if (entry) forApprovalAtByApplication.set(app.id as string, entry.at);
-  }
-
-  const committeeByVoter = new Map<string, { votes: number; turnarounds: number[] }>();
-  for (const row of votes ?? []) {
-    const voterId = row.voter_id as string;
-    const entry = committeeByVoter.get(voterId) ?? { votes: 0, turnarounds: [] };
-    entry.votes += 1;
-    const forApprovalAt = forApprovalAtByApplication.get(row.loan_application_id as string);
-    if (forApprovalAt && row.voted_at) {
-      entry.turnarounds.push(daysBetween(forApprovalAt, row.voted_at as string));
-    }
-    committeeByVoter.set(voterId, entry);
-  }
-  const voterNames = await resolveNames(Array.from(committeeByVoter.keys()));
-
   const committeeParticipation: CommitteeParticipationRow[] = Array.from(
     committeeByVoter.entries(),
   ).map(([voterId, entry]) => ({
     voterId,
-    name: voterNames.get(voterId) ?? "Unknown",
+    name: names.get(voterId) ?? "Unknown",
     votesCast: entry.votes,
     avgTurnaroundDays: mean(entry.turnarounds),
   }));
@@ -179,8 +299,9 @@ export async function computeStaffMetrics(supabase: SupabaseClient): Promise<Sta
   // --- Proof-verification backlog -----------------------------------------
   const now = Date.now();
   const buckets = { "0-1d": 0, "2-3d": 0, "4-7d": 0, "7d+": 0 };
-  for (const row of pendingProofs ?? []) {
-    const ageDays = (now - new Date(row.created_at as string).getTime()) / (1000 * 60 * 60 * 24);
+  for (const row of payments) {
+    if (row.status !== "pending_verification" || !row.created_at) continue;
+    const ageDays = (now - new Date(row.created_at).getTime()) / 86_400_000;
     if (ageDays <= 1) buckets["0-1d"] += 1;
     else if (ageDays <= 3) buckets["2-3d"] += 1;
     else if (ageDays <= 7) buckets["4-7d"] += 1;
@@ -191,5 +312,19 @@ export async function computeStaffMetrics(supabase: SupabaseClient): Promise<Sta
     count,
   }));
 
-  return { collectorScorecard, committeeParticipation, proofBacklog };
+  return {
+    collectorScorecard,
+    committeeParticipation,
+    proofBacklog,
+    agentScorecard: buildAgentScorecard(leads, statusByApplication, names, period),
+    cigScorecard: buildCigScorecard(verifications, checks, names, period),
+    lraScorecard: buildLraScorecard(releaseFiles, names, period),
+    remedialScorecard: buildRemedialScorecard(
+      assignments,
+      turnovers,
+      postings,
+      names,
+      period,
+    ),
+  };
 }

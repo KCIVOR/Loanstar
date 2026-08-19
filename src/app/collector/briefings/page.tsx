@@ -35,7 +35,7 @@ import {
 } from "@/lib/collector/briefings";
 import { formatDateTime } from "@/lib/collector/format";
 
-type SegmentFilter = "all" | "seafarer" | "sme";
+type SegmentFilter = "all" | "seafarer" | "sme" | "individual";
 
 /** API row with `application.segment` from briefings select (Phase 22). */
 type BriefingItem = Omit<BriefingQueueItem, "application"> & {
@@ -57,13 +57,27 @@ const SEGMENT_CHIPS: Array<{ id: SegmentFilter; label: string }> = [
   { id: "all", label: "All" },
   { id: "seafarer", label: "Seafarer" },
   { id: "sme", label: "SME" },
+  { id: "individual", label: "Individual" },
 ];
 
 function segmentBadge(segment: string | null | undefined) {
-  const isSme = segment === "sme";
+  if (segment === "sme") {
+    return (
+      <Badge variant="navy" dot>
+        SME
+      </Badge>
+    );
+  }
+  if (segment === "individual") {
+    return (
+      <Badge variant="warning" dot>
+        Individual
+      </Badge>
+    );
+  }
   return (
-    <Badge variant={isSme ? "navy" : "teal"} dot>
-      {isSme ? "SME" : "Seafarer"}
+    <Badge variant="teal" dot>
+      Seafarer
     </Badge>
   );
 }
@@ -372,7 +386,7 @@ export default function CollectorBriefingsPage() {
             ) : null}
             {segmentFilter !== "all" ? (
               <span className="active-pill">
-                Segment: {segmentFilter === "sme" ? "SME" : "Seafarer"}
+                Segment: {segmentFilter === "sme" ? "SME" : segmentFilter === "individual" ? "Individual" : "Seafarer"}
                 <button
                   type="button"
                   aria-label="Clear segment filter"

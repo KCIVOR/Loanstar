@@ -15,6 +15,13 @@ describe("penaltyRateConfigKey (Phase 5.1)", () => {
     assert.equal(penaltyRateConfigKey("sme"), "penalty_rate_sme");
   });
 
+  it("maps individual → penalty_rate_individual", () => {
+    assert.equal(
+      penaltyRateConfigKey("individual"),
+      "penalty_rate_individual",
+    );
+  });
+
   it("refuses NULL/unknown — must not silently mean Seafarer", () => {
     assert.throws(() => penaltyRateConfigKey(null), /missing or unknown/);
     assert.throws(() => penaltyRateConfigKey(undefined), /missing or unknown/);
@@ -24,10 +31,11 @@ describe("penaltyRateConfigKey (Phase 5.1)", () => {
 });
 
 describe("resolvePenaltyRate", () => {
-  const rates = { seafarer: 0.15, sme: 0.05 };
+  const rates = { seafarer: 0.15, sme: 0.05, individual: 0.05 };
 
   it("returns segment-specific rates", () => {
     assert.equal(resolvePenaltyRate("seafarer", rates), 0.15);
     assert.equal(resolvePenaltyRate("sme", rates), 0.05);
+    assert.equal(resolvePenaltyRate("individual", rates), 0.05);
   });
 });

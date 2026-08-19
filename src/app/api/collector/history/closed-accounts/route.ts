@@ -11,7 +11,7 @@ import { createClient } from "@/lib/supabase/server";
 
 const RANGE_PRESETS = new Set(["30d", "90d", "all", "custom"]);
 const SORT_KEYS = new Set(["borrower", "account", "closedAt"]);
-const SEGMENT_FILTERS = new Set(["all", "seafarer", "sme"]);
+const SEGMENT_FILTERS = new Set(["all", "seafarer", "sme", "individual"]);
 
 /** Paid-off accounts on this collector's book. Read-only. */
 export async function GET(request: Request) {
@@ -24,7 +24,7 @@ export async function GET(request: Request) {
     const segmentRaw = searchParams.get("segment") ?? "all";
     const segment = (
       SEGMENT_FILTERS.has(segmentRaw) ? segmentRaw : "all"
-    ) as "all" | "seafarer" | "sme";
+    ) as "all" | "seafarer" | "sme" | "individual";
 
     const rangeRaw = searchParams.get("range") ?? "30d";
     const preset = (

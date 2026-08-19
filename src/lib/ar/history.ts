@@ -7,7 +7,7 @@ export type ClosedAccountRow = {
   loanAccountNo: string | null;
   borrowerName: string;
   borrowerNo: string;
-  segment: "sme" | "seafarer" | null;
+  segment: "sme" | "seafarer" | "individual" | null;
   outstandingBalance: number;
   portfolioName: string | null;
   closedAt: string;
@@ -17,7 +17,7 @@ export type ClosedAccountSortKey = "borrower" | "account" | "closedAt";
 
 export type ClosedAccountsQueryParams = {
   search?: string;
-  segment?: "all" | "seafarer" | "sme";
+  segment?: "all" | "seafarer" | "sme" | "individual";
   from?: string | null;
   to?: string | null;
   sortKey?: ClosedAccountSortKey;
@@ -37,7 +37,7 @@ export type ReconciledPostingRow = {
   loanAccountNo: string | null;
   borrowerName: string;
   borrowerNo: string;
-  segment: "sme" | "seafarer" | null;
+  segment: "sme" | "seafarer" | "individual" | null;
   amount: number;
   depositReference: string | null;
   postedAt: string;
@@ -47,7 +47,7 @@ export type ReconciledDcrSortKey = "borrower" | "amount" | "postedAt";
 
 export type ReconciledDcrQueryParams = {
   search?: string;
-  segment?: "all" | "seafarer" | "sme";
+  segment?: "all" | "seafarer" | "sme" | "individual";
   from?: string | null;
   to?: string | null;
   sortKey?: ReconciledDcrSortKey;
@@ -189,8 +189,10 @@ export async function getClosedAccountsHistory(
       : portfolioRaw;
 
     const segmentRaw = row.segment as string | null | undefined;
-    const segment: "sme" | "seafarer" | null =
-      segmentRaw === "sme" || segmentRaw === "seafarer" ? segmentRaw : null;
+    const segment: "sme" | "seafarer" | "individual" | null =
+      segmentRaw === "sme" || segmentRaw === "seafarer" || segmentRaw === "individual"
+        ? segmentRaw
+        : null;
 
     return [
       {
@@ -393,8 +395,10 @@ export async function getReconciledDcrHistory(
     const dcr = Array.isArray(dcrRaw) ? dcrRaw[0] : dcrRaw;
 
     const segmentRaw = masterlist?.segment as string | null | undefined;
-    const segment: "sme" | "seafarer" | null =
-      segmentRaw === "sme" || segmentRaw === "seafarer" ? segmentRaw : null;
+    const segment: "sme" | "seafarer" | "individual" | null =
+      segmentRaw === "sme" || segmentRaw === "seafarer" || segmentRaw === "individual"
+        ? segmentRaw
+        : null;
 
     return [
       {
@@ -480,7 +484,7 @@ export type RoundingWriteoffRow = {
   loanAccountNo: string | null;
   borrowerName: string;
   borrowerNo: string;
-  segment: "sme" | "seafarer" | null;
+  segment: "sme" | "seafarer" | "individual" | null;
   amortizationScheduleId: string | null;
   installmentNo: number | null;
   amount: number;
@@ -633,8 +637,10 @@ export async function getRoundingWriteoffHistory(
       : masterlistRaw;
 
     const segmentRaw = masterlist?.segment as string | null | undefined;
-    const segment: "sme" | "seafarer" | null =
-      segmentRaw === "sme" || segmentRaw === "seafarer" ? segmentRaw : null;
+    const segment: "sme" | "seafarer" | "individual" | null =
+      segmentRaw === "sme" || segmentRaw === "seafarer" || segmentRaw === "individual"
+        ? segmentRaw
+        : null;
 
     const scheduleRaw = row.amortization_schedules as
       | { installment_no: number }

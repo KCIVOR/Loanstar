@@ -42,9 +42,11 @@ function RiskKpiValue({ metric, alertAboveThreshold }: { metric: MetricValue; al
 export function RiskPanel({
   metrics,
   series,
+  par30Href,
 }: {
   metrics: MetricValue[];
   series: RiskSeries;
+  par30Href?: string;
 }) {
   const par30 = metricById(metrics, "risk.par30");
   const par90 = metricById(metrics, "risk.par90");
@@ -93,7 +95,15 @@ export function RiskPanel({
       </div>
 
       <div className="mb-4 grid grid-cols-2 gap-3.5 lg:grid-cols-4">
-        {par30 ? <RiskKpiValue metric={par30} alertAboveThreshold={15} /> : null}
+        {par30 ? (
+          par30Href ? (
+            <Link href={par30Href} className="block no-underline">
+              <RiskKpiValue metric={par30} alertAboveThreshold={15} />
+            </Link>
+          ) : (
+            <RiskKpiValue metric={par30} alertAboveThreshold={15} />
+          )
+        ) : null}
         {par90 ? <RiskKpiValue metric={par90} alertAboveThreshold={5} /> : null}
         {top10Concentration ? (
           <RiskKpiValue metric={top10Concentration} alertAboveThreshold={40} />

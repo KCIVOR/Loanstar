@@ -23,7 +23,7 @@ type LoanType = {
   name: string;
   interest_rate: number;
   pf_rate: number;
-  segment: "seafarer" | "sme" | null;
+  segment: "seafarer" | "sme" | "individual" | null;
   is_active: boolean;
   effective_from: string;
   effective_to: string | null;
@@ -40,7 +40,7 @@ export default function LoanTypesPage() {
   const [saving, setSaving] = useState(false);
 
   const [name, setName] = useState("");
-  const [segment, setSegment] = useState<"seafarer" | "sme">("seafarer");
+  const [segment, setSegment] = useState<"seafarer" | "sme" | "individual">("seafarer");
   const [interestRate, setInterestRate] = useState("");
   const [pfRate, setPfRate] = useState("");
   const [effectiveFrom, setEffectiveFrom] = useState(
@@ -73,7 +73,7 @@ export default function LoanTypesPage() {
     setMessage(null);
 
     const pf = Number(pfRate);
-    if (segment !== "sme" && pf < MIN_PF_RATE) {
+    if (segment !== "sme" && segment !== "individual" && pf < MIN_PF_RATE) {
       setError(
         `PF rate must be at least ${(MIN_PF_RATE * 100).toFixed(3)}% (G2 guard)`,
       );
@@ -191,11 +191,12 @@ export default function LoanTypesPage() {
               id="lt-segment"
               value={segment}
               onChange={(e) =>
-                setSegment(e.target.value as "seafarer" | "sme")
+                setSegment(e.target.value as "seafarer" | "sme" | "individual")
               }
             >
               <option value="seafarer">Seafarer</option>
               <option value="sme">SME</option>
+              <option value="individual">Individual</option>
             </Select>
           </div>
           <div className="grid gap-4 sm:grid-cols-2">
@@ -216,7 +217,7 @@ export default function LoanTypesPage() {
             <div>
               <Label htmlFor="lt-pf" required>
                 PF rate (decimal
-                {segment === "sme"
+                {segment === "sme" || segment === "individual"
                   ? "; G2 floor does not apply"
                   : `, min ${(MIN_PF_RATE * 100).toFixed(3)}%`}
                 )

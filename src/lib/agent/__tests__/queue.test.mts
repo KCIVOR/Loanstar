@@ -6,6 +6,7 @@ import {
   AGENT_LEADS_QUEUE_PAGE_SIZES,
   QUEUE_FETCH_PAGE,
   clampAgentLeadsQueuePageSize,
+  passesSegmentFilter,
   passesStage,
   stageFilterSpec,
   statusFilterSpec,
@@ -177,5 +178,20 @@ describe("passesStage ↔ leadPipelineStage agreement", () => {
       passesStage(viaHelper, stageFilterSpec("gathering_docs")),
       false,
     );
+  });
+});
+
+describe("passesSegmentFilter (Phase 12)", () => {
+  it("matches individual leads only under the individual filter", () => {
+    assert.equal(
+      passesSegmentFilter({ segment: "individual" }, "individual"),
+      true,
+    );
+    assert.equal(
+      passesSegmentFilter({ segment: "seafarer" }, "individual"),
+      false,
+    );
+    assert.equal(passesSegmentFilter({ segment: "individual" }, "all"), true);
+    assert.equal(passesSegmentFilter({ segment: null }, "individual"), false);
   });
 });

@@ -208,7 +208,10 @@ export async function GET(_request: Request, { params }: RouteParams) {
         borrowerNo: data.borrower_no,
         borrowerId: (data.borrower_id as string | null) ?? null,
         loanAccountNo: data.loan_account_no,
-        segment: data.segment === "sme" ? "sme" : "seafarer",
+        segment:
+          data.segment === "sme" || data.segment === "individual"
+            ? data.segment
+            : "seafarer",
         manningAgency: (data.manning_agency as string | null) ?? null,
         vesselName: (data.vessel_name as string | null) ?? null,
         outstandingBalance: balance,

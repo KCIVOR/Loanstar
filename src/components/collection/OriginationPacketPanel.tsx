@@ -4,6 +4,8 @@ import { useEffect, useState } from "react";
 
 import { FieldVisitForm } from "@/components/cig/FieldVisitForm";
 import { SmeReloanVerificationForm } from "@/components/cig/SmeReloanVerificationForm";
+import { CmInspectionForm } from "@/components/cig/CmInspectionForm";
+import { RemInspectionForm } from "@/components/cig/RemInspectionForm";
 import {
   CiReferencesFormModal,
   ciFormCompletionBadge,
@@ -18,6 +20,12 @@ import {
   type FieldVisit,
   type SmeReloanVerification,
 } from "@/lib/cig/field-visit";
+import {
+  assessCmInspectionRequired,
+  assessRemInspectionRequired,
+  type CmInspection,
+  type RemInspection,
+} from "@/lib/cig/collateral-inspection";
 import {
   type PicAddress,
   type PicDemeanorTag,
@@ -112,6 +120,16 @@ function asFieldVisit(value: unknown): FieldVisit | null {
 function asSmeReloanVerification(value: unknown): SmeReloanVerification | null {
   if (!value || typeof value !== "object") return null;
   return value as SmeReloanVerification;
+}
+
+function asCmInspection(value: unknown): CmInspection | null {
+  if (!value || typeof value !== "object") return null;
+  return value as CmInspection;
+}
+
+function asRemInspection(value: unknown): RemInspection | null {
+  if (!value || typeof value !== "object") return null;
+  return value as RemInspection;
 }
 
 function smeUsesReloanForm(verification: OriginationPacket["verification"]): boolean {
@@ -274,8 +292,11 @@ function CiReportCard({
   packet: OriginationPacketDto;
 }) {
   const [showCiForm, setShowCiForm] = useState(false);
+  const [showCmInspectionForm, setShowCmInspectionForm] = useState(false);
+  const [showRemInspectionForm, setShowRemInspectionForm] = useState(false);
   const verification = packet.verification;
   const segment = packet.application.segment;
+  const collateralType = packet.application.collateralType ?? "none";
 
   if (!verification) {
     return (
@@ -350,6 +371,26 @@ function CiReportCard({
               {smeComplete ? "Complete" : "In progress"}
             </Badge>
           ) : null}
+          {collateralType === "car_refinancing" ? (
+            <Button
+              type="button"
+              variant="secondary"
+              size="sm"
+              onClick={() => setShowCmInspectionForm(true)}
+            >
+              View full CM Inspection
+            </Button>
+          ) : null}
+          {collateralType === "real_estate" ? (
+            <Button
+              type="button"
+              variant="secondary"
+              size="sm"
+              onClick={() => setShowRemInspectionForm(true)}
+            >
+              View full REM Inspection
+            </Button>
+          ) : null}
         </div>
       </div>
 
@@ -412,6 +453,7 @@ function CiReportCard({
 
       {segment !== "sme" ? (
         <>
+          {segment === "seafarer" ? (
           <div className="mt-4 border-t border-line-soft pt-4">
             <div className="text-xs font-semibold uppercase tracking-wide text-ink-500">
               Crewing manager
@@ -432,9 +474,15 @@ function CiReportCard({
                   : "—"}
               </p>
               <p>
-                <span className="text-ink-400">Salary:</span>{" "}
+                <span className="text-ink-400">Total Salary:</span>{" "}
                 {verification.cmSalary != null
                   ? `₱${formatMoney(verification.cmSalary)}`
+                  : "—"}
+              </p>
+              <p>
+                <span className="text-ink-400">Basic Salary:</span>{" "}
+                {verification.cmBasicSalary != null
+                  ? `₱${formatMoney(verification.cmBasicSalary)}`
                   : "—"}
               </p>
               <p>
@@ -465,6 +513,7 @@ function CiReportCard({
               <p className="mt-2 text-sm text-ink-700">{verification.cmNotes}</p>
             ) : null}
           </div>
+          ) : null}
 
           <div className="mt-4 border-t border-line-soft pt-4">
             <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-ink-500">
@@ -609,6 +658,102 @@ function CiReportCard({
           )}
         </div>
       )}
+
+      {collateralType === "car_refinancing" ? (
+        <div className="mt-4 border-t border-line-soft pt-4">
+          <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+            <div className="text-xs font-semibold uppercase tracking-wide text-ink-500">
+              CM Inspection — vehicle collateral
+            </div>
+            <Badge
+              variant={
+                assessCmInspectionRequired(asCmInspection(verification.cmInspection))
+                  .complete
+                  ? "success"
+                  : "warning"
+              }
+            >
+              {assessCmInspectionRequired(asCmInspection(verification.cmInspection))
+                .complete
+                ? "Complete"
+                : "In progress"}
+            </Badge>
+          </div>
+          {asCmInspection(verification.cmInspection) ? (
+            <div className="mt-2 grid gap-x-4 gap-y-1 text-sm text-ink-700 sm:grid-cols-2">
+              <p>
+                <span className="text-ink-400">Account:</span>{" "}
+                {displayText(
+                  asCmInspection(verification.cmInspection)?.account?.accountName,
+                )}
+              </p>
+              <p>
+                <span className="text-ink-400">Plate number:</span>{" "}
+                {displayText(
+                  asCmInspection(verification.cmInspection)?.orCrDetails
+                    ?.plateNumber,
+                )}
+              </p>
+              <p>
+                <span className="text-ink-400">Verified by:</span>{" "}
+                {displayText(asCmInspection(verification.cmInspection)?.verifiedBy)}
+              </p>
+            </div>
+          ) : (
+            <p className="mt-1 text-sm text-ink-400">Not recorded.</p>
+          )}
+        </div>
+      ) : null}
+
+      {collateralType === "real_estate" ? (
+        <div className="mt-4 border-t border-line-soft pt-4">
+          <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+            <div className="text-xs font-semibold uppercase tracking-wide text-ink-500">
+              REM Inspection — property collateral
+            </div>
+            <Badge
+              variant={
+                assessRemInspectionRequired(
+                  asRemInspection(verification.remInspection),
+                ).complete
+                  ? "success"
+                  : "warning"
+              }
+            >
+              {assessRemInspectionRequired(
+                asRemInspection(verification.remInspection),
+              ).complete
+                ? "Complete"
+                : "In progress"}
+            </Badge>
+          </div>
+          {asRemInspection(verification.remInspection) ? (
+            <div className="mt-2 grid gap-x-4 gap-y-1 text-sm text-ink-700 sm:grid-cols-2">
+              <p>
+                <span className="text-ink-400">Account:</span>{" "}
+                {displayText(
+                  asRemInspection(verification.remInspection)?.account?.accountName,
+                )}
+              </p>
+              <p>
+                <span className="text-ink-400">Registered owner at title:</span>{" "}
+                {displayText(
+                  asRemInspection(verification.remInspection)?.titleDetails
+                    ?.registeredOwnerAtTitle,
+                )}
+              </p>
+              <p>
+                <span className="text-ink-400">Verified by:</span>{" "}
+                {displayText(
+                  asRemInspection(verification.remInspection)?.verifiedBy,
+                )}
+              </p>
+            </div>
+          ) : (
+            <p className="mt-1 text-sm text-ink-400">Not recorded.</p>
+          )}
+        </div>
+      ) : null}
       </Card>
       {showCiForm && segment !== "sme" ? (
         <CiReferencesFormModal
@@ -631,6 +776,42 @@ function CiReportCard({
           readOnly
           verifierName=""
         />
+      ) : null}
+      {showCmInspectionForm && collateralType === "car_refinancing" ? (
+        <Modal
+          open={showCmInspectionForm}
+          onClose={() => setShowCmInspectionForm(false)}
+          title="CM Inspection"
+          className="!max-w-4xl"
+        >
+          <div className="max-h-[65vh] overflow-y-auto pr-1">
+            <CmInspectionForm
+              value={asCmInspection(verification.cmInspection)}
+              onChange={() => undefined}
+              onSave={() => undefined}
+              verifierName=""
+              readOnly
+            />
+          </div>
+        </Modal>
+      ) : null}
+      {showRemInspectionForm && collateralType === "real_estate" ? (
+        <Modal
+          open={showRemInspectionForm}
+          onClose={() => setShowRemInspectionForm(false)}
+          title="REM Inspection"
+          className="!max-w-4xl"
+        >
+          <div className="max-h-[65vh] overflow-y-auto pr-1">
+            <RemInspectionForm
+              value={asRemInspection(verification.remInspection)}
+              onChange={() => undefined}
+              onSave={() => undefined}
+              verifierName=""
+              readOnly
+            />
+          </div>
+        </Modal>
       ) : null}
     </>
   );
@@ -717,8 +898,10 @@ function PacketBody({
         title="Borrower attachments"
         description={
           packet.application.segment === "sme"
-            ? "Read-only — business registration, permits, financial statements, and other intake files uploaded by the borrower."
-            : "Read-only — Passport, Seaman's Book, Contract, IDs, and House Sketch uploaded by the borrower."
+            ? "Read-only — business registration, permits, financial statements, and collateral files (OR/CR or title) when this loan has collateral."
+            : packet.application.segment === "individual"
+              ? "Read-only — IDs, income proof, and collateral files uploaded by the borrower."
+              : "Read-only — Passport, Seaman's Book, Contract, IDs, and House Sketch uploaded by the borrower."
         }
         excludeSlugs={CSA_ONLY_INTAKE_SLUGS}
       />

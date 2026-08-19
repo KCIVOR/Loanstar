@@ -7,7 +7,7 @@ export const createLoanTypeSchema = z.object({
   pfRate: z.number().min(0).max(1),
   effectiveFrom: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   deactivatePrevious: z.boolean().default(true),
-  segment: z.enum(["seafarer", "sme"]).default("seafarer"),
+  segment: z.enum(["seafarer", "sme", "individual"]).default("seafarer"),
 });
 
 export type CreateLoanTypeInput = z.infer<typeof createLoanTypeSchema>;

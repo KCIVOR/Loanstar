@@ -2,15 +2,19 @@
 
 import { useState } from "react";
 
+import { fillVisibleRemarkFields } from "@/lib/dev/fill-remarks";
+
 export type AutofillAction = {
   label: string;
   onClick: () => void;
 };
 
+const REMARKS_LABEL = "Fill remarks / notes";
+
 /**
  * Floating button that reveals a menu of fake-data autofill actions — lets
- * staff fill CI reports and application forms without hand-typing while
- * exercising a flow (e.g. during a live client demo).
+ * staff fill CI reports, inspection forms, and remarks/notes without
+ * hand-typing while exercising a flow (e.g. during a live client demo).
  *
  * Always on outside production. In production it stays OFF by default —
  * real borrowers must never see a "fill with fake data" button on their
@@ -19,17 +23,36 @@ export type AutofillAction = {
  * demo/staging deployment, then unset it — don't leave it on permanently
  * for the live production site.
  */
-export function AutofillOverlay({ actions }: { actions: AutofillAction[] }) {
+export function AutofillOverlay({
+  actions = [],
+}: {
+  actions?: AutofillAction[];
+}) {
   const [open, setOpen] = useState(false);
 
   const enabled =
     process.env.NODE_ENV !== "production" ||
     process.env.NEXT_PUBLIC_ENABLE_AUTOFILL === "true";
   if (!enabled) return null;
-  if (actions.length === 0) return null;
+
+  const allActions = actions.some((action) => action.label === REMARKS_LABEL)
+    ? actions
+    : [
+        ...actions,
+        {
+          label: REMARKS_LABEL,
+          onClick: () => {
+            fillVisibleRemarkFields();
+          },
+        },
+      ];
+  if (allActions.length === 0) return null;
 
   return (
-    <div style={{ position: "fixed", bottom: 20, right: 20, zIndex: 9999 }}>
+    <div
+      data-autofill-overlay
+      style={{ position: "fixed", bottom: 20, right: 20, zIndex: 9999 }}
+    >
       {open ? (
         <div
           style={{
@@ -54,7 +77,7 @@ export function AutofillOverlay({ actions }: { actions: AutofillAction[] }) {
           >
             Autofill (dev only)
           </div>
-          {actions.map((action) => (
+          {allActions.map((action) => (
             <button
               key={action.label}
               type="button"

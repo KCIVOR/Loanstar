@@ -78,7 +78,10 @@ export async function GET(_request: Request, { params }: RouteParams) {
       .maybeSingle();
 
     const checklist = await getStageChecklist(supabase, "intake", id, {
-      segment: application.segment === "sme" ? "sme" : "seafarer",
+      segment:
+        application.segment === "sme" || application.segment === "individual"
+          ? application.segment
+          : "seafarer",
       entityType:
         application.entity_type === "individual" ||
         application.entity_type === "corporate"
@@ -119,7 +122,10 @@ export async function GET(_request: Request, { params }: RouteParams) {
         statusLabel: formatStatusLabel(application.status),
         statusHistory: application.status_history,
         blocker: application.blocker,
-        segment: application.segment === "sme" ? "sme" : "seafarer",
+        segment:
+          application.segment === "sme" || application.segment === "individual"
+            ? application.segment
+            : "seafarer",
         entityType:
           application.entity_type === "individual" ||
           application.entity_type === "corporate"

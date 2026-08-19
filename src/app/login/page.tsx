@@ -25,7 +25,7 @@ const SEED_ACCOUNTS = [
   { label: "LRA", email: "lra@loanstar.local" },
   { label: "AR", email: "ar@loanstar.local" },
   { label: "Collector", email: "collector@loanstar.local" },
-  { label: "Collection Head", email: "collection_head@loanstar.local" },
+  { label: "Briefer", email: "collection_head@loanstar.local" },
   { label: "Remedial", email: "remedial@loanstar.local" },
   { label: "Borrower", email: "borrower@loanstar.local" },
 ];

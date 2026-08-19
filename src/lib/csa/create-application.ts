@@ -11,12 +11,20 @@ export const createApplicationSchema = z
     lastName: z.string().min(1),
     middleName: z.string().optional(),
     mobilePhone: z.string().optional(),
-    segment: z.enum(["seafarer", "sme"]).default("seafarer"),
+    segment: z.enum(["seafarer", "sme", "individual"]).default("seafarer"),
     entityType: z.enum(["individual", "corporate"]).optional(),
+    /** SME/Individual only — Seafarer never carries collateral (confirmed 2026-08-19). */
+    collateralType: z
+      .enum(["none", "car_refinancing", "real_estate"])
+      .default("none"),
   })
   .refine((data) => data.segment !== "sme" || data.entityType != null, {
     message: "entityType is required when segment is sme",
     path: ["entityType"],
+  })
+  .refine((data) => data.segment !== "seafarer" || data.collateralType === "none", {
+    message: "Seafarer applications cannot carry collateral",
+    path: ["collateralType"],
   });
 
 export type CreateApplicationInput = z.infer<typeof createApplicationSchema>;
@@ -60,6 +68,7 @@ export async function createCsaApplication(
       status: "submitted",
       segment: body.segment,
       entity_type: body.entityType ?? null,
+      collateral_type: body.collateralType,
       status_history: [
         {
           status: "submitted",
@@ -84,6 +93,7 @@ export async function createCsaApplication(
   await ensureDocumentSlots(supabase, "intake", application.id, borrowerId, {
     segment: body.segment,
     entityType: body.entityType ?? null,
+    collateralType: body.collateralType,
   });
 
   await writeAuditEvent({
@@ -97,6 +107,7 @@ export async function createCsaApplication(
       email: body.email,
       segment: body.segment,
       entityType: body.entityType ?? null,
+      collateralType: body.collateralType,
     },
   });
 

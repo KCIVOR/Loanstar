@@ -21,7 +21,7 @@ export type CigQueueItem = {
   } | null;
   isRevision: boolean;
   callbackOverdueAt: string | null;
-  segment: "sme" | "seafarer" | null;
+  segment: "sme" | "seafarer" | "individual" | null;
 };
 
 export type CigQueueSortKey = "priority" | "endorsed" | "waiting" | "status";
@@ -77,7 +77,7 @@ export function passesWorkFilter(
 
 export function passesSegmentFilter(
   row: Pick<CigQueueItem, "segment">,
-  segment: "all" | "seafarer" | "sme",
+  segment: "all" | "seafarer" | "sme" | "individual",
 ): boolean {
   if (segment === "all") return true;
   return row.segment === segment;
@@ -324,8 +324,10 @@ export async function getCigQueue(supabase: SupabaseClient): Promise<CigQueueIte
         ? row.borrowers[0]
         : row.borrowers;
       const segmentRaw = row.segment as string | null;
-      const segment: "sme" | "seafarer" | null =
-        segmentRaw === "sme" || segmentRaw === "seafarer" ? segmentRaw : null;
+      const segment: "sme" | "seafarer" | "individual" | null =
+        segmentRaw === "sme" || segmentRaw === "seafarer" || segmentRaw === "individual"
+          ? segmentRaw
+          : null;
       return {
         id: row.id as string,
         applicationNo: row.application_no as string | null,

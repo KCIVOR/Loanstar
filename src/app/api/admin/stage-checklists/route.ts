@@ -13,8 +13,12 @@ const createChecklistSchema = z.object({
   isRequired: z.boolean().optional().default(true),
   isOptionalFlag: z.boolean().optional().default(false),
   sortOrder: z.number().int().min(0).optional().default(0),
-  segment: z.enum(["seafarer", "sme"]).optional().default("seafarer"),
+  segment: z.enum(["seafarer", "sme", "individual"]).optional().default("seafarer"),
   entityType: z.enum(["individual", "corporate"]).nullable().optional(),
+  collateralType: z
+    .enum(["none", "car_refinancing", "real_estate"])
+    .nullable()
+    .optional(),
 });
 
 export async function GET(request: Request) {
@@ -25,6 +29,7 @@ export async function GET(request: Request) {
     const stage = searchParams.get("stage");
     const segment = searchParams.get("segment");
     const entityType = searchParams.get("entityType");
+    const collateralType = searchParams.get("collateralType");
 
     let query = supabase
       .from("stage_checklists")
@@ -34,6 +39,7 @@ export async function GET(request: Request) {
         stage,
         segment,
         entity_type,
+        collateral_type,
         is_required,
         is_optional_flag,
         sort_order,
@@ -47,7 +53,7 @@ export async function GET(request: Request) {
     if (stage) {
       query = query.eq("stage", stage);
     }
-    if (segment === "seafarer" || segment === "sme") {
+    if (segment === "seafarer" || segment === "sme" || segment === "individual") {
       query = query.eq("segment", segment);
     }
     if (entityType === "individual" || entityType === "corporate") {
@@ -56,11 +62,28 @@ export async function GET(request: Request) {
       query = query.is("entity_type", null);
     }
 
-    const { data, error } = await query;
+    const { data: rawData, error } = await query;
 
     if (error) throw new Error(error.message);
 
-    const items = (data ?? []).map((row) => {
+    // Applied in JS rather than a second chained .or() — avoids relying on
+    // exactly how postgrest-js combines multiple .or() calls on the same
+    // query (same caution already noted for src/lib/documents/checklist.ts).
+    const data = (rawData ?? []).filter((row) => {
+      if (
+        collateralType === "none" ||
+        collateralType === "car_refinancing" ||
+        collateralType === "real_estate"
+      ) {
+        return row.collateral_type == null || row.collateral_type === collateralType;
+      }
+      if (collateralType === "universal_only") {
+        return row.collateral_type == null;
+      }
+      return true;
+    });
+
+    const items = data.map((row) => {
       const docType = Array.isArray(row.document_types)
         ? row.document_types[0]
         : row.document_types;
@@ -70,6 +93,7 @@ export async function GET(request: Request) {
         stage: row.stage,
         segment: row.segment ?? "seafarer",
         entityType: row.entity_type ?? null,
+        collateralType: row.collateral_type ?? null,
         isRequired: row.is_required,
         isOptionalFlag: row.is_optional_flag,
         sortOrder: row.sort_order,
@@ -102,6 +126,7 @@ export async function POST(request: Request) {
         sort_order: body.sortOrder,
         segment: body.segment,
         entity_type: body.entityType ?? null,
+        collateral_type: body.collateralType ?? null,
       })
       .select(
         `
@@ -109,6 +134,7 @@ export async function POST(request: Request) {
         stage,
         segment,
         entity_type,
+        collateral_type,
         is_required,
         is_optional_flag,
         sort_order,
@@ -123,7 +149,7 @@ export async function POST(request: Request) {
         return NextResponse.json(
           {
             error:
-              "Checklist item already exists for this stage, segment, entity type, and document type",
+              "Checklist item already exists for this stage, segment, entity type, and collateral type",
           },
           { status: 409 },
         );
@@ -149,6 +175,7 @@ export async function POST(request: Request) {
         sortOrder: body.sortOrder,
         segment: body.segment,
         entityType: body.entityType ?? null,
+        collateralType: body.collateralType ?? null,
       },
     });
 
@@ -159,6 +186,7 @@ export async function POST(request: Request) {
           stage: item.stage,
           segment: item.segment ?? "seafarer",
           entityType: item.entity_type ?? null,
+          collateralType: item.collateral_type ?? null,
           isRequired: item.is_required,
           isOptionalFlag: item.is_optional_flag,
           sortOrder: item.sort_order,

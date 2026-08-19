@@ -23,6 +23,8 @@ import {
   Th,
 } from "@/components/ui";
 import { DocumentChecklist } from "@/components/DocumentChecklist";
+import { AutofillOverlay } from "@/components/dev/AutofillOverlay";
+import { fakeRemark } from "@/lib/dev/fake-data";
 import { GeneratedDocPanel } from "@/components/documents/GeneratedDocPanel";
 import {
   formatStatusLabel,
@@ -36,6 +38,10 @@ import {
   isPostSignForPdcCollect,
 } from "@/lib/lra/pdc-collect";
 import { releaseStageForPath, type ReleasePath } from "@/lib/lra/constants";
+import {
+  canShowMarkAllSigned,
+  unsignedGeneratedDocumentIds,
+} from "@/lib/lra/mark-all-signed";
 import { releasePipelineSteps } from "@/lib/lra/release-pipeline";
 import { createClient } from "@/lib/supabase/client";
 
@@ -46,7 +52,7 @@ type LraWorkspace = {
     status: string;
     statusLabel: string;
     blocker: string | null;
-    segment: "seafarer" | "sme";
+    segment: "seafarer" | "sme" | "individual";
     entityType: "individual" | "corporate" | null;
   };
   borrower: {
@@ -203,6 +209,8 @@ export default function LraApplicationPage() {
     id: string;
     slug: string;
   } | null>(null);
+  const [confirmSignAll, setConfirmSignAll] = useState(false);
+  const [signingAll, setSigningAll] = useState(false);
   const [combinedFile, setCombinedFile] = useState<File | null>(null);
   const [combinedRemarks, setCombinedRemarks] = useState("");
   const [confirmCombinedUpload, setConfirmCombinedUpload] = useState(false);
@@ -502,6 +510,34 @@ export default function LraApplicationPage() {
     }
   }
 
+  async function markAllDocsSigned() {
+    setSigningAll(true);
+    setError(null);
+    try {
+      const res = await fetch(
+        `/api/lra/applications/${applicationId}/documents/sign-all`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ confirm: true }),
+        },
+      );
+      if (!res.ok) {
+        const body = (await res.json().catch(() => null)) as {
+          error?: string;
+        } | null;
+        throw new Error(body?.error ?? "Failed to record signatures");
+      }
+      setConfirmSignAll(false);
+      setMessage("All remaining signatures recorded.");
+      await load({ silent: true });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed");
+    } finally {
+      setSigningAll(false);
+    }
+  }
+
   async function unmarkDocSigned(docId: string) {
     setSigningDocId(docId);
     setError(null);
@@ -723,6 +759,13 @@ export default function LraApplicationPage() {
   if (showReleaseAction && !data.employmentContractPresent) {
     releaseBlockers.push("Employment contract must be uploaded");
   }
+  const unsignedCount = unsignedGeneratedDocumentIds(
+    data.generatedDocuments.map((doc) => ({
+      id: doc.id,
+      signed_at: doc.signedAt,
+      is_finalized: Boolean(doc.isFinalized),
+    })),
+  ).length;
   const closeBlockers: string[] = [];
   if (
     showCloseAction &&
@@ -742,6 +785,7 @@ export default function LraApplicationPage() {
       ? companyName
       : personalName;
   const isSme = data.application.segment === "sme";
+  const isIndividual = data.application.segment === "individual";
   const appNo =
     data.application.applicationNo ??
     data.borrower?.borrower_no ??
@@ -771,8 +815,8 @@ export default function LraApplicationPage() {
       />
 
       <div className="mb-6 flex flex-wrap items-center gap-2">
-        <Badge variant={isSme ? "navy" : "teal"} dot>
-          {isSme ? "SME" : "Seafarer"}
+        <Badge variant={isSme ? "navy" : isIndividual ? "warning" : "teal"} dot>
+          {isSme ? "SME" : isIndividual ? "Individual" : "Seafarer"}
         </Badge>
         <Badge variant={statusBadgeVariant(data.application.status)} dot>
           {data.application.statusLabel ??
@@ -894,7 +938,7 @@ export default function LraApplicationPage() {
                   onChange={(checked) => togglePath("with_pdc", checked)}
                 />
                 <Checkbox
-                  label="Without PDC (ATM surrender)"
+                  label="ATM surrender only"
                   checked={selectedPaths.has("without_pdc")}
                   onChange={(checked) => togglePath("without_pdc", checked)}
                 />
@@ -1274,7 +1318,23 @@ export default function LraApplicationPage() {
                 </span>
               </button>
               {generatedDocsOpen ? (
-                <div className="chk-list chk-list--page mt-3 !max-w-none">
+                <div className="mt-3">
+                  {canShowMarkAllSigned({
+                    releaseStatus: rf.status,
+                    unsignedCount,
+                  }) ? (
+                    <div className="mb-3">
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        loading={signingAll}
+                        onClick={() => setConfirmSignAll(true)}
+                      >
+                        Mark all signed
+                      </Button>
+                    </div>
+                  ) : null}
+                  <div className="chk-list chk-list--page !max-w-none">
                   {data.generatedDocuments.map((doc) => (
                     <div
                       key={doc.id}
@@ -1359,8 +1419,22 @@ export default function LraApplicationPage() {
                       </span>
                     </div>
                   ))}
+                  </div>
                 </div>
               ) : null}
+
+              <ConfirmDialog
+                open={confirmSignAll}
+                title="Record all remaining signatures?"
+                message="Confirm the borrower has physically signed all remaining generated documents during the in-branch session. You are recorded as the witnessing LRA. You can still unmark individual documents before the briefing is acknowledged."
+                confirmLabel="Yes, mark all signed"
+                cancelLabel="Cancel"
+                loading={signingAll}
+                onCancel={() => setConfirmSignAll(false)}
+                onConfirm={() => {
+                  void markAllDocsSigned();
+                }}
+              />
 
               <ConfirmDialog
                 open={confirmSignDoc !== null}
@@ -1430,7 +1504,7 @@ export default function LraApplicationPage() {
               >
                 <path d="M12 5v14M5 12h14" />
               </svg>
-              Hand off to the Collection Head — the briefing must be checked
+              Hand off to the Briefer — the briefing must be checked
               off in the Collection portal before release.
             </div>
           ) : null}
@@ -1685,6 +1759,14 @@ export default function LraApplicationPage() {
           />
         </div>
       )}
+      <AutofillOverlay
+        actions={[
+          {
+            label: "Fill signing remarks",
+            onClick: () => setCombinedRemarks(fakeRemark("signing")),
+          },
+        ]}
+      />
     </div>
   );
 }

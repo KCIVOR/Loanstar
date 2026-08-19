@@ -3,6 +3,7 @@ import { describe, it } from "node:test";
 
 import {
   getCompletionSummary,
+  overlayChecklistScope,
   rowMatchesChecklistScope,
   type ChecklistItem,
 } from "../checklist";
@@ -131,6 +132,33 @@ describe("rowMatchesChecklistScope (SME Phase 2)", () => {
     );
   });
 
+  it("keeps individual-segment rows isolated from seafarer/sme (Phase 1.4)", () => {
+    assert.equal(
+      rowMatchesChecklistScope(
+        { segment: "individual", entity_type: null },
+        "individual",
+        null,
+      ),
+      true,
+    );
+    assert.equal(
+      rowMatchesChecklistScope(
+        { segment: "seafarer", entity_type: null },
+        "individual",
+        null,
+      ),
+      false,
+    );
+    assert.equal(
+      rowMatchesChecklistScope(
+        { segment: "individual", entity_type: null },
+        "seafarer",
+        null,
+      ),
+      false,
+    );
+  });
+
   it("includes SME common rows for individual and corporate", () => {
     const common = { segment: "sme", entity_type: null };
     assert.equal(rowMatchesChecklistScope(common, "sme", "individual"), true);
@@ -165,6 +193,101 @@ describe("rowMatchesChecklistScope (SME Phase 2)", () => {
     assert.equal(corporate.length, 13);
     assert.ok(!individual.includes("seaman_book"));
     assert.ok(!individual.includes("board_resolution"));
+  });
+});
+
+describe("rowMatchesChecklistScope collateral_type dimension (Phase 5)", () => {
+  it("a NULL collateral_type row applies regardless of collateral choice", () => {
+    const universal = { segment: "sme", entity_type: null, collateral_type: null };
+    assert.equal(rowMatchesChecklistScope(universal, "sme", null, "none"), true);
+    assert.equal(
+      rowMatchesChecklistScope(universal, "sme", null, "car_refinancing"),
+      true,
+    );
+    assert.equal(
+      rowMatchesChecklistScope(universal, "sme", null, "real_estate"),
+      true,
+    );
+  });
+
+  it("a car_refinancing-only row only matches car_refinancing applications", () => {
+    const carRefiOnly = {
+      segment: "sme",
+      entity_type: null,
+      collateral_type: "car_refinancing",
+    };
+    assert.equal(
+      rowMatchesChecklistScope(carRefiOnly, "sme", null, "car_refinancing"),
+      true,
+    );
+    assert.equal(rowMatchesChecklistScope(carRefiOnly, "sme", null, "none"), false);
+    assert.equal(
+      rowMatchesChecklistScope(carRefiOnly, "sme", null, "real_estate"),
+      false,
+    );
+  });
+
+  it("a real_estate-only row excludes clean and car_refinancing Individual applications", () => {
+    // Confirms Individual + Real Estate is a fully distinct list, not
+    // clean-list-plus-extras — the real_estate-only rows (title, property
+    // picture, tax dec, proof of income, location sketch) must not leak into
+    // the clean or car_refinancing views.
+    const realEstateOnly = {
+      segment: "individual",
+      entity_type: null,
+      collateral_type: "real_estate",
+    };
+    assert.equal(
+      rowMatchesChecklistScope(realEstateOnly, "individual", null, "real_estate"),
+      true,
+    );
+    assert.equal(
+      rowMatchesChecklistScope(realEstateOnly, "individual", null, "none"),
+      false,
+    );
+    assert.equal(
+      rowMatchesChecklistScope(
+        realEstateOnly,
+        "individual",
+        null,
+        "car_refinancing",
+      ),
+      false,
+    );
+  });
+
+  it("omitting collateralType defaults to 'none' scope", () => {
+    const cleanOnly = { segment: "individual", entity_type: null, collateral_type: "none" };
+    assert.equal(rowMatchesChecklistScope(cleanOnly, "individual", null), true);
+    const universal = { segment: "individual", entity_type: null, collateral_type: null };
+    assert.equal(rowMatchesChecklistScope(universal, "individual", null), true);
+  });
+});
+
+describe("overlayChecklistScope", () => {
+  const loadedCar = {
+    segment: "sme" as const,
+    entityType: "corporate" as const,
+    collateralType: "car_refinancing" as const,
+  };
+
+  it("keeps application collateral when callers only pass segment and entity type", () => {
+    const scope = overlayChecklistScope(loadedCar, {
+      segment: "sme",
+      entityType: "corporate",
+    });
+    assert.equal(scope.collateralType, "car_refinancing");
+    assert.equal(scope.segment, "sme");
+    assert.equal(scope.entityType, "corporate");
+  });
+
+  it("does not drop vehicle extras onto a clean loan when collateralType is explicit none", () => {
+    const scope = overlayChecklistScope(loadedCar, {
+      segment: "sme",
+      entityType: "corporate",
+      collateralType: "none",
+    });
+    assert.equal(scope.collateralType, "none");
   });
 });
 

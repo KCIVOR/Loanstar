@@ -13,6 +13,9 @@ import { generateAmortizationSchedule } from "@/lib/ar/schedule";
 /**
  * Denormalized employment/identity columns on masterlist.
  * SME reuses manning_agency / vessel_name for company + nature (no schema change).
+ * Individual has neither a business nor a manning agency/vessel — both columns
+ * resolve to null (deliberate, not a silent gap: there is nothing to map,
+ * per Phase 11.3's "decide and document" requirement).
  */
 export function resolveMasterlistEmploymentFields(input: {
   segment: string | null | undefined;
@@ -28,6 +31,9 @@ export function resolveMasterlistEmploymentFields(input: {
       (biz.officeAddress ?? biz.companyAddress ?? "").trim() ||
       null;
     return { manningAgency: company, vesselName: natureOrAddress };
+  }
+  if (input.segment === "individual") {
+    return { manningAgency: null, vesselName: null };
   }
   return {
     manningAgency: (input.manningAgencyName ?? "").trim() || null,
@@ -76,7 +82,10 @@ export async function initializeArAccount(
 
   // Phase 5.0: persist segment at insert — aging/penalty reads masterlist.segment.
   // Legacy apps with null segment default to seafarer (pre-Phase-1 rows).
-  const segment = app.segment === "sme" ? "sme" : "seafarer";
+  const segment =
+    app.segment === "sme" || app.segment === "individual"
+      ? app.segment
+      : "seafarer";
 
   const { data: releaseFile } = await supabase
     .from("release_files")

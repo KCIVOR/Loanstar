@@ -8,7 +8,7 @@ export type ReleasedLoanRow = {
   id: string;
   applicationId: string;
   applicationNo: string | null;
-  segment: "sme" | "seafarer" | null;
+  segment: "sme" | "seafarer" | "individual" | null;
   borrower: {
     borrowerNo: string;
     firstName: string;
@@ -27,7 +27,7 @@ export type ReleasedLoansSortKey = "applicationNo" | "borrower" | "closedAt";
 export type ReleasedLoansQueryParams = {
   search?: string;
   releasePath?: ReleasePath | "all";
-  segment?: "all" | "seafarer" | "sme";
+  segment?: "all" | "seafarer" | "sme" | "individual";
   from?: string | null;
   to?: string | null;
   sortKey?: ReleasedLoansSortKey;
@@ -123,19 +123,221 @@ async function findLoanApplicationIdsForSearch(
   return (data ?? []).map((row) => row.id as string);
 }
 
+const HISTORY_SELECT = `
+  id,
+  loan_application_id,
+  release_paths,
+  computation_id,
+  pdc_collected_at,
+  loan_applications (
+    application_no,
+    segment,
+    borrowers (
+      borrower_no,
+      first_name,
+      last_name,
+      email
+    )
+  ),
+  computations (
+    loan_type_name,
+    net_released
+  ),
+  release_events!inner (
+    acted_at
+  )
+`;
+
+/**
+ * PostgREST/Supabase default max rows per request. The superset fetch walks
+ * pages at this size so results are not silently truncated at 1000.
+ */
+export const HISTORY_FETCH_PAGE = 1000;
+
+function mapHistoryRow(row: Record<string, unknown>): ReleasedLoanRow | null {
+  const eventsRaw = row.release_events;
+  const event = Array.isArray(eventsRaw) ? eventsRaw[0] : eventsRaw;
+  const closedAt =
+    ((event as { acted_at?: string } | undefined)?.acted_at as
+      | string
+      | null
+      | undefined) ?? null;
+  if (!closedAt) return null;
+
+  const appRaw = row.loan_applications;
+  const app = (Array.isArray(appRaw) ? appRaw[0] : appRaw) as
+    | {
+        application_no?: string | null;
+        segment?: string | null;
+        borrowers?: unknown;
+      }
+    | undefined;
+  const borrowerRaw = app?.borrowers;
+  const borrower = (
+    Array.isArray(borrowerRaw) ? borrowerRaw[0] : borrowerRaw
+  ) as
+    | {
+        borrower_no: string;
+        first_name: string;
+        last_name: string;
+        email: string;
+      }
+    | undefined;
+
+  const computationRaw = row.computations;
+  const computation = (
+    Array.isArray(computationRaw) ? computationRaw[0] : computationRaw
+  ) as { loan_type_name?: string | null; net_released?: unknown } | undefined;
+
+  const netRaw = computation?.net_released;
+  const netReleased =
+    netRaw === null || netRaw === undefined ? null : Number(netRaw);
+
+  const pathsRaw = row.release_paths;
+  const releasePaths: ReleasePath[] = Array.isArray(pathsRaw)
+    ? pathsRaw.filter(
+        (p): p is ReleasePath => p === "with_pdc" || p === "without_pdc",
+      )
+    : [];
+
+  const segmentRaw = app?.segment;
+  const segment: "sme" | "seafarer" | "individual" | null =
+    segmentRaw === "sme" ||
+    segmentRaw === "seafarer" ||
+    segmentRaw === "individual"
+      ? segmentRaw
+      : null;
+
+  return {
+    id: row.id as string,
+    applicationId: row.loan_application_id as string,
+    applicationNo: app?.application_no ?? null,
+    segment,
+    borrower: borrower
+      ? {
+          borrowerNo: borrower.borrower_no,
+          firstName: borrower.first_name,
+          lastName: borrower.last_name,
+          email: borrower.email,
+        }
+      : null,
+    releasePaths,
+    loanTypeName: computation?.loan_type_name ?? null,
+    netReleased,
+    pdcCollectedAt: (row.pdc_collected_at as string | null) ?? null,
+    closedAt,
+  };
+}
+
+/** Null segment never matches a concrete Seafarer/SME/Individual filter. */
+export function passesHistorySegmentFilter(
+  row: { segment: "sme" | "seafarer" | "individual" | null },
+  segmentFilter: "all" | "seafarer" | "sme" | "individual",
+): boolean {
+  if (segmentFilter === "all") return true;
+  return row.segment === segmentFilter;
+}
+
+/**
+ * Fetch date/path/search-filtered closed `release_files` rows, walking
+ * PostgREST pages so large sets are not silently truncated at 1000. Segment
+ * is applied later in JS — filtering an embedded to-one resource
+ * (`loan_applications.segment`) via `.eq()` does not restrict the parent
+ * `release_files` rows unless the embed is marked `!inner` (same class of
+ * pitfall documented in `queue.ts` for `release_queue`'s status filter);
+ * without it Supabase silently ignores the filter and returns every closed
+ * file regardless of segment.
+ */
+async function fetchHistorySuperset(
+  supabase: SupabaseClient,
+  opts: {
+    applicationIds: string[] | null;
+    releasePath: ReleasePath | "all";
+    from: string | null;
+    to: string | null;
+  },
+): Promise<ReleasedLoanRow[]> {
+  const rows: ReleasedLoanRow[] = [];
+  const pathEq = releasePathFilterSpec(opts.releasePath);
+  let offset = 0;
+
+  for (;;) {
+    let query = supabase
+      .from("release_files")
+      .select(HISTORY_SELECT)
+      .eq("status", "closed")
+      .eq("release_events.event_type", "closed")
+      .order("id", { ascending: true })
+      .range(offset, offset + HISTORY_FETCH_PAGE - 1);
+
+    if (pathEq) {
+      query = query.contains("release_paths", [pathEq]);
+    }
+    if (opts.from) {
+      query = query.gte("release_events.acted_at", toInclusiveStart(opts.from));
+    }
+    if (opts.to) {
+      query = query.lte("release_events.acted_at", toInclusiveEnd(opts.to));
+    }
+    if (opts.applicationIds) {
+      query = query.in("loan_application_id", opts.applicationIds);
+    }
+
+    const { data, error } = await query;
+    if (error) {
+      throw new Error(error.message);
+    }
+
+    const batch = (data ?? []) as Record<string, unknown>[];
+    for (const row of batch) {
+      const mapped = mapHistoryRow(row);
+      if (mapped) rows.push(mapped);
+    }
+
+    if (batch.length < HISTORY_FETCH_PAGE) break;
+    offset += HISTORY_FETCH_PAGE;
+  }
+
+  return rows;
+}
+
+function compareHistoryRows(
+  a: ReleasedLoanRow,
+  b: ReleasedLoanRow,
+  sortKey: ReleasedLoansSortKey,
+  sortDir: "asc" | "desc",
+): number {
+  const dir = sortDir === "asc" ? 1 : -1;
+
+  if (sortKey === "applicationNo") {
+    const cmp = (a.applicationNo ?? "").localeCompare(b.applicationNo ?? "");
+    if (cmp !== 0) return cmp * dir;
+  } else if (sortKey === "borrower") {
+    // Server-side 2-hop foreign-table order is unreliable — sort client-side
+    // instead, same fallback documented on the old query-builder approach.
+    const aName = `${a.borrower?.lastName ?? ""} ${a.borrower?.firstName ?? ""}`;
+    const bName = `${b.borrower?.lastName ?? ""} ${b.borrower?.firstName ?? ""}`;
+    const cmp = aName.localeCompare(bName);
+    if (cmp !== 0) return cmp * dir;
+  } else {
+    const cmp =
+      new Date(a.closedAt).getTime() - new Date(b.closedAt).getTime();
+    if (cmp !== 0) return cmp * dir;
+  }
+
+  return a.id.localeCompare(b.id);
+}
+
 /**
  * Closed release files — one row per `release_files` with status `closed`.
  * `closedAt` comes from the matching `release_events` row (`event_type =
  * 'closed'`). Amount/loan type come from the pinned `computation_id` FK
  * (not latest-active lookup).
  *
- * Sort note: `applicationNo` orders via foreignTable `loan_applications`
- * (1-hop). `borrower` is **not** sorted server-side — PostgREST 2-hop
- * foreign-table order (`loan_applications.borrowers`) is unreliable;
- * callers should sort `borrower` client-side on the current page. When
- * `sortKey` is `borrower`, the server falls back to `closedAt`.
- * `closedAt` orders via foreignTable `release_events.acted_at`.
- * Primary order is always followed by `.order("id", { ascending: true })`.
+ * Path/date/search filters run in SQL (reliable — they target the
+ * `release_files`/`release_events!inner` row itself, not an optional
+ * embed). Segment, sort, and pagination run in JS over the fetched superset
+ * — see `fetchHistorySuperset` for why segment can't be a SQL `.eq()`.
  */
 export async function getReleasedLoansHistory(
   supabase: SupabaseClient,
@@ -155,8 +357,6 @@ export async function getReleasedLoansHistory(
 
   const safePage = Math.max(1, page);
   const safePageSize = clampReleasedLoansPageSize(pageSize);
-  const offset = (safePage - 1) * safePageSize;
-  const ascending = sortDir === "asc";
   const term = sanitizeSearchTerm(search);
 
   let applicationIds: string[] | null = null;
@@ -172,137 +372,23 @@ export async function getReleasedLoansHistory(
     }
   }
 
-  let query = supabase
-    .from("release_files")
-    .select(
-      `
-      id,
-      loan_application_id,
-      release_paths,
-      computation_id,
-      pdc_collected_at,
-      loan_applications (
-        application_no,
-        segment,
-        borrowers (
-          borrower_no,
-          first_name,
-          last_name,
-          email
-        )
-      ),
-      computations (
-        loan_type_name,
-        net_released
-      ),
-      release_events!inner (
-        acted_at
-      )
-    `,
-      { count: "exact" },
-    )
-    .eq("status", "closed")
-    .eq("release_events.event_type", "closed");
-
-  const pathEq = releasePathFilterSpec(releasePath);
-  if (pathEq) {
-    query = query.contains("release_paths", [pathEq]);
-  }
-
-  if (segmentFilter !== "all") {
-    query = query.eq("loan_applications.segment", segmentFilter);
-  }
-
-  if (from) {
-    query = query.gte("release_events.acted_at", toInclusiveStart(from));
-  }
-  if (to) {
-    query = query.lte("release_events.acted_at", toInclusiveEnd(to));
-  }
-
-  if (applicationIds) {
-    query = query.in("loan_application_id", applicationIds);
-  }
-
-  if (sortKey === "applicationNo") {
-    query = query.order("application_no", {
-      ascending,
-      foreignTable: "loan_applications",
-    });
-  } else {
-    // closedAt default; also used when sortKey === "borrower" (client-page sort)
-    query = query.order("acted_at", {
-      ascending,
-      foreignTable: "release_events",
-    });
-  }
-
-  query = query
-    .order("id", { ascending: true })
-    .range(offset, offset + safePageSize - 1);
-
-  const { data, error, count } = await query;
-  if (error) {
-    throw new Error(error.message);
-  }
-
-  const rows = (data ?? []).flatMap((row) => {
-    const eventsRaw = row.release_events;
-    const event = Array.isArray(eventsRaw) ? eventsRaw[0] : eventsRaw;
-    const closedAt = (event?.acted_at as string | null | undefined) ?? null;
-    if (!closedAt) return [];
-
-    const appRaw = row.loan_applications;
-    const app = Array.isArray(appRaw) ? appRaw[0] : appRaw;
-    const borrowerRaw = app?.borrowers;
-    const borrower = Array.isArray(borrowerRaw)
-      ? borrowerRaw[0]
-      : borrowerRaw;
-
-    const computationRaw = row.computations;
-    const computation = Array.isArray(computationRaw)
-      ? computationRaw[0]
-      : computationRaw;
-
-    const netRaw = computation?.net_released;
-    const netReleased =
-      netRaw === null || netRaw === undefined ? null : Number(netRaw);
-
-    const pathsRaw = row.release_paths;
-    const releasePaths: ReleasePath[] = Array.isArray(pathsRaw)
-      ? pathsRaw.filter(
-          (p): p is ReleasePath => p === "with_pdc" || p === "without_pdc",
-        )
-      : [];
-
-    const segmentRaw = app?.segment as string | null | undefined;
-    const segment: "sme" | "seafarer" | null =
-      segmentRaw === "sme" || segmentRaw === "seafarer" ? segmentRaw : null;
-
-    return [
-      {
-        id: row.id as string,
-        applicationId: row.loan_application_id as string,
-        applicationNo: (app?.application_no as string | null) ?? null,
-        segment,
-        borrower: borrower
-          ? {
-              borrowerNo: borrower.borrower_no as string,
-              firstName: borrower.first_name as string,
-              lastName: borrower.last_name as string,
-              email: borrower.email as string,
-            }
-          : null,
-        releasePaths,
-        loanTypeName: (computation?.loan_type_name as string | null) ?? null,
-        netReleased,
-        pdcCollectedAt: (row.pdc_collected_at as string | null) ?? null,
-        closedAt,
-      },
-    ];
+  const superset = await fetchHistorySuperset(supabase, {
+    applicationIds,
+    releasePath,
+    from,
+    to,
   });
 
-  return { rows, totalCount: count ?? 0 };
+  const filtered = superset.filter((row) =>
+    passesHistorySegmentFilter(row, segmentFilter),
+  );
+  filtered.sort((a, b) => compareHistoryRows(a, b, sortKey, sortDir));
+
+  const totalCount = filtered.length;
+  const offset = (safePage - 1) * safePageSize;
+  const rows = filtered.slice(offset, offset + safePageSize);
+
+  return { rows, totalCount };
 }
 
 /**

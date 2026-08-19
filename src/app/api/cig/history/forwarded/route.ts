@@ -13,7 +13,7 @@ import { createClient } from "@/lib/supabase/server";
 const RANGE_PRESETS = new Set(["30d", "90d", "all", "custom"]);
 const SORT_KEYS = new Set(["forwardedAt", "applicationNo", "borrower"]);
 const FINDINGS = new Set(["all", "positive", "negative"]);
-const SEGMENT_FILTERS = new Set(["all", "seafarer", "sme"]);
+const SEGMENT_FILTERS = new Set(["all", "seafarer", "sme", "individual"]);
 
 /** Forwarded-to-Committee history. Read-only. */
 export async function GET(request: Request) {
@@ -30,7 +30,7 @@ export async function GET(request: Request) {
     const segmentRaw = searchParams.get("segment") ?? "all";
     const segment = (
       SEGMENT_FILTERS.has(segmentRaw) ? segmentRaw : "all"
-    ) as "all" | "seafarer" | "sme";
+    ) as "all" | "seafarer" | "sme" | "individual";
 
     const rangeRaw = searchParams.get("range") ?? "30d";
     const preset = (

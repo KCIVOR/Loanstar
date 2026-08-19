@@ -45,7 +45,7 @@ export type AgentLeadQueueRow = {
   businessName: string | null;
   borrowerId: string | null;
   applicationId: string | null;
-  segment: "sme" | "seafarer" | null;
+  segment: "sme" | "seafarer" | "individual" | null;
   status: string;
   createdAt: string;
   updatedAt: string;
@@ -59,7 +59,7 @@ export type AgentLeadsQueueParams = {
   search?: string;
   stageFilter?: AgentLeadStageFilter | string;
   statusFilter?: AgentLeadStatusFilter | string;
-  segmentFilter?: "all" | "seafarer" | "sme" | string;
+  segmentFilter?: "all" | "seafarer" | "sme" | "individual" | string;
   from?: string | null;
   to?: string | null;
   sortKey?: AgentLeadsSortKey;
@@ -166,7 +166,7 @@ export function passesStage(
 /** Segment membership — unconverted (null) never match a non-"all" filter. */
 export function passesSegmentFilter(
   row: Pick<AgentLeadQueueRow, "segment">,
-  segment: "all" | "seafarer" | "sme",
+  segment: "all" | "seafarer" | "sme" | "individual",
 ): boolean {
   if (segment === "all") return true;
   return row.segment === segment;
@@ -220,8 +220,10 @@ function mapEnrichedLead(
   const appRaw = row.loan_applications;
   const app = Array.isArray(appRaw) ? appRaw[0] : appRaw;
   const segmentRaw = app?.segment;
-  const segment: "sme" | "seafarer" | null =
-    segmentRaw === "sme" || segmentRaw === "seafarer" ? segmentRaw : null;
+  const segment: "sme" | "seafarer" | "individual" | null =
+    segmentRaw === "sme" || segmentRaw === "seafarer" || segmentRaw === "individual"
+      ? segmentRaw
+      : null;
 
   return {
     id: row.id,
@@ -374,8 +376,10 @@ export async function getAgentLeadsQueue(
   const term = sanitizeSearchTerm(search);
   const statusSpec = statusFilterSpec(statusFilter);
   const stageSpec = stageFilterSpec(stageFilter);
-  const segmentSpec: "all" | "seafarer" | "sme" =
-    segmentFilter === "seafarer" || segmentFilter === "sme"
+  const segmentSpec: "all" | "seafarer" | "sme" | "individual" =
+    segmentFilter === "seafarer" ||
+    segmentFilter === "sme" ||
+    segmentFilter === "individual"
       ? segmentFilter
       : "all";
 

@@ -57,7 +57,7 @@ export function findResumableDraft<T extends { id: string; status: string }>(
 }
 
 export type ReloanSegmentScope = {
-  segment: "seafarer" | "sme";
+  segment: "seafarer" | "sme" | "individual";
   entityType: "individual" | "corporate" | null;
 };
 
@@ -88,9 +88,15 @@ export function resolveReloanSegment(input: {
     input.parentSegment === "sme" &&
     (entityType === "individual" || entityType === "corporate");
 
-  return inheritSme
-    ? { segment: "sme", entityType: entityType as "individual" | "corporate" }
-    : { segment: "seafarer", entityType: null };
+  if (inheritSme) {
+    return { segment: "sme", entityType: entityType as "individual" | "corporate" };
+  }
+
+  if (input.parentSegment === "individual") {
+    return { segment: "individual", entityType: null };
+  }
+
+  return { segment: "seafarer", entityType: null };
 }
 
 export type BorrowerCreateSegmentResult =
@@ -119,6 +125,10 @@ export function resolveBorrowerCreateSegment(input: {
 
     if (bodySegment === "seafarer") {
       return { ok: true, scope: { segment: "seafarer", entityType: null } };
+    }
+
+    if (bodySegment === "individual") {
+      return { ok: true, scope: { segment: "individual", entityType: null } };
     }
 
     if (bodySegment !== "sme") {

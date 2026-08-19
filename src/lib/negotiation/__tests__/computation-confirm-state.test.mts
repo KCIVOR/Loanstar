@@ -55,12 +55,23 @@ test("intake-only signature (no negotiation) shows as confirmed", () => {
   );
 });
 
-test("pre-decision computation (no negotiation, no signature) is not confirmable", () => {
+test("pre-decision computation (no negotiation, no signature) is confirmable by the borrower", () => {
   assert.equal(
     computationConfirmState({
       signedAt: null,
       negotiationStatus: null,
       applicationStatus: "for_approval",
+    }),
+    "confirm",
+  );
+});
+
+test("active counter-offer negotiation is not confirmable — waiting on Committee's response", () => {
+  assert.equal(
+    computationConfirmState({
+      signedAt: null,
+      negotiationStatus: "negotiating",
+      applicationStatus: "negotiating_terms",
     }),
     "hidden",
   );

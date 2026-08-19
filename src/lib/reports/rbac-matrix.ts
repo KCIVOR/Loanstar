@@ -23,6 +23,7 @@ export const EXPECTED_DEFAULT_RBAC: ExpectedPermission[] = [
   { role: "cig", module: "computation", view: true, create: false, edit: false, delete: false, executeTrigger: false },
   { role: "committee", module: "committee", view: true, create: true, edit: true, delete: false, executeTrigger: true },
   { role: "committee", module: "negotiation", view: true, create: true, edit: true, delete: false, executeTrigger: true },
+  { role: "committee", module: "reports", view: true, create: false, edit: false, delete: false, executeTrigger: false },
   { role: "lra", module: "release_lra", view: true, create: true, edit: true, delete: false, executeTrigger: true },
   { role: "ar", module: "accounting_ar", view: true, create: true, edit: true, delete: false, executeTrigger: true },
   { role: "ar", module: "reports", view: true, create: false, edit: false, delete: false, executeTrigger: false },

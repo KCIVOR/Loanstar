@@ -129,9 +129,12 @@ export async function POST(request: Request, { params }: RouteParams) {
     // Profile form stores PHP as monthlyIncomePhp; legacy rows may use monthlyIncome.
     const monthlyIncome =
       financial.monthlyIncomePhp ?? financial.monthlyIncome ?? null;
-    const segment = application.segment === "sme" ? "sme" : "seafarer";
+    const segment =
+      application.segment === "sme" || application.segment === "individual"
+        ? application.segment
+        : "seafarer";
     const securityFeeRate =
-      segment === "sme"
+      segment === "sme" || segment === "individual"
         ? 0
         : (body.securityFeeRate ?? Number(loanType.interest_rate));
 

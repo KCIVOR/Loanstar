@@ -32,7 +32,7 @@ import type {
 
 const PAGE_SIZE_OPTIONS = [10, 20, 30, 50, 100] as const;
 
-type SegmentFilter = "all" | "seafarer" | "sme";
+type SegmentFilter = "all" | "seafarer" | "sme" | "individual";
 
 const DEFAULT_DATE_RANGE: DateRangeValue = {
   preset: "30d",
@@ -46,15 +46,29 @@ const SEGMENT_CHIPS: Array<{ id: SegmentFilter; label: string }> = [
   { id: "all", label: "All" },
   { id: "seafarer", label: "Seafarer" },
   { id: "sme", label: "SME" },
+  { id: "individual", label: "Individual" },
 ];
 
 type SortKey = ClosedLeadsSortKey;
 
-function segmentBadge(segment: "sme" | "seafarer" | null | undefined) {
-  const isSme = segment === "sme";
+function segmentBadge(segment: "sme" | "seafarer" | "individual" | null | undefined) {
+  if (segment === "sme") {
+    return (
+      <Badge variant="navy" dot>
+        SME
+      </Badge>
+    );
+  }
+  if (segment === "individual") {
+    return (
+      <Badge variant="warning" dot>
+        Individual
+      </Badge>
+    );
+  }
   return (
-    <Badge variant={isSme ? "navy" : "teal"} dot>
-      {isSme ? "SME" : "Seafarer"}
+    <Badge variant="teal" dot>
+      Seafarer
     </Badge>
   );
 }
@@ -241,7 +255,7 @@ export default function AgentClosedLeadsPage() {
           <div className="active-pill-row">
             {segmentFilter !== "all" ? (
               <span className="active-pill">
-                Segment: {segmentFilter === "sme" ? "SME" : "Seafarer"}
+                Segment: {segmentFilter === "sme" ? "SME" : segmentFilter === "individual" ? "Individual" : "Seafarer"}
                 <button
                   type="button"
                   aria-label="Clear segment filter"
