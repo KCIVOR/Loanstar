@@ -3,6 +3,10 @@ import { z } from "zod";
 
 import { writeAuditEvent } from "@/lib/audit/writer";
 import { ensureDocumentSlots } from "@/lib/documents/checklist";
+import {
+  isOriginationStatus,
+  SERVICING_STATUSES,
+} from "@/lib/borrowers/reloan";
 
 export const createApplicationSchema = z
   .object({
@@ -17,6 +21,8 @@ export const createApplicationSchema = z
     collateralType: z
       .enum(["none", "car_refinancing", "real_estate"])
       .default("none"),
+    /** Individual + no-collateral only — MPL (monthly) vs Salary (semi-monthly) payment rule. */
+    individualLoanType: z.enum(["mpl", "salary"]).optional(),
   })
   .refine((data) => data.segment !== "sme" || data.entityType != null, {
     message: "entityType is required when segment is sme",
@@ -25,9 +31,52 @@ export const createApplicationSchema = z
   .refine((data) => data.segment !== "seafarer" || data.collateralType === "none", {
     message: "Seafarer applications cannot carry collateral",
     path: ["collateralType"],
-  });
+  })
+  .refine(
+    (data) =>
+      !(data.segment === "individual" && data.collateralType === "none") ||
+      data.individualLoanType != null,
+    {
+      message:
+        "individualLoanType is required for individual applications with no collateral",
+      path: ["individualLoanType"],
+    },
+  )
+  .refine(
+    (data) =>
+      data.segment === "individual" && data.collateralType === "none"
+        ? true
+        : data.individualLoanType == null,
+    {
+      message:
+        "individualLoanType only applies to individual applications with no collateral",
+      path: ["individualLoanType"],
+    },
+  );
 
 export type CreateApplicationInput = z.infer<typeof createApplicationSchema>;
+
+export type ExistingApplicationLite = {
+  applicationNo: string | null;
+  status: string;
+  segment: string | null;
+};
+
+export function classifyExistingApplications(apps: ExistingApplicationLite[]): {
+  servicing: ExistingApplicationLite[];
+  origination: ExistingApplicationLite[];
+} {
+  const servicing: ExistingApplicationLite[] = [];
+  const origination: ExistingApplicationLite[] = [];
+  for (const app of apps) {
+    if ((SERVICING_STATUSES as readonly string[]).includes(app.status)) {
+      servicing.push(app);
+    } else if (isOriginationStatus(app.status)) {
+      origination.push(app);
+    }
+  }
+  return { servicing, origination };
+}
 
 export async function createCsaApplication(
   supabase: SupabaseClient,
@@ -69,6 +118,7 @@ export async function createCsaApplication(
       segment: body.segment,
       entity_type: body.entityType ?? null,
       collateral_type: body.collateralType,
+      individual_loan_type: body.individualLoanType ?? null,
       status_history: [
         {
           status: "submitted",
@@ -108,6 +158,7 @@ export async function createCsaApplication(
       segment: body.segment,
       entityType: body.entityType ?? null,
       collateralType: body.collateralType,
+      individualLoanType: body.individualLoanType ?? null,
     },
   });
 

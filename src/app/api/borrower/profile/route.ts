@@ -144,7 +144,36 @@ export async function GET() {
   try {
     const user = await requireModulePermission("borrower_portal", "view");
     const borrower = await getOwnBorrower(user.id);
-    return jsonOk({ profile: mapBorrowerRow(borrower) });
+
+    let segment: "seafarer" | "sme" | "individual" = "seafarer";
+    let entityType: "individual" | "corporate" | null = null;
+
+    try {
+      const supabase = await createClient();
+      const { data: latestApp, error: appError } = await supabase
+        .from("loan_applications")
+        .select("segment, entity_type")
+        .eq("borrower_id", borrower.id)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (!appError && latestApp) {
+        segment =
+          latestApp.segment === "sme" || latestApp.segment === "individual"
+            ? latestApp.segment
+            : "seafarer";
+        entityType =
+          latestApp.entity_type === "individual" ||
+          latestApp.entity_type === "corporate"
+            ? latestApp.entity_type
+            : null;
+      }
+    } catch {
+      // Best-effort: profile still returns if the applications lookup fails.
+    }
+
+    return jsonOk({ profile: mapBorrowerRow(borrower), segment, entityType });
   } catch (error) {
     return handleApiError(error);
   }

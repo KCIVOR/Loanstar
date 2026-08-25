@@ -20,6 +20,7 @@ import { parseBorrowerNameParts } from "@/lib/csa/leads";
 type LoanSegment = "seafarer" | "sme" | "individual";
 type EntityType = "individual" | "corporate";
 type CollateralType = "none" | "car_refinancing" | "real_estate";
+type IndividualLoanType = "mpl" | "salary";
 
 function CsaNewApplicationForm() {
   const router = useRouter();
@@ -40,22 +41,73 @@ function CsaNewApplicationForm() {
   const [segment, setSegment] = useState<LoanSegment>("seafarer");
   const [entityType, setEntityType] = useState<EntityType>("individual");
   const [collateralType, setCollateralType] = useState<CollateralType>("none");
+  const [individualLoanType, setIndividualLoanType] = useState<IndividualLoanType | "">("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [existingWarning, setExistingWarning] = useState<string | null>(null);
 
   const collateralEligible = segment === "sme" || segment === "individual";
+  const individualLoanTypeEligible =
+    segment === "individual" && collateralType === "none";
 
   function handleSegmentChange(next: LoanSegment) {
     setSegment(next);
     if (next === "seafarer") setCollateralType("none");
+    if (next !== "individual") setIndividualLoanType("");
   }
 
-  function fillIntake(nextSegment: LoanSegment, nextEntityType: EntityType) {
+  function handleCollateralTypeChange(next: CollateralType) {
+    setCollateralType(next);
+    if (next !== "none") setIndividualLoanType("");
+  }
+
+  async function handleEmailBlur() {
+    const trimmed = email.trim().toLowerCase();
+    if (!trimmed) {
+      setExistingWarning(null);
+      return;
+    }
+    try {
+      const res = await fetch(
+        `/api/csa/borrowers/existing?email=${encodeURIComponent(trimmed)}`,
+      );
+      if (!res.ok) return;
+      const data = (await res.json()) as {
+        exists: boolean;
+        servicing: { applicationNo: string | null; status: string }[];
+        origination: { applicationNo: string | null; status: string }[];
+      };
+      if (!data.exists || (data.servicing.length === 0 && data.origination.length === 0)) {
+        setExistingWarning(null);
+        return;
+      }
+      const parts: string[] = [];
+      if (data.servicing.length > 0) {
+        parts.push(`${data.servicing.length} active loan account(s)`);
+      }
+      if (data.origination.length > 0) {
+        parts.push(`${data.origination.length} application(s) in process`);
+      }
+      setExistingWarning(
+        `This email already has ${parts.join(" and ")}. Creating another file is allowed. ` +
+          `The borrower profile is shared — saving the form on the new file overwrites the same name and business info.`,
+      );
+    } catch {
+      // non-blocking; warning is optional
+    }
+  }
+
+  function fillIntake(
+    nextSegment: LoanSegment,
+    nextEntityType: EntityType,
+    nextIndividualLoanType: IndividualLoanType | "" = "",
+  ) {
     const rand = Math.floor(Math.random() * 100000);
     const names = { first: "Juan", last: "Dela Cruz" };
     setSegment(nextSegment);
     setEntityType(nextEntityType);
     setCollateralType("none");
+    setIndividualLoanType(nextIndividualLoanType);
     setEmail(`autofill.${rand}@example.local`);
     setFirstName(names.first);
     setLastName(names.last);
@@ -77,6 +129,9 @@ function CsaNewApplicationForm() {
         segment,
         entityType: segment === "sme" ? entityType : undefined,
         collateralType: collateralEligible ? collateralType : undefined,
+        individualLoanType: individualLoanTypeEligible
+          ? individualLoanType || undefined
+          : undefined,
       };
 
       const res = await fetch(
@@ -172,13 +227,32 @@ function CsaNewApplicationForm() {
                 id="collateralType"
                 value={collateralType}
                 onChange={(e) =>
-                  setCollateralType(e.target.value as CollateralType)
+                  handleCollateralTypeChange(e.target.value as CollateralType)
                 }
                 required
               >
                 <option value="none">Clean (no collateral)</option>
                 <option value="car_refinancing">Car Refinancing</option>
                 <option value="real_estate">Real Estate</option>
+              </Select>
+            </div>
+          ) : null}
+          {individualLoanTypeEligible ? (
+            <div className="sm:col-span-2">
+              <Label htmlFor="individualLoanType" required>
+                Individual loan type
+              </Label>
+              <Select
+                id="individualLoanType"
+                value={individualLoanType}
+                onChange={(e) =>
+                  setIndividualLoanType(e.target.value as IndividualLoanType)
+                }
+                required
+              >
+                <option value="">Select loan type</option>
+                <option value="mpl">MPL (Multi-Purpose Loan)</option>
+                <option value="salary">Salary</option>
               </Select>
             </div>
           ) : null}
@@ -192,6 +266,7 @@ function CsaNewApplicationForm() {
               required
               value={email}
               onChange={(e) => setEmail(e.target.value)}
+              onBlur={() => void handleEmailBlur()}
             />
           </div>
           <div>
@@ -233,6 +308,11 @@ function CsaNewApplicationForm() {
             />
           </div>
           <div className="sm:col-span-2">
+            {existingWarning ? (
+              <div className="mb-3">
+                <Alert variant="warning">{existingWarning}</Alert>
+              </div>
+            ) : null}
             <Button type="submit" loading={saving}>
               {leadId ? "Convert lead & create application" : "Create application"}
             </Button>
@@ -244,7 +324,14 @@ function CsaNewApplicationForm() {
           { label: "Fill: Seafarer", onClick: () => fillIntake("seafarer", "individual") },
           { label: "Fill: SME (Individual)", onClick: () => fillIntake("sme", "individual") },
           { label: "Fill: SME (Corporate)", onClick: () => fillIntake("sme", "corporate") },
-          { label: "Fill: Individual", onClick: () => fillIntake("individual", "individual") },
+          {
+            label: "Fill: Individual (MPL)",
+            onClick: () => fillIntake("individual", "individual", "mpl"),
+          },
+          {
+            label: "Fill: Individual (Salary)",
+            onClick: () => fillIntake("individual", "individual", "salary"),
+          },
         ]}
       />
     </div>

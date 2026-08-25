@@ -11,6 +11,7 @@ import {
   docsUploadPercent,
   borrowerAppFocus,
   borrowerAppPageTitle,
+  formatLoanProductLabel,
 } from "../home";
 
 describe("borrowerHomeMode", () => {
@@ -28,9 +29,16 @@ describe("borrowerHomeMode", () => {
     );
   });
 
-  it("active_loan wins when loan exists", () => {
+  it("active_and_applying when loan and in-process application both exist", () => {
     assert.equal(
       borrowerHomeMode({ hasOpenApplication: true, hasActiveLoan: true }),
+      "active_and_applying",
+    );
+  });
+
+  it("active_loan when loan exists and no in-process application", () => {
+    assert.equal(
+      borrowerHomeMode({ hasOpenApplication: false, hasActiveLoan: true }),
       "active_loan",
     );
   });
@@ -41,6 +49,10 @@ describe("borrowerHomeDescription", () => {
     assert.match(borrowerHomeDescription("ready"), /start/i);
     assert.match(borrowerHomeDescription("in_progress"), /progress|document/i);
     assert.match(borrowerHomeDescription("active_loan"), /loan|payment/i);
+    assert.equal(
+      borrowerHomeDescription("active_and_applying"),
+      "You have an active loan and a new application in process. Open either file below.",
+    );
   });
 });
 
@@ -142,5 +154,56 @@ describe("docsUploadPercent", () => {
 
   it("is 100 when nothing required", () => {
     assert.equal(docsUploadPercent({ uploaded: 0, required: 0 }), 100);
+  });
+});
+
+describe("formatLoanProductLabel", () => {
+  it("formats Seafarer loan", () => {
+    assert.equal(
+      formatLoanProductLabel({ segment: "seafarer" }),
+      "Seafarer",
+    );
+  });
+
+  it("formats SME corporate with collateral", () => {
+    assert.equal(
+      formatLoanProductLabel({
+        segment: "sme",
+        entityType: "corporate",
+        collateralType: "real_estate",
+      }),
+      "SME (Small & Medium Enterprise) — Corporate (Partnership/Corporation) · Real Estate",
+    );
+  });
+
+  it("formats SME sole proprietorship clean", () => {
+    assert.equal(
+      formatLoanProductLabel({
+        segment: "sme",
+        entityType: "individual",
+        collateralType: "none",
+      }),
+      "SME (Small & Medium Enterprise) — Individual (Sole Proprietorship) · Clean (no collateral)",
+    );
+  });
+
+  it("formats Individual with car refinancing", () => {
+    assert.equal(
+      formatLoanProductLabel({
+        segment: "individual",
+        collateralType: "car_refinancing",
+      }),
+      "Individual — Car Refinancing",
+    );
+  });
+
+  it("formats Individual clean", () => {
+    assert.equal(
+      formatLoanProductLabel({
+        segment: "individual",
+        collateralType: "none",
+      }),
+      "Individual — Clean (no collateral)",
+    );
   });
 });

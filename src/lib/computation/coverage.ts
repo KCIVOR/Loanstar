@@ -67,9 +67,13 @@ export type CoverageEndorseOptions = {
 };
 
 /**
- * Endorse gate: null ratio is non-blocking (income undeclared);
- * ratio must be <= threshold when known.
- * SME: always non-blocking (see skipCoverageForSegment).
+ * Endorse gate: coverage ratio is always non-blocking — an over-threshold
+ * ratio surfaces as a warning for CSA/CIG/Committee to see and weigh, not a
+ * hard stop on endorsement. `blocker` is kept in the return shape for the
+ * benefit of existing callers but is now always null; `coverageOk` is
+ * likewise always true. (Previously ratio > threshold set both to block
+ * endorsement — changed so a high ratio never prevents the file from
+ * moving forward on its own.)
  */
 export function evaluateCoverageForEndorse(
   coverageRatio: number | null,
@@ -96,9 +100,9 @@ export function evaluateCoverageForEndorse(
 
   if (coverageRatio > threshold) {
     return {
-      coverageOk: false,
-      warnings: [],
-      blocker: formatCoverageBlocker(threshold),
+      coverageOk: true,
+      warnings: [formatCoverageBlocker(threshold)],
+      blocker: null,
     };
   }
 

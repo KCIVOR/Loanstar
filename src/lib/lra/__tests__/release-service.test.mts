@@ -1,25 +1,41 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
+import { addScheduleMonths, advanceSemiMonthly } from "@/lib/computation/release-date";
+import { halfUp } from "@/lib/computation/money";
+
 import { savePdcChecks } from "../release-service";
 
 type StubOpts = {
   terms: number;
   monthlyAmortization: number;
   releasePath?: string;
+  firstPaymentDate?: string | null;
+  paymentFrequency?: "monthly" | "semi_monthly";
+  totalLoan?: number;
 };
 
-function makeCheckRow(amount: number, index = 0) {
+const FIRST_PAYMENT_DATE = "2026-08-12";
+
+function makeCheckRow(
+  amount: number,
+  index = 0,
+  anchor: string = FIRST_PAYMENT_DATE,
+) {
   return {
     checkNumber: String(1001 + index),
     amount,
-    checkDate: "2026-08-12",
+    checkDate: addScheduleMonths(anchor, index),
     bankName: "Test Bank",
   };
 }
 
-function makeChecks(count: number, amount: number) {
-  return Array.from({ length: count }, (_, i) => makeCheckRow(amount, i));
+function makeChecks(
+  count: number,
+  amount: number,
+  anchor: string = FIRST_PAYMENT_DATE,
+) {
+  return Array.from({ length: count }, (_, i) => makeCheckRow(amount, i, anchor));
 }
 
 function makeSavePdcStub(opts: StubOpts) {
@@ -69,11 +85,15 @@ function makeSavePdcStub(opts: StubOpts) {
     total_deductions: 0,
     net_released: 100000,
     total_interest: 0,
-    total_loan: 100000,
+    total_loan: opts.totalLoan ?? 100000,
     release_date: null,
-    first_payment_date: null,
+    first_payment_date:
+      opts.firstPaymentDate === undefined
+        ? FIRST_PAYMENT_DATE
+        : opts.firstPaymentDate,
     due_day: null,
     line_items: [],
+    payment_frequency: opts.paymentFrequency ?? "monthly",
   };
 
   const supabase = {
@@ -261,5 +281,223 @@ describe("savePdcChecks hard lock", () => {
     assert.equal(stub.getReleaseFileUpdated()?.status, "ready_generate");
     assert.equal(stub.getReleaseFileUpdated()?.blank_check_from, "2001");
     assert.equal(stub.getReleaseFileUpdated()?.blank_check_to, "2003");
+  });
+
+  it("throws when the computation has no recorded payment start date", async () => {
+    const stub = makeSavePdcStub({
+      terms: 3,
+      monthlyAmortization: 5000,
+      firstPaymentDate: null,
+    });
+    const checks = makeChecks(3, 5000);
+
+    await assert.rejects(
+      () =>
+        savePdcChecks(stub.supabase, "rf-1", checks, undefined, "actor-1"),
+      /no payment start date recorded/,
+    );
+
+    assert.equal(stub.getInsertedChecks(), null);
+  });
+
+  it("throws when the first check date doesn't match the computed schedule", async () => {
+    const stub = makeSavePdcStub({ terms: 3, monthlyAmortization: 5000 });
+    const checks = makeChecks(3, 5000, "2026-09-12");
+
+    await assert.rejects(
+      () =>
+        savePdcChecks(stub.supabase, "rf-1", checks, undefined, "actor-1"),
+      /PDC #1 date must be 2026-08-12/,
+    );
+
+    assert.equal(stub.getInsertedChecks(), null);
+  });
+
+  it("throws when a middle check date is shifted off the computed schedule", async () => {
+    const stub = makeSavePdcStub({ terms: 3, monthlyAmortization: 5000 });
+    const checks = makeChecks(3, 5000);
+    checks[1] = { ...checks[1], checkDate: "2026-10-12" };
+
+    await assert.rejects(
+      () =>
+        savePdcChecks(stub.supabase, "rf-1", checks, undefined, "actor-1"),
+      /PDC #2 date must be 2026-09-12 \(got 2026-10-12\)/,
+    );
+
+    assert.equal(stub.getInsertedChecks(), null);
+  });
+
+  it("succeeds when every check date follows the computed schedule exactly", async () => {
+    const stub = makeSavePdcStub({ terms: 3, monthlyAmortization: 5000 });
+    const checks = makeChecks(3, 5000);
+
+    const result = await savePdcChecks(
+      stub.supabase,
+      "rf-1",
+      checks,
+      undefined,
+      "actor-1",
+    );
+
+    assert.equal(result.status, "ready_generate");
+    assert.deepEqual(
+      stub.getInsertedChecks()?.map((c) => (c as { check_date: string }).check_date),
+      ["2026-08-12", "2026-09-12", "2026-10-12"],
+    );
+  });
+});
+
+describe("savePdcChecks hard lock (semi-monthly / Salary)", () => {
+  const SEMI_FIRST = "2026-08-31";
+  const TERMS = 6;
+  const MONTHLY_AMORTIZATION = 21578.33;
+  const TOTAL_LOAN = 129470;
+  const HALF = halfUp(MONTHLY_AMORTIZATION / 2);
+
+  function makeSemiMonthlyChecks(
+    count: number,
+    anchor: string = SEMI_FIRST,
+    totalLoan: number = TOTAL_LOAN,
+  ) {
+    const lastAmount = halfUp(totalLoan - halfUp(HALF * (count - 1)));
+    return Array.from({ length: count }, (_, i) => ({
+      checkNumber: String(2001 + i),
+      amount: i === count - 1 ? lastAmount : HALF,
+      checkDate: advanceSemiMonthly(anchor, i),
+      bankName: "Test Bank",
+    }));
+  }
+
+  it("throws when semi-monthly check count is below terms * 2", async () => {
+    const stub = makeSavePdcStub({
+      terms: TERMS,
+      monthlyAmortization: MONTHLY_AMORTIZATION,
+      paymentFrequency: "semi_monthly",
+      totalLoan: TOTAL_LOAN,
+      firstPaymentDate: SEMI_FIRST,
+    });
+
+    await assert.rejects(
+      () =>
+        savePdcChecks(
+          stub.supabase,
+          "rf-1",
+          makeSemiMonthlyChecks(10),
+          undefined,
+          "actor-1",
+        ),
+      /Number of checks must equal twice the loan term \(12\)/,
+    );
+    assert.equal(stub.getInsertedChecks(), null);
+  });
+
+  it("throws when semi-monthly check count exceeds terms * 2", async () => {
+    const stub = makeSavePdcStub({
+      terms: TERMS,
+      monthlyAmortization: MONTHLY_AMORTIZATION,
+      paymentFrequency: "semi_monthly",
+      totalLoan: TOTAL_LOAN,
+      firstPaymentDate: SEMI_FIRST,
+    });
+
+    await assert.rejects(
+      () =>
+        savePdcChecks(
+          stub.supabase,
+          "rf-1",
+          makeSemiMonthlyChecks(14),
+          undefined,
+          "actor-1",
+        ),
+      /Number of checks must equal twice the loan term \(12\)/,
+    );
+    assert.equal(stub.getInsertedChecks(), null);
+  });
+
+  it("throws when a semi-monthly check amount isn't the half-amortization", async () => {
+    const stub = makeSavePdcStub({
+      terms: TERMS,
+      monthlyAmortization: MONTHLY_AMORTIZATION,
+      paymentFrequency: "semi_monthly",
+      totalLoan: TOTAL_LOAN,
+      firstPaymentDate: SEMI_FIRST,
+    });
+    const checks = makeSemiMonthlyChecks(12);
+    checks[1] = { ...checks[1], amount: HALF + 1 };
+
+    await assert.rejects(
+      () =>
+        savePdcChecks(stub.supabase, "rf-1", checks, undefined, "actor-1"),
+      new RegExp(`Check amount must equal ₱${HALF} for PDC #2`),
+    );
+    assert.equal(stub.getInsertedChecks(), null);
+  });
+
+  it("throws when a semi-monthly check date doesn't alternate correctly", async () => {
+    const stub = makeSavePdcStub({
+      terms: TERMS,
+      monthlyAmortization: MONTHLY_AMORTIZATION,
+      paymentFrequency: "semi_monthly",
+      totalLoan: TOTAL_LOAN,
+      firstPaymentDate: SEMI_FIRST,
+    });
+    const checks = makeSemiMonthlyChecks(12);
+    checks[1] = { ...checks[1], checkDate: "2026-10-15" };
+
+    await assert.rejects(
+      () =>
+        savePdcChecks(stub.supabase, "rf-1", checks, undefined, "actor-1"),
+      /PDC #2 date must be 2026-09-15 \(got 2026-10-15\)/,
+    );
+    assert.equal(stub.getInsertedChecks(), null);
+  });
+
+  it("succeeds with a correct 12-check semi-monthly schedule — alternating dates, half amounts, last absorbs rounding, sums to totalLoan", async () => {
+    const stub = makeSavePdcStub({
+      terms: TERMS,
+      monthlyAmortization: MONTHLY_AMORTIZATION,
+      paymentFrequency: "semi_monthly",
+      totalLoan: TOTAL_LOAN,
+      firstPaymentDate: SEMI_FIRST,
+    });
+    const checks = makeSemiMonthlyChecks(12);
+
+    const result = await savePdcChecks(
+      stub.supabase,
+      "rf-1",
+      checks,
+      undefined,
+      "actor-1",
+    );
+
+    assert.equal(result.status, "ready_generate");
+    const inserted = stub.getInsertedChecks() as Array<{
+      check_date: string;
+      amount: number;
+    }>;
+    assert.equal(inserted.length, 12);
+    assert.deepEqual(
+      inserted.map((c) => c.check_date),
+      [
+        "2026-08-31",
+        "2026-09-15",
+        "2026-09-30",
+        "2026-10-15",
+        "2026-10-31",
+        "2026-11-15",
+        "2026-11-30",
+        "2026-12-15",
+        "2026-12-31",
+        "2027-01-15",
+        "2027-01-31",
+        "2027-02-15",
+      ],
+    );
+    // First 11 checks are the flat half-amortization; the last absorbs rounding.
+    for (const row of inserted.slice(0, 11)) {
+      assert.equal(row.amount, HALF);
+    }
+    const sum = inserted.reduce((total, row) => halfUp(total + row.amount), 0);
+    assert.equal(sum, TOTAL_LOAN);
   });
 });

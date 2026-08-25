@@ -118,6 +118,7 @@ export const WORKFLOW_TRIGGERS: WorkflowTrigger[] = [
     preconditions: [
       "Release status released",
       "Signed check voucher uploaded on release checklist",
+      "Creates the AR masterlist account automatically",
     ],
   },
   {
@@ -136,7 +137,7 @@ export const WORKFLOW_TRIGGERS: WorkflowTrigger[] = [
     module: "accounting_ar",
     requiredPermission: "execute_trigger",
     preconditions: [
-      "Application in AR queue (LRA closed the file)",
+      "Runs automatically on LRA close (no AR receive click)",
       "Not yet received (no masterlist account)",
     ],
   },

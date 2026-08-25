@@ -10,7 +10,8 @@ import {
  * Param-driven LRA release queue over `release_queue`.
  *
  * ## Scope split (active / completed / all)
- * Completed is an OR across embeds + blocker prefix (`isCompletedLraQueueItem`).
+ * Completed is closed/paid_off only (`isCompletedLraQueueItem`). Files in
+ * `released` still need Close & transmit and stay on Active.
  * PostgREST 3-way OR across nested tables is fragile, so date / search run in
  * SQL where reliable; the full matching set is fetched, then scope + application
  * status are applied in JS (status via left-join embed `.eq` does not filter

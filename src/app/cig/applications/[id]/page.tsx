@@ -40,8 +40,10 @@ import type { BorrowerProfile } from "@/lib/borrowers/types";
 import {
   fakeBorrowerProfile,
   fakeCmInspection,
+  fakeFieldVisit,
   fakeRemark,
   fakeRemInspection,
+  fakeSmeReloanVerification,
   fakeVerificationPatch,
 } from "@/lib/dev/fake-data";
 import { CSA_ONLY_INTAKE_SLUGS } from "@/lib/documents/csa-only-intake";
@@ -2425,6 +2427,24 @@ export default function CigApplicationPage() {
                   label: "Fill Application Form",
                   onClick: () =>
                     setBorrower(fakeBorrowerProfile(segment, entityType, borrower)),
+                },
+              ]
+            : []),
+          ...(segment === "sme"
+            ? [
+                {
+                  label: isReloan
+                    ? "Fill SME Re-loan Verification"
+                    : "Fill SME Field Visit",
+                  onClick: () => {
+                    setVerification((prev) => ({
+                      ...(prev as VerificationData),
+                      ...(isReloan
+                        ? { smeReloanVerification: fakeSmeReloanVerification() }
+                        : { fieldVisit: fakeFieldVisit() }),
+                    }));
+                    setShowFieldVisitForm(true);
+                  },
                 },
               ]
             : []),

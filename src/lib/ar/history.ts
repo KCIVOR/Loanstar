@@ -512,7 +512,7 @@ export type RoundingWriteoffKpiCounts = {
   totalAmount: number;
 };
 
-async function resolvePerformerNames(
+export async function resolvePerformerNames(
   supabase: SupabaseClient,
   ids: string[],
 ): Promise<Map<string, string>> {
@@ -749,4 +749,272 @@ export async function getRoundingWriteoffPerformers(
   return ids
     .map((id) => ({ id, name: nameById.get(id) ?? id }))
     .sort((a, b) => a.name.localeCompare(b.name));
+}
+
+export type InternalTransferHistoryRow = {
+  id: string;
+  sourceLoanApplicationId: string;
+  sourceApplicationNo: string | null;
+  sourceLoanAccountNo: string | null;
+  targetMasterlistId: string;
+  targetLoanAccountNo: string | null;
+  targetBorrowerName: string;
+  targetBorrowerNo: string;
+  segment: "sme" | "seafarer" | "individual" | null;
+  transferType: "other_loan" | "offset";
+  months: number | null;
+  amount: number;
+  status: "posted" | "rejected";
+  reviewedBy: string | null;
+  reviewedByName: string;
+  reviewedAt: string | null;
+  rejectionReason: string | null;
+  createdAt: string;
+};
+
+export type InternalTransferSortKey = "borrower" | "amount" | "reviewedAt";
+
+export type InternalTransferHistoryQueryParams = {
+  search?: string;
+  segment?: "all" | "seafarer" | "sme" | "individual";
+  from?: string | null;
+  to?: string | null;
+  sortKey?: InternalTransferSortKey;
+  sortDir?: "asc" | "desc";
+  page: number;
+  pageSize: number;
+};
+
+export type InternalTransferKpiCounts = {
+  totalResolved: number;
+  totalPostedAmount: number;
+};
+
+/**
+ * Posted and rejected internal transfers — the history counterpart to
+ * `listPendingInternalTransfers` (which only ever returns `pending` rows).
+ * Search resolves against masterlist ids on **either** side of the transfer
+ * (source or target), since both are real accounts a user might search by.
+ */
+export async function getInternalTransferHistory(
+  supabase: SupabaseClient,
+  params: InternalTransferHistoryQueryParams,
+): Promise<{ rows: InternalTransferHistoryRow[]; totalCount: number }> {
+  const {
+    search = "",
+    segment: segmentFilter = "all",
+    from = null,
+    to = null,
+    sortKey = "reviewedAt",
+    sortDir = "desc",
+    page,
+    pageSize,
+  } = params;
+
+  const safePage = Math.max(1, page);
+  const safePageSize = clampArHistoryPageSize(pageSize);
+  const offset = (safePage - 1) * safePageSize;
+  const ascending = sortDir === "asc";
+  const term = sanitizeSearchTerm(search);
+
+  let masterlistIds: string[] | null = null;
+  if (term) {
+    masterlistIds = await findMasterlistIdsForSearch(supabase, term);
+    if (masterlistIds.length === 0) {
+      return { rows: [], totalCount: 0 };
+    }
+  }
+
+  let query = supabase
+    .from("internal_transfers")
+    .select(
+      `
+      id, source_loan_application_id, target_masterlist_id, transfer_type,
+      months, amount, status, rejection_reason, reviewed_by, reviewed_at, created_at,
+      source_application:loan_applications!internal_transfers_source_loan_application_id_fkey ( application_no ),
+      source_masterlist:masterlist!internal_transfers_source_masterlist_id_fkey ( loan_account_no ),
+      target_masterlist:masterlist!internal_transfers_target_masterlist_id_fkey!inner ( loan_account_no, borrower_name, borrower_no, segment )
+    `,
+      { count: "exact" },
+    )
+    .in("status", ["posted", "rejected"]);
+
+  if (masterlistIds) {
+    const ids = masterlistIds.join(",");
+    query = query.or(
+      `source_masterlist_id.in.(${ids}),target_masterlist_id.in.(${ids})`,
+    );
+  }
+
+  if (segmentFilter !== "all") {
+    query = query.eq("target_masterlist.segment", segmentFilter);
+  }
+
+  if (from) {
+    query = query.gte("reviewed_at", toInclusiveStart(from));
+  }
+  if (to) {
+    query = query.lte("reviewed_at", toInclusiveEnd(to));
+  }
+
+  // PostgREST/supabase-js cannot order top-level rows by a to-one embedded
+  // relation's column — the `foreignTable`/`referencedTable` order option
+  // only reorders rows *within* a one-to-many embed; for a many-to-one embed
+  // like target_masterlist it's silently a no-op (confirmed empirically
+  // against the live API while building this function — the DCR/rounding-
+  // writeoff history functions use this same pattern for their "borrower"
+  // sort and inherit the identical limitation, out of scope to fix here).
+  // Given this feature's realistic volume (a handful of resolved transfers,
+  // not thousands of payments), sorting by borrower name fetches everything
+  // matching the current filters up to a generous cap and sorts in JS,
+  // instead of shipping a sort option that silently does nothing.
+  const isBorrowerSort = sortKey === "borrower";
+  const BORROWER_SORT_FETCH_CAP = 2000;
+
+  if (isBorrowerSort) {
+    query = query
+      .order("id", { ascending: true })
+      .range(0, BORROWER_SORT_FETCH_CAP - 1);
+  } else {
+    if (sortKey === "amount") {
+      query = query.order("amount", { ascending });
+    } else {
+      query = query.order("reviewed_at", { ascending });
+    }
+    query = query
+      .order("id", { ascending: true })
+      .range(offset, offset + safePageSize - 1);
+  }
+
+  const { data, error, count } = await query;
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  const reviewerIds = Array.from(
+    new Set(
+      (data ?? [])
+        .map((row) => row.reviewed_by as string | null)
+        .filter((id): id is string => Boolean(id)),
+    ),
+  );
+  const nameById = await resolvePerformerNames(supabase, reviewerIds);
+
+  const rows = (data ?? []).map((row) => {
+    const sourceApp = Array.isArray(row.source_application)
+      ? row.source_application[0]
+      : row.source_application;
+    const sourceMl = Array.isArray(row.source_masterlist)
+      ? row.source_masterlist[0]
+      : row.source_masterlist;
+    const targetMl = Array.isArray(row.target_masterlist)
+      ? row.target_masterlist[0]
+      : row.target_masterlist;
+
+    const segmentRaw = targetMl?.segment as string | null | undefined;
+    const segment: "sme" | "seafarer" | "individual" | null =
+      segmentRaw === "sme" || segmentRaw === "seafarer" || segmentRaw === "individual"
+        ? segmentRaw
+        : null;
+
+    const reviewedBy = (row.reviewed_by as string | null) ?? null;
+
+    return {
+      id: row.id as string,
+      sourceLoanApplicationId: row.source_loan_application_id as string,
+      sourceApplicationNo: (sourceApp?.application_no as string | null) ?? null,
+      sourceLoanAccountNo: (sourceMl?.loan_account_no as string | null) ?? null,
+      targetMasterlistId: row.target_masterlist_id as string,
+      targetLoanAccountNo: (targetMl?.loan_account_no as string | null) ?? null,
+      targetBorrowerName: (targetMl?.borrower_name as string | undefined) ?? "",
+      targetBorrowerNo: (targetMl?.borrower_no as string | undefined) ?? "",
+      segment,
+      transferType: row.transfer_type as "other_loan" | "offset",
+      months: row.months as number | null,
+      amount: Number(row.amount),
+      status: row.status as "posted" | "rejected",
+      reviewedBy,
+      reviewedByName: reviewedBy ? (nameById.get(reviewedBy) ?? reviewedBy) : "—",
+      reviewedAt: (row.reviewed_at as string | null) ?? null,
+      rejectionReason: (row.rejection_reason as string | null) ?? null,
+      createdAt: row.created_at as string,
+    };
+  });
+
+  if (isBorrowerSort) {
+    rows.sort((a, b) =>
+      ascending
+        ? a.targetBorrowerName.localeCompare(b.targetBorrowerName)
+        : b.targetBorrowerName.localeCompare(a.targetBorrowerName),
+    );
+    return {
+      rows: rows.slice(offset, offset + safePageSize),
+      totalCount: count ?? 0,
+    };
+  }
+
+  return { rows, totalCount: count ?? 0 };
+}
+
+/**
+ * Internal-transfer history KPI — date-scoped (on `reviewed_at`) only.
+ * `totalResolved` counts posted + rejected together (a workload metric);
+ * `totalPostedAmount` sums `amount` for posted rows only, since a rejected
+ * transfer never moved money and blending it in would overstate the total.
+ */
+export async function getInternalTransferKpiCounts(
+  supabase: SupabaseClient,
+  bounds: { from?: string | null; to?: string | null },
+): Promise<InternalTransferKpiCounts> {
+  const { from = null, to = null } = bounds;
+
+  let countQuery = supabase
+    .from("internal_transfers")
+    .select("id", { count: "exact", head: true })
+    .in("status", ["posted", "rejected"]);
+  if (from) {
+    countQuery = countQuery.gte("reviewed_at", toInclusiveStart(from));
+  }
+  if (to) {
+    countQuery = countQuery.lte("reviewed_at", toInclusiveEnd(to));
+  }
+
+  const { count, error: countError } = await countQuery;
+  if (countError) throw new Error(countError.message);
+
+  const amountRows: { amount: number }[] = [];
+  let offset = 0;
+  for (;;) {
+    let amountQuery = supabase
+      .from("internal_transfers")
+      .select("amount")
+      .eq("status", "posted");
+    if (from) {
+      amountQuery = amountQuery.gte("reviewed_at", toInclusiveStart(from));
+    }
+    if (to) {
+      amountQuery = amountQuery.lte("reviewed_at", toInclusiveEnd(to));
+    }
+    amountQuery = amountQuery
+      .order("id", { ascending: true })
+      .range(offset, offset + POSTING_AMOUNT_FETCH_PAGE - 1);
+
+    const { data, error } = await amountQuery;
+    if (error) throw new Error(error.message);
+
+    const batch = data ?? [];
+    for (const row of batch) {
+      amountRows.push({ amount: Number(row.amount) });
+    }
+
+    if (batch.length < POSTING_AMOUNT_FETCH_PAGE) {
+      break;
+    }
+    offset += POSTING_AMOUNT_FETCH_PAGE;
+  }
+
+  return {
+    totalResolved: count ?? 0,
+    totalPostedAmount: sumPostingAmounts(amountRows),
+  };
 }

@@ -4,10 +4,10 @@ import type { SupabaseClient } from "@supabase/supabase-js";
  * Active AR masterlist queue — server-side search / status / aging / date /
  * sort / pagination.
  *
- * Date field: `created_at` — masterlist rows are inserted at AR receive
- * (loan release / enrollment) in `createMasterlistFromRelease`
- * (`src/lib/ar/masterlist.ts`). That is the AR-relevant arrival timestamp;
- * `release_date` is a date-only loan field, not a queue-arrival event.
+ * Date field: `created_at` — masterlist rows are inserted when LRA closes
+ * (`initializeArAccount` in `src/lib/ar/masterlist.ts`). That is the
+ * AR-relevant arrival timestamp; `release_date` is a date-only loan field,
+ * not a queue-arrival event.
  *
  * Search: borrower_name, borrower_no, loan_account_no, plus the denormalized
  * columns that back `masterlistSecondaryIdentity` (manning_agency, vessel_name).

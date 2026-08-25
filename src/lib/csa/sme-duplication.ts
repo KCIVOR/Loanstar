@@ -85,6 +85,24 @@ export async function findSmeDuplicationMatches(
     matches.push(match);
   }
 
+  // Same-account: other applications on the same borrower (different file, same login).
+  const { data: sameAccountApps } = await supabase
+    .from("loan_applications")
+    .select("id, application_no")
+    .eq("borrower_id", app.borrower_id as string)
+    .neq("id", applicationId);
+
+  for (const other of sameAccountApps ?? []) {
+    push({
+      source: "borrower",
+      id: app.borrower_id as string,
+      companyName,
+      ownerName,
+      applicationId: other.id as string,
+      applicationNo: (other.application_no as string | null) ?? null,
+    });
+  }
+
   if (companyKey) {
     const { data: borrowers } = await supabase
       .from("borrowers")

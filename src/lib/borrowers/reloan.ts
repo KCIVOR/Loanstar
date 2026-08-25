@@ -1,30 +1,43 @@
-/** Terminal statuses that do not block starting a new reloan (paid off, denied, or cancelled). */
+/** Finished — do not block a new apply. Count as history. */
 export const RELOAN_TERMINAL_STATUSES = ["paid_off", "denied", "cancelled"] as const;
+
+/** Live or recently disbursed loan accounts — do not block a new apply. */
+export const SERVICING_STATUSES = ["released", "closed", "loan_active"] as const;
 
 export type ReloanEligibilityResult =
   | { ok: true }
   | { ok: false; reason: string };
 
-export type NextApplicationKind = "first" | "reloan";
+export type NextApplicationKind = "first" | "reloan" | "additional";
+
+export const ORIGINATION_BLOCK_REASON =
+  "You already have an application in process. Finish or wait for it to close before starting another.";
+
+/** Origination statuses block a new apply (except a resumable draft, handled by callers). */
+export function isOriginationStatus(status: string): boolean {
+  if ((RELOAN_TERMINAL_STATUSES as readonly string[]).includes(status)) {
+    return false;
+  }
+  if ((SERVICING_STATUSES as readonly string[]).includes(status)) {
+    return false;
+  }
+  return true;
+}
 
 /**
- * A borrower may start a reloan only when every existing application is
- * terminal (paid off, denied, or cancelled). Any in-flight application blocks
- * another. An empty history is allowed (first application).
+ * A borrower may start another application when every existing file is
+ * terminal or in servicing. Origination in flight still blocks. An empty
+ * history is allowed (first application).
  */
 export function canStartReloan(input: {
   applicationStatuses: string[];
 }): ReloanEligibilityResult {
-  const open = input.applicationStatuses.filter(
-    (status) =>
-      !(RELOAN_TERMINAL_STATUSES as readonly string[]).includes(status),
-  );
+  const open = input.applicationStatuses.filter(isOriginationStatus);
 
   if (open.length > 0) {
     return {
       ok: false,
-      reason:
-        "You already have an ongoing application. Finish or wait for it to close before starting another.",
+      reason: ORIGINATION_BLOCK_REASON,
     };
   }
 
@@ -33,13 +46,18 @@ export function canStartReloan(input: {
 
 /**
  * What kind of application the borrower may open next, or null if blocked.
- * Empty history → first loan; only terminal apps → reloan.
+ * Empty history → first; terminal history with no servicing → reloan;
+ * at least one servicing account → additional.
  */
 export function nextApplicationKind(input: {
   applicationStatuses: string[];
 }): NextApplicationKind | null {
   if (!canStartReloan(input).ok) return null;
-  return input.applicationStatuses.length === 0 ? "first" : "reloan";
+  if (input.applicationStatuses.length === 0) return "first";
+  const hasServicing = input.applicationStatuses.some((status) =>
+    (SERVICING_STATUSES as readonly string[]).includes(status),
+  );
+  return hasServicing ? "additional" : "reloan";
 }
 
 /**

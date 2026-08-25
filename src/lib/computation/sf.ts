@@ -25,17 +25,37 @@ function normalizeOtherDeductions(
 ): Required<OtherDeductions> {
   return {
     otherLoan: other?.otherLoan ?? 0,
+    otherLoanAccountNo: other?.otherLoanAccountNo ?? null,
     offset: other?.offset ?? 0,
+    offsetAccountNo: other?.offsetAccountNo ?? null,
+    offsetMonths: other?.offsetMonths ?? null,
+    otherLoans: other?.otherLoans ?? [],
+    offsets: other?.offsets ?? [],
     advancePayment: other?.advancePayment ?? 0,
     previousLoanBalance: other?.previousLoanBalance ?? 0,
     accountOpening: other?.accountOpening ?? 0,
   };
 }
 
+/** Prefers the multi-loan array when populated; falls back to the legacy
+ * singular scalar so computations stored before multi-loan support total
+ * identically to before. Never sums both — that would double-count. */
+function effectiveOtherLoanAmount(other: Required<OtherDeductions>): number {
+  return other.otherLoans.length > 0
+    ? sumHalfUp(...other.otherLoans.map((e) => e.amount))
+    : other.otherLoan;
+}
+
+function effectiveOffsetAmount(other: Required<OtherDeductions>): number {
+  return other.offsets.length > 0
+    ? sumHalfUp(...other.offsets.map((e) => e.amount))
+    : other.offset;
+}
+
 function otherDeductionsTotal(other: Required<OtherDeductions>): number {
   return sumHalfUp(
-    other.otherLoan,
-    other.offset,
+    effectiveOtherLoanAmount(other),
+    effectiveOffsetAmount(other),
     other.advancePayment,
     other.previousLoanBalance,
     other.accountOpening,

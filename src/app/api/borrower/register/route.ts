@@ -44,6 +44,9 @@ function createSignupClient() {
         autoRefreshToken: false,
         persistSession: false,
         detectSessionInUrl: false,
+        // Implicit tokens land in the login-page hash so confirming email
+        // can establish a session without a PKCE verifier from this signup.
+        flowType: "implicit",
       },
     },
   );

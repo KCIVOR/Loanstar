@@ -202,6 +202,36 @@ export async function GET(_request: Request, { params }: RouteParams) {
       };
     });
 
+    const { data: transferAllocRows } = await supabase
+      .from("internal_transfer_allocations")
+      .select(
+        `
+        id, amount, amortization_schedule_id, created_at,
+        internal_transfers!inner (
+          target_masterlist_id,
+          source_masterlist:masterlist!internal_transfers_source_masterlist_id_fkey ( loan_account_no )
+        )
+      `,
+      )
+      .eq("internal_transfers.target_masterlist_id", id)
+      .order("created_at", { ascending: false });
+
+    const internalTransferCredits = (transferAllocRows ?? []).map((row) => {
+      const transfer = Array.isArray(row.internal_transfers)
+        ? row.internal_transfers[0]
+        : row.internal_transfers;
+      const sourceMl = Array.isArray(transfer?.source_masterlist)
+        ? transfer.source_masterlist[0]
+        : transfer?.source_masterlist;
+      return {
+        id: row.id as string,
+        amount: Number(row.amount),
+        amortization_schedule_id: row.amortization_schedule_id as string | null,
+        createdAt: row.created_at as string,
+        sourceLoanAccountNo: (sourceMl?.loan_account_no as string | null) ?? null,
+      };
+    });
+
     return jsonOk({
       record: { ...data, application_status: applicationStatus },
       payments: paymentsWithUploaderNames,
@@ -209,6 +239,7 @@ export async function GET(_request: Request, { params }: RouteParams) {
       pdcChecks,
       roundingWriteoffThreshold,
       roundingWriteoffs,
+      internalTransferCredits,
     });
   } catch (error) {
     return handleApiError(error);

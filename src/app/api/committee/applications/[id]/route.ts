@@ -18,7 +18,7 @@ import {
   resolveCommitteeCollateralType,
 } from "@/lib/committee/ci-report";
 import { getApplicationForStaff } from "@/lib/csa/application";
-import { getActiveComputation } from "@/lib/csa/computation";
+import { getActiveComputation, getSmeRateHistory } from "@/lib/csa/computation";
 import { csaScreeningCheckSlug } from "@/lib/csa/sme-duplication";
 import {
   getNegotiation,
@@ -94,6 +94,58 @@ export async function GET(_request: Request, { params }: RouteParams) {
           })
         : null;
     const computation = await getActiveComputation(supabase, id);
+    const rateHistory = await getSmeRateHistory(supabase, id);
+    const admin = createServiceClient();
+
+    // masterlist RLS only grants SELECT to super_admin, accounting_ar, the
+    // borrower, or the assigned collector — Committee has none of those, so
+    // this must read via service role or it silently sees zero rows (same
+    // gap already fixed for CSA's computation route).
+    let activeLoans: Array<{
+      loanApplicationId: string;
+      loanAccountNo: string;
+      outstandingBalance: number;
+      monthlyAmortization: number;
+      accountStatus: string;
+      remainingInstallments: number;
+    }> = [];
+    if (borrower?.id) {
+      const { data: masterlistRows } = await admin
+        .from("masterlist")
+        .select(
+          "id, loan_application_id, loan_account_no, outstanding_balance, monthly_amortization, account_status",
+        )
+        .eq("borrower_id", borrower.id)
+        .eq("account_status", "active");
+
+      // One batched query for every active account's open-installment count
+      // (not N+1) — the same set AR actually allocates against when an
+      // Offset transfer posts, so "N months" in the offset picker matches
+      // reality instead of an outstanding_balance ÷ monthly approximation.
+      const masterlistIds = (masterlistRows ?? []).map((row) => row.id as string);
+      const remainingByMasterlistId = new Map<string, number>();
+      if (masterlistIds.length > 0) {
+        const { data: scheduleRows } = await admin
+          .from("amortization_schedules")
+          .select("masterlist_id")
+          .in("masterlist_id", masterlistIds)
+          .in("status", ["pending", "partial", "overdue"]);
+        for (const row of scheduleRows ?? []) {
+          const mid = row.masterlist_id as string;
+          remainingByMasterlistId.set(mid, (remainingByMasterlistId.get(mid) ?? 0) + 1);
+        }
+      }
+
+      activeLoans = (masterlistRows ?? []).map((row) => ({
+        loanApplicationId: (row.loan_application_id as string | null) ?? "",
+        loanAccountNo: (row.loan_account_no as string | null) ?? "Active Account",
+        outstandingBalance: Number(row.outstanding_balance ?? 0),
+        monthlyAmortization: Number(row.monthly_amortization ?? 0),
+        accountStatus: (row.account_status as string | null) ?? "active",
+        remainingInstallments: remainingByMasterlistId.get(row.id as string) ?? 0,
+      }));
+    }
+
     const negotiation = await getNegotiation(supabase, id);
     const negotiationMessages = await withAuthorNames(
       await listNegotiationMessages(supabase, id),
@@ -120,7 +172,6 @@ export async function GET(_request: Request, { params }: RouteParams) {
         ].filter((v): v is string => Boolean(v)),
       ),
     );
-    const admin = createServiceClient();
     const nameById = new Map<string, string>();
     if (actorIds.length) {
       const { data: profiles } = await admin
@@ -272,15 +323,35 @@ export async function GET(_request: Request, { params }: RouteParams) {
             netReleased: computation.netReleased,
             totalLoan: computation.totalLoan,
             monthlyAmortization: computation.monthlyAmortization,
+            firstPaymentDate: computation.firstPaymentDate,
             lineItems: computation.lineItems,
             signedAt: computation.signedAt,
+            witnessedBy: computation.witnessedBy,
+            loanTypeId: computation.loanTypeId ?? null,
             loanTypeName: computation.loanTypeName,
             terms: computation.terms,
             addonMonths: computation.addonMonths,
+            pfRate: computation.pfRate,
+            interestRate: computation.interestRate,
+            securityFeeRate: computation.securityFeeRate,
+            processingFee: computation.processingFee,
+            adminCost: computation.adminCost,
+            docStamp: computation.docStamp,
+            notaryFee: computation.notaryFee,
+            securityFee: computation.securityFee,
+            totalDeductions: computation.totalDeductions,
+            totalInterest: computation.totalInterest,
             coverageRatio: computation.coverageRatio,
             coverageWarning: computation.coverageWarning,
+            adminRate: computation.adminRate,
+            chattelRate: computation.chattelRate,
+            chattelFee: computation.chattelFee,
+            otherDeductions: computation.otherDeductions ?? null,
+            otherDeductionsTotal: computation.otherDeductionsTotal,
           }
         : null,
+      activeLoans,
+      rateHistory,
       votes: votes.map((v) => ({ ...v, voterName: nameById.get(v.voterId) ?? null })),
       tally,
       myVote,

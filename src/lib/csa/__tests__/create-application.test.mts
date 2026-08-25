@@ -57,9 +57,66 @@ describe("createApplicationSchema (SME Phase 1)", () => {
     const parsed = createApplicationSchema.parse({
       ...base,
       segment: "individual",
+      individualLoanType: "mpl",
     });
     assert.equal(parsed.segment, "individual");
     assert.equal(parsed.entityType, undefined);
+  });
+});
+
+describe("createApplicationSchema (Salary/MPL individual sub-type)", () => {
+  it("rejects individual + no-collateral without individualLoanType", () => {
+    const result = createApplicationSchema.safeParse({
+      ...base,
+      segment: "individual",
+    });
+    assert.equal(result.success, false);
+  });
+
+  it("accepts individual + no-collateral with individualLoanType mpl", () => {
+    const parsed = createApplicationSchema.parse({
+      ...base,
+      segment: "individual",
+      individualLoanType: "mpl",
+    });
+    assert.equal(parsed.individualLoanType, "mpl");
+  });
+
+  it("accepts individual + no-collateral with individualLoanType salary", () => {
+    const parsed = createApplicationSchema.parse({
+      ...base,
+      segment: "individual",
+      individualLoanType: "salary",
+    });
+    assert.equal(parsed.individualLoanType, "salary");
+  });
+
+  it("rejects individualLoanType when collateralType is not none", () => {
+    const result = createApplicationSchema.safeParse({
+      ...base,
+      segment: "individual",
+      collateralType: "car_refinancing",
+      individualLoanType: "mpl",
+    });
+    assert.equal(result.success, false);
+  });
+
+  it("rejects individualLoanType for sme segment", () => {
+    const result = createApplicationSchema.safeParse({
+      ...base,
+      segment: "sme",
+      entityType: "individual",
+      individualLoanType: "mpl",
+    });
+    assert.equal(result.success, false);
+  });
+
+  it("does not require individualLoanType for seafarer", () => {
+    const parsed = createApplicationSchema.parse({
+      ...base,
+      segment: "seafarer",
+    });
+    assert.equal(parsed.individualLoanType, undefined);
   });
 });
 

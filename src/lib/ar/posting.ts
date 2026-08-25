@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { resolvePenaltyRate } from "@/lib/ar/penalty-rate";
+import { canWriteOffAccountRounding } from "@/lib/ar/rounding-writeoff";
 import {
   calculatePenaltyAmount,
   computeAgingBucket,
@@ -301,6 +302,80 @@ export async function writeOffRoundingDifference(
   return {
     amount: remainingDue,
     scheduleId: amortizationScheduleId,
+    writtenOffAt: now,
+  };
+}
+
+/**
+ * Closes an account leftover after every installment is already paid.
+ * Used when total loan and monthly × terms differ by a rounding centavo.
+ */
+export async function writeOffAccountRoundingDifference(
+  supabase: SupabaseClient,
+  masterlistId: string,
+  actorId: string,
+  notes?: string,
+) {
+  const { data: record, error: mlError } = await supabase
+    .from("masterlist")
+    .select("id, outstanding_balance, amortization_schedules ( status )")
+    .eq("id", masterlistId)
+    .single();
+
+  if (mlError || !record) {
+    throw new Error(mlError?.message ?? "Masterlist record not found");
+  }
+
+  const schedulesRaw = record.amortization_schedules;
+  const schedules = Array.isArray(schedulesRaw) ? schedulesRaw : [];
+  const scheduleStatuses = schedules.map((row) =>
+    String((row as { status?: string }).status ?? ""),
+  );
+
+  const threshold = await getRoundingWriteoffThreshold(supabase);
+  const eligibility = canWriteOffAccountRounding({
+    outstandingBalance: Number(record.outstanding_balance),
+    threshold,
+    scheduleStatuses,
+  });
+
+  if (!eligibility.ok) {
+    throw new Error(eligibility.reason);
+  }
+
+  const now = new Date().toISOString();
+
+  const { error: insertError } = await supabase
+    .from("rounding_writeoffs")
+    .insert({
+      masterlist_id: masterlistId,
+      amortization_schedule_id: null,
+      amount: eligibility.amount,
+      performed_by: actorId,
+      performed_at: now,
+      notes: notes ?? null,
+    });
+
+  if (insertError) throw new Error(insertError.message);
+
+  const newBalance = Math.max(
+    0,
+    halfUp(Number(record.outstanding_balance) - eligibility.amount),
+  );
+
+  const { error: mlUpdateError } = await supabase
+    .from("masterlist")
+    .update({
+      outstanding_balance: newBalance,
+      account_status: newBalance <= 0 ? "paid" : "active",
+    })
+    .eq("id", masterlistId);
+
+  if (mlUpdateError) throw new Error(mlUpdateError.message);
+
+  return {
+    amount: eligibility.amount,
+    scheduleId: null as string | null,
     writtenOffAt: now,
   };
 }

@@ -8,9 +8,13 @@ import {
   getActiveComputation,
   persistComputation,
 } from "@/lib/csa/computation";
+import {
+  findCrossBucketAccountNos,
+  findDuplicateAccountNos,
+} from "@/lib/computation/deduction-breakdown";
 import { assertInterviewRecordedForComputation } from "@/lib/csa/initial-interview";
 import { requireModulePermission } from "@/lib/permissions/server";
-import { createClient } from "@/lib/supabase/server";
+import { createClient, createServiceClient } from "@/lib/supabase/server";
 
 type RouteParams = { params: Promise<{ id: string }> };
 
@@ -22,17 +26,56 @@ const computeSchema = z.object({
   addonMonths: z.number().int().min(0).optional(),
   loanTypeId: z.string().uuid().optional(),
   securityFeeRate: z.number().min(0).optional(),
-  /** SME: loan_desired × admin_rate (outside PF bundle). Ignored for Seafarer. */
+  /** SME/Individual only — free-text rate, overrides the loan-type lookup. Ignored for Seafarer. */
+  pfRate: z.number().min(0).optional(),
+  /** SME/Individual only — free-text rate, overrides the loan-type lookup. Ignored for Seafarer. */
+  interestRate: z.number().min(0).optional(),
+  /** SME/Individual: loan_desired × admin_rate (outside PF bundle). Ignored for Seafarer. */
   adminRate: z.number().min(0).optional(),
-  /** SME: With DS & Notary flag. Default true when omitted. */
+  /** SME/Individual: principal × chattel_rate (CMF). Ignored for Seafarer. */
+  chattelRate: z.number().min(0).optional(),
+  /** SME/Individual: With DS & Notary flag. Default true when omitted. */
   withDsAndNotary: z.boolean().optional(),
   otherDeductions: z
     .object({
       otherLoan: z.number().min(0).optional(),
+      otherLoanAccountNo: z.string().nullable().optional(),
       offset: z.number().min(0).optional(),
+      offsetAccountNo: z.string().nullable().optional(),
+      offsetMonths: z.number().min(0).optional(),
+      otherLoans: z
+        .array(
+          z.object({
+            accountNo: z.string().nullable(),
+            amount: z.number().min(0),
+          }),
+        )
+        .optional(),
+      offsets: z
+        .array(
+          z.object({
+            accountNo: z.string().nullable(),
+            amount: z.number().min(0),
+            months: z.number().min(0).nullable(),
+          }),
+        )
+        .optional(),
       advancePayment: z.number().min(0).optional(),
       previousLoanBalance: z.number().min(0).optional(),
       accountOpening: z.number().min(0).optional(),
+    })
+    .superRefine((val, ctx) => {
+      for (const dup of findDuplicateAccountNos(val.otherLoans)) {
+        ctx.addIssue(`Duplicate account "${dup}" in Other Loan entries`);
+      }
+      for (const dup of findDuplicateAccountNos(val.offsets)) {
+        ctx.addIssue(`Duplicate account "${dup}" in Offset entries`);
+      }
+      for (const dup of findCrossBucketAccountNos(val.otherLoans, val.offsets)) {
+        ctx.addIssue(
+          `Account "${dup}" cannot be targeted by both Other Loan and Offset in the same computation`,
+        );
+      }
     })
     .optional(),
   releaseDate: z.string().optional(),
@@ -45,7 +88,65 @@ export async function GET(_request: Request, { params }: RouteParams) {
     const { id } = await params;
     const supabase = await createClient();
     const computation = await getActiveComputation(supabase, id);
-    return jsonOk({ computation });
+
+    const { data: appRow } = await supabase
+      .from("loan_applications")
+      .select("borrower_id")
+      .eq("id", id)
+      .maybeSingle();
+
+    let activeLoans: Array<{
+      loanApplicationId: string;
+      loanAccountNo: string;
+      outstandingBalance: number;
+      monthlyAmortization: number;
+      accountStatus: string;
+      remainingInstallments: number;
+    }> = [];
+
+    if (appRow?.borrower_id) {
+      // masterlist RLS only grants SELECT to super_admin, accounting_ar, the
+      // borrower, or the assigned collector — CSA/Committee have none of
+      // those, so this must read via service role or it silently sees zero
+      // rows (permission is already gated above by requireModulePermission).
+      const admin = createServiceClient();
+      const { data: masterlistRows } = await admin
+        .from("masterlist")
+        .select(
+          "id, loan_application_id, loan_account_no, outstanding_balance, monthly_amortization, account_status",
+        )
+        .eq("borrower_id", appRow.borrower_id)
+        .eq("account_status", "active");
+
+      // One batched query for every active account's open-installment count
+      // (not N+1) — the same set AR actually allocates against when an
+      // Offset transfer posts, so "N months" in the offset picker matches
+      // reality instead of an outstanding_balance ÷ monthly approximation.
+      const masterlistIds = (masterlistRows ?? []).map((row) => row.id as string);
+      const remainingByMasterlistId = new Map<string, number>();
+      if (masterlistIds.length > 0) {
+        const { data: scheduleRows } = await admin
+          .from("amortization_schedules")
+          .select("masterlist_id")
+          .in("masterlist_id", masterlistIds)
+          .in("status", ["pending", "partial", "overdue"]);
+        for (const row of scheduleRows ?? []) {
+          const mid = row.masterlist_id as string;
+          remainingByMasterlistId.set(mid, (remainingByMasterlistId.get(mid) ?? 0) + 1);
+        }
+      }
+
+      activeLoans = (masterlistRows ?? []).map((row) => ({
+        loanApplicationId: (row.loan_application_id as string | null) ?? "",
+        loanAccountNo: (row.loan_account_no as string | null) ?? "Active Account",
+        outstandingBalance: Number(row.outstanding_balance ?? 0),
+        monthlyAmortization: Number(row.monthly_amortization ?? 0),
+        accountStatus: (row.account_status as string | null) ?? "active",
+        remainingInstallments: remainingByMasterlistId.get(row.id as string) ?? 0,
+      }));
+    }
+
+    return jsonOk({ computation, activeLoans });
   } catch (error) {
     return handleApiError(error);
   }
@@ -133,6 +234,11 @@ export async function POST(request: Request, { params }: RouteParams) {
       application.segment === "sme" || application.segment === "individual"
         ? application.segment
         : "seafarer";
+    const individualLoanType =
+      application.individual_loan_type === "mpl" ||
+      application.individual_loan_type === "salary"
+        ? application.individual_loan_type
+        : null;
     const securityFeeRate =
       segment === "sme" || segment === "individual"
         ? 0
@@ -141,16 +247,28 @@ export async function POST(request: Request, { params }: RouteParams) {
     const saved = await persistComputation(supabase, {
       loanApplicationId: id,
       segment,
+      individualLoanType,
       loanTypeId: loanType.id,
       loanTypeName: loanType.name,
       inputMode: body.inputMode,
       amount: body.amount,
       terms: body.terms,
       addonMonths: body.addonMonths,
-      pfRate: Number(loanType.pf_rate),
-      interestRate: Number(loanType.interest_rate),
+      // SME/Individual: a typed rate overrides the loan-type lookup — loanType
+      // is still resolved above unconditionally, but only for the label here.
+      // Seafarer is untouched: always loanType's rate.
+      pfRate:
+        (segment === "sme" || segment === "individual") && body.pfRate != null
+          ? body.pfRate
+          : Number(loanType.pf_rate),
+      interestRate:
+        (segment === "sme" || segment === "individual") &&
+        body.interestRate != null
+          ? body.interestRate
+          : Number(loanType.interest_rate),
       securityFeeRate,
       adminRate: body.adminRate,
+      chattelRate: body.chattelRate,
       withDsAndNotary: body.withDsAndNotary,
       otherDeductions: body.otherDeductions,
       releaseDate: body.releaseDate,

@@ -99,12 +99,24 @@ type ApplicationWorkspace = {
     totalInterest: number;
     totalLoan: number;
     monthlyAmortization: number;
+    firstPaymentDate: string | null;
+    adminRate?: number | null;
+    chattelRate?: number | null;
+    chattelFee?: number | null;
     lineItems: Array<{ key: string; label: string; amount: number }>;
     coverageWarning: boolean;
     signedAt: string | null;
     witnessedBy: string | null;
     loanTypeName: string | null;
   } | null;
+  rateHistory: Array<{
+    applicationNo: string | null;
+    createdAt: string;
+    pfRate: number;
+    interestRate: number;
+    adminRate: number | null;
+    chattelRate: number | null;
+  }>;
   endorseReadiness: EndorseReadiness;
   negotiation: {
     status: string;
@@ -1238,6 +1250,8 @@ export default function CsaApplicationPage() {
         <ComputationPanel
           applicationId={applicationId}
           loanTypeId={data.details?.loanTypeId ?? null}
+          segment={data.application.segment}
+          rateHistory={data.rateHistory}
           editable={editable}
           computation={data.computation}
           onUpdated={() => void load({ silent: true })}
@@ -1262,9 +1276,12 @@ export default function CsaApplicationPage() {
               const thresholdPct = Math.round(
                 (data.endorseReadiness.coverageThreshold ?? 0.35) * 100,
               );
-              const coverageWarning = data.endorseReadiness.warnings.find((w) =>
-                w.includes("Coverage ratio unknown"),
-              );
+              // The endorseReadiness warnings array is coverage-only today
+              // (see src/lib/csa/application.ts), so any entry — unknown
+              // income, SME's no-affordability-check note, or an
+              // over-threshold ratio — belongs here as a notice, never a
+              // silent pass into the "ok" branch below.
+              const coverageWarning = data.endorseReadiness.warnings[0];
               if (!data.endorseReadiness.coverageOk) {
                 const blocker =
                   data.endorseReadiness.missing.find((m) =>

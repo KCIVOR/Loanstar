@@ -15,7 +15,8 @@ describe("SME coverage gate (Phase 3.5.4)", () => {
   });
 
   test("evaluateCoverageForEndorse skips SME — no 35% personal-income gate", () => {
-    // Would block a Seafarer file; must not block SME.
+    // Neither segment blocks endorsement; SME gets a distinct
+    // no-affordability-check message rather than the over-threshold one.
     const result = evaluateCoverageForEndorse(0.9, 0.35, { segment: "sme" });
     assert.equal(result.coverageOk, true);
     assert.equal(result.blocker, null);
@@ -25,11 +26,15 @@ describe("SME coverage gate (Phase 3.5.4)", () => {
     );
   });
 
-  test("evaluateCoverageForEndorse still enforces threshold for Seafarer", () => {
+  test("evaluateCoverageForEndorse warns but does not block Seafarer over threshold", () => {
     const result = evaluateCoverageForEndorse(0.9, 0.35, {
       segment: "seafarer",
     });
-    assert.equal(result.coverageOk, false);
-    assert.ok(result.blocker);
+    assert.equal(result.coverageOk, true);
+    assert.equal(result.blocker, null);
+    assert.ok(
+      result.warnings.some((w) => /exceeds 35%/i.test(w)),
+      `expected an over-threshold warning, got ${JSON.stringify(result.warnings)}`,
+    );
   });
 });

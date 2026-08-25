@@ -5,7 +5,12 @@ import {
   getCoverageThreshold,
   skipCoverageForSegment,
 } from "@/lib/computation/coverage";
-import { computeFirstPaymentDate } from "@/lib/computation/release-date";
+import {
+  computeFirstPaymentDate,
+  computeSalaryFirstPaymentDate,
+  computeSmeFirstPaymentDate,
+  formatDateLocal,
+} from "@/lib/computation/release-date";
 import { computeSfLoan } from "@/lib/computation/sf";
 import { computeSmeLoan } from "@/lib/computation/sme";
 import type {
@@ -13,6 +18,10 @@ import type {
   OtherDeductions,
   SfComputeResult,
 } from "@/lib/computation/types";
+import {
+  loadActiveObligations,
+  sumActiveObligations,
+} from "@/lib/borrowers/existing-obligations";
 import { createServiceClient } from "@/lib/supabase/server";
 
 export type PersistComputationInput = {
@@ -20,6 +29,9 @@ export type PersistComputationInput = {
   /** Application segment — selects SF vs SME engine. Individual reuses the SME
    * engine (confirmed 2026-08-19 — same calculator, same rates). Defaults to seafarer. */
   segment?: "seafarer" | "sme" | "individual" | null;
+  /** Individual only — MPL (monthly, reuses SME's date rule) vs Salary
+   * (semi-monthly). Drives first-payment-date and payment_frequency. */
+  individualLoanType?: "mpl" | "salary" | null;
   loanTypeId?: string | null;
   loanTypeName?: string | null;
   inputMode: InputMode;
@@ -31,6 +43,8 @@ export type PersistComputationInput = {
   securityFeeRate: number;
   /** SME only — loan_desired × admin_rate (outside PF bundle). Default 0. */
   adminRate?: number;
+  /** SME only — principal × chattel_rate (CMF). Default 0. */
+  chattelRate?: number;
   /** SME only — per-account DS & Notary flag. Default true. */
   withDsAndNotary?: boolean;
   otherDeductions?: OtherDeductions;
@@ -119,6 +133,12 @@ export function mapComputationRow(row: Record<string, unknown>) {
     lineItems: row.line_items as Array<{ key: string; label: string; amount: number }>,
     coverageRatio: row.coverage_ratio != null ? Number(row.coverage_ratio) : null,
     coverageWarning: Boolean(row.coverage_warning),
+    adminRate: row.admin_rate != null ? Number(row.admin_rate) : null,
+    chattelRate: row.chattel_rate != null ? Number(row.chattel_rate) : null,
+    chattelFee: row.chattel_fee != null ? Number(row.chattel_fee) : null,
+    withDsAndNotary:
+      row.with_ds_and_notary != null ? Boolean(row.with_ds_and_notary) : null,
+    paymentFrequency: row.payment_frequency as "monthly" | "semi_monthly",
     computedBy: row.computed_by as string | null,
     signedAt: row.signed_at as string | null,
     signedBy: row.signed_by as string | null,
@@ -138,6 +158,8 @@ export async function persistComputation(
       : "seafarer";
 
   let result: SfComputeResult;
+  // Set only on the sme/individual branch below; stays null for seafarer.
+  let smeChattelFee: number | null = null;
   if (segment === "sme" || segment === "individual") {
     // Loan Desired mode: CSA `amount` is treated as loan_desired (extraction §4).
     // SF inputMode is still stored for DB CHECK compatibility; it does not drive SME math.
@@ -148,9 +170,11 @@ export async function persistComputation(
       pfRate: input.pfRate,
       interestRate: input.interestRate,
       adminRate: input.adminRate ?? 0,
+      chattelRate: input.chattelRate ?? 0,
       withDsAndNotary: input.withDsAndNotary ?? true,
       otherDeductions: input.otherDeductions,
     });
+    smeChattelFee = sme.chattelFee;
     result = smeToSfResult(input, sme);
   } else {
     result = computeSfLoan({
@@ -167,21 +191,70 @@ export async function persistComputation(
 
   // SME: skip Seafarer 35% personal-income coverage — see coverage.ts.
   // Store null ratio so endorse does not inherit a meaningless figure.
-  const coverage = skipCoverageForSegment(segment)
-    ? { ratio: null as number | null, warning: false, message: null as string | null }
-    : checkCoverageRatio(
-        result.monthlyAmortization,
-        input.monthlyIncome,
-        await getCoverageThreshold(supabase),
+  // Seafarer and Individual: include other active masterlist amorts in the ratio.
+  let otherMonthlyAmortization = 0;
+  let coverage: {
+    ratio: number | null;
+    warning: boolean;
+    message: string | null;
+    otherMonthlyAmortization: number;
+  };
+
+  if (skipCoverageForSegment(segment)) {
+    coverage = {
+      ratio: null,
+      warning: false,
+      message: null,
+      otherMonthlyAmortization: 0,
+    };
+  } else {
+    // Load borrower_id for this application to fetch other obligations.
+    const { data: appRow } = await supabase
+      .from("loan_applications")
+      .select("borrower_id")
+      .eq("id", input.loanApplicationId)
+      .maybeSingle();
+
+    if (appRow?.borrower_id) {
+      // masterlist RLS only grants SELECT to super_admin, accounting_ar, the
+      // borrower, or the assigned collector — CSA has none of those, so this
+      // must read via service role or it silently sees zero rows.
+      const obligationRows = await loadActiveObligations(
+        createServiceClient(),
+        appRow.borrower_id as string,
       );
+      const obligations = sumActiveObligations(
+        obligationRows,
+        input.loanApplicationId,
+      );
+      otherMonthlyAmortization = obligations.otherMonthlyAmortization;
+    }
+
+    const combinedAmort =
+      result.monthlyAmortization + otherMonthlyAmortization;
+    const base = checkCoverageRatio(
+      combinedAmort,
+      input.monthlyIncome,
+      await getCoverageThreshold(supabase),
+    );
+    coverage = { ...base, otherMonthlyAmortization };
+  }
 
   const releaseDate = input.releaseDate ? new Date(input.releaseDate) : new Date();
   const dueDay = input.dueDay ?? 10;
-  const firstPayment = computeFirstPaymentDate(
-    releaseDate,
-    result.addonMonths,
-    dueDay,
-  );
+  // SME, and MPL (individual_loan_type "mpl"): release + 1 month, same day,
+  // no cutoff, no addon-months adjustment. Salary (individual_loan_type
+  // "salary"): semi-monthly — next 15th/end-of-month on or after release.
+  // Seafarer, Auto/REM, and any individual row with no individual_loan_type
+  // set keep the old 22nd-cutoff rule unchanged.
+  const firstPayment =
+    segment === "sme" || input.individualLoanType === "mpl"
+      ? computeSmeFirstPaymentDate(releaseDate)
+      : input.individualLoanType === "salary"
+        ? computeSalaryFirstPaymentDate(releaseDate)
+        : computeFirstPaymentDate(releaseDate, result.addonMonths, dueDay);
+  const paymentFrequency: "monthly" | "semi_monthly" =
+    input.individualLoanType === "salary" ? "semi_monthly" : "monthly";
 
   // Deactivate prior actives with service role: CSA RLS cannot update rows
   // that already have signed_at set, which left multiple is_active=true rows
@@ -233,11 +306,16 @@ export async function persistComputation(
       total_loan: result.totalLoan,
       monthly_amortization: result.monthlyAmortization,
       release_date: releaseDate.toISOString().slice(0, 10),
-      first_payment_date: firstPayment.toISOString().slice(0, 10),
+      first_payment_date: formatDateLocal(firstPayment),
       due_day: dueDay,
       line_items: buildLineItems(result),
       coverage_ratio: coverage.ratio,
       coverage_warning: coverage.warning,
+      admin_rate: input.adminRate ?? null,
+      chattel_rate: input.chattelRate ?? null,
+      chattel_fee: smeChattelFee,
+      with_ds_and_notary: input.withDsAndNotary ?? null,
+      payment_frequency: paymentFrequency,
       computed_by: input.computedBy,
       is_active: true,
     })
@@ -275,4 +353,70 @@ export async function getActiveComputation(
   }
 
   return data ? mapComputationRow(data) : null;
+}
+
+export type SmeRateHistoryEntry = {
+  applicationNo: string | null;
+  createdAt: string;
+  pfRate: number;
+  interestRate: number;
+  adminRate: number | null;
+  chattelRate: number | null;
+};
+
+/**
+ * A borrower's past sme/individual computations, most recent first — shown
+ * as read-only reference in the CSA panel, and used to pre-fill the rate
+ * inputs for a reloan. Never a locked "enrollment": Committee (and CSA) can
+ * always override it. Scoped to the *same* segment as the current
+ * application — sme and individual are different products with different
+ * normal rate shapes (individual's admin/CMF are normally 0), so pooling
+ * them would produce a misleading "last used" default (confirmed decision).
+ *
+ * Uses the regular request-scoped client, not service role — `computations`
+ * RLS is module-wide for CSA/Committee (`has_module_permission('computation',
+ * 'view')`), unlike masterlist's narrower policy, so no workaround is needed.
+ */
+export async function getSmeRateHistory(
+  supabase: SupabaseClient,
+  applicationId: string,
+): Promise<SmeRateHistoryEntry[]> {
+  const { data: appRow } = await supabase
+    .from("loan_applications")
+    .select("borrower_id, segment")
+    .eq("id", applicationId)
+    .maybeSingle();
+
+  if (!appRow?.borrower_id) return [];
+  const segment = appRow.segment;
+  if (segment !== "sme" && segment !== "individual") return [];
+
+  const { data, error } = await supabase
+    .from("computations")
+    .select(
+      "pf_rate, interest_rate, admin_rate, chattel_rate, created_at, loan_application_id, loan_applications!inner(application_no, borrower_id, segment)",
+    )
+    .eq("loan_applications.borrower_id", appRow.borrower_id)
+    .eq("loan_applications.segment", segment)
+    .neq("loan_application_id", applicationId)
+    .order("created_at", { ascending: false })
+    .limit(10);
+
+  if (error) {
+    throw new Error(`Failed to load rate history: ${error.message}`);
+  }
+
+  return (data ?? []).map((row) => {
+    const app = Array.isArray(row.loan_applications)
+      ? row.loan_applications[0]
+      : row.loan_applications;
+    return {
+      applicationNo: (app?.application_no as string | null) ?? null,
+      createdAt: row.created_at as string,
+      pfRate: Number(row.pf_rate),
+      interestRate: Number(row.interest_rate),
+      adminRate: row.admin_rate != null ? Number(row.admin_rate) : null,
+      chattelRate: row.chattel_rate != null ? Number(row.chattel_rate) : null,
+    };
+  });
 }

@@ -122,6 +122,13 @@ test("resolveApplicationFormSlug: sme with invalid entityType is rejected", () =
   assert.equal(result.ok, false);
 });
 
+test("resolveApplicationFormSlug: Individual segment uses the SME Individual template", () => {
+  assert.deepEqual(resolveApplicationFormSlug({ segment: "individual" }), {
+    ok: true,
+    slug: "application_form_sme_individual",
+  });
+});
+
 // --- buildApplicationFormContext — Seafarer stability ---
 
 test("Seafarer context keeps manning/allottee keys and does not set isSme", () => {
@@ -219,7 +226,7 @@ test("SME Individual context exposes income + spouse keys and does not remap man
   assert.equal(ctx.spouseLastName, "Dela Cruz");
   assert.equal(ctx.spousePosition, "Cashier");
   assert.equal(ctx.salesAgent, "Agent A");
-  assert.equal(ctx.typeOfLoan, "Business Loan");
+  assert.equal(ctx.typeOfLoan, "");
 });
 
 test("SME Individual prefers explicit spouse income scalars over legacy spouseMonthlyIncome", () => {
@@ -316,4 +323,48 @@ test("SME Corporate context includes officers and stockholders arrays", () => {
   assert.equal((ctx.creditReferences as unknown[]).length, 1);
   assert.equal((ctx.bankAccounts as unknown[]).length, 1);
   assert.equal(ctx.bankAuthorizationAccount, "BDO — 123");
+});
+
+test("SME Corporate businessAddress joins officeAddress and officeAddressLine2", () => {
+  const ctx = buildApplicationFormContext({
+    segment: "sme",
+    entityType: "corporate",
+    profile: baseProfile({
+      businessInfo: {
+        officeAddress: "Makati",
+        officeAddressLine2: "12th Floor",
+      },
+      profileData: { noOfDependents: "3" },
+    }),
+  });
+
+  assert.equal(ctx.businessAddress, "Makati\n12th Floor");
+  assert.equal(ctx.noOfDependents, "3");
+});
+
+test("Individual segment print context uses the same SME Individual keys", () => {
+  const ctx = buildApplicationFormContext({
+    segment: "individual",
+    profile: baseProfile({
+      manningAgency: {},
+      picWork: {},
+      allottee: {},
+      businessInfo: {
+        companyName: "Juan Sari-Sari",
+        natureOfBusiness: "Retail",
+        companyAddress: "Baliwag",
+        salesAgent: "Agent A",
+      },
+      profileData: { loanDesired: "150000" },
+    }),
+    computation,
+  });
+
+  assert.equal(ctx.isSme, true);
+  assert.equal(ctx.isSeafarer, false);
+  assert.equal(ctx.manningAgency, "");
+  assert.equal(ctx.allotteeName, "");
+  assert.equal(ctx.businessCompanyName, "Juan Sari-Sari");
+  assert.equal(ctx.salesAgent, "Agent A");
+  assert.equal(ctx.typeOfLoan, "");
 });

@@ -229,13 +229,90 @@ describe("application form completeness SME Phase 3.6", () => {
   });
 });
 
-describe("application form completeness Individual (Phase 1.4)", () => {
-  it("does not require manning/rank/vessel or any business field for Individual", () => {
+describe("application form completeness SME Phase 5", () => {
+  it("does not require requested terms or purpose of loan for SME individual", () => {
     const profile = {
       ...completeProfile(),
       manningAgency: {},
       picWork: {},
-      businessInfo: {},
+      profileData: { loanDesired: "150000" },
+      businessInfo: {
+        companyName: "Ana Trading",
+        companyAddress: "123 Market St",
+        yearsOfOperation: "5",
+      },
+    };
+    const result = assessApplicationFormCompleteness(profile, {
+      segment: "sme",
+      entityType: "individual",
+    });
+    assert.equal(result.complete, true);
+  });
+
+  it("does not require requested terms or purpose of loan for SME corporate", () => {
+    const profile = {
+      ...completeProfile(),
+      manningAgency: {},
+      picWork: {},
+      profileData: { loanDesired: "150000" },
+      businessInfo: {
+        companyName: "RC Ramos Construction",
+        officeAddress: "Makati",
+        natureOfBusiness: "Construction",
+        tin: "123-456-789",
+        dateEstablished: "2010-01-01",
+      },
+    };
+    const result = assessApplicationFormCompleteness(profile, {
+      segment: "sme",
+      entityType: "corporate",
+    });
+    assert.equal(result.complete, true);
+  });
+
+  it("omits requested terms and purpose of loan from empty SME missing[]", () => {
+    const individual = assessApplicationFormCompleteness(emptyProfile(), {
+      segment: "sme",
+      entityType: "individual",
+    });
+    const corporate = assessApplicationFormCompleteness(emptyProfile(), {
+      segment: "sme",
+      entityType: "corporate",
+    });
+    for (const result of [individual, corporate]) {
+      assert.ok(!result.missing.includes("Application form: requested terms"));
+      assert.ok(!result.missing.includes("Application form: purpose of loan"));
+    }
+  });
+
+  it("omits requested terms and purpose of loan from null SME missing[]", () => {
+    const individual = assessApplicationFormCompleteness(null, {
+      segment: "sme",
+      entityType: "individual",
+    });
+    const corporate = assessApplicationFormCompleteness(null, {
+      segment: "sme",
+      entityType: "corporate",
+    });
+    for (const result of [individual, corporate]) {
+      assert.ok(!result.missing.includes("Application form: requested terms"));
+      assert.ok(!result.missing.includes("Application form: purpose of loan"));
+    }
+  });
+});
+
+describe("application form completeness Individual segment", () => {
+  it("matches SME Individual: company/employer fields, no terms/purpose, no manning", () => {
+    const profile = {
+      ...completeProfile(),
+      manningAgency: {},
+      picWork: {},
+      profileData: { loanDesired: "150000" },
+      businessInfo: {
+        companyName: "Ana Trading",
+        companyAddress: "123 Market St",
+        yearsOfOperation: "5",
+      },
     };
     const result = assessApplicationFormCompleteness(profile, {
       segment: "individual",
@@ -244,24 +321,19 @@ describe("application form completeness Individual (Phase 1.4)", () => {
     assert.deepEqual(result.missing, []);
   });
 
-  it("lists only the common identity + loan-intent fields for an empty Individual profile", () => {
+  it("requires the same Individual PDF fields as SME Individual for an empty profile", () => {
     const result = assessApplicationFormCompleteness(emptyProfile(), {
       segment: "individual",
     });
+    const smeIndividual = assessApplicationFormCompleteness(emptyProfile(), {
+      segment: "sme",
+      entityType: "individual",
+    });
     assert.equal(result.complete, false);
-    assert.deepEqual(result.missing, [
-      "Application form: first name",
-      "Application form: last name",
-      "Application form: mobile phone",
-      "Application form: email",
-      "Application form: loan desired",
-      "Application form: requested terms",
-      "Application form: purpose of loan",
-      "Application form: present address",
-    ]);
+    assert.deepEqual(result.missing, smeIndividual.missing);
+    assert.ok(!result.missing.includes("Application form: requested terms"));
+    assert.ok(!result.missing.includes("Application form: purpose of loan"));
     assert.ok(!result.missing.includes("Application form: manning agency name"));
-    assert.ok(!result.missing.includes("Application form: rank"));
-    assert.ok(!result.missing.includes("Application form: vessel"));
   });
 
   it("null-profile branch matches the populated-profile branch's missing set", () => {

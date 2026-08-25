@@ -188,7 +188,7 @@ export async function fetchQueueSources(
     },
     {
       id: "bottleneck.arQueue",
-      stage: "Released file awaiting AR setup",
+      stage: "Closed file missing AR account",
       owner: "AR",
       ...ar,
       targetDays: QUEUE_TARGET_DAYS.arQueue,

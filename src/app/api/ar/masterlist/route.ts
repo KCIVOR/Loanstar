@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 
 import { resolveDateBounds, type DateRangeValue } from "@/components/history";
 import { handleApiError, jsonOk } from "@/lib/api/handler";
-import { masterlistToCsv } from "@/lib/ar/masterlist";
+import { enrollUnprocessedArQueue, masterlistToCsv } from "@/lib/ar/masterlist";
 import {
   MASTERLIST_QUEUE_PAGE_SIZES,
   getMasterlistQueue,
@@ -10,7 +10,7 @@ import {
   type MasterlistQueueSortKey,
 } from "@/lib/ar/queue";
 import { requireModulePermission } from "@/lib/permissions/server";
-import { createClient } from "@/lib/supabase/server";
+import { createClient, createServiceClient } from "@/lib/supabase/server";
 
 const RANGE_PRESETS = new Set(["30d", "90d", "all", "custom"]);
 const SORT_KEYS = new Set(["status", "borrower", "balance"]);
@@ -18,7 +18,7 @@ const SEGMENT_FILTERS = new Set(["all", "seafarer", "sme", "individual"]);
 
 export async function GET(request: Request) {
   try {
-    await requireModulePermission("accounting_ar", "view");
+    const user = await requireModulePermission("accounting_ar", "view");
     const { searchParams } = new URL(request.url);
 
     const search = searchParams.get("search") ?? "";
@@ -58,6 +58,14 @@ export async function GET(request: Request) {
       : 10;
 
     const supabase = await createClient();
+
+    // Leftover ar_queue rows from before auto-enroll on LRA close.
+    try {
+      await enrollUnprocessedArQueue(createServiceClient(), user.id);
+    } catch {
+      /* masterlist still loads; leftovers retry on the next request */
+    }
+
     const [queue, kpi] = await Promise.all([
       getMasterlistQueue(supabase, {
         search,

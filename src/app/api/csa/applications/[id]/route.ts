@@ -10,7 +10,7 @@ import {
   getEndorseReadiness,
   isCsaEditableStatus,
 } from "@/lib/csa/application";
-import { getActiveComputation } from "@/lib/csa/computation";
+import { getActiveComputation, getSmeRateHistory } from "@/lib/csa/computation";
 import {
   borrowerProfileToRow,
   mapBorrowerRow,
@@ -89,6 +89,7 @@ export async function GET(_request: Request, { params }: RouteParams) {
           : null,
     });
     const computation = await getActiveComputation(supabase, id);
+    const rateHistory = await getSmeRateHistory(supabase, id);
     const endorseReadiness = await getEndorseReadiness(supabase, id);
     const negotiation = await getNegotiation(supabase, id);
 
@@ -159,6 +160,7 @@ export async function GET(_request: Request, { params }: RouteParams) {
         : null,
       checklist,
       computation,
+      rateHistory,
       endorseReadiness,
       negotiation,
     });

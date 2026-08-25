@@ -40,17 +40,44 @@ test("canStartReloan rejects when documents_pending app exists", () => {
   });
   assert.equal(result.ok, false);
   if (!result.ok) {
-    assert.match(result.reason, /ongoing/i);
+    assert.match(result.reason, /in process/i);
   }
 });
 
-test("canStartReloan rejects when loan_active app exists", () => {
+test("canStartReloan allows when the only open file is loan_active", () => {
+  assert.deepEqual(
+    canStartReloan({ applicationStatuses: ["loan_active"] }),
+    { ok: true },
+  );
+});
+
+test("canStartReloan allows loan_active plus paid_off history", () => {
+  assert.deepEqual(
+    canStartReloan({
+      applicationStatuses: ["paid_off", "loan_active"],
+    }),
+    { ok: true },
+  );
+});
+
+test("canStartReloan allows released and closed (servicing, not origination)", () => {
+  assert.deepEqual(
+    canStartReloan({ applicationStatuses: ["released"] }),
+    { ok: true },
+  );
+  assert.deepEqual(
+    canStartReloan({ applicationStatuses: ["closed", "loan_active"] }),
+    { ok: true },
+  );
+});
+
+test("canStartReloan still rejects a submitted file even with an active loan", () => {
   const result = canStartReloan({
-    applicationStatuses: ["loan_active"],
+    applicationStatuses: ["loan_active", "submitted"],
   });
   assert.equal(result.ok, false);
   if (!result.ok) {
-    assert.match(result.reason, /ongoing/i);
+    assert.match(result.reason, /in process/i);
   }
 });
 
@@ -62,6 +89,13 @@ test("nextApplicationKind is reloan when only terminal apps", () => {
   assert.equal(
     nextApplicationKind({ applicationStatuses: ["paid_off"] }),
     "reloan",
+  );
+});
+
+test("nextApplicationKind is additional when a servicing account exists", () => {
+  assert.equal(
+    nextApplicationKind({ applicationStatuses: ["loan_active"] }),
+    "additional",
   );
 });
 

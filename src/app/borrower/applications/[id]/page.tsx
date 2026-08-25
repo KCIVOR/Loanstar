@@ -91,6 +91,18 @@ type ComputationSummary = {
   totalLoan: number;
   monthlyAmortization: number;
   lineItems: Array<{ key: string; label: string; amount: number }>;
+  otherDeductions?: {
+    otherLoan?: number;
+    otherLoanAccountNo?: string | null;
+    offset?: number;
+    offsetAccountNo?: string | null;
+    offsetMonths?: number | null;
+    otherLoans?: Array<{ accountNo: string | null; amount: number }>;
+    offsets?: Array<{ accountNo: string | null; amount: number; months: number | null }>;
+    advancePayment?: number;
+    previousLoanBalance?: number;
+    accountOpening?: number;
+  } | null;
   signedAt: string | null;
   loanTypeName: string | null;
 };
@@ -419,6 +431,27 @@ export default function BorrowerApplicationPage() {
         }
         onUploadComplete={reload}
       />
+      {isDraft ? (
+        <div className="-mt-6 flex flex-wrap items-center justify-between gap-3 rounded-[var(--r-lg)] border border-line-soft bg-surface-2/70 px-4 py-3 sm:px-5">
+          <div className="min-w-0 max-w-2xl">
+            <p className="font-display text-base font-semibold leading-tight text-navy-900">
+              Ready to submit?
+            </p>
+            <p className="mt-0.5 text-sm leading-snug text-ink-500">
+              {docsSummary
+                ? `This application is not yet visible to Loan Star. You can submit now and finish uploading documents afterward (${docsSummary.uploaded} of ${docsSummary.required} uploaded so far).`
+                : "This application is not yet visible to Loan Star."}
+            </p>
+          </div>
+          <Button
+            type="button"
+            disabled={!canSubmit}
+            onClick={() => setShowSubmitConfirm(true)}
+          >
+            Submit application
+          </Button>
+        </div>
+      ) : null}
     </div>
   );
 
@@ -683,28 +716,6 @@ export default function BorrowerApplicationPage() {
       </Card>
 
       <div className="flex flex-col gap-6">{orderedSections}</div>
-
-      {isDraft ? (
-        <div className="mb-6 mt-6 flex flex-wrap items-center justify-between gap-3 rounded-[var(--r-lg)] border border-line-soft bg-surface-2/70 px-4 py-4 sm:px-5">
-          <div>
-            <p className="font-display text-base font-semibold text-navy-900">
-              Ready to submit?
-            </p>
-            <p className="mt-1 text-sm text-ink-500">
-              {docsSummary
-                ? `This application is not yet visible to Loan Star. You can submit now and finish uploading documents afterward (${docsSummary.uploaded} of ${docsSummary.required} uploaded so far).`
-                : "This application is not yet visible to Loan Star."}
-            </p>
-          </div>
-          <Button
-            type="button"
-            disabled={!canSubmit}
-            onClick={() => setShowSubmitConfirm(true)}
-          >
-            Submit application
-          </Button>
-        </div>
-      ) : null}
 
       <ConfirmDialog
         open={showSubmitConfirm}

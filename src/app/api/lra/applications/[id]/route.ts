@@ -6,6 +6,9 @@ import { loadBlriContext } from "@/lib/lra/blri-data";
 import { hasEmploymentContractUploaded } from "@/lib/lra/employment-contract";
 import {
   getOrCreateReleaseFile,
+  missingSignedReleaseSlugs,
+  resolveSignedReleaseDocuments,
+  signedReleaseSlugLabels,
 } from "@/lib/lra/release-service";
 import { requireModulePermission } from "@/lib/permissions/server";
 import { createClient } from "@/lib/supabase/server";
@@ -105,6 +108,11 @@ export async function GET(_request: Request, { params }: RouteParams) {
       })),
     );
 
+    const signedReleaseBySlug = await resolveSignedReleaseDocuments(supabase, id);
+    const missingSignedReleaseLabels = signedReleaseSlugLabels(
+      missingSignedReleaseSlugs(signedReleaseBySlug.keys()),
+    );
+
     return jsonOk({
       application: {
         id: app.id,
@@ -131,12 +139,16 @@ export async function GET(_request: Request, { params }: RouteParams) {
             netReleased: computation.netReleased,
             principal: computation.principal,
             monthlyAmortization: computation.monthlyAmortization,
+            totalLoan: computation.totalLoan,
             terms: computation.terms,
+            firstPaymentDate: computation.firstPaymentDate,
+            paymentFrequency: computation.paymentFrequency,
           }
         : null,
       blriPreview,
       employmentContractPresent,
       pdcCollectedByName,
+      missingSignedReleaseLabels,
     });
   } catch (error) {
     return handleApiError(error);

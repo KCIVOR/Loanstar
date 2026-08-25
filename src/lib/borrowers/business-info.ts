@@ -74,6 +74,8 @@ export type BusinessInfo = {
   acronym?: string;
   companyAddress?: string;
   officeAddress?: string;
+  /** Corporate PDF second office-address line. Joined into print `businessAddress`. */
+  officeAddressLine2?: string;
   landlineNos?: string;
   mobileNos?: string;
   natureOfBusiness?: string;

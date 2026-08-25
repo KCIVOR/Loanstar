@@ -12,7 +12,6 @@ import {
   Card,
   ConfirmDialog,
   FacebookLinkText,
-  Input,
   Label,
   PageHeader,
   Select,
@@ -22,6 +21,7 @@ import {
   Modal,
 } from "@/components/ui";
 import { DocumentChecklist } from "@/components/DocumentChecklist";
+import { ComputationPanel } from "@/components/csa/ComputationPanel";
 import { ApplicantProfileFields } from "@/components/borrowers/ApplicantProfileFields";
 import { AutofillOverlay } from "@/components/dev/AutofillOverlay";
 import { fakeCommitteeAssessment, fakeRemark } from "@/lib/dev/fake-data";
@@ -140,14 +140,57 @@ type CommitteeDetail = {
     netReleased: number;
     totalLoan: number;
     monthlyAmortization: number;
+    firstPaymentDate: string | null;
     lineItems: Array<{ key: string; label: string; amount: number }>;
     terms: number;
     addonMonths: number;
     signedAt: string | null;
+    witnessedBy: string | null;
+    loanTypeId: string | null;
     loanTypeName: string | null;
+    pfRate: number;
+    interestRate: number;
+    securityFeeRate: number;
+    processingFee: number;
+    adminCost: number;
+    docStamp: number;
+    notaryFee: number;
+    securityFee: number;
+    totalDeductions: number;
+    totalInterest: number;
     coverageRatio: number | null;
     coverageWarning: boolean;
+    adminRate?: number | null;
+    chattelRate?: number | null;
+    chattelFee?: number | null;
+    otherDeductions?: {
+      otherLoan?: number;
+      otherLoanAccountNo?: string | null;
+      offset?: number;
+      offsetAccountNo?: string | null;
+      offsetMonths?: number | null;
+      otherLoans?: Array<{ accountNo: string | null; amount: number }>;
+      offsets?: Array<{ accountNo: string | null; amount: number; months: number | null }>;
+      advancePayment?: number;
+      accountOpening?: number;
+    } | null;
+    otherDeductionsTotal: number;
   } | null;
+  activeLoans: Array<{
+    loanApplicationId: string;
+    loanAccountNo: string;
+    outstandingBalance: number;
+    monthlyAmortization: number;
+    accountStatus: string;
+  }>;
+  rateHistory: Array<{
+    applicationNo: string | null;
+    createdAt: string;
+    pfRate: number;
+    interestRate: number;
+    adminRate: number | null;
+    chattelRate: number | null;
+  }>;
   votes: Array<{
     voterId: string;
     voterName: string | null;
@@ -358,9 +401,6 @@ export default function CommitteeApplicationPage() {
   const [resendOpen, setResendOpen] = useState(false);
   const [resending, setResending] = useState(false);
   const [decisionComment, setDecisionComment] = useState("");
-  const [overrideAmount, setOverrideAmount] = useState("");
-  const [overrideMode, setOverrideMode] = useState("NET_SARADO");
-  const [overrideTerms, setOverrideTerms] = useState("6");
   const [overrideMessage, setOverrideMessage] = useState("");
   const [accepting, setAccepting] = useState(false);
   const [confirmAccept, setConfirmAccept] = useState(false);
@@ -494,39 +534,14 @@ export default function CommitteeApplicationPage() {
     }
   }
 
-  async function handleOverride(e: FormEvent) {
-    e.preventDefault();
-    setSaving(true);
-    setMessage(null);
-    setError(null);
-    try {
-      const res = await fetch(
-        `/api/committee/applications/${applicationId}/override`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            amount: Number(overrideAmount),
-            inputMode: overrideMode,
-            terms: Number(overrideTerms),
-            message: overrideMessage.trim() || undefined,
-          }),
-        },
-      );
-      const body = (await res.json()) as { error?: string };
-      if (!res.ok) throw new Error(body.error ?? "Override failed");
-      setMessage(
-        data?.application.canAdjustPreDecision
-          ? "Amount adjusted — this is what will be approved."
-          : "Committee override saved — borrower must re-sign.",
-      );
-      setOverrideMessage("");
-      await load({ silent: true });
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Override failed");
-    } finally {
-      setSaving(false);
-    }
+  function handleComputationUpdated() {
+    setMessage(
+      data?.application.canAdjustPreDecision
+        ? "Amount adjusted — this is what will be approved."
+        : "Committee override saved — borrower must re-sign.",
+    );
+    setOverrideMessage("");
+    void load({ silent: true });
   }
 
   async function handleAcceptOffer() {
@@ -621,6 +636,11 @@ export default function CommitteeApplicationPage() {
   // alone waits for canDecide (all 3 votes — Phase 2).
   const canVote = data.application.status === "for_approval";
   const votesCast = data.votes.length;
+  // Matches the override endpoint's own status gate exactly — the panel
+  // must never offer an edit the backend would reject.
+  const computationEditable =
+    data.application.canAdjustPreDecision ||
+    (data.application.canOverride && Boolean(data.negotiation));
   const isCommitteeHold = data.application.status === "committee_hold";
   const holdReason =
     isCommitteeHold && data.latestAction?.action === "hold"
@@ -1796,7 +1816,7 @@ export default function CommitteeApplicationPage() {
         </Card>
       ) : null}
 
-      {data.computation ? (
+      {data.computation && !computationEditable ? (
         <div className="mb-6">
           <div className="mb-1 flex flex-wrap items-center gap-2">
             <h2 className="font-display text-lg font-semibold text-navy-900">
@@ -1829,6 +1849,63 @@ export default function CommitteeApplicationPage() {
                     </div>
                   );
                 })}
+              {(() => {
+                const od = data.computation!.otherDeductions;
+                const otherLoanRows =
+                  od?.otherLoans && od.otherLoans.length > 0
+                    ? od.otherLoans
+                    : (od?.otherLoan ?? 0) > 0
+                      ? [{ accountNo: od?.otherLoanAccountNo ?? null, amount: od!.otherLoan! }]
+                      : [];
+                const offsetRows =
+                  od?.offsets && od.offsets.length > 0
+                    ? od.offsets
+                    : (od?.offset ?? 0) > 0
+                      ? [
+                          {
+                            accountNo: od?.offsetAccountNo ?? null,
+                            amount: od!.offset!,
+                            months: od?.offsetMonths ?? null,
+                          },
+                        ]
+                      : [];
+                if (otherLoanRows.length === 0 && offsetRows.length === 0) return null;
+                return (
+                  <>
+                    <div className="row2" style={{ borderTop: "1px dashed rgba(255,255,255,.15)", paddingTop: 8, marginTop: 4 }}>
+                      <span style={{ fontSize: 11, opacity: 0.7, textTransform: "uppercase", letterSpacing: "0.06em" }}>Other deductions (CSA)</span>
+                      <b>{""}</b>
+                    </div>
+                    {otherLoanRows.map((row, i) => (
+                      <div key={`other-loan-${i}`} className="row2">
+                        <span>
+                          Other Loan
+                          {row.accountNo ? (
+                            <span className="ml-1 text-xs font-normal opacity-80">
+                              ({row.accountNo})
+                            </span>
+                          ) : null}
+                        </span>
+                        <b>₱{formatMoney(row.amount)}</b>
+                      </div>
+                    ))}
+                    {offsetRows.map((row, i) => (
+                      <div key={`offset-${i}`} className="row2">
+                        <span>
+                          Offset amount
+                          {row.accountNo ? (
+                            <span className="ml-1 text-xs font-normal opacity-80">
+                              ({row.accountNo}
+                              {row.months ? ` · ${row.months} mo${row.months > 1 ? "s" : ""}` : ""})
+                            </span>
+                          ) : null}
+                        </span>
+                        <b>₱{formatMoney(row.amount)}</b>
+                      </div>
+                    ))}
+                  </>
+                );
+              })()}
               <div className="row2" style={{ borderTop: "1px dashed rgba(255,255,255,.2)" }}>
                 <span className="flex items-center gap-2">
                   <i
@@ -1852,8 +1929,7 @@ export default function CommitteeApplicationPage() {
         </div>
       ) : null}
 
-      {data.application.canAdjustPreDecision ||
-      (data.application.canOverride && data.negotiation) ? (
+      {computationEditable ? (
         <Card className="mb-6">
           <h2 className="mb-2 font-display text-lg font-semibold text-navy-900">
             {data.application.canAdjustPreDecision
@@ -1918,70 +1994,36 @@ export default function CommitteeApplicationPage() {
 
           <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-ink-400">
             {data.application.canAdjustPreDecision
-              ? null
-              : "Or override with a different amount"}
+              ? "Full calculator — same as CSA's, including Other Loan / Offset"
+              : "Or override with different numbers — full calculator below"}
           </p>
-          <form onSubmit={(e) => void handleOverride(e)} className="space-y-3">
-            <div>
-              <Label htmlFor="overrideAmount" required>
-                Override amount
-              </Label>
-              <div className="affix">
-                <span className="add">₱</span>
-                <Input
-                  id="overrideAmount"
-                  type="number"
-                  step="0.01"
-                  value={overrideAmount}
-                  onChange={(e) => setOverrideAmount(e.target.value)}
-                  required
-                  mono
-                />
-              </div>
-            </div>
-            <div>
-              <Label htmlFor="overrideMode">Input mode</Label>
-              <Select
-                id="overrideMode"
-                value={overrideMode}
-                onChange={(e) => setOverrideMode(e.target.value)}
-              >
-                <option value="NET_SARADO">Net Sarado</option>
-                <option value="NET_LESS_SECURITY">Net Less Security</option>
-                <option value="PRINCIPAL">Principal</option>
-              </Select>
-            </div>
-            <div>
-              <Label htmlFor="overrideTerms" required>
-                Terms (months)
-              </Label>
-              <Input
-                id="overrideTerms"
-                type="number"
-                value={overrideTerms}
-                onChange={(e) => setOverrideTerms(e.target.value)}
-                required
-                className="mono"
+          {!data.application.canAdjustPreDecision ? (
+            <div className="mb-3">
+              <Label htmlFor="overrideMessage">Note to borrower (optional)</Label>
+              <Textarea
+                id="overrideMessage"
+                rows={2}
+                value={overrideMessage}
+                onChange={(e) => setOverrideMessage(e.target.value)}
+                placeholder="Explain the override to the borrower…"
               />
             </div>
-            {!data.application.canAdjustPreDecision ? (
-              <div>
-                <Label htmlFor="overrideMessage">Note (optional)</Label>
-                <Textarea
-                  id="overrideMessage"
-                  rows={2}
-                  value={overrideMessage}
-                  onChange={(e) => setOverrideMessage(e.target.value)}
-                  placeholder="Explain the override to the borrower…"
-                />
-              </div>
-            ) : null}
-            <Button type="submit" loading={saving}>
-              {data.application.canAdjustPreDecision
-                ? "Adjust amount"
-                : "Apply override & send to borrower"}
-            </Button>
-          </form>
+          ) : null}
+          <ComputationPanel
+            mode="committee"
+            applicationId={applicationId}
+            loanTypeId={data.computation?.loanTypeId ?? null}
+            segment={data.application.segment}
+            editable={computationEditable}
+            computation={data.computation}
+            rateHistory={data.rateHistory}
+            onUpdated={handleComputationUpdated}
+            extraFields={
+              !data.application.canAdjustPreDecision && overrideMessage.trim()
+                ? { message: overrideMessage.trim() }
+                : undefined
+            }
+          />
         </Card>
       ) : null}
 

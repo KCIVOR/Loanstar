@@ -33,14 +33,13 @@ describe("coverage endorse gate (Phase 9)", () => {
     assert.equal(result.blocker, null);
   });
 
-  it("0.36 exceeds 0.35 and becomes a blocking missing item", () => {
+  it("0.36 exceeds 0.35 but is a non-blocking warning, not a hard stop", () => {
     const result = evaluateCoverageForEndorse(0.36, threshold);
-    assert.equal(result.coverageOk, false);
-    assert.deepEqual(result.warnings, []);
-    assert.equal(
-      result.blocker,
+    assert.equal(result.coverageOk, true);
+    assert.deepEqual(result.warnings, [
       "Monthly amortization exceeds 35% of declared income",
-    );
+    ]);
+    assert.equal(result.blocker, null);
   });
 
   it("honors a raised config threshold (0.40 admits 0.36)", () => {

@@ -58,6 +58,7 @@ export async function getApplicationForStaff(
       segment,
       entity_type,
       collateral_type,
+      individual_loan_type,
       is_reloan,
       parent_application_id,
       endorsed_at,

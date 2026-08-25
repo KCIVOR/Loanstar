@@ -1,8 +1,27 @@
 export type InputMode = "NET_SARADO" | "NET_LESS_SECURITY" | "PRINCIPAL";
 
+export type LoanDeductionEntry = {
+  accountNo: string | null;
+  amount: number;
+};
+
+export type OffsetDeductionEntry = LoanDeductionEntry & {
+  months: number | null;
+};
+
 export type OtherDeductions = {
+  // Legacy singular fields — kept for backward-compat reads of computations
+  // stored before multi-loan support. New writes should leave these at
+  // their defaults and populate otherLoans/offsets instead.
   otherLoan?: number;
+  otherLoanAccountNo?: string | null;
   offset?: number;
+  offsetAccountNo?: string | null;
+  offsetMonths?: number | null;
+
+  otherLoans?: LoanDeductionEntry[];
+  offsets?: OffsetDeductionEntry[];
+
   advancePayment?: number;
   previousLoanBalance?: number;
   accountOpening?: number;

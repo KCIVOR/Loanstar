@@ -33,13 +33,15 @@ import {
   borrowerHomeMode,
   docsUploadPercent,
   formatBlockerLabel,
+  formatLoanProductLabel,
   nextActionLabel,
   nextStepGuidance,
 } from "@/lib/borrowers/home";
 import {
   canStartReloan,
+  isOriginationStatus,
   nextApplicationKind,
-  RELOAN_TERMINAL_STATUSES,
+  SERVICING_STATUSES,
 } from "@/lib/borrowers/reloan";
 import type { BorrowerProfile } from "@/lib/borrowers/types";
 
@@ -53,10 +55,17 @@ type Application = {
   createdAt: string;
   segment: string;
   entityType: string | null;
+  collateralType?: string | null;
   loanAmount: number | null;
   loanTypeName: string | null;
   termMonths: number | null;
   interestRate: number | null;
+  loanAccount: {
+    outstanding: number;
+    monthly: number;
+    accountStatus: string;
+    loanAccountNo: string | null;
+  } | null;
 };
 
 type DocsSummary = {
@@ -66,23 +75,12 @@ type DocsSummary = {
   percentComplete: number;
 };
 
-type LoanSummary = {
-  applicationId: string;
-  outstanding: number;
-  totalLoan: number;
-  monthly: number;
-  accountStatus: string;
-  paidCount: number;
-  termCount: number;
-  nextDue: { date: string; amount: number } | null;
-};
-
-const LOAN_STATUSES = ["released", "closed", "loan_active", "paid_off"];
 const HISTORY_PAGE_SIZE = 5;
 
 type StartSegment = "seafarer" | "sme" | "individual";
 type StartEntityType = "individual" | "corporate";
 type StartCollateralType = "none" | "car_refinancing" | "real_estate";
+type StartIndividualLoanType = "mpl" | "salary";
 
 function formatMoney(value: number) {
   return value.toLocaleString("en-PH", {
@@ -178,7 +176,6 @@ export default function BorrowerDashboardPage() {
   const router = useRouter();
   const [profile, setProfile] = useState<BorrowerProfile | null>(null);
   const [applications, setApplications] = useState<Application[]>([]);
-  const [loan, setLoan] = useState<LoanSummary | null>(null);
   const [docsSummary, setDocsSummary] = useState<DocsSummary | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -189,6 +186,9 @@ export default function BorrowerDashboardPage() {
     useState<StartEntityType>("individual");
   const [pickerCollateralType, setPickerCollateralType] =
     useState<StartCollateralType>("none");
+  const [pickerIndividualLoanType, setPickerIndividualLoanType] = useState<
+    StartIndividualLoanType | ""
+  >("");
   const [confirmDeleteDraft, setConfirmDeleteDraft] = useState(false);
   const [deleteDraftLoading, setDeleteDraftLoading] = useState(false);
   const [historySearch, setHistorySearch] = useState("");
@@ -216,12 +216,7 @@ export default function BorrowerDashboardPage() {
       setApplications(apps);
 
       const openPipeline =
-        apps.find(
-          (a) =>
-            !(RELOAN_TERMINAL_STATUSES as readonly string[]).includes(
-              a.status,
-            ) && !LOAN_STATUSES.includes(a.status),
-        ) ?? null;
+        apps.find((a) => isOriginationStatus(a.status)) ?? null;
 
       if (openPipeline) {
         try {
@@ -252,56 +247,6 @@ export default function BorrowerDashboardPage() {
       } else {
         setDocsSummary(null);
       }
-
-      // Prefer a still-open loan over an already paid-off one — a borrower
-      // can carry both (e.g. one paid-off loan plus a newer active one), and
-      // picking whichever was created most recently would surface the
-      // wrong "current loan" summary once a newer loan happens to be the
-      // one that's already closed out.
-      const loanApp =
-        apps.find(
-          (a) => LOAN_STATUSES.includes(a.status) && a.status !== "paid_off",
-        ) ?? apps.find((a) => LOAN_STATUSES.includes(a.status));
-      if (loanApp) {
-        try {
-          const loanRes = await fetch(
-            `/api/borrower/applications/${loanApp.id}/loan`,
-          );
-          if (loanRes.ok) {
-            const loanData = (await loanRes.json()) as {
-              loan: Record<string, unknown> & {
-                amortization_schedules?: Array<{
-                  installment_no: number;
-                  due_date: string;
-                  amount_due: number;
-                  status: string;
-                }>;
-              };
-            };
-            const ml = loanData.loan;
-            const schedules = [...(ml.amortization_schedules ?? [])].sort(
-              (a, b) => a.installment_no - b.installment_no,
-            );
-            const next = schedules.find((s) => s.status !== "paid");
-            setLoan({
-              applicationId: loanApp.id,
-              outstanding: Number(ml.outstanding_balance ?? 0),
-              totalLoan: Number(ml.total_loan ?? 0),
-              monthly: Number(ml.monthly_amortization ?? 0),
-              accountStatus: (ml.account_status as string) ?? "active",
-              paidCount: schedules.filter((s) => s.status === "paid").length,
-              termCount: schedules.length,
-              nextDue: next
-                ? { date: next.due_date, amount: Number(next.amount_due) }
-                : null,
-            });
-          }
-        } catch {
-          /* loan panel is progressive enhancement */
-        }
-      } else {
-        setLoan(null);
-      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load");
     } finally {
@@ -322,6 +267,7 @@ export default function BorrowerDashboardPage() {
     segment: StartSegment;
     entityType?: StartEntityType;
     collateralType?: StartCollateralType;
+    individualLoanType?: StartIndividualLoanType;
   }) {
     setStartAppLoading(true);
     setError(null);
@@ -349,28 +295,34 @@ export default function BorrowerDashboardPage() {
     }
   }
 
-  /** Both first and reloan open the segment picker. Reloan prefills from the
-   * latest application; first defaults to Seafarer. */
+  /** First defaults to Seafarer. Reloan and additional prefill from the
+   * latest servicing application. */
   function handleStartClick() {
-    if (appKind === "reloan") {
-      const latest = applications[0];
+    if (appKind === "reloan" || appKind === "additional") {
+      const latestServicing =
+        applications.find((a) =>
+          (SERVICING_STATUSES as readonly string[]).includes(a.status),
+        ) ?? applications[0];
       const segment =
-        latest?.segment === "sme" || latest?.segment === "individual"
-          ? latest.segment
+        latestServicing?.segment === "sme" ||
+        latestServicing?.segment === "individual"
+          ? latestServicing.segment
           : "seafarer";
       setPickerSegment(segment);
       setPickerEntityType(
         segment === "sme"
-          ? latest?.entityType === "corporate"
+          ? latestServicing?.entityType === "corporate"
             ? "corporate"
             : "individual"
           : "individual",
       );
       setPickerCollateralType("none");
+      setPickerIndividualLoanType("");
     } else {
       setPickerSegment("seafarer");
       setPickerEntityType("individual");
       setPickerCollateralType("none");
+      setPickerIndividualLoanType("");
     }
     setShowSegmentPicker(true);
   }
@@ -378,7 +330,16 @@ export default function BorrowerDashboardPage() {
   function handlePickerSegmentChange(next: StartSegment) {
     setPickerSegment(next);
     if (next === "seafarer") setPickerCollateralType("none");
+    if (next !== "individual") setPickerIndividualLoanType("");
   }
+
+  function handlePickerCollateralTypeChange(next: StartCollateralType) {
+    setPickerCollateralType(next);
+    if (next !== "none") setPickerIndividualLoanType("");
+  }
+
+  const pickerIndividualLoanTypeEligible =
+    pickerSegment === "individual" && pickerCollateralType === "none";
 
   function handleConfirmSegmentPicker() {
     void handleStartApplication(
@@ -388,22 +349,22 @@ export default function BorrowerDashboardPage() {
             entityType: pickerEntityType,
             collateralType: pickerCollateralType,
           }
-        : { segment: pickerSegment, collateralType: pickerCollateralType },
+        : {
+            segment: pickerSegment,
+            collateralType: pickerCollateralType,
+            individualLoanType: pickerIndividualLoanTypeEligible
+              ? pickerIndividualLoanType || undefined
+              : undefined,
+          },
     );
   }
 
   const statuses = applications.map((a) => a.status);
-  const application =
-    applications.find(
-      (a) =>
-        !(RELOAN_TERMINAL_STATUSES as readonly string[]).includes(a.status),
-    ) ?? null;
   const pipelineApp =
-    applications.find(
-      (a) =>
-        !(RELOAN_TERMINAL_STATUSES as readonly string[]).includes(a.status) &&
-        !LOAN_STATUSES.includes(a.status),
-    ) ?? null;
+    applications.find((a) => isOriginationStatus(a.status)) ?? null;
+  const loanAccounts = applications.filter((a) =>
+    (SERVICING_STATUSES as readonly string[]).includes(a.status),
+  );
 
   async function handleDeleteDraft() {
     if (!pipelineApp || pipelineApp.status !== "draft") return;
@@ -435,15 +396,16 @@ export default function BorrowerDashboardPage() {
   const appKind = nextApplicationKind({ applicationStatuses: statuses });
   const canStart = canStartReloan({ applicationStatuses: statuses });
   const startLabel =
-    appKind === "reloan" ? "Apply for reloan" : "Start application";
+    appKind === "additional"
+      ? "Apply for another loan"
+      : appKind === "reloan"
+        ? "Apply for reloan"
+        : "Start application";
+  const showStart = canStart.ok && !pipelineApp;
   const mode = borrowerHomeMode({
     hasOpenApplication: pipelineApp != null,
-    hasActiveLoan: loan != null,
+    hasActiveLoan: loanAccounts.length > 0,
   });
-  const fullyPaid = loan !== null && loan.outstanding <= 0;
-  const paidPct = loan?.termCount
-    ? Math.round((loan.paidCount / loan.termCount) * 100)
-    : 0;
   const docsPct =
     docsSummary && docsSummary.required > 0
       ? docsUploadPercent({
@@ -461,11 +423,11 @@ export default function BorrowerDashboardPage() {
     : null;
   const blockerLabel = formatBlockerLabel(pipelineApp?.blocker);
 
-  /** Past files only — exclude the current open / active loan application. */
-  const historySource = applications.filter((app) => {
-    if (application && app.id === application.id) return false;
-    return true;
-  });
+  /** Past files only — exclude live servicing accounts and the in-process application. */
+  const liveIds = new Set(
+    [...loanAccounts, pipelineApp].filter(Boolean).map((a) => a!.id),
+  );
+  const historySource = applications.filter((app) => !liveIds.has(app.id));
 
   const statusOptions = Array.from(
     new Set(historySource.map((a) => a.status)),
@@ -494,7 +456,7 @@ export default function BorrowerDashboardPage() {
     safeHistoryPage * HISTORY_PAGE_SIZE,
   );
 
-  const statusTone = application
+  const statusTone = pipelineApp
     ? ({
         success: "success",
         warning: "warning",
@@ -502,7 +464,7 @@ export default function BorrowerDashboardPage() {
         teal: "teal",
         navy: "navy",
         neutral: "navy",
-      }[statusBadgeVariant(application.status)] as keyof typeof KPI_TONES)
+      }[statusBadgeVariant(pipelineApp.status)] as keyof typeof KPI_TONES)
     : "navy";
 
   return (
@@ -510,6 +472,13 @@ export default function BorrowerDashboardPage() {
       <PageHeader
         title={`Welcome, ${profile?.firstName ?? "Borrower"}`}
         description={borrowerHomeDescription(mode)}
+        actions={
+          !loading && showStart ? (
+            <Button loading={startAppLoading} onClick={handleStartClick}>
+              {startLabel}
+            </Button>
+          ) : undefined
+        }
       />
 
       {error ? (
@@ -561,83 +530,6 @@ export default function BorrowerDashboardPage() {
             </div>
           ) : null}
 
-          {loan ? (
-            <Card variant="gradient" className="mb-6">
-              <div className="flex flex-wrap items-start justify-between gap-6">
-                <div className="min-w-[240px]">
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-white/55">
-                    Outstanding balance
-                  </p>
-                  <p className="mono mt-1 text-[34px] font-semibold leading-none tracking-tight">
-                    ₱{formatMoney(loan.outstanding)}
-                  </p>
-                  <div className="mt-3">
-                    <Badge variant={fullyPaid ? "success" : "teal"} dot>
-                      {fullyPaid ? "Fully paid" : "Active loan"}
-                    </Badge>
-                  </div>
-                  <div className="mt-5 max-w-[320px]">
-                    <div className="flex items-center justify-between text-[12px] text-white/60">
-                      <span>
-                        {loan.paidCount} of {loan.termCount} installments paid
-                      </span>
-                      <span className="mono">{paidPct}%</span>
-                    </div>
-                    <div
-                      className="mt-1.5 h-1.5 overflow-hidden rounded-full"
-                      style={{ background: "rgba(255,255,255,0.15)" }}
-                    >
-                      <div
-                        className="h-full rounded-full bg-teal-400 transition-[width]"
-                        style={{ width: `${paidPct}%` }}
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                <div className="flex flex-wrap gap-3">
-                  <div className="min-w-[150px] rounded-[var(--r-md)] bg-white/10 px-4 py-3">
-                    <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-white/55">
-                      Monthly
-                    </p>
-                    <p className="mono mt-1 text-lg font-semibold">
-                      ₱{formatMoney(loan.monthly)}
-                    </p>
-                  </div>
-                  <div className="min-w-[150px] rounded-[var(--r-md)] bg-white/10 px-4 py-3">
-                    <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-white/55">
-                      Next payment
-                    </p>
-                    <p className="mono mt-1 text-lg font-semibold">
-                      {loan.nextDue ? formatDate(loan.nextDue.date) : "—"}
-                    </p>
-                    {loan.nextDue ? (
-                      <p className="mono mt-1 text-sm text-teal-300">
-                        ₱{formatMoney(loan.nextDue.amount)}
-                      </p>
-                    ) : null}
-                  </div>
-                  <div className="min-w-[150px] rounded-[var(--r-md)] bg-white/10 px-4 py-3">
-                    <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-white/55">
-                      Total loan
-                    </p>
-                    <p className="mono mt-1 text-lg font-semibold">
-                      ₱{formatMoney(loan.totalLoan)}
-                    </p>
-                  </div>
-                </div>
-              </div>
-
-              <div className="mt-5 border-t border-white/10 pt-4">
-                <Link href={`/borrower/applications/${loan.applicationId}`}>
-                  <Button variant="secondary" size="sm">
-                    {fullyPaid ? "View loan record" : "View loan & pay"}
-                  </Button>
-                </Link>
-              </div>
-            </Card>
-          ) : null}
-
           <div className="kpi-grid">
             <Kpi
               tone="navy"
@@ -651,15 +543,15 @@ export default function BorrowerDashboardPage() {
               icon={IconFile}
               label="Current application"
               value={
-                application
-                  ? (application.statusLabel ??
-                    formatStatusLabel(application.status))
+                pipelineApp
+                  ? (pipelineApp.statusLabel ??
+                    formatStatusLabel(pipelineApp.status))
                   : "None"
               }
               hint={
-                application?.applicationNo ? (
-                  <span className="mono">{application.applicationNo}</span>
-                ) : application ? (
+                pipelineApp?.applicationNo ? (
+                  <span className="mono">{pipelineApp.applicationNo}</span>
+                ) : pipelineApp ? (
                   "No application no. yet"
                 ) : (
                   "Start when ready"
@@ -688,23 +580,93 @@ export default function BorrowerDashboardPage() {
               }
             />
             <Kpi
-              tone={loan?.nextDue ? "warning" : "navy"}
+              tone={loanAccounts.length > 0 ? "teal" : "navy"}
               icon={IconCalendar}
-              label={loan?.nextDue ? "Amount due next" : "Monthly amortization"}
+              label={
+                loanAccounts.length === 1
+                  ? "Outstanding balance"
+                  : "Loan accounts"
+              }
               value={
-                loan
-                  ? `₱${formatMoney(loan.nextDue ? loan.nextDue.amount : loan.monthly)}`
-                  : "—"
+                loanAccounts.length === 1
+                  ? `₱${formatMoney(loanAccounts[0].loanAccount?.outstanding ?? 0)}`
+                  : loanAccounts.length > 0
+                    ? loanAccounts.length
+                    : "—"
               }
               hint={
-                loan?.nextDue
-                  ? `Due ${formatDate(loan.nextDue.date)}`
-                  : loan
-                    ? "No payment due"
-                    : "No active loan"
+                loanAccounts.length === 0
+                  ? "No active loan"
+                  : loanAccounts.length === 1
+                    ? (loanAccounts[0].loanAccount?.loanAccountNo ??
+                      loanAccounts[0].applicationNo ??
+                      "Active loan")
+                    : `${loanAccounts.length} loan accounts`
               }
             />
           </div>
+
+          {loanAccounts.length > 0 ? (
+            <div className="mt-6">
+              <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+                <h2 className="font-display text-lg font-semibold text-navy-900">
+                  Your loans
+                </h2>
+              </div>
+              <div className="grid gap-3 sm:grid-cols-2">
+                {loanAccounts.map((app) => {
+                  const acct = app.loanAccount;
+                  const title =
+                    acct?.loanAccountNo ??
+                    app.applicationNo ??
+                    "Loan account";
+                  return (
+                    <Card key={app.id}>
+                      <div className="flex flex-wrap items-start justify-between gap-3">
+                        <div>
+                          <p className="text-[11px] font-semibold uppercase tracking-[0.06em] text-ink-400">
+                            {acct?.loanAccountNo
+                              ? "Loan account"
+                              : "Application no."}
+                          </p>
+                          <p className="mono mt-1 text-sm font-semibold text-ink-900">
+                            {title}
+                          </p>
+                          <p className="mt-1 text-xs font-medium text-teal-700">
+                            {formatLoanProductLabel(app)}
+                          </p>
+                          {acct?.loanAccountNo && app.applicationNo ? (
+                            <p className="mono mt-0.5 text-xs text-ink-500">
+                              {app.applicationNo}
+                            </p>
+                          ) : null}
+                        </div>
+                        <Badge
+                          variant={statusBadgeVariant(app.status)}
+                          dot
+                        >
+                          {app.statusLabel ?? formatStatusLabel(app.status)}
+                        </Badge>
+                      </div>
+                      <p className="mt-3 text-[11px] font-semibold uppercase tracking-[0.06em] text-ink-400">
+                        Outstanding
+                      </p>
+                      <p className="mono mt-1 text-lg font-semibold text-ink-900">
+                        ₱{formatMoney(acct?.outstanding ?? 0)}
+                      </p>
+                      <div className="mt-4 border-t border-[var(--line-soft)] pt-3">
+                        <Link href={`/borrower/applications/${app.id}`}>
+                          <Button variant="secondary" size="sm">
+                            View loan
+                          </Button>
+                        </Link>
+                      </div>
+                    </Card>
+                  );
+                })}
+              </div>
+            </div>
+          ) : null}
 
           {pipelineApp ? (
             <Card className="mt-6 overflow-x-auto">
@@ -748,9 +710,13 @@ export default function BorrowerDashboardPage() {
                     Loan type
                   </div>
                   <div className="mt-1 text-sm font-semibold text-ink-900">
-                    {pipelineApp.loanTypeName ??
-                      (pipelineApp.isReloan ? "Reloan" : "New loan")}
+                    {formatLoanProductLabel(pipelineApp)}
                   </div>
+                  {pipelineApp.loanTypeName ? (
+                    <div className="mt-0.5 text-xs text-ink-500">
+                      {pipelineApp.loanTypeName}
+                    </div>
+                  ) : null}
                 </div>
                 <div className="rounded-[var(--r-md)] border border-line-soft bg-surface-2/80 px-3 py-2.5">
                   <div className="text-[11px] font-semibold uppercase tracking-[0.06em] text-ink-400">
@@ -801,7 +767,7 @@ export default function BorrowerDashboardPage() {
                 ) : null}
               </div>
             </Card>
-          ) : loan && !fullyPaid ? null : (
+          ) : loanAccounts.length === 0 ? (
             <Card className="mt-6">
               <EmptyState
                 title="No active application"
@@ -820,7 +786,7 @@ export default function BorrowerDashboardPage() {
                 }
               />
             </Card>
-          )}
+          ) : null}
 
           {historySource.length ? (
             <div className="mt-8 rounded-[var(--r-lg)] border border-line-soft bg-surface-2/50 p-4 sm:p-5">
@@ -946,7 +912,15 @@ export default function BorrowerDashboardPage() {
                                   {app.applicationNo ?? app.id.slice(0, 8)}
                                 </span>
                               </Td>
-                              <Td>{app.isReloan ? "Reloan" : "New loan"}</Td>
+                              <Td>
+                                <div className="font-medium text-ink-900">
+                                  {formatLoanProductLabel(app)}
+                                </div>
+                                <div className="text-xs text-ink-500">
+                                  {app.isReloan ? "Reloan" : "New loan"}
+                                  {app.loanTypeName ? ` · ${app.loanTypeName}` : ""}
+                                </div>
+                              </Td>
                               <Td num>
                                 {app.loanAmount != null
                                   ? formatMoney(app.loanAmount)
@@ -1061,7 +1035,7 @@ export default function BorrowerDashboardPage() {
                 id="start-collateral-type"
                 value={pickerCollateralType}
                 onChange={(e) =>
-                  setPickerCollateralType(
+                  handlePickerCollateralTypeChange(
                     e.target.value as StartCollateralType,
                   )
                 }
@@ -1070,6 +1044,27 @@ export default function BorrowerDashboardPage() {
                 <option value="none">Clean (no collateral)</option>
                 <option value="car_refinancing">Car Refinancing</option>
                 <option value="real_estate">Real Estate</option>
+              </Select>
+            </div>
+          ) : null}
+          {pickerIndividualLoanTypeEligible ? (
+            <div>
+              <Label htmlFor="start-individual-loan-type" required>
+                Individual loan type
+              </Label>
+              <Select
+                id="start-individual-loan-type"
+                value={pickerIndividualLoanType}
+                onChange={(e) =>
+                  setPickerIndividualLoanType(
+                    e.target.value as StartIndividualLoanType,
+                  )
+                }
+                required
+              >
+                <option value="">Select loan type</option>
+                <option value="mpl">MPL (Multi-Purpose Loan)</option>
+                <option value="salary">Salary</option>
               </Select>
             </div>
           ) : null}

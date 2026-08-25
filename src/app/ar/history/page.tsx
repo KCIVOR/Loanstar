@@ -29,12 +29,15 @@ import type {
   ClosedAccountRow,
   ClosedAccountsKpiCounts,
   ClosedAccountSortKey,
+  InternalTransferHistoryRow,
+  InternalTransferKpiCounts,
+  InternalTransferSortKey,
   ReconciledDcrKpiCounts,
   ReconciledDcrSortKey,
   ReconciledPostingRow,
 } from "@/lib/ar/history";
 
-type HistoryTab = "accounts" | "dcr";
+type HistoryTab = "accounts" | "dcr" | "internal-transfers";
 type SegmentFilter = "all" | "seafarer" | "sme" | "individual";
 
 const PAGE_SIZE_OPTIONS = [10, 20, 30, 50, 100] as const;
@@ -47,10 +50,15 @@ const DEFAULT_DATE_RANGE: DateRangeValue = {
 
 const EMPTY_ACCOUNTS_KPI: ClosedAccountsKpiCounts = { total: 0 };
 const EMPTY_DCR_KPI: ReconciledDcrKpiCounts = { total: 0, totalAmount: 0 };
+const EMPTY_INTERNAL_TRANSFER_KPI: InternalTransferKpiCounts = {
+  totalResolved: 0,
+  totalPostedAmount: 0,
+};
 
 const TAB_OPTIONS: Array<{ value: HistoryTab; label: string }> = [
   { value: "accounts", label: "Closed accounts" },
   { value: "dcr", label: "Reconciled DCRRs" },
+  { value: "internal-transfers", label: "Internal transfers" },
 ];
 
 const SEGMENT_CHIPS: Array<{ id: SegmentFilter; label: string }> = [
@@ -78,6 +86,26 @@ function segmentBadge(segment: "sme" | "seafarer" | "individual" | null | undefi
   return (
     <Badge variant="teal" dot>
       Seafarer
+    </Badge>
+  );
+}
+
+function transferTypeLabel(row: InternalTransferHistoryRow): string {
+  if (row.transferType === "other_loan") return "Other Loan (full payoff)";
+  return row.months ? `Offset (${row.months} mo${row.months > 1 ? "s" : ""})` : "Offset";
+}
+
+function transferStatusBadge(status: "posted" | "rejected") {
+  if (status === "posted") {
+    return (
+      <Badge variant="success" dot>
+        Posted
+      </Badge>
+    );
+  }
+  return (
+    <Badge variant="danger" dot>
+      Rejected
     </Badge>
   );
 }
@@ -961,6 +989,452 @@ function DcrHistoryPanel() {
   );
 }
 
+function InternalTransfersHistoryPanel() {
+  const [rows, setRows] = useState<InternalTransferHistoryRow[]>([]);
+  const [totalCount, setTotalCount] = useState(0);
+  const [kpi, setKpi] = useState<InternalTransferKpiCounts>(
+    EMPTY_INTERNAL_TRANSFER_KPI,
+  );
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const [search, setSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+  const [segmentFilter, setSegmentFilter] = useState<SegmentFilter>("all");
+  const [dateRange, setDateRange] = useState<DateRangeValue>(DEFAULT_DATE_RANGE);
+  const [viewMode, setViewMode] = useState<HistoryViewMode>("list");
+  const [pageSize, setPageSize] =
+    useState<(typeof PAGE_SIZE_OPTIONS)[number]>(10);
+  const [page, setPage] = useState(1);
+  const [sortKey, setSortKey] = useState<InternalTransferSortKey>("reviewedAt");
+  const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
+  const [filterPanelOpen, setFilterPanelOpen] = useState(false);
+
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearch(search), 300);
+    return () => clearTimeout(timer);
+  }, [search]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [debouncedSearch, segmentFilter, dateRange, pageSize, sortKey, sortDir]);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const query = buildHistoryQuery({
+        search: debouncedSearch,
+        segment: segmentFilter,
+        dateRange,
+        sortKey,
+        sortDir,
+        page,
+        pageSize,
+      });
+      const res = await fetch(`/api/ar/history/internal-transfers?${query}`);
+      if (!res.ok) throw new Error("Failed to load internal transfer history");
+      const data = (await res.json()) as {
+        rows: InternalTransferHistoryRow[];
+        totalCount: number;
+        kpi: InternalTransferKpiCounts;
+      };
+      setRows(data.rows ?? []);
+      setTotalCount(data.totalCount ?? 0);
+      setKpi(data.kpi ?? EMPTY_INTERNAL_TRANSFER_KPI);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to load");
+    } finally {
+      setLoading(false);
+    }
+  }, [
+    debouncedSearch,
+    segmentFilter,
+    dateRange,
+    sortKey,
+    sortDir,
+    page,
+    pageSize,
+  ]);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  const pageCount = Math.max(1, Math.ceil(totalCount / pageSize));
+  const safePage = Math.min(page, pageCount);
+
+  function toggleSort(key: InternalTransferSortKey) {
+    if (sortKey === key) {
+      setSortDir((d) => (d === "asc" ? "desc" : "asc"));
+    } else {
+      setSortKey(key);
+      setSortDir(key === "reviewedAt" || key === "amount" ? "desc" : "asc");
+    }
+  }
+
+  function sortArrow(key: InternalTransferSortKey) {
+    if (sortKey !== key) return null;
+    return <span className="arr">{sortDir === "asc" ? "▲" : "▼"}</span>;
+  }
+
+  const dateIsDefault = dateRange.preset === "30d";
+  const activeFilterCount =
+    (segmentFilter !== "all" ? 1 : 0) + (dateIsDefault ? 0 : 1);
+
+  const summaryStart = rows.length ? (safePage - 1) * pageSize + 1 : 0;
+  const summaryEnd = (safePage - 1) * pageSize + rows.length;
+
+  return (
+    <div>
+      {error ? (
+        <div className="mb-4">
+          <Alert>{error}</Alert>
+        </div>
+      ) : null}
+
+      <div className="kpi-grid mb-4">
+        {!loading ? (
+          <>
+            <div className="card stat">
+              <div className="k">Total resolved</div>
+              <div className="v">{kpi.totalResolved}</div>
+            </div>
+            <div className="card stat">
+              <div className="k">Total amount posted</div>
+              <div className="v">{formatMoney(kpi.totalPostedAmount)}</div>
+            </div>
+          </>
+        ) : (
+          <>
+            <Skeleton variant="kpi" />
+            <Skeleton variant="kpi" />
+          </>
+        )}
+      </div>
+
+      <div className="card mb-4" style={{ overflow: "visible" }}>
+        <div className="tbl-toolbar" style={{ padding: "13px 14px" }}>
+          <div className="gsearch" style={{ maxWidth: 300, flex: 1, minWidth: 190 }}>
+            <span className="icon">
+              <svg
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth={2.2}
+                strokeLinecap="round"
+              >
+                <circle cx="11" cy="11" r="7" />
+                <path d="m21 21-4.3-4.3" />
+              </svg>
+            </span>
+            <input
+              className="input"
+              style={{ height: 37, paddingRight: 12, borderRadius: "var(--r-md)" }}
+              placeholder="Search borrower, account no…"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
+          </div>
+
+          <div className="active-pill-row">
+            {segmentFilter !== "all" ? (
+              <span className="active-pill">
+                Segment: {segmentFilter === "sme" ? "SME" : segmentFilter === "individual" ? "Individual" : "Seafarer"}
+                <button
+                  type="button"
+                  aria-label="Clear segment filter"
+                  onClick={() => setSegmentFilter("all")}
+                >
+                  ×
+                </button>
+              </span>
+            ) : null}
+            {!dateIsDefault ? (
+              <span className="active-pill">
+                {dateRangePillLabel(dateRange)}
+                <button
+                  type="button"
+                  aria-label="Clear date filter"
+                  onClick={() => setDateRange(DEFAULT_DATE_RANGE)}
+                >
+                  ×
+                </button>
+              </span>
+            ) : null}
+            {activeFilterCount > 0 ? (
+              <button
+                type="button"
+                className="clear-link"
+                onClick={() => {
+                  setSegmentFilter("all");
+                  setDateRange(DEFAULT_DATE_RANGE);
+                }}
+              >
+                Clear all
+              </button>
+            ) : null}
+          </div>
+
+          <div className="sp">
+            <ViewModeToggle value={viewMode} onChange={setViewMode} />
+            <button
+              type="button"
+              className={cn("btn btn-outline", filterPanelOpen && "is-on")}
+              onClick={() => setFilterPanelOpen((open) => !open)}
+            >
+              <svg
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth={2}
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                width={16}
+                height={16}
+                aria-hidden
+              >
+                <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3" />
+              </svg>
+              Filters
+              {activeFilterCount > 0 ? (
+                <span
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    minWidth: 16,
+                    height: 16,
+                    padding: "0 4px",
+                    borderRadius: "var(--r-full)",
+                    background: "var(--teal-600)",
+                    color: "#fff",
+                    fontSize: 10,
+                    fontWeight: 700,
+                    fontFamily: "var(--font-mono)",
+                  }}
+                >
+                  {activeFilterCount}
+                </span>
+              ) : null}
+            </button>
+          </div>
+        </div>
+
+        <div className={cn("filter-panel", filterPanelOpen && "is-open")}>
+          <div className="filter-group">
+            <span className="filter-group-label">Segment</span>
+            <div className="filter-bar">
+              {SEGMENT_CHIPS.map((chip) => (
+                <button
+                  key={chip.id}
+                  type="button"
+                  className={cn("fchip", segmentFilter === chip.id && "is-on")}
+                  onClick={() => setSegmentFilter(chip.id)}
+                >
+                  {chip.label}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className="filter-group">
+            <span className="filter-group-label">Resolved date</span>
+            <DateRangeFilter value={dateRange} onChange={setDateRange} />
+          </div>
+        </div>
+      </div>
+
+      {loading ? (
+        <div className="mb-4">
+          <Table>
+            <thead>
+              <tr>
+                <Th>Source loan</Th>
+                <Th>Target account</Th>
+                <Th>Type</Th>
+                <Th num>Amount</Th>
+                <Th>Status</Th>
+                <Th>Resolved by</Th>
+                <Th>Resolved on</Th>
+                <Th>Reason</Th>
+              </tr>
+            </thead>
+            <tbody>
+              {Array.from({ length: 6 }, (_, i) => (
+                <tr key={i}>
+                  <Td colSpan={8}>
+                    <Skeleton variant="line" />
+                  </Td>
+                </tr>
+              ))}
+            </tbody>
+          </Table>
+        </div>
+      ) : totalCount === 0 ? (
+        <EmptyState
+          title="No matching records"
+          description="Try clearing a filter or search term."
+          showMark={false}
+        />
+      ) : viewMode === "grid" ? (
+        <div className="grid-view mb-4">
+          {rows.map((row) => (
+            <div key={row.id} className="gcard">
+              <div className="gcard-top">
+                <span className="gcard-id mono">
+                  {row.targetLoanAccountNo ?? row.targetMasterlistId.slice(0, 8)}
+                </span>
+                {transferStatusBadge(row.status)}
+              </div>
+              <div className="gcard-name">{row.targetBorrowerName}</div>
+              <div className="gcard-meta">
+                <div className="row">
+                  <span className="k">Source loan</span>
+                  <span className="v mono">
+                    {row.sourceApplicationNo ?? row.sourceLoanAccountNo ?? "—"}
+                  </span>
+                </div>
+                <div className="row">
+                  <span className="k">Type</span>
+                  <span className="v">{transferTypeLabel(row)}</span>
+                </div>
+                <div className="row">
+                  <span className="k">Amount</span>
+                  <span className="v mono text-teal-600">
+                    {formatMoney(row.amount)}
+                  </span>
+                </div>
+                <div className="row">
+                  <span className="k">Resolved by</span>
+                  <span className="v">{row.reviewedByName}</span>
+                </div>
+                <div className="row">
+                  <span className="k">Resolved on</span>
+                  <span className="v mono">
+                    {row.reviewedAt ? formatDate(row.reviewedAt) : "—"}
+                  </span>
+                </div>
+                {row.rejectionReason ? (
+                  <div className="row">
+                    <span className="k">Reason</span>
+                    <span className="v">{row.rejectionReason}</span>
+                  </div>
+                ) : null}
+              </div>
+              <Link href={`/ar/masterlist/${row.targetMasterlistId}`}>
+                <Button variant="secondary" size="sm">
+                  View
+                </Button>
+              </Link>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div className="mb-4">
+          <Table className={viewMode === "compact" ? "is-compact" : undefined}>
+            <thead>
+              <tr>
+                <Th>Source loan</Th>
+                <Th
+                  className="sortable"
+                  onClick={() => toggleSort("borrower")}
+                >
+                  Target account
+                  {sortArrow("borrower")}
+                </Th>
+                <Th>Type</Th>
+                <Th
+                  className="sortable"
+                  num
+                  onClick={() => toggleSort("amount")}
+                >
+                  Amount
+                  {sortArrow("amount")}
+                </Th>
+                <Th>Status</Th>
+                <Th>Resolved by</Th>
+                <Th
+                  className="sortable"
+                  onClick={() => toggleSort("reviewedAt")}
+                >
+                  Resolved on
+                  {sortArrow("reviewedAt")}
+                </Th>
+                <Th>Reason</Th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((row) => (
+                <tr key={row.id}>
+                  <Td>
+                    <Link
+                      href={`/lra/applications/${row.sourceLoanApplicationId}`}
+                      className="mono text-sm font-medium text-teal-700 hover:underline"
+                    >
+                      {row.sourceApplicationNo ?? row.sourceLoanAccountNo ?? "—"}
+                    </Link>
+                  </Td>
+                  <Td>
+                    <Link
+                      href={`/ar/masterlist/${row.targetMasterlistId}`}
+                      className="mono text-sm font-medium text-teal-700 hover:underline"
+                    >
+                      {row.targetLoanAccountNo ?? "—"}
+                    </Link>
+                    <div className="mono text-xs text-ink-400">
+                      {row.targetBorrowerName}
+                    </div>
+                  </Td>
+                  <Td>{transferTypeLabel(row)}</Td>
+                  <Td num className="mono text-teal-600">
+                    {formatMoney(row.amount)}
+                  </Td>
+                  <Td>{transferStatusBadge(row.status)}</Td>
+                  <Td>{row.reviewedByName}</Td>
+                  <Td className="mono">
+                    {row.reviewedAt ? formatDate(row.reviewedAt) : "—"}
+                  </Td>
+                  <Td className="text-sm text-ink-400">
+                    {row.rejectionReason ?? "—"}
+                  </Td>
+                </tr>
+              ))}
+            </tbody>
+          </Table>
+        </div>
+      )}
+
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex flex-wrap items-center gap-2 text-xs text-ink-400">
+          <span>Show</span>
+          <Select
+            value={String(pageSize)}
+            onChange={(e) => {
+              setPageSize(
+                Number(e.target.value) as (typeof PAGE_SIZE_OPTIONS)[number],
+              );
+            }}
+            style={{ width: 72, height: 34 }}
+          >
+            {PAGE_SIZE_OPTIONS.map((size) => (
+              <option key={size} value={size}>
+                {size}
+              </option>
+            ))}
+          </Select>
+          <span>per page</span>
+        </div>
+        <Pagination
+          page={safePage}
+          pageCount={pageCount}
+          onPageChange={setPage}
+          summary={`Showing ${summaryStart}–${summaryEnd} of ${totalCount}`}
+        />
+      </div>
+    </div>
+  );
+}
+
 export default function ArHistoryPage() {
   const [tab, setTab] = useState<HistoryTab>("accounts");
 
@@ -979,12 +1453,15 @@ export default function ArHistoryPage() {
         />
       </div>
 
-      {/* Keep both panels mounted so each tab retains its own filters/sort/page. */}
+      {/* Keep all panels mounted so each tab retains its own filters/sort/page. */}
       <div hidden={tab !== "accounts"}>
         <AccountsHistoryPanel />
       </div>
       <div hidden={tab !== "dcr"}>
         <DcrHistoryPanel />
+      </div>
+      <div hidden={tab !== "internal-transfers"}>
+        <InternalTransfersHistoryPanel />
       </div>
     </div>
   );

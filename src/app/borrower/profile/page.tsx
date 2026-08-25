@@ -8,8 +8,13 @@ import { AutofillOverlay } from "@/components/dev/AutofillOverlay";
 import { fakeBorrowerProfile } from "@/lib/dev/fake-data";
 import type { BorrowerProfile } from "@/lib/borrowers/types";
 
+type ProfileSegment = "seafarer" | "sme" | "individual";
+type ProfileEntityType = "individual" | "corporate" | null;
+
 export default function BorrowerProfilePage() {
   const [profile, setProfile] = useState<BorrowerProfile | null>(null);
+  const [segment, setSegment] = useState<ProfileSegment>("seafarer");
+  const [entityType, setEntityType] = useState<ProfileEntityType>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -21,8 +26,22 @@ export default function BorrowerProfilePage() {
     try {
       const res = await fetch("/api/borrower/profile");
       if (!res.ok) throw new Error("Failed to load profile");
-      const data = (await res.json()) as { profile: BorrowerProfile };
+      const data = (await res.json()) as {
+        profile: BorrowerProfile;
+        segment?: ProfileSegment;
+        entityType?: ProfileEntityType;
+      };
       setProfile(data.profile);
+      setSegment(
+        data.segment === "sme" || data.segment === "individual"
+          ? data.segment
+          : "seafarer",
+      );
+      setEntityType(
+        data.entityType === "individual" || data.entityType === "corporate"
+          ? data.entityType
+          : null,
+      );
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load");
     } finally {
@@ -62,6 +81,7 @@ export default function BorrowerProfilePage() {
           financial: profile.financial,
           allottee: profile.allottee,
           picWork: profile.picWork,
+          businessInfo: profile.businessInfo,
           dependents: profile.dependents,
           references: profile.references,
           profileData: profile.profileData,
@@ -94,7 +114,7 @@ export default function BorrowerProfilePage() {
       />
       <PageHeader
         title="Application profile"
-        description="SF Application Form details for your loan file. Login settings (name, avatar, notification prefs) are under Account in the header."
+        description="Application form details for your loan file. Login settings (name, avatar, notification prefs) are under Account in the header."
       />
 
       {error ? (
@@ -109,7 +129,12 @@ export default function BorrowerProfilePage() {
       ) : null}
 
       <form onSubmit={(e) => void handleSubmit(e)} className="space-y-6">
-        <ApplicantProfileFields profile={profile} onChange={setProfile} />
+        <ApplicantProfileFields
+          profile={profile}
+          onChange={setProfile}
+          segment={segment}
+          entityType={entityType}
+        />
         <Button type="submit" loading={saving}>
           Save profile
         </Button>
@@ -118,7 +143,8 @@ export default function BorrowerProfilePage() {
         actions={[
           {
             label: "Fill Application Form",
-            onClick: () => setProfile(fakeBorrowerProfile("seafarer", null, profile)),
+            onClick: () =>
+              setProfile(fakeBorrowerProfile(segment, entityType, profile)),
           },
         ]}
       />

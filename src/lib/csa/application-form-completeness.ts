@@ -53,19 +53,13 @@ const SEAFARER_NULL_MISSING = [
   "Application form: present address",
 ] as const;
 
-/** Individual has neither a business (SME) nor a manning agency/vessel (Seafarer) —
- * same common identity + loan-intent fields as the other segments, minus both
- * segment-specific blocks. */
-const INDIVIDUAL_NULL_MISSING = [
-  "Application form: first name",
-  "Application form: last name",
-  "Application form: mobile phone",
-  "Application form: email",
-  "Application form: loan desired",
-  "Application form: requested terms",
-  "Application form: purpose of loan",
-  "Application form: present address",
-] as const;
+function usesIndividualApplicationForm(
+  segment: ApplicationFormScope["segment"],
+  entityType: ApplicationFormScope["entityType"],
+): boolean {
+  if (segment === "individual") return true;
+  return segment === "sme" && entityType !== "corporate";
+}
 
 /** Identity minimum from Individual Application Form LSLG v.4.pdf */
 const SME_INDIVIDUAL_BUSINESS_CHECKS: Array<{
@@ -92,7 +86,8 @@ const SME_CORPORATE_BUSINESS_CHECKS: Array<{
 /**
  * Endorse minimum for the digital loan application form.
  * Seafarer path (default) is frozen — missing[] must stay byte-identical.
- * SME path uses business_info fields from the client Individual/Corporate PDFs.
+ * SME and Individual segment use business_info fields from the client
+ * Individual PDF. SME Corporate uses the Business Application identity fields.
  */
 export function assessApplicationFormCompleteness(
   profile: ApplicationFormProfile | null | undefined,
@@ -102,11 +97,10 @@ export function assessApplicationFormCompleteness(
   const entityType = scope.entityType ?? null;
 
   if (!profile) {
-    if (segment === "sme") {
-      const businessLabels =
-        entityType === "corporate"
-          ? SME_CORPORATE_BUSINESS_CHECKS.map((c) => c.label)
-          : SME_INDIVIDUAL_BUSINESS_CHECKS.map((c) => c.label);
+    if (segment === "sme" || segment === "individual") {
+      const businessLabels = usesIndividualApplicationForm(segment, entityType)
+        ? SME_INDIVIDUAL_BUSINESS_CHECKS.map((c) => c.label)
+        : SME_CORPORATE_BUSINESS_CHECKS.map((c) => c.label);
       return {
         complete: false,
         missing: [
@@ -116,16 +110,8 @@ export function assessApplicationFormCompleteness(
           "Application form: email",
           ...businessLabels,
           "Application form: loan desired",
-          "Application form: requested terms",
-          "Application form: purpose of loan",
           "Application form: present address",
         ],
-      };
-    }
-    if (segment === "individual") {
-      return {
-        complete: false,
-        missing: [...INDIVIDUAL_NULL_MISSING],
       };
     }
     return {
@@ -149,12 +135,11 @@ export function assessApplicationFormCompleteness(
     missing.push("Application form: email");
   }
 
-  if (segment === "sme") {
+  if (segment === "sme" || segment === "individual") {
     const biz = profile.businessInfo ?? {};
-    const checks =
-      entityType === "corporate"
-        ? SME_CORPORATE_BUSINESS_CHECKS
-        : SME_INDIVIDUAL_BUSINESS_CHECKS;
+    const checks = usesIndividualApplicationForm(segment, entityType)
+      ? SME_INDIVIDUAL_BUSINESS_CHECKS
+      : SME_CORPORATE_BUSINESS_CHECKS;
     for (const check of checks) {
       if (!isFilledString(biz[check.key])) {
         missing.push(check.label);
@@ -171,21 +156,21 @@ export function assessApplicationFormCompleteness(
       missing.push("Application form: vessel");
     }
   }
-  // segment === "individual": no business, no manning/vessel — only the
-  // common identity + loan-intent fields below apply.
 
   if (!isFilledString(profileDataString(profile.profileData, "loanDesired"))) {
     missing.push("Application form: loan desired");
   }
-  if (
-    !isFilledString(profileDataString(profile.profileData, "requestedTerms"))
-  ) {
-    missing.push("Application form: requested terms");
-  }
-  if (
-    !isFilledString(profileDataString(profile.profileData, "purposeOfLoan"))
-  ) {
-    missing.push("Application form: purpose of loan");
+  if (segment !== "sme" && segment !== "individual") {
+    if (
+      !isFilledString(profileDataString(profile.profileData, "requestedTerms"))
+    ) {
+      missing.push("Application form: requested terms");
+    }
+    if (
+      !isFilledString(profileDataString(profile.profileData, "purposeOfLoan"))
+    ) {
+      missing.push("Application form: purpose of loan");
+    }
   }
   if (!isFilledString(profile.presentAddress?.street)) {
     missing.push("Application form: present address");

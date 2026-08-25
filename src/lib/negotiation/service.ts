@@ -4,7 +4,7 @@ import { createHash } from "crypto";
 import { appendStatusHistory } from "@/lib/applications/status";
 import { writeAuditEvent } from "@/lib/audit/writer";
 import { getActiveComputation, persistComputation } from "@/lib/csa/computation";
-import type { InputMode } from "@/lib/computation/types";
+import type { InputMode, OtherDeductions } from "@/lib/computation/types";
 import { createServiceClient } from "@/lib/supabase/server";
 
 export type NegotiationRecord = {
@@ -312,6 +312,17 @@ type OverrideInput = {
   terms: number;
   addonMonths?: number;
   loanTypeId?: string;
+  /** Explicit value wins; omitted (undefined) preserves whatever the active
+   * computation already had — see persistOverrideComputation. */
+  otherDeductions?: OtherDeductions;
+  /** SME/Individual only — free-text rate override. Same
+   * explicit-wins/omission-preserves-existing rule as otherDeductions.
+   * Ignored for Seafarer, which always uses the loan type's rate. */
+  pfRate?: number;
+  interestRate?: number;
+  adminRate?: number;
+  chattelRate?: number;
+  withDsAndNotary?: boolean;
 };
 
 /** Shared by both committee override paths: resolve the loan type, persist a new computation snapshot, and clear any prior signature since the amount changed. */
@@ -323,7 +334,9 @@ async function persistOverrideComputation(
 ) {
   const { data: existingComp } = await supabase
     .from("computations")
-    .select("loan_type_id, pf_rate, interest_rate, security_fee_rate, terms, addon_months, input_mode")
+    .select(
+      "loan_type_id, pf_rate, interest_rate, security_fee_rate, terms, addon_months, input_mode, other_deductions, admin_rate, chattel_rate, with_ds_and_notary",
+    )
     .eq("loan_application_id", applicationId)
     .eq("is_active", true)
     .maybeSingle();
@@ -377,14 +390,48 @@ async function persistOverrideComputation(
       input.addonMonths ??
       existingComp?.addon_months ??
       (segment === "sme" ? 0 : 2),
-    pfRate: Number(loanType.pf_rate),
-    interestRate: Number(loanType.interest_rate),
+    // SME/Individual: a typed rate override wins; omitting it preserves the
+    // active computation's own rate (not the generic loan-type rate) — same
+    // pattern as otherDeductions below. Seafarer is untouched: always loanType.
+    pfRate:
+      segment === "sme" || segment === "individual"
+        ? (input.pfRate ??
+          (existingComp?.pf_rate != null
+            ? Number(existingComp.pf_rate)
+            : Number(loanType.pf_rate)))
+        : Number(loanType.pf_rate),
+    interestRate:
+      segment === "sme" || segment === "individual"
+        ? (input.interestRate ??
+          (existingComp?.interest_rate != null
+            ? Number(existingComp.interest_rate)
+            : Number(loanType.interest_rate)))
+        : Number(loanType.interest_rate),
+    adminRate:
+      input.adminRate ??
+      (existingComp?.admin_rate != null
+        ? Number(existingComp.admin_rate)
+        : undefined),
+    chattelRate:
+      input.chattelRate ??
+      (existingComp?.chattel_rate != null
+        ? Number(existingComp.chattel_rate)
+        : undefined),
+    withDsAndNotary:
+      input.withDsAndNotary ?? existingComp?.with_ds_and_notary ?? undefined,
     securityFeeRate:
       segment === "sme"
         ? 0
         : existingComp?.security_fee_rate != null
           ? Number(existingComp.security_fee_rate)
           : Number(loanType.interest_rate),
+    // Explicit input wins (Committee actively setting/changing deductions);
+    // omission preserves the CSA-entered value — an override that only
+    // touches amount/terms/mode must not silently drop them.
+    otherDeductions:
+      input.otherDeductions ??
+      (existingComp?.other_deductions as OtherDeductions | null) ??
+      undefined,
     computedBy: actorId,
   });
 

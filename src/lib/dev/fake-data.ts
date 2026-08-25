@@ -115,7 +115,14 @@ function fullName(): { firstName: string; lastName: string } {
   return { firstName: pick(FIRST_NAMES), lastName: pick(LAST_NAMES) };
 }
 
-function fakeAddress() {
+const SME_OWNERSHIP = [
+  "Owned",
+  "Owned (Mortgage)",
+  "Rented",
+  "Parent Owned",
+  "Used free",
+] as const;
+function fakeAddress(ownershipOptions?: readonly string[]) {
   return {
     street: `${num(1, 999)} ${pick(STREETS)}`,
     barangay: pick(BARANGAYS),
@@ -124,7 +131,7 @@ function fakeAddress() {
     zipCode: String(num(1000, 9999)),
     country: "Philippines",
     lengthOfStay: `${num(1, 15)} years`,
-    ownership: pick(["Owned", "Rented", "With Parents"]),
+    ownership: pick(ownershipOptions ?? ["Owned", "Rented", "With Parents"]),
     mortgage: "",
   };
 }
@@ -159,13 +166,11 @@ function fakeDependents(): Dependent[] {
 /** Full BorrowerProfile fill for the Application Form (CSA intake / CIG edit / borrower's own). */
 export function fakeBorrowerProfile(
   segment: "seafarer" | "sme" | "individual",
-  entityType: "individual" | "corporate" | null,
+  _entityType: "individual" | "corporate" | null,
   base: BorrowerProfile,
 ): BorrowerProfile {
   const { firstName, lastName } = fullName();
-  const isSme = segment === "sme";
-  const isCorporate = isSme && entityType === "corporate";
-  const isIndividualSme = isSme && entityType === "individual";
+  const isSme = segment === "sme" || segment === "individual";
 
   const profile: BorrowerProfile = {
     ...base,
@@ -180,20 +185,23 @@ export function fakeBorrowerProfile(
     gender: pick(["male", "female"]),
     mobilePhone: phone(),
     landline: "",
-    presentAddress: fakeAddress(),
-    permanentAddress: fakeAddress(),
+    presentAddress: fakeAddress(isSme ? SME_OWNERSHIP : undefined),
+    permanentAddress: fakeAddress(isSme ? SME_OWNERSHIP : undefined),
     dependents: fakeDependents(),
     references: fakeReferences(segment),
     profileData: {
       ...base.profileData,
-      viber: phone(),
-      teams: `${firstName.toLowerCase()}.${lastName.toLowerCase()}@teams.example`,
-      facebook: `${firstName}${lastName}FB`,
-      education: pick(["College Graduate", "Vocational", "High School Graduate"]),
     },
   };
 
   if (!isSme) {
+    profile.profileData = {
+      ...profile.profileData,
+      viber: phone(),
+      teams: `${firstName.toLowerCase()}.${lastName.toLowerCase()}@teams.example`,
+      facebook: `${firstName}${lastName}FB`,
+      education: pick(["College Graduate", "Vocational", "High School Graduate"]),
+    };
     profile.picWork = {
       rank: pick(RANKS),
       vessel: pick(VESSELS),
@@ -264,6 +272,8 @@ export function fakeBorrowerProfile(
       contactNo: phone(),
     });
 
+    profile.landline = `02-${num(1000000, 9999999)}`;
+
     profile.businessInfo = {
       ...profile.businessInfo,
       dateApplied: new Date().toISOString().slice(0, 10),
@@ -303,39 +313,39 @@ export function fakeBorrowerProfile(
       bankAuthorizationAccount: String(num(1000000000, 9999999999)),
     };
 
-    if (isIndividualSme) {
-      const spouse = fullName();
-      profile.businessInfo.spouse = {
-        firstName: spouse.firstName,
-        lastName: spouse.lastName,
-        middleName: pick(FIRST_NAMES),
-        dateOfBirth: pastDate(25, 55),
-        presentAddress: `${pick(STREETS)}, ${pick(CITIES)}`,
-        yearsOfStayPresent: `${num(1, 15)} years`,
-        provincialAddress: pick(PROVINCES),
-        yearsOfStayProvincial: `${num(1, 20)} years`,
-        companyOrEmployerName: pick(COMPANIES),
-        yearsOfStayCompany: `${num(1, 10)} years`,
-        position: pick(["Employee", "Manager", "Self-employed"]),
-        contactNumber: phone(),
-        companyAddress: pick(CITIES),
-      };
-      profile.profileData = {
-        ...profile.profileData,
-        relativesLivingInProvince: `${pick(FIRST_NAMES)} ${pick(LAST_NAMES)}`,
-        relativesLivingInProvinceAddress: pick(PROVINCES),
-        relativesLivingInProvinceContact: phone(),
-      };
-    }
+    const spouse = fullName();
+    profile.businessInfo.spouse = {
+      firstName: spouse.firstName,
+      lastName: spouse.lastName,
+      middleName: pick(FIRST_NAMES),
+      dateOfBirth: pastDate(25, 55),
+      presentAddress: `${pick(STREETS)}, ${pick(CITIES)}`,
+      yearsOfStayPresent: `${num(1, 15)} years`,
+      provincialAddress: pick(PROVINCES),
+      yearsOfStayProvincial: `${num(1, 20)} years`,
+      companyOrEmployerName: pick(COMPANIES),
+      yearsOfStayCompany: `${num(1, 10)} years`,
+      position: pick(["Employee", "Manager", "Self-employed"]),
+      contactNumber: phone(),
+      companyAddress: pick(CITIES),
+    };
 
-    if (isCorporate) {
-      profile.businessInfo.companyOfficers = Array.from({ length: 3 }, officer);
-      profile.businessInfo.majorStockholders = Array.from({ length: 3 }, stockholder);
-      profile.businessInfo.tradeCustomers = Array.from({ length: 2 }, trade);
-      profile.businessInfo.tradeSuppliers = Array.from({ length: 2 }, trade);
-      profile.businessInfo.creditReferences = Array.from({ length: 2 }, credit);
-      profile.businessInfo.bankAccounts = Array.from({ length: 2 }, bankAccount);
-    }
+    profile.profileData = {
+      ...profile.profileData,
+      noOfDependents: String(profile.dependents.length),
+      loanDesired: String(num(100000, 1500000)),
+      relativesLivingInProvince: `${pick(FIRST_NAMES)} ${pick(LAST_NAMES)}`,
+      relativesLivingInProvinceAddress: pick(PROVINCES),
+      relativesLivingInProvinceContact: phone(),
+    };
+
+    profile.businessInfo.officeAddressLine2 = `2nd Floor, ${pick(STREETS)}, ${pick(CITIES)}`;
+    profile.businessInfo.companyOfficers = Array.from({ length: 2 }, officer);
+    profile.businessInfo.majorStockholders = Array.from({ length: 2 }, stockholder);
+    profile.businessInfo.tradeCustomers = Array.from({ length: 2 }, trade);
+    profile.businessInfo.tradeSuppliers = Array.from({ length: 2 }, trade);
+    profile.businessInfo.creditReferences = Array.from({ length: 2 }, credit);
+    profile.businessInfo.bankAccounts = Array.from({ length: 2 }, bankAccount);
   }
 
   return profile;
@@ -438,7 +448,7 @@ function fakeReferenceVerifications(): ReferenceVerification[] {
   });
 }
 
-function fakeFieldVisit(): FieldVisit {
+export function fakeFieldVisit(): FieldVisit {
   const header = {
     dateRequested: pastDate(0, 0),
     dateVisited: pastDate(0, 0),
@@ -498,7 +508,7 @@ function fakeFieldVisit(): FieldVisit {
   };
 }
 
-function fakeSmeReloanVerification(): SmeReloanVerification {
+export function fakeSmeReloanVerification(): SmeReloanVerification {
   return {
     header: {
       dateRequested: pastDate(0, 0),
@@ -831,6 +841,17 @@ export function fakeRemInspection(opts?: {
   };
 }
 
+/** Check no. + Bank/Branch for each PDC row — dates and amounts already come
+ * from the approved computation, so this only fills what staff would type. */
+export function fakePdcDetails(
+  count: number,
+): Array<{ checkNumber: string; bankName: string }> {
+  return Array.from({ length: count }, () => ({
+    checkNumber: String(num(100000, 999999)),
+    bankName: `${pick(BANKS)} - ${pick(CITIES)}`,
+  }));
+}
+
 export function fakeCommitteeAssessment() {
   return {
     characterNotes:
@@ -869,6 +890,7 @@ export function fakeVerificationPatch(
     biPurposeConfirmed: true,
     biDetailsConfirmed: true,
     biNotes: "Identity, purpose, and details confirmed via phone interview.",
+    cifVerifiedBy: opts?.verifierName || `${pick(FIRST_NAMES)} ${pick(LAST_NAMES)}`,
     finding: "positive" as const,
     findingNotes: "No derogatory findings. Recommended to proceed.",
     ...inspection,

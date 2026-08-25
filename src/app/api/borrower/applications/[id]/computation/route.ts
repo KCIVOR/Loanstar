@@ -74,6 +74,7 @@ export async function GET(_request: Request, { params }: RouteParams) {
         totalLoan: computation.totalLoan,
         monthlyAmortization: computation.monthlyAmortization,
         lineItems: computation.lineItems,
+        otherDeductions: computation.otherDeductions ?? null,
         firstPaymentDate: computation.firstPaymentDate,
         signedAt: computation.signedAt,
         loanTypeName: computation.loanTypeName,

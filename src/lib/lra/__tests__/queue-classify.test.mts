@@ -18,10 +18,20 @@ function item(
   };
 }
 
-test("completed when release file is released or closed", () => {
+test("completed only when release file is closed, not merely released", () => {
   assert.equal(
     isCompletedLraQueueItem(item({ releaseFileStatus: "released" })),
-    true,
+    false,
+  );
+  assert.equal(
+    isCompletedLraQueueItem(
+      item({
+        applicationStatus: "released",
+        blocker: "Released",
+        releaseFileStatus: "released",
+      }),
+    ),
+    false,
   );
   assert.equal(
     isCompletedLraQueueItem(item({ releaseFileStatus: "closed" })),
@@ -73,12 +83,22 @@ test("awaiting_briefing buckets as briefing (Briefer check-off)", () => {
   );
 });
 
-test("ready_release buckets as ready", () => {
+test("ready_release and released (awaiting close) bucket as ready", () => {
   assert.equal(
     lraQueueBucket(
       item({
         releaseFileStatus: "ready_release",
         blocker: "Documents signed, awaiting check release",
+      }),
+    ),
+    "ready",
+  );
+  assert.equal(
+    lraQueueBucket(
+      item({
+        applicationStatus: "released",
+        blocker: "Released",
+        releaseFileStatus: "released",
       }),
     ),
     "ready",

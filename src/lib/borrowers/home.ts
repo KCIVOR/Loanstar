@@ -1,7 +1,11 @@
 import { APPLICATION_STATUSES } from "../constants";
 import { formatStatusLabel } from "../applications/status";
 
-export type BorrowerHomeMode = "ready" | "in_progress" | "active_loan";
+export type BorrowerHomeMode =
+  | "ready"
+  | "in_progress"
+  | "active_loan"
+  | "active_and_applying";
 
 export type NextStepGuidance = {
   title: string;
@@ -28,6 +32,9 @@ export function borrowerHomeMode(input: {
   hasOpenApplication: boolean;
   hasActiveLoan: boolean;
 }): BorrowerHomeMode {
+  if (input.hasActiveLoan && input.hasOpenApplication) {
+    return "active_and_applying";
+  }
   if (input.hasActiveLoan) return "active_loan";
   if (input.hasOpenApplication) return "in_progress";
   return "ready";
@@ -39,6 +46,9 @@ export function borrowerHomeDescription(mode: BorrowerHomeMode): string {
   }
   if (mode === "in_progress") {
     return "Track your application progress and complete the next required step.";
+  }
+  if (mode === "active_and_applying") {
+    return "You have an active loan and a new application in process. Open either file below.";
   }
   return "Review your outstanding balance, next payment, and loan details.";
 }
@@ -287,4 +297,48 @@ export function nextStepGuidance(input: {
         body: `Current status: ${formatStatusLabel(input.status)}. Open your file for the latest details.`,
       };
   }
+}
+
+/** Formats user-friendly loan product label using standard system terminologies */
+export function formatLoanProductLabel(input: {
+  segment?: string | null;
+  entityType?: string | null;
+  collateralType?: string | null;
+}): string {
+  const seg = input.segment?.toLowerCase();
+  if (seg === "seafarer") {
+    return "Seafarer";
+  }
+
+  const parts: string[] = [];
+
+  if (seg === "sme") {
+    const isCorpo = input.entityType === "corporate";
+    parts.push(
+      isCorpo
+        ? "Corporate (Partnership/Corporation)"
+        : "Individual (Sole Proprietorship)",
+    );
+  }
+
+  const col = input.collateralType?.toLowerCase();
+  if (col === "car_refinancing") {
+    parts.push("Car Refinancing");
+  } else if (col === "real_estate") {
+    parts.push("Real Estate");
+  } else if (seg === "sme" || seg === "individual") {
+    parts.push("Clean (no collateral)");
+  }
+
+  const base =
+    seg === "sme"
+      ? "SME (Small & Medium Enterprise)"
+      : seg === "individual"
+        ? "Individual"
+        : "Loan";
+
+  if (parts.length > 0) {
+    return `${base} — ${parts.join(" · ")}`;
+  }
+  return base;
 }

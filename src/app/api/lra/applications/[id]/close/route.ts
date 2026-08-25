@@ -46,6 +46,22 @@ export async function POST(request: Request, { params }: RouteParams) {
       afterData: { trigger: "close_release", ...result },
     });
 
+    if (result.created) {
+      await writeAuditEvent({
+        actorId: user.id,
+        moduleSlug: "accounting_ar",
+        action: "execute_trigger",
+        entityType: "masterlist",
+        entityId: result.masterlistId,
+        afterData: {
+          trigger: "ar_receive_file",
+          applicationId: id,
+          created: result.created,
+          automatic: true,
+        },
+      });
+    }
+
     return jsonOk(result);
   } catch (error) {
     if (error instanceof z.ZodError) {

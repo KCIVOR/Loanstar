@@ -296,6 +296,7 @@ const PORTAL_NAV_ITEMS: PortalNavItem[] = [
     children: [
       { href: "/ar", label: "Masterlist", exact: true, matchPrefixes: ["/ar/masterlist"] },
       { href: "/ar/dcr", label: "DCRR queue" },
+      { href: "/ar/internal-transfers", label: "Internal transfers" },
       { href: "/ar/history", label: "Posting history" },
       { href: "/ar/rounding-writeoffs", label: "Rounding write-offs" },
     ],

@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 
 import {
+  buildDeductionRows,
   buildFinalComputationRows,
   type ComputationFigures,
 } from "../final-computation-sheet";
@@ -57,4 +58,38 @@ test("covers the full figure set in a stable order", () => {
       "Interest Rate",
     ],
   );
+});
+
+test("buildDeductionRows: one row per deduction entry, no renegotiation", () => {
+  const rows = buildDeductionRows(
+    {
+      otherLoans: [
+        { accountNo: "AN1", amount: 5_000 },
+        { accountNo: "AN2", amount: 3_000 },
+      ],
+    },
+    undefined,
+    false,
+  );
+  assert.deepEqual(rows, [
+    { label: "Other Loan (AN1)", original: "5,000.00", renegotiated: "" },
+    { label: "Other Loan (AN2)", original: "3,000.00", renegotiated: "" },
+  ]);
+});
+
+test("buildDeductionRows: no deductions produces no rows", () => {
+  assert.deepEqual(buildDeductionRows(null, null, false), []);
+});
+
+test("buildDeductionRows: pairs by label across original/renegotiated, blank when absent in one side", () => {
+  const rows = buildDeductionRows(
+    { otherLoans: [{ accountNo: "AN1", amount: 5_000 }] },
+    { otherLoans: [{ accountNo: "AN1", amount: 5_000 }], offsets: [{ accountNo: "AN2", amount: 2_000, months: 1 }] },
+    true,
+  );
+  const byLabel = Object.fromEntries(rows.map((r) => [r.label, r]));
+  assert.equal(byLabel["Other Loan (AN1)"]!.original, "5,000.00");
+  assert.equal(byLabel["Other Loan (AN1)"]!.renegotiated, "5,000.00");
+  assert.equal(byLabel["Offset (AN2 · 1 mo)"]!.original, "0.00");
+  assert.equal(byLabel["Offset (AN2 · 1 mo)"]!.renegotiated, "2,000.00");
 });

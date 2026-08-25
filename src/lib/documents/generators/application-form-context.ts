@@ -17,8 +17,9 @@ export type ResolveApplicationFormSlugResult =
 
 /**
  * Pick the published document_templates slug for an application-form printout.
- * Seafarer always uses the legacy slug. SME requires a valid entity_type —
- * never fall back to the Seafarer template (would print wrong labels).
+ * Seafarer always uses the legacy slug. Individual segment and SME Individual
+ * share application_form_sme_individual. SME Corporate requires entity_type.
+ * Never fall back to the Seafarer template (would print wrong labels).
  */
 export function resolveApplicationFormSlug(input: {
   segment?: string | null;
@@ -32,14 +33,7 @@ export function resolveApplicationFormSlug(input: {
     return { ok: true, slug: "application_form" };
   }
   if (segment === "individual") {
-    // No Individual-segment application-form template exists yet (Phase 4/10
-    // territory) — fail loudly rather than silently printing the Seafarer
-    // template with wrong labels for a personal-loan applicant.
-    return {
-      ok: false,
-      error:
-        "No application form template exists yet for the Individual segment.",
-    };
+    return { ok: true, slug: "application_form_sme_individual" };
   }
   if (input.entityType === "individual") {
     return { ok: true, slug: "application_form_sme_individual" };
@@ -137,14 +131,19 @@ export function buildApplicationFormContext(
 ): Record<string, unknown> {
   const borrower = input.profile;
   const computation = input.computation ?? null;
-  const isSme = input.segment === "sme";
+  const isSme = input.segment === "sme" || input.segment === "individual";
   const biz = borrower.businessInfo ?? {};
   const spouse = biz.spouse ?? {};
   const profileData = borrower.profileData ?? {};
 
   const businessCompanyName = str(biz.companyName);
   const businessNature = str(biz.natureOfBusiness);
-  const businessAddress = str(biz.officeAddress ?? biz.companyAddress);
+  const businessAddress = [
+    str(biz.officeAddress ?? biz.companyAddress),
+    str(biz.officeAddressLine2),
+  ]
+    .filter(Boolean)
+    .join("\n");
 
   const base: Record<string, unknown> = {
     companyName: COMPANY_NAME,
@@ -188,7 +187,9 @@ export function buildApplicationFormContext(
     roaming: str(profileData.roaming),
     facebook: str(profileData.facebook),
     education: str(profileData.education),
-    noOfDependents: String((borrower.dependents ?? []).length || str(profileData.noOfDependents)),
+    noOfDependents:
+      str(profileData.noOfDependents) ||
+      String((borrower.dependents ?? []).length),
 
     dependents: (borrower.dependents ?? []).map((d) => ({
       name: d.name ?? "",
@@ -270,7 +271,7 @@ export function buildApplicationFormContext(
     allotteeCompanyPhone: "",
 
     dateApplied: str(biz.dateApplied) || formatDate(input.applicationCreatedAt ?? null),
-    typeOfLoan: str(profileData.typeOfLoan) || "Business Loan",
+    typeOfLoan: str(profileData.typeOfLoan),
     loanDesired:
       str(profileData.loanDesired) ||
       (computation?.principal != null ? formatMoney(computation.principal) : ""),

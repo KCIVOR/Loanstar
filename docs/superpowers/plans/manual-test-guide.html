@@ -1,0 +1,906 @@
+<title>Offset & Other Loan Fix Checklist</title>
+<style>
+:root {
+  --paper: #faf7f1;
+  --paper-raised: #ffffff;
+  --ink: #1f2a24;
+  --ink-soft: #55625b;
+  --ink-faint: #8b9389;
+  --line: #ddd3c2;
+  --line-soft: #e9e2d3;
+  --accent: #0e6e5d;
+  --accent-ink: #0a4f43;
+  --accent-soft: #e4f0eb;
+  --amber: #8a5c10;
+  --amber-soft: #f6ecd9;
+  --amber-line: #e3d3ac;
+  --good: #1d7a4c;
+  --good-soft: #e5f4ea;
+  --good-line: #c7e3d3;
+  --mono-bg: #f0ebdc;
+  --mono-ink: #453a26;
+  --shadow: 0 1px 2px rgba(31,42,36,0.04), 0 8px 24px -12px rgba(31,42,36,0.12);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper: #14181a;
+    --paper-raised: #1a201f;
+    --ink: #ecebe3;
+    --ink-soft: #aeb4a9;
+    --ink-faint: #77807a;
+    --line: #2c332e;
+    --line-soft: #232a26;
+    --accent: #43c2a1;
+    --accent-ink: #8fe0c9;
+    --accent-soft: #163430;
+    --amber: #e3b368;
+    --amber-soft: #34290f;
+    --amber-line: #4a3c1c;
+    --good: #6fd39a;
+    --good-soft: #163625;
+    --good-line: #234d38;
+    --mono-bg: #20241f;
+    --mono-ink: #d8d0b8;
+    --shadow: 0 1px 2px rgba(0,0,0,0.3), 0 8px 24px -12px rgba(0,0,0,0.5);
+  }
+}
+:root[data-theme="dark"] {
+  --paper: #14181a;
+  --paper-raised: #1a201f;
+  --ink: #ecebe3;
+  --ink-soft: #aeb4a9;
+  --ink-faint: #77807a;
+  --line: #2c332e;
+  --line-soft: #232a26;
+  --accent: #43c2a1;
+  --accent-ink: #8fe0c9;
+  --accent-soft: #163430;
+  --amber: #e3b368;
+  --amber-soft: #34290f;
+  --amber-line: #4a3c1c;
+  --good: #6fd39a;
+  --good-soft: #163625;
+  --good-line: #234d38;
+  --mono-bg: #20241f;
+  --mono-ink: #d8d0b8;
+  --shadow: 0 1px 2px rgba(0,0,0,0.3), 0 8px 24px -12px rgba(0,0,0,0.5);
+}
+
+@import url('https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,450;0,9..144,560;0,9..144,680;1,9..144,500&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap');
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
+  font-size: 16px;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+}
+
+.wrap {
+  max-width: 760px;
+  margin: 0 auto;
+  padding: 64px 24px 96px;
+}
+
+h1, h2, h3 {
+  font-family: "Fraunces", Georgia, serif;
+  font-weight: 560;
+  letter-spacing: -0.01em;
+  text-wrap: balance;
+  color: var(--ink);
+}
+
+.eyebrow {
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 12.5px;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--accent-ink);
+  font-weight: 500;
+}
+
+header.masthead {
+  margin-bottom: 40px;
+}
+header.masthead .eyebrow { margin-bottom: 14px; display: block; }
+header.masthead h1 {
+  font-size: clamp(32px, 5vw, 44px);
+  line-height: 1.08;
+  margin: 0 0 18px;
+}
+header.masthead p.lede {
+  font-size: 17.5px;
+  color: var(--ink-soft);
+  max-width: 58ch;
+  margin: 0;
+}
+
+.intro-card {
+  margin-top: 32px;
+  background: var(--paper-raised);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 22px 24px;
+  box-shadow: var(--shadow);
+}
+.intro-card h2 {
+  font-size: 15px;
+  font-family: "IBM Plex Sans", sans-serif;
+  font-weight: 600;
+  margin: 0 0 12px;
+  color: var(--ink);
+}
+.intro-card ul {
+  margin: 0;
+  padding-left: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.intro-card li {
+  font-size: 15px;
+  color: var(--ink-soft);
+  display: flex;
+  gap: 10px;
+  align-items: baseline;
+}
+.intro-card li .num {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 12.5px;
+  color: var(--ink-faint);
+  min-width: 1.4em;
+}
+.intro-card li a {
+  color: var(--ink);
+  text-decoration: none;
+  border-bottom: 1px solid var(--line);
+}
+.intro-card li a:hover { border-color: var(--accent); color: var(--accent-ink); }
+.intro-card .tag {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 11px;
+  padding: 2px 7px;
+  border-radius: 999px;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+}
+.tag.can { background: var(--accent-soft); color: var(--accent-ink); }
+.tag.done { background: var(--amber-soft); color: var(--amber); }
+
+section.test {
+  margin-top: 56px;
+  scroll-margin-top: 24px;
+}
+
+.test-card {
+  background: var(--paper-raised);
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  padding: 32px 32px 30px;
+  box-shadow: var(--shadow);
+}
+
+.test-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 6px;
+}
+.test-head .eyebrow { margin-bottom: 8px; }
+.test-card h2 {
+  font-size: 24px;
+  margin: 0;
+  line-height: 1.2;
+}
+
+.status-pill {
+  flex: none;
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 11.5px;
+  font-weight: 500;
+  letter-spacing: 0.03em;
+  padding: 5px 11px;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  white-space: nowrap;
+  margin-top: 2px;
+}
+.status-pill.can {
+  background: var(--accent-soft);
+  color: var(--accent-ink);
+  border-color: color-mix(in srgb, var(--accent) 30%, transparent);
+}
+.status-pill.verified {
+  background: var(--amber-soft);
+  color: var(--amber);
+  border-color: var(--amber-line);
+}
+
+.plain {
+  font-size: 16px;
+  color: var(--ink-soft);
+  margin: 14px 0 26px;
+  max-width: 62ch;
+}
+.plain strong { color: var(--ink); font-weight: 600; }
+
+.steps {
+  margin: 0 0 22px;
+  padding: 0;
+  list-style: none;
+  counter-reset: step;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.steps li {
+  counter-increment: step;
+  display: grid;
+  grid-template-columns: 28px 1fr;
+  gap: 12px;
+  font-size: 15.5px;
+  color: var(--ink);
+}
+.steps li::before {
+  content: counter(step);
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 13px;
+  font-weight: 500;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: var(--accent-soft);
+  color: var(--accent-ink);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+}
+.steps li .field {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 0.92em;
+  background: var(--mono-bg);
+  color: var(--mono-ink);
+  padding: 1px 6px;
+  border-radius: 5px;
+}
+
+.result-box {
+  background: var(--good-soft);
+  border: 1px solid var(--good-line);
+  border-radius: 10px;
+  padding: 16px 18px;
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  margin-top: 4px;
+}
+.result-box .mark {
+  flex: none;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--good);
+  color: var(--paper-raised);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  margin-top: 1px;
+}
+.result-box .body b {
+  display: block;
+  font-size: 12.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--good);
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+.result-box .body p {
+  margin: 0;
+  font-size: 15px;
+  color: var(--ink);
+}
+
+.note-box {
+  background: var(--amber-soft);
+  border: 1px solid var(--amber-line);
+  border-radius: 10px;
+  padding: 18px 20px;
+  margin-top: 4px;
+}
+.note-box b {
+  display: block;
+  font-size: 12.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--amber);
+  font-weight: 600;
+  margin-bottom: 6px;
+}
+.note-box p {
+  margin: 0 0 10px;
+  font-size: 15px;
+  color: var(--ink);
+}
+.note-box p:last-child { margin-bottom: 0; }
+
+.divider {
+  border: none;
+  border-top: 1px solid var(--line-soft);
+  margin: 26px 0 22px;
+}
+
+.sub-label {
+  font-size: 12.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--ink-faint);
+  font-weight: 600;
+  margin: 0 0 12px;
+}
+
+footer.close {
+  margin-top: 64px;
+  padding-top: 28px;
+  border-top: 1px solid var(--line);
+}
+footer.close p {
+  font-size: 15px;
+  color: var(--ink-soft);
+  max-width: 58ch;
+  margin: 0 0 6px;
+}
+footer.close .eyebrow { display: block; margin-bottom: 10px; }
+
+@media (max-width: 560px) {
+  .wrap { padding: 44px 16px 72px; }
+  .test-card { padding: 24px 20px 22px; }
+  .test-head { flex-direction: column; }
+}
+
+.part-divider {
+  margin-top: 72px;
+  padding-top: 40px;
+  border-top: 1px solid var(--line);
+}
+.part-divider h2 {
+  font-size: clamp(26px, 4vw, 34px);
+  line-height: 1.12;
+  margin: 10px 0 14px;
+}
+.part-divider p.lede {
+  font-size: 16.5px;
+  color: var(--ink-soft);
+  max-width: 60ch;
+  margin: 0;
+}
+</style>
+
+<div class="wrap">
+
+<header class="masthead">
+  <span class="eyebrow">Loanstar · AR &amp; LRA Money-Movement Fixes</span>
+  <h1>Checking the Offset, Other Loan &amp; PDC fixes</h1>
+  <p class="lede">Six problems were found and fixed across how "Offset"/"Other Loan" deductions move money between accounts, and how the PDC check schedule gets its start date during release. This is a plain-language walkthrough so you can see each fix for yourself — no technical background needed.</p>
+</header>
+
+<div class="intro-card">
+  <h2>What's in this checklist</h2>
+  <ul>
+    <li><span class="num">1</span> <a href="#test-1">A confirm that hiccups shouldn't be able to double-charge an account</a> <span class="tag done">already verified</span></li>
+    <li><span class="num">2</span> <a href="#test-2">Two confirms happening at once shouldn't lose one of them</a> <span class="tag done">already verified</span></li>
+    <li><span class="num">3</span> <a href="#test-3">Confirming a deduction that would do nothing now says so</a> <span class="tag can">you can test this</span></li>
+    <li><span class="num">4</span> <a href="#test-4">Past transfers now have a history you can look up</a> <span class="tag can">you can test this</span></li>
+    <li><span class="num">5</span> <a href="#test-5">The same loan account can no longer be picked twice</a> <span class="tag can">you can test this</span></li>
+    <li><span class="num">6</span> <a href="#test-6">PDC's first check date now locks to the computed date</a> <span class="tag can">you can test this</span></li>
+  </ul>
+</div>
+
+<section class="test" id="test-1">
+  <div class="test-card">
+    <div class="test-head">
+      <div>
+        <span class="eyebrow">Test 1 of 5</span>
+        <h2>A confirm that hiccups shouldn't double-charge</h2>
+      </div>
+      <span class="status-pill verified">Already verified</span>
+    </div>
+    <p class="plain">
+      If AR's connection dropped at the exact wrong moment while confirming an Offset or Other Loan deduction, it used to be possible for that deduction to accidentally get applied <strong>twice</strong> — taking too much money off the target loan. We changed how a confirm is saved so it either fully happens once, or doesn't happen at all. There's no longer a way for it to land twice.
+    </p>
+    <div class="note-box">
+      <b>Why you can't click-test this one</b>
+      <p>This only shows up during an actual connection hiccup at the exact wrong instant — not something that can be triggered from the screen. I tested it directly against the system's records instead: confirmed a transfer, then deliberately tried to confirm it a second time to imitate a hiccup-and-retry.</p>
+      <p><strong>What I found:</strong> the second attempt was refused outright, and the account's balance, the loan's payment record, and the transfer's own status all showed exactly one confirm had happened — never two.</p>
+    </div>
+    <hr class="divider" />
+    <p class="sub-label">Optional sanity check for you</p>
+    <ul class="steps">
+      <li>Confirm any normal, healthy pending Offset or Other Loan transfer in <span class="field">AR &gt; Internal transfers</span> as you normally would.</li>
+    </ul>
+    <div class="result-box">
+      <div class="mark">✓</div>
+      <div class="body">
+        <b>What you should see</b>
+        <p>It posts normally — the target account's balance goes down by exactly the transfer amount, once. This confirms the fix didn't change anything about how a normal confirm behaves.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="test" id="test-2">
+  <div class="test-card">
+    <div class="test-head">
+      <div>
+        <span class="eyebrow">Test 2 of 5</span>
+        <h2>Two confirms at once shouldn't lose one</h2>
+      </div>
+      <span class="status-pill verified">Already verified</span>
+    </div>
+    <p class="plain">
+      If two different Offset/Other Loan transfers pointed at the <strong>same</strong> loan account and got confirmed within the same split second — say, two AR staff working at once — one of the two balance reductions used to be able to silently vanish, leaving the account under-reduced with no error. We changed how the system saves a balance update so two confirms in quick succession line up one after another instead of colliding.
+    </p>
+    <div class="note-box">
+      <b>Why you can't click-test this one</b>
+      <p>It needs two confirms landing at almost the exact same millisecond, which isn't realistic to reproduce by hand. I tested it directly instead: fired two different transfers at the same target account at the same time.</p>
+      <p><strong>What I found:</strong> both reductions came through correctly — nothing was lost, and the account's final balance reflected both transfers, not just one.</p>
+    </div>
+  </div>
+</section>
+
+<section class="test" id="test-3">
+  <div class="test-card">
+    <div class="test-head">
+      <div>
+        <span class="eyebrow">Test 3 of 5</span>
+        <h2>Confirming a "does-nothing" deduction now says so</h2>
+      </div>
+      <span class="status-pill can">You can test this</span>
+    </div>
+    <p class="plain">
+      If the target loan of a pending deduction got fully paid off through some <strong>other</strong> route before AR got around to confirming it — a real payment, a write-off, another transfer — confirming it used to say "Posted" as if it worked, while actually doing nothing at all. Now it refuses and tells AR plainly that the account is already settled, so they know to reject it instead.
+    </p>
+    <hr class="divider" />
+    <p class="sub-label">Steps (use a test loan, not a real client's)</p>
+    <ol class="steps">
+      <li>Set up a loan with an Offset or Other Loan deduction pointing at a second, existing loan account. Release it so the deduction lands as <span class="field">pending</span> in <span class="field">AR &gt; Internal transfers</span>.</li>
+      <li>Before confirming that pending transfer, fully pay off the <em>target</em> loan account through a normal payment (or a different transfer) so its balance reaches zero.</li>
+      <li>Now go back to <span class="field">AR &gt; Internal transfers</span> and click <span class="field">Confirm</span> on the original pending deduction.</li>
+    </ol>
+    <div class="result-box">
+      <div class="mark">✓</div>
+      <div class="body">
+        <b>What you should see</b>
+        <p>Instead of "Posted," you'll see an error explaining the target account already has no balance left and that this transfer should be rejected instead. The account's balance won't move, and the transfer stays in the pending list so it can be rejected with a reason.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="test" id="test-4">
+  <div class="test-card">
+    <div class="test-head">
+      <div>
+        <span class="eyebrow">Test 4 of 5</span>
+        <h2>Past transfers now have a history</h2>
+      </div>
+      <span class="status-pill can">You can test this</span>
+    </div>
+    <p class="plain">
+      Once AR confirmed or rejected an Offset/Other Loan transfer, it used to disappear with nowhere to look at it again — a rejected one especially, since the reason it was rejected wasn't shown anywhere. There's now a proper history tab for it.
+    </p>
+    <hr class="divider" />
+    <p class="sub-label">Steps</p>
+    <ol class="steps">
+      <li>Go to <span class="field">AR &gt; Posting History</span>.</li>
+      <li>Click the new <span class="field">Internal transfers</span> tab at the top.</li>
+    </ol>
+    <div class="result-box">
+      <div class="mark">✓</div>
+      <div class="body">
+        <b>What you should see</b>
+        <p>A list of every past confirmed and rejected Offset/Other Loan transfer, with the account, the amount, whether it was Posted or Rejected, who resolved it, when, and — for a rejected one — the reason given. You can also search, filter, and sort it, the same way the other history tabs on that page work.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="test" id="test-5">
+  <div class="test-card">
+    <div class="test-head">
+      <div>
+        <span class="eyebrow">Test 5 of 6</span>
+        <h2>The same account can't be picked twice</h2>
+      </div>
+      <span class="status-pill can">You can test this</span>
+    </div>
+    <p class="plain">
+      The computation screen already stopped CSA/Committee from picking the same loan account twice within Other Loan rows, or twice within Offset entries — that part isn't new. What changed is that the same rule is now also enforced behind the scenes, so it can't be gotten around by anything other than the normal screen.
+    </p>
+    <hr class="divider" />
+    <p class="sub-label">Steps</p>
+    <ol class="steps">
+      <li>Open a computation with Other Loan deductions (CSA new application, or Committee's override).</li>
+      <li>Add an Other Loan row and pick a target account.</li>
+      <li>Add a second Other Loan row and open its account dropdown.</li>
+    </ol>
+    <div class="result-box">
+      <div class="mark">✓</div>
+      <div class="body">
+        <b>What you should see</b>
+        <p>The account you already picked in the first row is no longer offered in the second row's list — there's nothing to click that would create a duplicate, which is the visible proof both the screen and the system now agree on this rule.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="test" id="test-6">
+  <div class="test-card">
+    <div class="test-head">
+      <div>
+        <span class="eyebrow">Test 6 of 6</span>
+        <h2>PDC's first check date now locks to the computed date</h2>
+      </div>
+      <span class="status-pill can">You can test this</span>
+    </div>
+    <p class="plain">
+      This one's from a separate but related check: when a loan is released and the physical post-dated checks (PDC) get set up, the very first check's date used to be a blank box someone had to type into by hand — completely disconnected from the payment start date the system had already calculated. Now it works the same way the box right next to it ("Monthly amount") always has: filled in automatically, and locked so it can't be changed.
+    </p>
+    <hr class="divider" />
+    <p class="sub-label">Steps</p>
+    <ol class="steps">
+      <li>Open a released (or ready-to-release) application's <span class="field">LRA</span> workspace, on the "With PDC" path.</li>
+      <li>Scroll to the PDC section where checks are set up.</li>
+      <li>Look at the <span class="field">First check date</span> box, right next to <span class="field">Monthly amount</span>.</li>
+    </ol>
+    <div class="result-box">
+      <div class="mark">✓</div>
+      <div class="body">
+        <b>What you should see</b>
+        <p>The box already has a date in it — greyed out, same as "Monthly amount" next to it — and clicking or typing into it does nothing. If you check that application's BLRI document, the "PAYMENT STARTS" date printed there should match exactly.</p>
+      </div>
+    </div>
+    <hr class="divider" />
+    <p class="sub-label">The part you can't accidentally break anymore</p>
+    <p class="plain">
+      Since the box is locked, there's no click-path left to test "what if the date is wrong" — that's the point, it can't happen from the screen anymore. I tested the hidden safety net directly instead: built a real loan record, then tried submitting a PDC schedule with dates that didn't match the computed one.
+    </p>
+    <div class="note-box">
+      <b>What I found</b>
+      <p>It was rejected outright, with a message naming exactly which date it expected. The same submission with the correct dates saved normally. So even a request that skipped the screen entirely would still be caught.</p>
+    </div>
+  </div>
+</section>
+
+<div class="part-divider">
+  <span class="eyebrow">Loanstar · CSA &amp; Committee Computation</span>
+  <h2>Checking the SME &amp; Individual calculator changes</h2>
+  <p class="lede">Business (SME) and individual loans used to be computed against one fixed generic rate — the calculator had no way to enter what a specific borrower actually negotiated. Now Interest, Processing Fee, Admin Fee, and Chattel Mortgage Fee (CMF) are typed in directly, Committee remembers what was already entered instead of quietly resetting it, and a returning borrower's last rate shows up as a starting point. Seafarer's calculator is untouched throughout.</p>
+</div>
+
+<div class="intro-card">
+  <h2>What's in this part</h2>
+  <ul>
+    <li><span class="num">1</span> <a href="#test-7">SME's rate is now typed in, not fixed</a> <span class="tag can">you can test this</span></li>
+    <li><span class="num">2</span> <a href="#test-8">Individual loans get the same fields, with Admin/CMF optional</a> <span class="tag can">you can test this</span></li>
+    <li><span class="num">3</span> <a href="#test-9">Committee's override no longer resets rates it didn't touch</a> <span class="tag can">you can test this</span></li>
+    <li><span class="num">4</span> <a href="#test-10">A returning borrower's last rate shows up as a starting point</a> <span class="tag can">you can test this</span></li>
+    <li><span class="num">5</span> <a href="#test-11">SME's first payment date now counts differently than Seafarer's</a> <span class="tag can">you can test this</span></li>
+  </ul>
+</div>
+
+<section class="test" id="test-7">
+  <div class="test-card">
+    <div class="test-head">
+      <div>
+        <span class="eyebrow">SME Test 1 of 5</span>
+        <h2>SME's rate is now typed in, not fixed</h2>
+      </div>
+      <span class="status-pill can">You can test this</span>
+    </div>
+    <p class="plain">
+      Before, every business (SME) loan used the same generic rate — 3% interest, 8% processing fee — no matter which account it was actually for, because there was only ever one SME product to pick from. Now the computation screen has four boxes you type directly into: <strong>Interest</strong>, <strong>Processing fee</strong>, <strong>Admin fee</strong>, and <strong>Chattel mortgage fee (CMF)</strong> — so whatever was actually negotiated for that borrower is what gets used.
+    </p>
+    <hr class="divider" />
+    <p class="sub-label">Steps</p>
+    <ol class="steps">
+      <li>Open a business/SME application in <span class="field">CSA</span> and go to its computation screen.</li>
+      <li>Type in a rate that's clearly different from the old generic one — e.g. <span class="field">Interest: 2.5</span>, <span class="field">Processing fee: 7</span>, <span class="field">Admin fee: 1</span>, <span class="field">CMF: 0</span>.</li>
+      <li>Fill in the amount and terms as normal, then compute.</li>
+    </ol>
+    <div class="result-box">
+      <div class="mark">✓</div>
+      <div class="body">
+        <b>What you should see</b>
+        <p>The computed numbers reflect the rates you typed — not 3%/8%. The <span class="field">Loan type</span> dropdown above it still exists (it just labels the loan for documents now), but changing your typed rate is what actually changes the math.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="test" id="test-8">
+  <div class="test-card">
+    <div class="test-head">
+      <div>
+        <span class="eyebrow">SME Test 2 of 5</span>
+        <h2>Individual loans get the same fields — Admin/CMF optional</h2>
+      </div>
+      <span class="status-pill can">You can test this</span>
+    </div>
+    <p class="plain">
+      Individual loans (the ones where a person applies alone, not a company) use the same calculator as SME. Most individual loans don't carry an admin fee or a chattel mortgage fee, so those two boxes start at zero and don't need to be filled in — but they're still there and still editable for the rare case that needs them.
+    </p>
+    <hr class="divider" />
+    <p class="sub-label">Steps</p>
+    <ol class="steps">
+      <li>Open an individual application in <span class="field">CSA</span> and go to its computation screen.</li>
+      <li>Look at the four rate boxes — <span class="field">Interest</span>, <span class="field">Processing fee</span>, <span class="field">Admin fee</span>, <span class="field">CMF</span>.</li>
+      <li>Fill in only Interest and Processing fee, leave Admin fee and CMF at 0, and compute.</li>
+    </ol>
+    <div class="result-box">
+      <div class="mark">✓</div>
+      <div class="body">
+        <b>What you should see</b>
+        <p>It computes normally without asking you to fill in Admin fee or CMF — no red required-field warning on those two. The computation still goes through using just Interest and Processing fee.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="test" id="test-9">
+  <div class="test-card">
+    <div class="test-head">
+      <div>
+        <span class="eyebrow">SME Test 3 of 5</span>
+        <h2>Committee's override no longer resets rates it didn't touch</h2>
+      </div>
+      <span class="status-pill can">You can test this</span>
+    </div>
+    <p class="plain">
+      Before, if Committee only wanted to adjust the loan amount and left the rate boxes alone, the rates CSA had typed in used to silently get wiped back to the old generic 3%/8% behind the scenes — even though nothing on screen looked wrong. Now, leaving a rate box untouched keeps whatever was already there.
+    </p>
+    <hr class="divider" />
+    <p class="sub-label">Steps</p>
+    <ol class="steps">
+      <li>Using the SME application from Test 1 (with your custom rates already on it), open it in <span class="field">Committee</span>.</li>
+      <li>Change only the <span class="field">Amount</span> field — leave Interest/Processing fee/Admin fee/CMF exactly as they are.</li>
+      <li>Submit the override.</li>
+    </ol>
+    <div class="result-box">
+      <div class="mark">✓</div>
+      <div class="body">
+        <b>What you should see</b>
+        <p>The rates stay exactly what CSA typed (2.5%/7%/1%/0% from Test 1) — only the amount changed. Then try it the other way: change one of the rate boxes too, submit again, and confirm that new rate is what actually takes effect this time.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="test" id="test-10">
+  <div class="test-card">
+    <div class="test-head">
+      <div>
+        <span class="eyebrow">SME Test 4 of 5</span>
+        <h2>A returning borrower's last rate shows up as a starting point</h2>
+      </div>
+      <span class="status-pill can">You can test this</span>
+    </div>
+    <p class="plain">
+      When a borrower who's had an SME or individual loan before applies again, the four rate boxes now pre-fill with whatever rate was used on their last loan — just as a convenient starting point, not a locked value. It's shown alongside as a small reference list too, so you can see their history at a glance.
+    </p>
+    <hr class="divider" />
+    <p class="sub-label">Steps</p>
+    <ol class="steps">
+      <li>Pick a borrower who already has at least one prior SME (or individual) loan computed in the system — or use the borrower from Test 1.</li>
+      <li>Start a brand-new application for that same borrower, same segment, and open its computation screen before computing anything.</li>
+    </ol>
+    <div class="result-box">
+      <div class="mark">✓</div>
+      <div class="body">
+        <b>What you should see</b>
+        <p>A small <span class="field">Previous rates for this borrower</span> box listing their past loan(s) and what rate each used. The four rate boxes above it are already filled in with the most recent one — but you can still change them freely before computing.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="test" id="test-11">
+  <div class="test-card">
+    <div class="test-head">
+      <div>
+        <span class="eyebrow">SME Test 5 of 5</span>
+        <h2>SME's first payment date now counts differently than Seafarer's</h2>
+      </div>
+      <span class="status-pill can">You can test this</span>
+    </div>
+    <p class="plain">
+      Seafarer loans count the first payment using a cutoff rule tied to the 22nd of the month. Business (SME) loans don't work that way — their first payment is simply <strong>one month after release, on the same day of the month</strong>. SME computations used to borrow Seafarer's rule by mistake; now they use their own.
+    </p>
+    <hr class="divider" />
+    <p class="sub-label">Steps</p>
+    <ol class="steps">
+      <li>Compute an SME loan with a known release date — e.g. release date <span class="field">August 24</span>.</li>
+      <li>Look at the <span class="field">First payment date</span> line in the results panel.</li>
+    </ol>
+    <div class="result-box">
+      <div class="mark">✓</div>
+      <div class="body">
+        <b>What you should see</b>
+        <p>For an August 24 release, the first payment date reads <span class="field">September 24</span> — exactly one month later, same day. Do the same for a Seafarer or individual loan with the same release date, and its first payment date should be unchanged from before (still following the 22nd-cutoff rule).</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<div class="part-divider">
+  <span class="eyebrow">Loanstar · Individual Loans (MPL &amp; Salary)</span>
+  <h2>Checking the MPL &amp; Salary payment schedule</h2>
+  <p class="lede">Individual loans used to have no way to tell an MPL loan apart from a Salary loan — both were computed the same generic way. Now you pick which one it is when the application is created, and each gets the payment schedule it's actually supposed to have: MPL pays once a month like SME; Salary pays twice a month, on the 15th and the last day. This reaches all the way through to the PDC checks and the real collection schedule, not just the computation screen.</p>
+</div>
+
+<div class="intro-card">
+  <h2>What's in this part</h2>
+  <ul>
+    <li><span class="num">1</span> <a href="#test-12">Individual applications now ask MPL or Salary</a> <span class="tag can">you can test this</span></li>
+    <li><span class="num">2</span> <a href="#test-13">MPL's first payment date — same rule as SME</a> <span class="tag can">you can test this</span></li>
+    <li><span class="num">3</span> <a href="#test-14">Salary's first payment lands on the 15th or the end of the month</a> <span class="tag can">you can test this</span></li>
+    <li><span class="num">4</span> <a href="#test-15">Salary's PDC schedule has 12 checks, not 6</a> <span class="tag can">you can test this</span></li>
+    <li><span class="num">5</span> <a href="#test-16">The real collection schedule matches the PDC checks exactly</a> <span class="tag done">already verified</span></li>
+  </ul>
+</div>
+
+<section class="test" id="test-12">
+  <div class="test-card">
+    <div class="test-head">
+      <div>
+        <span class="eyebrow">MPL/Salary Test 1 of 5</span>
+        <h2>Individual applications now ask MPL or Salary</h2>
+      </div>
+      <span class="status-pill can">You can test this</span>
+    </div>
+    <p class="plain">
+      Before, starting an individual application (no collateral) didn't ask anything about what <em>kind</em> of individual loan it was — MPL and Salary borrowers were treated identically. Now there's a required choice right after picking "Clean (no collateral)."
+    </p>
+    <hr class="divider" />
+    <p class="sub-label">Steps</p>
+    <ol class="steps">
+      <li>Go to <span class="field">CSA &gt; Create application</span>.</li>
+      <li>Set <span class="field">Loan segment</span> to <span class="field">Individual</span>.</li>
+      <li>Set <span class="field">Collateral</span> to <span class="field">Clean (no collateral)</span>.</li>
+    </ol>
+    <div class="result-box">
+      <div class="mark">✓</div>
+      <div class="body">
+        <b>What you should see</b>
+        <p>A new required box appears — <span class="field">Individual loan type</span> — with two choices: <span class="field">MPL</span> and <span class="field">Salary</span>. Try submitting without picking one; it should refuse to save until you do. Picking "Car Refinancing" or "Real Estate" instead makes this box disappear again — it's only for clean/no-collateral loans.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="test" id="test-13">
+  <div class="test-card">
+    <div class="test-head">
+      <div>
+        <span class="eyebrow">MPL/Salary Test 2 of 5</span>
+        <h2>MPL's first payment date — same rule as SME</h2>
+      </div>
+      <span class="status-pill can">You can test this</span>
+    </div>
+    <p class="plain">
+      MPL pays once a month, starting exactly one month after release, on the same day of the month — identical to how business (SME) loans already work.
+    </p>
+    <hr class="divider" />
+    <p class="sub-label">Steps</p>
+    <ol class="steps">
+      <li>Create (or open) an individual application with <span class="field">Individual loan type: MPL</span>.</li>
+      <li>Compute it with a release date of <span class="field">August 24</span>.</li>
+      <li>Look at the <span class="field">First payment date</span> line in the results panel.</li>
+    </ol>
+    <div class="result-box">
+      <div class="mark">✓</div>
+      <div class="body">
+        <b>What you should see</b>
+        <p>The first payment date reads <span class="field">September 24</span> — exactly one month later, same day. No twice-a-month split for MPL.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="test" id="test-14">
+  <div class="test-card">
+    <div class="test-head">
+      <div>
+        <span class="eyebrow">MPL/Salary Test 3 of 5</span>
+        <h2>Salary's first payment lands on the 15th or the end of the month</h2>
+      </div>
+      <span class="status-pill can">You can test this</span>
+    </div>
+    <p class="plain">
+      Salary loans pay twice a month — the 15th and the last day ("kinsenas-katapusan"). The very first payment is whichever of those two dates comes next after release.
+    </p>
+    <hr class="divider" />
+    <p class="sub-label">Steps</p>
+    <ol class="steps">
+      <li>Create (or open) an individual application with <span class="field">Individual loan type: Salary</span>.</li>
+      <li>Compute it with a release date of <span class="field">August 24</span> (after the 15th).</li>
+      <li>Look at the <span class="field">First payment date</span> line, then try again with a release date of <span class="field">August 10</span> (before the 15th).</li>
+    </ol>
+    <div class="result-box">
+      <div class="mark">✓</div>
+      <div class="body">
+        <b>What you should see</b>
+        <p>Released Aug 24 (past the 15th) → first payment <span class="field">August 31</span> (end of month, the next date available). Released Aug 10 (before the 15th) → first payment <span class="field">August 15</span> instead.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="test" id="test-15">
+  <div class="test-card">
+    <div class="test-head">
+      <div>
+        <span class="eyebrow">MPL/Salary Test 4 of 5</span>
+        <h2>Salary's PDC schedule has 12 checks, not 6</h2>
+      </div>
+      <span class="status-pill can">You can test this</span>
+    </div>
+    <p class="plain">
+      Since Salary pays twice a month, a 6-term loan needs 12 actual post-dated checks, not 6 — each for half the usual monthly amount, alternating between the 15th and the end of the month.
+    </p>
+    <hr class="divider" />
+    <p class="sub-label">Steps</p>
+    <ol class="steps">
+      <li>Take the Salary application from Test 3 through to <span class="field">LRA</span>'s PDC encoding step (with 6 terms).</li>
+      <li>Click <span class="field">Build schedule</span>.</li>
+    </ol>
+    <div class="result-box">
+      <div class="mark">✓</div>
+      <div class="body">
+        <b>What you should see</b>
+        <p><span class="field">12</span> rows, not 6 — dates alternating between a 15th and an end-of-month, each about two weeks apart. Each amount is roughly half the "Monthly amount" shown above, except the very last one, which may be a centavo or two different — that's the schedule correcting for rounding so the 12 checks add up to exactly the right total.</p>
+      </div>
+    </div>
+    <hr class="divider" />
+    <p class="sub-label">The part that's locked behind the scenes</p>
+    <p class="plain">
+      Just like SME's PDC lock, you can't submit a Salary schedule with the wrong count, wrong dates, or wrong amounts — the system checks it and refuses, naming exactly what it expected. I tested this directly: a schedule with 10 checks instead of 12, and one with a check dated years off, were both rejected outright with the correct expected value named in the error.
+    </p>
+  </div>
+</section>
+
+<section class="test" id="test-16">
+  <div class="test-card">
+    <div class="test-head">
+      <div>
+        <span class="eyebrow">MPL/Salary Test 5 of 5</span>
+        <h2>The real collection schedule matches the PDC checks exactly</h2>
+      </div>
+      <span class="status-pill verified">Already verified</span>
+    </div>
+    <p class="plain">
+      Beyond the PDC screen, there's a separate, real record AR uses to track when each payment is due and to calculate late penalties. Before this fix, this record could quietly disagree with the PDC schedule for anything other than a Seafarer loan — a real, already-live bug unrelated to MPL/Salary that got fixed along the way.
+    </p>
+    <div class="note-box">
+      <b>Why you can't click-test this one directly</b>
+      <p>Seeing it requires taking a loan all the way through release into AR's records — not something to do casually on a shared system. I tested it directly instead: built a real Salary loan end-to-end and compared its PDC schedule against AR's own collection record.</p>
+      <p><strong>What I found:</strong> both showed the exact same 12 dates and amounts, down to the centavo — no disagreement between what the borrower signs for and what AR actually collects against.</p>
+    </div>
+  </div>
+</section>
+
+<footer class="close">
+  <span class="eyebrow">One more thing</span>
+  <p>If anything you see doesn't match what's described here — a different message, a missing tab, anything at all — that's worth flagging. Tell me exactly what you saw and I'll dig into it.</p>
+</footer>
+
+</div>

@@ -2,17 +2,30 @@ import { handleApiError, jsonOk } from "@/lib/api/handler";
 import { requireModulePermission } from "@/lib/permissions/server";
 import { createClient } from "@/lib/supabase/server";
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
     await requireModulePermission("intake", "view");
     const supabase = await createClient();
 
-    const { data, error } = await supabase
+    const { searchParams } = new URL(request.url);
+    const segmentParam = searchParams.get("segment");
+    const segment =
+      segmentParam === "sme" ||
+      segmentParam === "individual" ||
+      segmentParam === "seafarer"
+        ? segmentParam
+        : null;
+
+    let query = supabase
       .from("loan_types")
       .select(
         "id, name, interest_rate, pf_rate, effective_from, effective_to",
       )
-      .eq("is_active", true)
+      .eq("is_active", true);
+    if (segment) {
+      query = query.eq("segment", segment);
+    }
+    const { data, error } = await query
       .order("name")
       .order("effective_from", { ascending: false });
 

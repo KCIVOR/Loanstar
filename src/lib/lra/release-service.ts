@@ -1,7 +1,12 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { ValidationError } from "@/lib/api/errors";
+import { writeAuditEvent } from "@/lib/audit/writer";
+import { initializeArAccount } from "@/lib/ar/masterlist";
 import { mapBorrowerRow, type BorrowerRow } from "@/lib/borrowers/types";
+import { extractDeductionTargets } from "@/lib/computation/deduction-breakdown";
+import { halfUp } from "@/lib/computation/money";
+import { addScheduleMonths, advanceSemiMonthly } from "@/lib/computation/release-date";
 import { getActiveComputation } from "@/lib/csa/computation";
 import { ensureDocumentSlots } from "@/lib/documents/checklist";
 import { hashPdf, renderTemplateToPdf } from "@/lib/documents/render";
@@ -230,9 +235,22 @@ export async function savePdcChecks(
     throw new Error("No active computation found for this application");
   }
 
-  if (checks.length !== computation.terms) {
+  if (!computation.firstPaymentDate) {
     throw new ValidationError(
-      `Number of checks must equal the loan term (${computation.terms})`,
+      "This application's computation has no payment start date recorded — recompute it before saving PDC checks.",
+    );
+  }
+
+  // Salary loans (semi-monthly) need terms*2 checks, each half the monthly
+  // amortization (last one absorbing rounding against totalLoan), on
+  // alternating 15th/end-of-month dates. Every other cadence (Seafarer, SME,
+  // MPL) is unchanged: `terms` checks, flat monthlyAmortization, addScheduleMonths.
+  const isSemiMonthly = computation.paymentFrequency === "semi_monthly";
+  const expectedCount = isSemiMonthly ? computation.terms * 2 : computation.terms;
+
+  if (checks.length !== expectedCount) {
+    throw new ValidationError(
+      `Number of checks must equal ${isSemiMonthly ? "twice the loan term" : "the loan term"} (${expectedCount})`,
     );
   }
 
@@ -248,13 +266,47 @@ export async function savePdcChecks(
     return { ...row, checkNumber, bankName };
   });
 
-  for (const row of normalizedChecks) {
-    if (row.amount !== computation.monthlyAmortization) {
-      throw new ValidationError(
-        `Check amount must equal the monthly amortization (₱${computation.monthlyAmortization})`,
-      );
+  const halfAmortization = halfUp(computation.monthlyAmortization / 2);
+  const lastSemiMonthlyAmount = halfUp(
+    computation.totalLoan - halfUp(halfAmortization * (expectedCount - 1)),
+  );
+
+  if (isSemiMonthly) {
+    normalizedChecks.forEach((row, index) => {
+      const expectedAmount =
+        index === expectedCount - 1
+          ? lastSemiMonthlyAmount > 0
+            ? lastSemiMonthlyAmount
+            : halfAmortization
+          : halfAmortization;
+      if (row.amount !== expectedAmount) {
+        throw new ValidationError(
+          `Check amount must equal ₱${expectedAmount} for PDC #${index + 1}`,
+        );
+      }
+    });
+  } else {
+    // Unchanged monthly-cadence path — exact same check and message as before
+    // this plan (Seafarer/SME/MPL).
+    for (const row of normalizedChecks) {
+      if (row.amount !== computation.monthlyAmortization) {
+        throw new ValidationError(
+          `Check amount must equal the monthly amortization (₱${computation.monthlyAmortization})`,
+        );
+      }
     }
   }
+
+  normalizedChecks.forEach((row, index) => {
+    const expectedDate = isSemiMonthly
+      ? advanceSemiMonthly(computation.firstPaymentDate!, index)
+      : addScheduleMonths(computation.firstPaymentDate!, index);
+    if (row.checkDate !== expectedDate) {
+      throw new ValidationError(
+        `PDC #${index + 1} date must be ${expectedDate} (got ${row.checkDate}) — dates must follow the computed payment schedule`,
+      );
+    }
+  });
 
   await supabase.from("pdc_checks").delete().eq("release_file_id", releaseFileId);
 
@@ -954,6 +1006,83 @@ export async function recordRelease(
   return { status: "released" as const };
 }
 
+/**
+ * Creates a pending `internal_transfers` row for every Other Loan/Offset
+ * deduction on the released loan that names a target account — the actual
+ * balance reduction happens later when AR reviews and confirms it (never
+ * automatic, never through the payments/DCR pipeline — see the plan doc for
+ * why). Never throws: a bookkeeping side-effect must not block the release
+ * that already succeeded; an unresolved account number is logged, not fatal.
+ */
+export async function createPendingInternalTransfers(
+  admin: SupabaseClient,
+  loanApplicationId: string,
+  sourceMasterlistId: string,
+  actorId: string,
+) {
+  try {
+    // Idempotency: closeRelease has a retry path for a failed AR enroll,
+    // which would otherwise call this again and double-create transfers for
+    // the same release.
+    const { data: existing } = await admin
+      .from("internal_transfers")
+      .select("id")
+      .eq("source_loan_application_id", loanApplicationId)
+      .limit(1);
+    if (existing && existing.length > 0) return;
+
+    const computation = await getActiveComputation(admin, loanApplicationId);
+    const targets = extractDeductionTargets(computation?.otherDeductions);
+    if (targets.length === 0) return;
+
+    for (const target of targets) {
+      const { data: targetAccount } = await admin
+        .from("masterlist")
+        .select("id")
+        .eq("loan_account_no", target.accountNo)
+        .maybeSingle();
+
+      if (!targetAccount) {
+        await writeAuditEvent({
+          actorId,
+          moduleSlug: "release_lra",
+          action: "execute_trigger",
+          entityType: "internal_transfer",
+          entityId: loanApplicationId,
+          afterData: {
+            trigger: "internal_transfer_unresolved_account",
+            accountNo: target.accountNo,
+            amount: target.amount,
+          },
+        });
+        continue;
+      }
+
+      await admin.from("internal_transfers").insert({
+        source_loan_application_id: loanApplicationId,
+        source_masterlist_id: sourceMasterlistId,
+        target_masterlist_id: targetAccount.id,
+        transfer_type: target.transferType,
+        months: target.months,
+        amount: target.amount,
+        created_by: actorId,
+      });
+    }
+  } catch (err) {
+    await writeAuditEvent({
+      actorId,
+      moduleSlug: "release_lra",
+      action: "execute_trigger",
+      entityType: "internal_transfer",
+      entityId: loanApplicationId,
+      afterData: {
+        trigger: "internal_transfer_creation_failed",
+        error: err instanceof Error ? err.message : String(err),
+      },
+    });
+  }
+}
+
 export async function closeRelease(
   supabase: SupabaseClient,
   releaseFileId: string,
@@ -971,6 +1100,28 @@ export async function closeRelease(
   }
 
   const file = mapReleaseFileRow(row);
+
+  // Retry path: close already committed but masterlist enroll failed.
+  if (file.status === "closed") {
+    const admin = createServiceClient();
+    const ar = await initializeArAccount(
+      admin,
+      file.loanApplicationId,
+      releaseFileId,
+      actorId,
+    );
+    await createPendingInternalTransfers(
+      admin,
+      file.loanApplicationId,
+      ar.masterlistId,
+      actorId,
+    );
+    return {
+      status: "closed" as const,
+      masterlistId: ar.masterlistId,
+      created: ar.created,
+    };
+  }
 
   if (file.status !== "released") {
     throw new ValidationError("Release must be recorded before closure");
@@ -1048,10 +1199,28 @@ export async function closeRelease(
     applicationStatus: "closed",
   });
 
-  // AR hand-off stops here: the ar_queue row is AR's work item. The masterlist
-  // account is created when AR explicitly receives the file (ar_receive_file
-  // trigger), not automatically at close.
-  return { status: "closed" as const };
+  // Privileged enroll: AR RLS cannot SELECT release_files / computations.
+  // Same service-client pattern as the legacy receive route.
+  const admin = createServiceClient();
+  const ar = await initializeArAccount(
+    admin,
+    file.loanApplicationId,
+    releaseFileId,
+    actorId,
+  );
+
+  await createPendingInternalTransfers(
+    admin,
+    file.loanApplicationId,
+    ar.masterlistId,
+    actorId,
+  );
+
+  return {
+    status: "closed" as const,
+    masterlistId: ar.masterlistId,
+    created: ar.created,
+  };
 }
 
 export async function listLraQueue(supabase: SupabaseClient) {

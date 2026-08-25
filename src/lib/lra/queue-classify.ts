@@ -9,7 +9,10 @@ export type LraQueueClassifyInput = {
 };
 
 const COMPLETED_APP_STATUSES = new Set(["paid_off", "closed"]);
-const COMPLETED_RELEASE_STATUSES = new Set(["released", "closed"]);
+/** Only transmitted/closed files are done. `released` still needs Close &
+ * transmit (signed scans) — treating it as completed hid those files from
+ * the default Active queue and from History (which is closed-only). */
+const COMPLETED_RELEASE_STATUSES = new Set(["closed"]);
 // awaiting_signatures is LRA work: the in-branch signing session.
 const SETUP_RELEASE_STATUSES = new Set([
   "awaiting_path",
@@ -35,9 +38,6 @@ export function isCompletedLraQueueItem(
   ) {
     return true;
   }
-  if (input.blocker?.startsWith("Released")) {
-    return true;
-  }
   return false;
 }
 
@@ -47,7 +47,7 @@ export function lraQueueBucket(input: LraQueueClassifyInput): LraQueueBucket {
   const release = input.releaseFileStatus as ReleaseFileStatus | null | undefined;
   if (release && SETUP_RELEASE_STATUSES.has(release)) return "setup";
   if (release && BRIEFING_RELEASE_STATUSES.has(release)) return "briefing";
-  if (release === "ready_release") return "ready";
+  if (release === "ready_release" || release === "released") return "ready";
 
   // Fallback when release_files row is missing — use blocker text.
   const blocker = input.blocker ?? "";

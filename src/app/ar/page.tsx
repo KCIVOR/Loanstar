@@ -13,7 +13,6 @@ import {
   Alert,
   Badge,
   Button,
-  Card,
   cn,
   EmptyState,
   PageHeader,
@@ -44,38 +43,6 @@ type AssignmentJoin = {
 };
 
 type MasterlistRow = MasterlistQueueRow;
-
-type QueueRow = {
-  id: string;
-  loan_application_id: string;
-  queued_at: string;
-  loan_applications?:
-    | {
-        application_no: string | null;
-        status: string;
-        borrowers?:
-          | {
-              borrower_no: string;
-              first_name: string;
-              last_name: string;
-            }
-          | Array<{
-              borrower_no: string;
-              first_name: string;
-              last_name: string;
-            }>
-          | null;
-      }
-    | Array<{
-        application_no: string | null;
-        status: string;
-        borrowers?:
-          | { borrower_no: string; first_name: string; last_name: string }
-          | Array<{ borrower_no: string; first_name: string; last_name: string }>
-          | null;
-      }>
-    | null;
-};
 
 type SortKey = "priority" | "balance" | "borrower" | "status";
 type StatusFilter = "all" | "active" | "paid" | "default" | "remedial";
@@ -302,11 +269,8 @@ export default function ArDashboardPage() {
   const [rows, setRows] = useState<MasterlistRow[]>([]);
   const [totalCount, setTotalCount] = useState(0);
   const [kpi, setKpi] = useState<MasterlistQueueKpiCounts>(EMPTY_KPI);
-  const [queue, setQueue] = useState<QueueRow[]>([]);
   const [loading, setLoading] = useState(true);
-  const [receiving, setReceiving] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [message, setMessage] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
@@ -343,13 +307,6 @@ export default function ArDashboardPage() {
     sortKey,
     sortDir,
   ]);
-
-  const loadQueue = useCallback(async () => {
-    const qRes = await fetch("/api/ar/queue");
-    if (!qRes.ok) throw new Error("Failed to load receive queue");
-    const qData = (await qRes.json()) as { queue: QueueRow[] };
-    setQueue(qData.queue ?? []);
-  }, []);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -396,12 +353,6 @@ export default function ArDashboardPage() {
   ]);
 
   useEffect(() => {
-    void loadQueue().catch((err) => {
-      setError(err instanceof Error ? err.message : "Failed to load");
-    });
-  }, [loadQueue]);
-
-  useEffect(() => {
     void (async () => {
       try {
         const res = await fetch("/api/ar/bir-status-codes");
@@ -417,29 +368,6 @@ export default function ArDashboardPage() {
   useEffect(() => {
     void load();
   }, [load]);
-
-  async function receiveFile(applicationId: string) {
-    setReceiving(applicationId);
-    setError(null);
-    setMessage(null);
-    try {
-      const res = await fetch(`/api/ar/queue/${applicationId}/receive`, {
-        method: "POST",
-      });
-      if (!res.ok) {
-        const body = (await res.json().catch(() => null)) as {
-          error?: string;
-        } | null;
-        throw new Error(body?.error ?? "Failed to receive file");
-      }
-      setMessage("File received — masterlist account created, loan is active.");
-      await Promise.all([load(), loadQueue()]);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed");
-    } finally {
-      setReceiving(null);
-    }
-  }
 
   async function exportCsv() {
     const res = await fetch("/api/ar/masterlist", { method: "POST" });
@@ -550,78 +478,6 @@ export default function ArDashboardPage() {
         <div className="mb-4">
           <Alert>{error}</Alert>
         </div>
-      ) : null}
-      {message ? (
-        <div className="mb-4">
-          <Alert variant="success">{message}</Alert>
-        </div>
-      ) : null}
-
-      {queue.length > 0 ? (
-        <Card className="mb-6">
-          <h2 className="mb-1 font-display text-lg font-semibold text-navy-900">
-            Receive queue
-          </h2>
-          <p className="mb-3 text-sm text-ink-500">
-            Closed files transmitted by LRA — receiving a file creates its
-            masterlist account and amortization schedule.
-          </p>
-          <Table>
-            <thead>
-              <tr>
-                <Th>Borrower</Th>
-                <Th>Queued</Th>
-                <Th className="w-1">{""}</Th>
-              </tr>
-            </thead>
-            <tbody>
-              {queue.map((row) => {
-                const appRaw = row.loan_applications;
-                const app = Array.isArray(appRaw) ? appRaw[0] : appRaw;
-                const borrowerRaw = app?.borrowers;
-                const borrower = Array.isArray(borrowerRaw)
-                  ? borrowerRaw[0]
-                  : borrowerRaw;
-                return (
-                  <tr key={row.id}>
-                    <Td>
-                      <div className="font-medium text-ink-900">
-                        {borrower
-                          ? `${borrower.first_name} ${borrower.last_name}`
-                          : "Unknown borrower"}
-                      </div>
-                      <span className="id">
-                        {app?.application_no ??
-                          borrower?.borrower_no ??
-                          row.loan_application_id.slice(0, 8)}
-                      </span>
-                    </Td>
-                    <Td className="mono">
-                      {new Date(row.queued_at).toLocaleString("en-PH", {
-                        year: "numeric",
-                        month: "short",
-                        day: "numeric",
-                        hour: "numeric",
-                        minute: "2-digit",
-                      })}
-                    </Td>
-                    <Td>
-                      <Button
-                        size="sm"
-                        loading={receiving === row.loan_application_id}
-                        onClick={() =>
-                          void receiveFile(row.loan_application_id)
-                        }
-                      >
-                        Receive &amp; create account
-                      </Button>
-                    </Td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </Table>
-        </Card>
       ) : null}
 
       <div className="kpi-grid mb-4">

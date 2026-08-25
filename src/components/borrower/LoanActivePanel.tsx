@@ -79,6 +79,14 @@ type PaymentRow = {
   uploadedByStaff?: boolean;
 };
 
+type InternalTransferCreditRow = {
+  id: string;
+  amount: number;
+  amortization_schedule_id: string | null;
+  createdAt: string;
+  sourceLoanAccountNo: string | null;
+};
+
 type PostingRow = {
   id: string;
   amortization_schedule_id: string | null;
@@ -121,6 +129,9 @@ export function LoanActivePanel({
   const [loan, setLoan] = useState<Record<string, unknown> | null>(null);
   const [payments, setPayments] = useState<PaymentRow[]>([]);
   const [postings, setPostings] = useState<PostingRow[]>([]);
+  const [internalTransferCredits, setInternalTransferCredits] = useState<
+    InternalTransferCreditRow[]
+  >([]);
   const [pdcChecks, setPdcChecks] = useState<LedgerPdcCheck[]>([]);
   const [loading, setLoading] = useState(false);
   const [amount, setAmount] = useState("");
@@ -154,11 +165,13 @@ export function LoanActivePanel({
         payments: PaymentRow[];
         postings?: PostingRow[];
         pdcChecks?: LedgerPdcCheck[];
+        internalTransferCredits?: InternalTransferCreditRow[];
       };
       setLoan(data.loan);
       setPayments(data.payments);
       setPostings(data.postings ?? []);
       setPdcChecks(data.pdcChecks ?? []);
+      setInternalTransferCredits(data.internalTransferCredits ?? []);
     } finally {
       setLoading(false);
     }
@@ -309,7 +322,18 @@ export function LoanActivePanel({
       checkNo: checkNoByInstallment.get(Number(row.installment_no)) ?? null,
       status: String(row.status ?? ""),
     })),
-    payments: ledgerEntriesFromPostings(postings),
+    payments: [
+      ...ledgerEntriesFromPostings(postings),
+      ...internalTransferCredits.map((row) => ({
+        id: `transfer:${row.id}`,
+        paymentDate: String(row.createdAt).slice(0, 10),
+        amount: Number(row.amount ?? 0),
+        referenceNo: row.sourceLoanAccountNo,
+        channel: "Internal transfer",
+        status: "posted",
+        scheduleId: row.amortization_schedule_id,
+      })),
+    ],
   });
 
   return (

@@ -59,6 +59,14 @@ export async function initializeArAccount(
     .maybeSingle();
 
   if (existing) {
+    await supabase
+      .from("ar_queue")
+      .update({
+        processed_at: new Date().toISOString(),
+        masterlist_id: existing.id,
+      })
+      .eq("loan_application_id", loanApplicationId)
+      .is("processed_at", null);
     return { masterlistId: existing.id as string, created: false };
   }
 
@@ -158,6 +166,11 @@ export async function initializeArAccount(
     releaseDate,
     addonMonths: computation.addonMonths,
     dueDay: computation.dueDay ?? 10,
+    totalLoan: computation.totalLoan,
+    // Reuse the already-computed, segment-correct date instead of letting
+    // generateAmortizationSchedule recompute it with the Seafarer-only rule.
+    firstPaymentDate: computation.firstPaymentDate,
+    paymentFrequency: computation.paymentFrequency,
   });
 
   const { error: schedError } = await supabase.from("amortization_schedules").insert(
@@ -192,6 +205,46 @@ export async function initializeArAccount(
   });
 
   return { masterlistId: masterlist.id as string, created: true };
+}
+
+/**
+ * Enroll any LRA-closed files still sitting in `ar_queue` (leftovers from
+ * before auto-enroll on close). Idempotent; failures on one row do not
+ * block the rest.
+ */
+export async function enrollUnprocessedArQueue(
+  supabase: SupabaseClient,
+  actorId?: string,
+): Promise<{ enrolled: number; errors: string[] }> {
+  const { data, error } = await supabase
+    .from("ar_queue")
+    .select("loan_application_id, release_file_id")
+    .is("processed_at", null);
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  let enrolled = 0;
+  const errors: string[] = [];
+
+  for (const row of data ?? []) {
+    try {
+      const result = await initializeArAccount(
+        supabase,
+        row.loan_application_id as string,
+        row.release_file_id as string,
+        actorId,
+      );
+      if (result.created) enrolled += 1;
+    } catch (err) {
+      errors.push(
+        `${row.loan_application_id}: ${err instanceof Error ? err.message : String(err)}`,
+      );
+    }
+  }
+
+  return { enrolled, errors };
 }
 
 export async function assignMasterlist(

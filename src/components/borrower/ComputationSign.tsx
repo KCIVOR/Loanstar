@@ -12,6 +12,7 @@ import {
   Textarea,
 } from "@/components/ui";
 import { computationConfirmState } from "@/lib/negotiation/computation-confirm-state";
+import { buildDeductionBreakdownRows } from "@/lib/computation/deduction-breakdown";
 
 type ComputationSummary = {
   id: string;
@@ -21,6 +22,18 @@ type ComputationSummary = {
   totalLoan: number;
   monthlyAmortization: number;
   lineItems: Array<{ key: string; label: string; amount: number }>;
+  otherDeductions?: {
+    otherLoan?: number;
+    otherLoanAccountNo?: string | null;
+    offset?: number;
+    offsetAccountNo?: string | null;
+    offsetMonths?: number | null;
+    otherLoans?: Array<{ accountNo: string | null; amount: number }>;
+    offsets?: Array<{ accountNo: string | null; amount: number; months: number | null }>;
+    advancePayment?: number;
+    previousLoanBalance?: number;
+    accountOpening?: number;
+  } | null;
   signedAt: string | null;
   loanTypeName: string | null;
 };
@@ -66,6 +79,17 @@ export function ComputationSign({
   const [countering, setCountering] = useState(false);
 
   if (!computation) return null;
+
+  const deductionRows = buildDeductionBreakdownRows(computation.otherDeductions);
+  const lineItems = computation.lineItems.flatMap((item) =>
+    item.key === "other_deductions" && deductionRows.length > 0
+      ? deductionRows.map((row, i) => ({
+          key: `other_deductions_${i}`,
+          label: row.label,
+          amount: row.amount,
+        }))
+      : [item],
+  );
 
   const confirmState = computationConfirmState({
     signedAt: computation.signedAt,
@@ -144,7 +168,7 @@ export function ComputationSign({
       </p>
 
       <div className="mb-4 grid gap-x-8 gap-y-2 sm:grid-cols-2">
-        {computation.lineItems.map((item) => {
+        {lineItems.map((item) => {
           const isKey = KEY_AMOUNT_KEYS.has(item.key);
           return (
             <div

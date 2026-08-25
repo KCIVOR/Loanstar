@@ -2,7 +2,8 @@
 
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { FormEvent, Suspense, useState } from "react";
+import { FormEvent, Suspense, useEffect, useState } from "react";
+import type { EmailOtpType } from "@supabase/supabase-js";
 
 import {
   Alert,
@@ -11,10 +12,17 @@ import {
   Input,
   Label,
   LoanStarLogo,
+  Spinner,
 } from "@/components/ui";
+import { sessionFromHash } from "@/lib/auth/session-from-hash";
 import { resolveHomePath } from "@/lib/permissions/home";
 import type { UserPermissions } from "@/lib/permissions/types";
 import { createClient } from "@/lib/supabase/client";
+
+function safeRedirectPath(raw: string | null): string | null {
+  if (raw && raw.startsWith("/") && !raw.startsWith("//")) return raw;
+  return null;
+}
 
 const SEED_ACCOUNTS = [
   { label: "Super Admin", email: "super_admin@loanstar.local" },
@@ -53,6 +61,90 @@ function LoginForm() {
   const [remember, setRemember] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [confirming, setConfirming] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    const supabase = createClient();
+
+    async function finishEmailConfirmation() {
+      const code = searchParams.get("code");
+      const tokenHash = searchParams.get("token_hash");
+      const otpType = searchParams.get("type");
+      const linkError =
+        searchParams.get("error_description") ?? searchParams.get("error");
+      const hashTokens = sessionFromHash(window.location.hash);
+      const fromEmailLink =
+        Boolean(code) || Boolean(tokenHash) || Boolean(hashTokens);
+
+      if (linkError && fromEmailLink) {
+        setError(linkError.replace(/\+/g, " "));
+        return;
+      }
+
+      if (!fromEmailLink) return;
+
+      setConfirming(true);
+      setLoading(true);
+
+      let authError: string | null = null;
+
+      // @supabase/ssr hardcodes PKCE and rejects #access_token hashes.
+      // Confirmation emails use implicit tokens, so apply them explicitly.
+      if (hashTokens) {
+        const { error: sessionError } = await supabase.auth.setSession(hashTokens);
+        if (sessionError) authError = sessionError.message;
+        else {
+          window.history.replaceState(
+            null,
+            "",
+            `${window.location.pathname}${window.location.search}`,
+          );
+        }
+      } else if (tokenHash && otpType) {
+        const { error: otpError } = await supabase.auth.verifyOtp({
+          token_hash: tokenHash,
+          type: otpType as EmailOtpType,
+        });
+        if (otpError) authError = otpError.message;
+      } else if (code) {
+        const { error: exchangeError } =
+          await supabase.auth.exchangeCodeForSession(code);
+        if (exchangeError) authError = exchangeError.message;
+      }
+
+      if (cancelled) return;
+
+      if (authError) {
+        setError(authError);
+        setConfirming(false);
+        setLoading(false);
+        return;
+      }
+
+      const { data } = await supabase.auth.getSession();
+      if (cancelled) return;
+
+      if (!data.session) {
+        setError(
+          "Email confirmed, but we couldn't sign you in automatically. Please log in.",
+        );
+        setConfirming(false);
+        setLoading(false);
+        return;
+      }
+
+      router.replace(
+        safeRedirectPath(redirect) ?? (await resolveLandingPath()),
+      );
+      router.refresh();
+    }
+
+    void finishEmailConfirmation();
+    return () => {
+      cancelled = true;
+    };
+  }, [searchParams, redirect, router]);
 
   async function signIn(emailValue: string, passwordValue: string) {
     setError(null);
@@ -132,6 +224,14 @@ function LoginForm() {
             </svg>
             Back to home
           </Link>
+          {confirming ? (
+            <>
+              <h3>Confirming your email</h3>
+              <p className="s">Your email is confirmed. Signing you in…</p>
+              <Spinner label="Opening your portal…" className="py-8" />
+            </>
+          ) : (
+            <>
           <h3>Welcome back</h3>
           <p className="s">Log in to your LoanStar portal.</p>
 
@@ -258,6 +358,8 @@ function LoginForm() {
               </div>
             </div>
           ) : null}
+            </>
+          )}
         </div>
       </div>
     </div>

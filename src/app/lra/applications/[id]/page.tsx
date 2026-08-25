@@ -24,8 +24,10 @@ import {
 } from "@/components/ui";
 import { DocumentChecklist } from "@/components/DocumentChecklist";
 import { AutofillOverlay } from "@/components/dev/AutofillOverlay";
-import { fakeRemark } from "@/lib/dev/fake-data";
+import { fakePdcDetails, fakeRemark } from "@/lib/dev/fake-data";
 import { GeneratedDocPanel } from "@/components/documents/GeneratedDocPanel";
+import { addScheduleMonths, advanceSemiMonthly } from "@/lib/computation/release-date";
+import { halfUp } from "@/lib/computation/money";
 import {
   formatStatusLabel,
   statusBadgeVariant,
@@ -44,6 +46,48 @@ import {
 } from "@/lib/lra/mark-all-signed";
 import { releasePipelineSteps } from "@/lib/lra/release-pipeline";
 import { createClient } from "@/lib/supabase/client";
+
+/** Salary loans (semi-monthly) need twice as many PDC checks as their term
+ * count; every other cadence (Seafarer, SME, MPL) is unchanged: one per term. */
+function pdcCheckCount(computation: {
+  terms: number;
+  paymentFrequency: "monthly" | "semi_monthly" | null;
+}): number {
+  return computation.paymentFrequency === "semi_monthly"
+    ? computation.terms * 2
+    : computation.terms;
+}
+
+/** Date + amount for PDC check `index` (0-based) of `count` total checks.
+ * Semi-monthly: alternates 15th/end-of-month, half the monthly amortization
+ * per check, with the last check absorbing the rounding remainder against
+ * totalLoan (same pattern already used for the monthly AR schedule). Every
+ * other cadence is untouched — flat monthlyAmortization, `addScheduleMonths`. */
+function pdcCheckAt(
+  computation: {
+    monthlyAmortization: number;
+    totalLoan: number;
+    paymentFrequency: "monthly" | "semi_monthly" | null;
+  },
+  pdcDate: string,
+  index: number,
+  count: number,
+): { checkDate: string; amount: number } {
+  if (computation.paymentFrequency === "semi_monthly") {
+    const checkDate = advanceSemiMonthly(pdcDate, index);
+    const half = halfUp(computation.monthlyAmortization / 2);
+    if (index === count - 1) {
+      const priorTotal = halfUp(half * (count - 1));
+      const remainder = halfUp(computation.totalLoan - priorTotal);
+      return { checkDate, amount: remainder > 0 ? remainder : half };
+    }
+    return { checkDate, amount: half };
+  }
+  return {
+    checkDate: addScheduleMonths(pdcDate, index),
+    amount: computation.monthlyAmortization,
+  };
+}
 
 type LraWorkspace = {
   application: {
@@ -93,7 +137,10 @@ type LraWorkspace = {
     netReleased: number;
     principal: number;
     monthlyAmortization: number;
+    totalLoan: number;
     terms: number;
+    firstPaymentDate: string | null;
+    paymentFrequency: "monthly" | "semi_monthly" | null;
   } | null;
   blriPreview: {
     principal: number;
@@ -104,6 +151,7 @@ type LraWorkspace = {
   } | null;
   employmentContractPresent: boolean;
   pdcCollectedByName: string | null;
+  missingSignedReleaseLabels: string[];
 };
 
 type PathChoice = "with_pdc" | "without_pdc";
@@ -155,11 +203,6 @@ function formatDateTime(value: string) {
   });
 }
 
-function pdcScheduleDate(firstCheckDate: string, index: number) {
-  const date = new Date(firstCheckDate);
-  date.setMonth(date.getMonth() + index);
-  return date.toISOString().slice(0, 10);
-}
 
 type CombinedUploadResult = {
   fileName: string;
@@ -189,7 +232,6 @@ export default function LraApplicationPage() {
   const [selectedPaths, setSelectedPaths] = useState<Set<PathChoice>>(
     () => new Set<PathChoice>(["with_pdc"]),
   );
-  const [pdcDate, setPdcDate] = useState("");
   const [pdcDraft, setPdcDraft] = useState<PdcDraftRow[]>([]);
   const [blankFrom, setBlankFrom] = useState("");
   const [blankTo, setBlankTo] = useState("");
@@ -218,6 +260,11 @@ export default function LraApplicationPage() {
   const [viewingCombined, setViewingCombined] = useState(false);
   const [combinedUploadResult, setCombinedUploadResult] =
     useState<CombinedUploadResult | null>(null);
+
+  // Always the computed payment start date, never independently entered —
+  // matches "Monthly amount" right next to it, which reads straight from
+  // the computation with no separate state either.
+  const pdcDate = data?.computation?.firstPaymentDate ?? "";
 
   const load = useCallback(
     async (opts?: { silent?: boolean }) => {
@@ -348,19 +395,6 @@ export default function LraApplicationPage() {
     }
   }
 
-  function updatePdcFirstDate(value: string) {
-    setPdcDate(value);
-    if (!value || !data?.computation) return;
-    const monthlyAmortization = data.computation.monthlyAmortization;
-    setPdcDraft((current) =>
-      current.map((row, index) => ({
-        ...row,
-        amount: monthlyAmortization,
-        checkDate: pdcScheduleDate(value, index),
-      })),
-    );
-  }
-
   function buildPdcSchedule(e?: FormEvent) {
     e?.preventDefault();
     if (!data?.computation) {
@@ -370,18 +404,20 @@ export default function LraApplicationPage() {
       return;
     }
     if (!pdcDate) {
-      setError("First check date is required.");
+      setError(
+        "This application's computation has no payment start date recorded — recompute it before building the PDC schedule.",
+      );
       return;
     }
     setError(null);
-    const terms = data.computation.terms;
-    const monthlyAmortization = data.computation.monthlyAmortization;
+    const count = pdcCheckCount(data.computation);
     const rows: PdcDraftRow[] = [];
-    for (let i = 0; i < terms; i += 1) {
+    for (let i = 0; i < count; i += 1) {
+      const { checkDate, amount } = pdcCheckAt(data.computation, pdcDate, i, count);
       rows.push({
         checkNumber: pdcDraft[i]?.checkNumber ?? "",
-        amount: monthlyAmortization,
-        checkDate: pdcScheduleDate(pdcDate, i),
+        amount,
+        checkDate,
         bankName: pdcDraft[i]?.bankName ?? "",
       });
     }
@@ -408,11 +444,14 @@ export default function LraApplicationPage() {
       return;
     }
     if (!pdcDate) {
-      setError("First check date is required.");
+      setError(
+        "This application's computation has no payment start date recorded — recompute it before building the PDC schedule.",
+      );
       return;
     }
     const computation = data.computation;
-    if (pdcDraft.length !== computation.terms) {
+    const count = pdcCheckCount(computation);
+    if (pdcDraft.length !== count) {
       setError("Build the complete PDC schedule before saving.");
       return;
     }
@@ -432,13 +471,16 @@ export default function LraApplicationPage() {
     }
     setSaving(true);
     setError(null);
-    const checks = pdcDraft.map((row, index) => ({
-      ...row,
-      amount: computation.monthlyAmortization,
-      checkDate: pdcScheduleDate(pdcDate, index),
-      checkNumber: row.checkNumber.trim(),
-      bankName: row.bankName.trim(),
-    }));
+    const checks = pdcDraft.map((row, index) => {
+      const { checkDate, amount } = pdcCheckAt(computation, pdcDate, index, count);
+      return {
+        ...row,
+        amount,
+        checkDate,
+        checkNumber: row.checkNumber.trim(),
+        bankName: row.bankName.trim(),
+      };
+    });
     try {
       const res = await fetch(`/api/lra/applications/${applicationId}/pdc`, {
         method: "POST",
@@ -576,7 +618,7 @@ export default function LraApplicationPage() {
         } | null;
         throw new Error(body?.error ?? "Close failed");
       }
-      setMessage("File closed and queued for AR.");
+      setMessage("File closed — AR masterlist account created.");
       await load();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed");
@@ -749,9 +791,11 @@ export default function LraApplicationPage() {
       pdcCheckCount: data.pdcChecks.length,
       pdcCollectedAt: rf.pdc_collected_at,
     });
+  const missingSignedScans = data.missingSignedReleaseLabels ?? [];
   const canClose =
     showCloseAction &&
-    (!releasePaths.includes("with_pdc") || pdcCollected);
+    (!releasePaths.includes("with_pdc") || pdcCollected) &&
+    missingSignedScans.length === 0;
   const releaseBlockers: string[] = [];
   if (showReleaseAction && !data.briefing?.acknowledged_at) {
     releaseBlockers.push("Briefing sign-off required");
@@ -773,6 +817,11 @@ export default function LraApplicationPage() {
     !pdcCollected
   ) {
     closeBlockers.push(PDC_COLLECT_CLOSE_ERROR);
+  }
+  if (showCloseAction && missingSignedScans.length > 0) {
+    closeBlockers.push(
+      `Upload signed documents above (${missingSignedScans.join(", ")})`,
+    );
   }
 
   const companyName = data.borrower?.business_info?.companyName?.trim();
@@ -1040,7 +1089,7 @@ export default function LraApplicationPage() {
                   <Input
                     type="date"
                     value={pdcDate}
-                    onChange={(e) => updatePdcFirstDate(e.target.value)}
+                    disabled
                     required
                   />
                 </div>
@@ -1184,65 +1233,6 @@ export default function LraApplicationPage() {
                   </tbody>
                 </Table>
               </div>
-            </Card>
-          ) : null}
-
-          {showPdcCollectCard ? (
-            <Card>
-              <h2 className="mb-1 font-display text-lg font-semibold text-navy-900">
-                Physical PDC collection
-              </h2>
-              <p className="mb-3 text-sm text-ink-500">
-                Confirm the encoded checks were physically collected from the
-                borrower. Encoding and collection are separate steps.
-              </p>
-              <p className="mb-3 text-sm text-ink-700">
-                Encoded schedule:{" "}
-                <span className="mono font-medium">
-                  {data.pdcChecks.length}
-                </span>{" "}
-                check{data.pdcChecks.length === 1 ? "" : "s"}
-                {rf.blank_check_from && rf.blank_check_to
-                  ? ` · blank range ${rf.blank_check_from}–${rf.blank_check_to}`
-                  : ""}
-              </p>
-              {pdcCollected ? (
-                <Alert variant="success">
-                  Collected
-                  {rf.pdc_collected_at
-                    ? ` on ${new Date(rf.pdc_collected_at).toLocaleString()}`
-                    : ""}
-                  {data.pdcCollectedByName
-                    ? ` · ${data.pdcCollectedByName}`
-                    : ""}
-                </Alert>
-              ) : (
-                <>
-                  <div className="banner warn mb-3">
-                    <span>Pending: physical PDCs not yet collected</span>
-                  </div>
-                  <Button
-                    loading={saving}
-                    disabled={!canConfirmPdcCollect}
-                    onClick={() => setConfirmPdcCollect(true)}
-                  >
-                    Confirm physical PDCs collected
-                  </Button>
-                  <ConfirmDialog
-                    open={confirmPdcCollect}
-                    title="Confirm physical PDCs collected?"
-                    message={`Confirm that all ${data.pdcChecks.length} encoded post-dated check(s) have been physically collected from the borrower. This is required before closing the file to Accounting.`}
-                    confirmLabel="Yes, confirm collected"
-                    loading={saving}
-                    onCancel={() => setConfirmPdcCollect(false)}
-                    onConfirm={() => {
-                      void confirmPhysicalPdcCollected().then(() =>
-                        setConfirmPdcCollect(false),
-                      );
-                    }}
-                  />
-                </>
-              )}
             </Card>
           ) : null}
 
@@ -1509,104 +1499,6 @@ export default function LraApplicationPage() {
             </div>
           ) : null}
 
-          {showReleaseAction ? (
-            <Card>
-              <h2 className="mb-1 font-display text-lg font-semibold text-navy-900">
-                {!releasePaths.includes("with_pdc") &&
-                releasePaths.includes("without_pdc")
-                  ? "Release cash"
-                  : "Release check / cash"}
-              </h2>
-              <p className="mb-3 text-sm text-ink-500">
-                Record disbursement only after funds have been handed over.
-              </p>
-              <Button
-                loading={saving}
-                disabled={!canRelease}
-                onClick={() => setConfirmRelease(true)}
-              >
-                Record release
-              </Button>
-              {!canRelease && releaseBlockers.length > 0 ? (
-                <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-warning">
-                  {releaseBlockers.map((item) => (
-                    <li key={item}>{item}</li>
-                  ))}
-                </ul>
-              ) : null}
-
-              <ConfirmDialog
-                open={confirmRelease}
-                title="Record this release?"
-                message={
-                  data.computation
-                    ? `This records the disbursement of ${formatMoney(
-                        data.computation.netReleased,
-                      )} to the borrower. Make sure the check or cash has actually been handed over — this cannot be undone from this screen.`
-                    : "This records the disbursement of loan proceeds to the borrower. This cannot be undone from this screen."
-                }
-                confirmLabel="Yes, record release"
-                loading={saving}
-                onCancel={() => setConfirmRelease(false)}
-                onConfirm={() => {
-                  void releaseFunds().then(() => setConfirmRelease(false));
-                }}
-              />
-            </Card>
-          ) : null}
-
-          {showCloseAction ? (
-            <Card>
-              <h2 className="mb-1 font-display text-lg font-semibold text-navy-900">
-                Close & transmit
-              </h2>
-              <p className="mb-3 text-sm text-ink-500">
-                Upload the signed check voucher on the release checklist below,
-                then close the file to queue it for AR.
-              </p>
-              <Button
-                loading={saving}
-                disabled={!canClose}
-                onClick={() => setConfirmClose(true)}
-              >
-                Close file
-              </Button>
-              {!canClose && closeBlockers.length > 0 ? (
-                <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-warning">
-                  {closeBlockers.map((item) => (
-                    <li key={item}>{item}</li>
-                  ))}
-                </ul>
-              ) : null}
-
-              <ConfirmDialog
-                open={confirmClose}
-                title="Close this file?"
-                message="Confirm the signed check voucher has been uploaded on the release checklist below. Closing queues the file for AR and ends LRA processing."
-                confirmLabel="Yes, close file"
-                loading={saving}
-                onCancel={() => setConfirmClose(false)}
-                onConfirm={() => {
-                  void closeFile().then(() => setConfirmClose(false));
-                }}
-              />
-            </Card>
-          ) : null}
-
-          {isClosed ? (
-            <Card>
-              <h2 className="mb-2 font-display text-lg font-semibold text-navy-900">
-                Transmitted to AR
-              </h2>
-              <p className="mb-3 text-sm text-ink-500">
-                LRA processing is complete for this file.
-              </p>
-              <Link href="/lra">
-                <Button variant="secondary">Back to LRA queue</Button>
-              </Link>
-            </Card>
-          ) : null}
-
           {data.borrower?.id && signingStage ? (
             <DocumentChecklist
               applicationId={applicationId}
@@ -1757,6 +1649,165 @@ export default function LraApplicationPage() {
             endpoint={`/api/lra/applications/${applicationId}/final-computation-sheet`}
             generateLabel="Generate sheet"
           />
+
+          {showPdcCollectCard ? (
+            <Card>
+              <h2 className="mb-1 font-display text-lg font-semibold text-navy-900">
+                Physical PDC collection
+              </h2>
+              <p className="mb-3 text-sm text-ink-500">
+                Confirm the encoded checks were physically collected from the
+                borrower. Encoding and collection are separate steps.
+              </p>
+              <p className="mb-3 text-sm text-ink-700">
+                Encoded schedule:{" "}
+                <span className="mono font-medium">
+                  {data.pdcChecks.length}
+                </span>{" "}
+                check{data.pdcChecks.length === 1 ? "" : "s"}
+                {rf.blank_check_from && rf.blank_check_to
+                  ? ` · blank range ${rf.blank_check_from}–${rf.blank_check_to}`
+                  : ""}
+              </p>
+              {pdcCollected ? (
+                <Alert variant="success">
+                  Collected
+                  {rf.pdc_collected_at
+                    ? ` on ${new Date(rf.pdc_collected_at).toLocaleString()}`
+                    : ""}
+                  {data.pdcCollectedByName
+                    ? ` · ${data.pdcCollectedByName}`
+                    : ""}
+                </Alert>
+              ) : (
+                <>
+                  <div className="banner warn mb-3">
+                    <span>Pending: physical PDCs not yet collected</span>
+                  </div>
+                  <Button
+                    loading={saving}
+                    disabled={!canConfirmPdcCollect}
+                    onClick={() => setConfirmPdcCollect(true)}
+                  >
+                    Confirm physical PDCs collected
+                  </Button>
+                  <ConfirmDialog
+                    open={confirmPdcCollect}
+                    title="Confirm physical PDCs collected?"
+                    message={`Confirm that all ${data.pdcChecks.length} encoded post-dated check(s) have been physically collected from the borrower. This is required before closing the file to Accounting.`}
+                    confirmLabel="Yes, confirm collected"
+                    loading={saving}
+                    onCancel={() => setConfirmPdcCollect(false)}
+                    onConfirm={() => {
+                      void confirmPhysicalPdcCollected().then(() =>
+                        setConfirmPdcCollect(false),
+                      );
+                    }}
+                  />
+                </>
+              )}
+            </Card>
+          ) : null}
+
+          {showReleaseAction ? (
+            <Card>
+              <h2 className="mb-1 font-display text-lg font-semibold text-navy-900">
+                {!releasePaths.includes("with_pdc") &&
+                releasePaths.includes("without_pdc")
+                  ? "Release cash"
+                  : "Release check / cash"}
+              </h2>
+              <p className="mb-3 text-sm text-ink-500">
+                Record disbursement only after funds have been handed over.
+              </p>
+              <Button
+                loading={saving}
+                disabled={!canRelease}
+                onClick={() => setConfirmRelease(true)}
+              >
+                Record release
+              </Button>
+              {!canRelease && releaseBlockers.length > 0 ? (
+                <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-warning">
+                  {releaseBlockers.map((item) => (
+                    <li key={item}>{item}</li>
+                  ))}
+                </ul>
+              ) : null}
+
+              <ConfirmDialog
+                open={confirmRelease}
+                title="Record this release?"
+                message={
+                  data.computation
+                    ? `This records the disbursement of ${formatMoney(
+                        data.computation.netReleased,
+                      )} to the borrower. Make sure the check or cash has actually been handed over — this cannot be undone from this screen.`
+                    : "This records the disbursement of loan proceeds to the borrower. This cannot be undone from this screen."
+                }
+                confirmLabel="Yes, record release"
+                loading={saving}
+                onCancel={() => setConfirmRelease(false)}
+                onConfirm={() => {
+                  void releaseFunds().then(() => setConfirmRelease(false));
+                }}
+              />
+            </Card>
+          ) : null}
+
+          {showCloseAction ? (
+            <Card>
+              <h2 className="mb-1 font-display text-lg font-semibold text-navy-900">
+                Close & transmit
+              </h2>
+              <p className="mb-3 text-sm text-ink-500">
+                Upload the signed packet in Signed documents above (check
+                voucher, notarized promissory note, and disclosure statement),
+                then close the file. The AR masterlist account is created
+                automatically — AR does not need to receive the file.
+              </p>
+              <Button
+                loading={saving}
+                disabled={!canClose}
+                onClick={() => setConfirmClose(true)}
+              >
+                Close file
+              </Button>
+              {!canClose && closeBlockers.length > 0 ? (
+                <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-warning">
+                  {closeBlockers.map((item) => (
+                    <li key={item}>{item}</li>
+                  ))}
+                </ul>
+              ) : null}
+
+              <ConfirmDialog
+                open={confirmClose}
+                title="Close this file?"
+                message="Confirm the signed packet is uploaded in Signed documents (check voucher, notarized promissory note, and disclosure statement). Closing creates the AR masterlist account and ends LRA processing."
+                confirmLabel="Yes, close file"
+                loading={saving}
+                onCancel={() => setConfirmClose(false)}
+                onConfirm={() => {
+                  void closeFile().then(() => setConfirmClose(false));
+                }}
+              />
+            </Card>
+          ) : null}
+
+          {isClosed ? (
+            <Card>
+              <h2 className="mb-2 font-display text-lg font-semibold text-navy-900">
+                Transmitted to AR
+              </h2>
+              <p className="mb-3 text-sm text-ink-500">
+                LRA processing is complete. The account is on the AR masterlist.
+              </p>
+              <Link href="/lra">
+                <Button variant="secondary">Back to LRA queue</Button>
+              </Link>
+            </Card>
+          ) : null}
         </div>
       )}
       <AutofillOverlay
@@ -1765,6 +1816,23 @@ export default function LraApplicationPage() {
             label: "Fill signing remarks",
             onClick: () => setCombinedRemarks(fakeRemark("signing")),
           },
+          ...(pdcDraft.length > 0
+            ? [
+                {
+                  label: "Fill PDC details",
+                  onClick: () => {
+                    const filled = fakePdcDetails(pdcDraft.length);
+                    setPdcDraft((current) =>
+                      current.map((row, i) => ({
+                        ...row,
+                        checkNumber: filled[i]!.checkNumber,
+                        bankName: filled[i]!.bankName,
+                      })),
+                    );
+                  },
+                },
+              ]
+            : []),
         ]}
       />
     </div>

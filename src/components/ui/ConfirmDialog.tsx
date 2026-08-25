@@ -39,7 +39,7 @@ export function ConfirmDialog({
           </button>
         </div>
         <div className="modal-b">
-          {message ? <p>{message}</p> : null}
+          {message ? <div>{message}</div> : null}
           {children ? <div className="mt-3">{children}</div> : null}
         </div>
         <div className="modal-f">

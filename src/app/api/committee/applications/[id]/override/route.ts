@@ -4,6 +4,10 @@ import { z } from "zod";
 import { writeAuditEvent } from "@/lib/audit/writer";
 import { handleApiError, jsonOk } from "@/lib/api/handler";
 import {
+  findCrossBucketAccountNos,
+  findDuplicateAccountNos,
+} from "@/lib/computation/deduction-breakdown";
+import {
   committeeAdjustPreDecision,
   committeeOverrideAmount,
 } from "@/lib/negotiation/service";
@@ -18,7 +22,55 @@ const overrideSchema = z.object({
   terms: z.number().int().positive(),
   addonMonths: z.number().int().min(0).optional(),
   loanTypeId: z.string().uuid().optional(),
+  /** SME/Individual only — free-text rate override. Ignored for Seafarer. */
+  pfRate: z.number().min(0).optional(),
+  interestRate: z.number().min(0).optional(),
+  adminRate: z.number().min(0).optional(),
+  chattelRate: z.number().min(0).optional(),
+  withDsAndNotary: z.boolean().optional(),
   message: z.string().trim().max(2000).optional(),
+  otherDeductions: z
+    .object({
+      otherLoan: z.number().min(0).optional(),
+      otherLoanAccountNo: z.string().nullable().optional(),
+      offset: z.number().min(0).optional(),
+      offsetAccountNo: z.string().nullable().optional(),
+      offsetMonths: z.number().min(0).optional(),
+      otherLoans: z
+        .array(
+          z.object({
+            accountNo: z.string().nullable(),
+            amount: z.number().min(0),
+          }),
+        )
+        .optional(),
+      offsets: z
+        .array(
+          z.object({
+            accountNo: z.string().nullable(),
+            amount: z.number().min(0),
+            months: z.number().min(0).nullable(),
+          }),
+        )
+        .optional(),
+      advancePayment: z.number().min(0).optional(),
+      previousLoanBalance: z.number().min(0).optional(),
+      accountOpening: z.number().min(0).optional(),
+    })
+    .superRefine((val, ctx) => {
+      for (const dup of findDuplicateAccountNos(val.otherLoans)) {
+        ctx.addIssue(`Duplicate account "${dup}" in Other Loan entries`);
+      }
+      for (const dup of findDuplicateAccountNos(val.offsets)) {
+        ctx.addIssue(`Duplicate account "${dup}" in Offset entries`);
+      }
+      for (const dup of findCrossBucketAccountNos(val.otherLoans, val.offsets)) {
+        ctx.addIssue(
+          `Account "${dup}" cannot be targeted by both Other Loan and Offset in the same computation`,
+        );
+      }
+    })
+    .optional(),
 });
 
 export async function POST(request: Request, { params }: RouteParams) {

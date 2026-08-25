@@ -2,6 +2,8 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { mapBorrowerRow, type BorrowerRow } from "@/lib/borrowers/types";
 import { mapComputationRow } from "@/lib/csa/computation";
+import { buildDeductionBreakdownRows } from "@/lib/computation/deduction-breakdown";
+import type { OtherDeductions } from "@/lib/computation/types";
 import { renderAndStore, type RenderedDocumentResult } from "@/lib/documents/render-store";
 
 import { COMPANY_NAME, formatDate, formatMoney, joinAddress } from "./shared";
@@ -50,6 +52,37 @@ export function buildFinalComputationRows(
     row("Terms (months)", (c) => String(c.terms)),
     row("Interest Rate", (c) => pct(c.interestRate)),
   ];
+}
+
+/**
+ * One row per deduction entry (e.g. "Other Loan (AN300002)"), paired the
+ * same way `buildFinalComputationRows` pairs its fixed rows: original vs
+ * renegotiated by label, blank renegotiated column when there was none.
+ */
+export function buildDeductionRows(
+  originalDeductions: OtherDeductions | null | undefined,
+  renegotiatedDeductions: OtherDeductions | null | undefined,
+  hasRenegotiation: boolean,
+): Row[] {
+  const originalRows = buildDeductionBreakdownRows(originalDeductions);
+  const renegotiatedRows = hasRenegotiation
+    ? buildDeductionBreakdownRows(renegotiatedDeductions)
+    : [];
+
+  const labels = Array.from(
+    new Set([
+      ...originalRows.map((r) => r.label),
+      ...renegotiatedRows.map((r) => r.label),
+    ]),
+  );
+
+  return labels.map((label) => ({
+    label,
+    original: formatMoney(originalRows.find((r) => r.label === label)?.amount ?? 0),
+    renegotiated: hasRenegotiation
+      ? formatMoney(renegotiatedRows.find((r) => r.label === label)?.amount ?? 0)
+      : "",
+  }));
 }
 
 function toFigures(c: ReturnType<typeof mapComputationRow>): ComputationFigures {
@@ -115,10 +148,17 @@ export async function generateFinalComputationSheet(
     preparedBy: "",
     checkedBy: "",
     approvedBy: "",
-    computationRows: buildFinalComputationRows(
-      toFigures(original),
-      renegotiated ? toFigures(renegotiated) : null,
-    ),
+    computationRows: [
+      ...buildFinalComputationRows(
+        toFigures(original),
+        renegotiated ? toFigures(renegotiated) : null,
+      ),
+      ...buildDeductionRows(
+        original.otherDeductions,
+        renegotiated?.otherDeductions,
+        renegotiated !== null,
+      ),
+    ],
   };
 
   return renderAndStore(supabase, {

@@ -23,6 +23,7 @@ import {
   masterlistSecondaryIdentity,
 } from "@/lib/ar/masterlist-display";
 import { canMarkPaidOff } from "@/lib/ar/paid-off";
+import { canWriteOffAccountRounding } from "@/lib/ar/rounding-writeoff";
 import { formatStatusLabel } from "@/lib/applications/status";
 import { halfUp } from "@/lib/computation/money";
 import {
@@ -66,6 +67,15 @@ type ScheduleRow = {
   rolled_into_installment_no?: number | null;
 };
 
+type WriteOffTarget =
+  | {
+      kind: "installment";
+      scheduleId: string;
+      installmentNo: number;
+      amount: number;
+    }
+  | { kind: "account"; amount: number };
+
 type RoundingWriteoffRow = {
   id: string;
   amount: number;
@@ -74,6 +84,14 @@ type RoundingWriteoffRow = {
   notes: string | null;
   performedByName: string | null;
   installmentNo: number | null;
+};
+
+type InternalTransferCreditRow = {
+  id: string;
+  amount: number;
+  amortization_schedule_id: string | null;
+  createdAt: string;
+  sourceLoanAccountNo: string | null;
 };
 
 type PostingRow = {
@@ -163,6 +181,9 @@ export default function ArMasterlistDetailPage() {
   const [roundingWriteoffs, setRoundingWriteoffs] = useState<
     RoundingWriteoffRow[]
   >([]);
+  const [internalTransferCredits, setInternalTransferCredits] = useState<
+    InternalTransferCreditRow[]
+  >([]);
   const [pdcChecks, setPdcChecks] = useState<LedgerPdcCheck[]>([]);
   const [roundingWriteoffThreshold, setRoundingWriteoffThreshold] =
     useState(1);
@@ -180,11 +201,9 @@ export default function ArMasterlistDetailPage() {
   const [error, setError] = useState<string | null>(null);
   const [confirmPaidOff, setConfirmPaidOff] = useState(false);
   const [confirmRemedial, setConfirmRemedial] = useState(false);
-  const [writeOffTarget, setWriteOffTarget] = useState<{
-    scheduleId: string;
-    installmentNo: number;
-    amount: number;
-  } | null>(null);
+  const [writeOffTarget, setWriteOffTarget] = useState<WriteOffTarget | null>(
+    null,
+  );
   const [viewingId, setViewingId] = useState<string | null>(null);
 
   const load = useCallback(async (opts?: { silent?: boolean }) => {
@@ -203,6 +222,7 @@ export default function ArMasterlistDetailPage() {
         pdcChecks?: LedgerPdcCheck[];
         roundingWriteoffThreshold?: number;
         roundingWriteoffs?: RoundingWriteoffRow[];
+        internalTransferCredits?: InternalTransferCreditRow[];
       };
       setRecord(recData.record);
       setPayments(recData.payments ?? []);
@@ -212,6 +232,7 @@ export default function ArMasterlistDetailPage() {
         Number(recData.roundingWriteoffThreshold ?? 1),
       );
       setRoundingWriteoffs(recData.roundingWriteoffs ?? []);
+      setInternalTransferCredits(recData.internalTransferCredits ?? []);
       const assignmentsRaw = recData.record.assignments as
         | Record<string, unknown>
         | Record<string, unknown>[]
@@ -350,15 +371,19 @@ export default function ArMasterlistDetailPage() {
       const res = await fetch(`/api/ar/masterlist/${id}/write-off`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          amortizationScheduleId: writeOffTarget.scheduleId,
-        }),
+        body: JSON.stringify(
+          writeOffTarget.kind === "installment"
+            ? { amortizationScheduleId: writeOffTarget.scheduleId }
+            : {},
+        ),
       });
       const body = (await res.json()) as { error?: string };
       if (!res.ok) throw new Error(body.error ?? "Write-off failed");
       setWriteOffTarget(null);
       setMessage(
-        `Rounding difference of ₱${formatMoney(writeOffTarget.amount)} written off for installment #${writeOffTarget.installmentNo}.`,
+        writeOffTarget.kind === "installment"
+          ? `Rounding difference of ₱${formatMoney(writeOffTarget.amount)} written off for installment #${writeOffTarget.installmentNo}.`
+          : `Rounding leftover of ₱${formatMoney(writeOffTarget.amount)} written off.`,
       );
       await load({ silent: true });
     } catch (err) {
@@ -479,6 +504,16 @@ export default function ArMasterlistDetailPage() {
       scheduleId: row.amortization_schedule_id,
     }),
   );
+  const internalTransferEntries: LedgerPaymentEntry[] =
+    internalTransferCredits.map((row) => ({
+      id: `transfer:${row.id}`,
+      paymentDate: String(row.createdAt).slice(0, 10),
+      amount: Number(row.amount ?? 0),
+      referenceNo: row.sourceLoanAccountNo,
+      channel: "Internal transfer",
+      status: "posted",
+      scheduleId: row.amortization_schedule_id,
+    }));
   const checkNoByInstallment = checkNumbersByInstallmentNo(pdcChecks);
   const ledgerRows = buildAccountLedgerRows({
     openingDebit,
@@ -494,6 +529,7 @@ export default function ArMasterlistDetailPage() {
     payments: [
       ...ledgerEntriesFromPostings(postings),
       ...writeOffEntries,
+      ...internalTransferEntries,
     ],
   });
   const writeOffCandidates = schedules.flatMap((row) => {
@@ -511,12 +547,24 @@ export default function ArMasterlistDetailPage() {
     if (!canWriteOff) return [];
     return [
       {
+        kind: "installment" as const,
         scheduleId: String(row.id),
         installmentNo: Number(row.installment_no),
         amount: remainingDue,
       },
     ];
   });
+  const accountWriteOff = canWriteOffAccountRounding({
+    outstandingBalance: outstanding,
+    threshold: roundingWriteoffThreshold,
+    scheduleStatuses: schedules.map((row) => String(row.status ?? "")),
+  });
+  const allWriteOffCandidates: WriteOffTarget[] = [
+    ...writeOffCandidates,
+    ...(accountWriteOff.ok
+      ? [{ kind: "account" as const, amount: accountWriteOff.amount }]
+      : []),
+  ];
 
   return (
     <div>
@@ -852,22 +900,29 @@ export default function ArMasterlistDetailPage() {
           rounding write-offs.
         </p>
         <AccountLedger rows={ledgerRows} className="mb-4" />
-        {writeOffCandidates.length > 0 ? (
+        {allWriteOffCandidates.length > 0 ? (
             <div className="rounded-[var(--r-md)] border border-line-soft bg-surface px-4 py-3">
             <p className="mb-2 text-sm font-medium text-ink-800">
               Rounding write-off candidates
             </p>
             <ul className="flex flex-wrap gap-2">
-              {writeOffCandidates.map((candidate) => (
-                <li key={candidate.scheduleId}>
+              {allWriteOffCandidates.map((candidate) => (
+                <li
+                  key={
+                    candidate.kind === "installment"
+                      ? candidate.scheduleId
+                      : "account-leftover"
+                  }
+                >
                   <Button
                     type="button"
                     variant="ghost"
                     size="sm"
                     onClick={() => setWriteOffTarget(candidate)}
                   >
-                    Write off ₱{formatMoney(candidate.amount)} on #
-                    {candidate.installmentNo}
+                    {candidate.kind === "installment"
+                      ? `Write off ₱${formatMoney(candidate.amount)} on #${candidate.installmentNo}`
+                      : `Write off ₱${formatMoney(candidate.amount)} leftover`}
                   </Button>
                 </li>
               ))}
@@ -1005,7 +1060,9 @@ export default function ArMasterlistDetailPage() {
         title="Write off rounding difference?"
         message={
           writeOffTarget
-            ? `This will write off ₱${formatMoney(writeOffTarget.amount)} on installment #${writeOffTarget.installmentNo} and mark that installment paid. The write-off will be logged under your account (the acting AR user) — it is not a silent delete.`
+            ? writeOffTarget.kind === "installment"
+              ? `This will write off ₱${formatMoney(writeOffTarget.amount)} on installment #${writeOffTarget.installmentNo} and mark that installment paid. The write-off will be logged under your account (the acting AR user) — it is not a silent delete.`
+              : `This will write off the ₱${formatMoney(writeOffTarget.amount)} leftover on the account after every installment was paid. The write-off will be logged under your account (the acting AR user) — it is not a silent delete.`
             : ""
         }
         confirmLabel="Yes, write off"

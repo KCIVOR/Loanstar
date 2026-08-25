@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { RepeatingRows } from "@/components/borrowers/RepeatingRows";
 import { Button, Card, Checkbox, FacebookLinkField, Input, Label, PhoneInput, Select } from "@/components/ui";
 import type {
   BusinessBankAccount,
@@ -23,12 +24,6 @@ import type {
 } from "@/lib/borrowers/types";
 
 const CARD_TITLE = "mb-4 font-display text-lg font-semibold text-navy-900";
-
-function padRows<T extends object>(rows: T[] | undefined, min: number): T[] {
-  const out = [...(rows ?? [])];
-  while (out.length < min) out.push({} as T);
-  return out;
-}
 
 /** A left|right field pair on one row, mirroring the two-column layout of
  * docs/documents/seafarer_application_form.jpeg. */
@@ -138,6 +133,13 @@ const PURPOSE_OF_LOAN_OPTIONS = [
 ];
 const NATURE_OF_BUSINESS_OPTIONS = ["Trading", "Manufacturing", "Retail", "Services"];
 const TYPE_OF_LOAN_OPTIONS = ["Business loan", "Auto loan", "Housing loan", "Personal loan"];
+const SME_OWNERSHIP_OPTIONS = [
+  "Owned",
+  "Owned (Mortgage)",
+  "Rented",
+  "Parent Owned",
+  "Used free",
+];
 const BANK_OPTIONS = ["BDO", "BPI", "Metrobank", "Landbank", "PNB"];
 
 /** A dropdown with a fixed option list plus an "Other" choice that reveals a
@@ -307,10 +309,9 @@ export function ApplicantProfileFields({
   emailEditable?: boolean;
   /** View-only — disables all inputs (e.g. CIG reviewing CSA/borrower form). */
   readOnly?: boolean;
-  /** Loan segment — SME hides seafarer manning/allottee and shows business_info.
-   * Individual hides both — no business, no maritime employment, just the
-   * common personal/financial sections (confirmed 2026-08-19: no extra data
-   * collection for Individual, not even when they own a side business). */
+  /** Loan segment — SME and Individual use the client Individual + Business
+   * application form. Seafarer keeps manning/allottee. Individual segment
+   * matches SME Individual (not SME Corporate) on screen. */
   segment?: "seafarer" | "sme" | "individual";
   entityType?: "individual" | "corporate" | null;
 }) {
@@ -318,10 +319,10 @@ export function ApplicantProfileFields({
     if (readOnly || !onChangeProp) return;
     onChangeProp(next);
   };
-  const isSme = segment === "sme";
+  const isSme = segment === "sme" || segment === "individual";
   const isSeafarer = segment === "seafarer";
-  const isCorporate = isSme && entityType === "corporate";
-  const isIndividualSme = isSme && entityType === "individual";
+  const isCorporate = segment === "sme" && entityType === "corporate";
+  const isIndividualSme = isSme && !isCorporate;
   const biz = profile.businessInfo ?? {};
   const setBiz = (patch: Partial<BusinessInfo>) =>
     onChange({
@@ -338,6 +339,7 @@ export function ApplicantProfileFields({
     relativesLivingInProvinceAddress?: string;
     relativesLivingInProvinceContact?: string;
     permanentAddressSameAsPresent?: boolean;
+    noOfDependents?: string;
   };
   const setProfileData = (patch: Record<string, unknown>) =>
     onChange({
@@ -374,6 +376,201 @@ export function ApplicantProfileFields({
       disabled={readOnly}
       className="m-0 min-w-0 space-y-6 border-0 p-0"
     >
+      {isSme ? (
+        <>
+      <Card>
+        <FieldRow>
+          <Field
+            id="dateApplied"
+            label="Date Applied"
+            type="date"
+            value={biz.dateApplied ?? ""}
+            onChange={(v) => setBiz({ dateApplied: v })}
+          />
+          <Field
+            id="loanDesired"
+            label="Loan Desired"
+            value={contact.loanDesired ?? ""}
+            onChange={(v) => setProfileData({ loanDesired: v })}
+          />
+        </FieldRow>
+        <Field
+          id="salesAgent"
+          label="Sales Agent"
+          value={biz.salesAgent ?? ""}
+          onChange={(v) => setBiz({ salesAgent: v })}
+        />
+      </Card>
+
+      <h3 className="mb-2 mt-6 font-display text-sm font-semibold uppercase tracking-wide text-navy-500">
+        Individual / Representative Application
+      </h3>
+      <Card>
+        <h2 className={CARD_TITLE}>I. Personal information</h2>
+        <div className="mb-3 grid gap-3 sm:grid-cols-3">
+          <Field
+            id="lastName"
+            label="Last name *"
+            value={profile.lastName}
+            onChange={(v) => onChange({ ...profile, lastName: v })}
+          />
+          <Field
+            id="firstName"
+            label="First name *"
+            value={profile.firstName}
+            onChange={(v) => onChange({ ...profile, firstName: v })}
+          />
+          <Field
+            id="middleName"
+            label="Middle name"
+            value={profile.middleName ?? ""}
+            onChange={(v) => onChange({ ...profile, middleName: v })}
+          />
+        </div>
+        <div className="mb-3">
+          <SelectField
+            id="civilStatus"
+            label="Status"
+            value={profile.civilStatus ?? ""}
+            options={CIVIL_STATUS_OPTIONS}
+            onChange={(v) => onChange({ ...profile, civilStatus: v })}
+          />
+        </div>
+
+        <Field
+          id="presentAddress"
+          label="Present address"
+          value={profile.presentAddress.street ?? ""}
+          onChange={(v) =>
+            onChange({
+              ...profile,
+              presentAddress: { ...profile.presentAddress, street: v },
+            })
+          }
+        />
+        <FieldRow>
+          <SelectField
+            id="presentOwnership"
+            label="Ownership"
+            value={profile.presentAddress.ownership ?? ""}
+            options={SME_OWNERSHIP_OPTIONS}
+            onChange={(v) =>
+              onChange({
+                ...profile,
+                presentAddress: {
+                  ...profile.presentAddress,
+                  ownership: v,
+                },
+              })
+            }
+          />
+          <Field
+            id="presentLengthOfStay"
+            label="Yrs of stay"
+            value={profile.presentAddress.lengthOfStay ?? ""}
+            onChange={(v) =>
+              onChange({
+                ...profile,
+                presentAddress: {
+                  ...profile.presentAddress,
+                  lengthOfStay: v,
+                },
+              })
+            }
+          />
+        </FieldRow>
+
+        <Field
+          id="permanentAddress"
+          label="Provincial address"
+          value={profile.permanentAddress.street ?? ""}
+          onChange={(v) =>
+            onChange({
+              ...profile,
+              permanentAddress: { ...profile.permanentAddress, street: v },
+            })
+          }
+        />
+        <FieldRow>
+          <SelectField
+            id="permanentOwnership"
+            label="Ownership"
+            value={profile.permanentAddress.ownership ?? ""}
+            options={SME_OWNERSHIP_OPTIONS}
+            onChange={(v) =>
+              onChange({
+                ...profile,
+                permanentAddress: {
+                  ...profile.permanentAddress,
+                  ownership: v,
+                },
+              })
+            }
+          />
+          <Field
+            id="permanentLengthOfStay"
+            label="Yrs of stay"
+            value={profile.permanentAddress.lengthOfStay ?? ""}
+            onChange={(v) =>
+              onChange({
+                ...profile,
+                permanentAddress: {
+                  ...profile.permanentAddress,
+                  lengthOfStay: v,
+                },
+              })
+            }
+          />
+        </FieldRow>
+
+        <FieldRow>
+          <Field
+            id="placeOfBirth"
+            label="Place of birth"
+            value={profile.placeOfBirth ?? ""}
+            onChange={(v) => onChange({ ...profile, placeOfBirth: v })}
+          />
+          <Field
+            id="dateOfBirth"
+            label="Date of birth"
+            type="date"
+            value={profile.dateOfBirth ?? ""}
+            onChange={(v) => onChange({ ...profile, dateOfBirth: v })}
+          />
+        </FieldRow>
+
+        <FieldRow>
+          <Field
+            id="landline"
+            label="Landline"
+            value={profile.landline ?? ""}
+            onChange={(v) => onChange({ ...profile, landline: v })}
+          />
+          <PhoneField
+            id="mobilePhone"
+            label="Mobile"
+            value={profile.mobilePhone ?? ""}
+            onChange={(v) => onChange({ ...profile, mobilePhone: v })}
+          />
+        </FieldRow>
+        <FieldRow>
+          <Field
+            id="email"
+            label="Email address"
+            value={profile.email}
+            disabled={!emailEditable}
+          />
+          <Field
+            id="noOfDependents"
+            label="No. of dependents"
+            value={contact.noOfDependents ?? ""}
+            onChange={(v) => setProfileData({ noOfDependents: v })}
+          />
+        </FieldRow>
+      </Card>
+        </>
+      ) : (
+        <>
       <Card>
         <FieldRow>
           <Field
@@ -382,14 +579,7 @@ export function ApplicantProfileFields({
             value={contact.loanDesired ?? ""}
             onChange={(v) => setProfileData({ loanDesired: v })}
           />
-          {isSme ? (
-            <Field
-              id="salesAgent"
-              label="Sales agent"
-              value={biz.salesAgent ?? ""}
-              onChange={(v) => setBiz({ salesAgent: v })}
-            />
-          ) : isSeafarer ? (
+          {isSeafarer ? (
             <Field
               id="rank"
               label="Rank"
@@ -424,11 +614,6 @@ export function ApplicantProfileFields({
         </FieldRow>
       </Card>
 
-      {isSme ? (
-        <h3 className="mb-2 mt-6 font-display text-sm font-semibold uppercase tracking-wide text-navy-500">
-          Individual / Representative Application
-        </h3>
-      ) : null}
       <Card>
         <h2 className={CARD_TITLE}>I. Personal information</h2>
         <div className="mb-3 grid gap-3 sm:grid-cols-3">
@@ -644,6 +829,272 @@ export function ApplicantProfileFields({
           </div>
         </FieldRow>
       </Card>
+        </>
+      )}
+
+      {isSme ? (
+        <Card>
+          <h2 className={CARD_TITLE}>I. Applicant data — employment</h2>
+          <FieldRow>
+            <Field
+              id="emp_companyName"
+              label="Company or employer's name"
+              value={biz.companyName ?? ""}
+              onChange={(v) => setBiz({ companyName: v })}
+            />
+            <Field
+              id="emp_position"
+              label="Position"
+              value={biz.position ?? ""}
+              onChange={(v) => setBiz({ position: v })}
+            />
+          </FieldRow>
+          <Field
+            id="emp_address"
+            label="Company address"
+            value={biz.companyAddress ?? ""}
+            onChange={(v) => setBiz({ companyAddress: v })}
+          />
+          <FieldRow>
+            <Field
+              id="emp_contact"
+              label="Contact number"
+              value={biz.companyContactNumber ?? ""}
+              onChange={(v) => setBiz({ companyContactNumber: v })}
+            />
+            <Field
+              id="emp_yearsOfStay"
+              label="Years of stay"
+              value={biz.yearsOfStay ?? ""}
+              onChange={(v) => setBiz({ yearsOfStay: v })}
+            />
+          </FieldRow>
+          <FieldRow>
+            <Field
+              id="emp_yearsOfOperation"
+              label="Years of operation"
+              value={biz.yearsOfOperation ?? ""}
+              onChange={(v) => setBiz({ yearsOfOperation: v })}
+            />
+            <Field
+              id="emp_email"
+              label="Business email"
+              value={biz.companyEmail ?? ""}
+              onChange={(v) => setBiz({ companyEmail: v })}
+            />
+          </FieldRow>
+          <FieldRow>
+            <Field
+              id="emp_website"
+              label="Website"
+              value={biz.website ?? ""}
+              onChange={(v) => setBiz({ website: v })}
+            />
+            <Field
+              id="emp_prevEmployer"
+              label="Previous employer"
+              value={biz.previousEmployer ?? ""}
+              onChange={(v) => setBiz({ previousEmployer: v })}
+            />
+          </FieldRow>
+          <Field
+            id="emp_prevAddress"
+            label="Previous company address"
+            value={biz.previousCompanyAddress ?? ""}
+            onChange={(v) => setBiz({ previousCompanyAddress: v })}
+          />
+          <FieldRow>
+            <Field
+              id="emp_prevYears"
+              label="Previous yrs of stay"
+              value={biz.previousYearsOfStay ?? ""}
+              onChange={(v) => setBiz({ previousYearsOfStay: v })}
+            />
+            <Field
+              id="emp_prevContact"
+              label="Previous contact number"
+              value={biz.previousContactNumber ?? ""}
+              onChange={(v) => setBiz({ previousContactNumber: v })}
+            />
+          </FieldRow>
+        </Card>
+      ) : null}
+
+      {isSme ? (
+        <Card>
+          <h2 className={CARD_TITLE}>III. Spouse information</h2>
+          <div className="mb-3 grid gap-3 sm:grid-cols-3">
+            <Field
+              id="spouse_lastName"
+              label="Last name"
+              value={biz.spouse?.lastName ?? ""}
+              onChange={(v) => setSpouse({ lastName: v })}
+            />
+            <Field
+              id="spouse_firstName"
+              label="First name"
+              value={biz.spouse?.firstName ?? ""}
+              onChange={(v) => setSpouse({ firstName: v })}
+            />
+            <Field
+              id="spouse_middleName"
+              label="Middle name"
+              value={biz.spouse?.middleName ?? ""}
+              onChange={(v) => setSpouse({ middleName: v })}
+            />
+          </div>
+          <FieldRow>
+            <Field
+              id="spouse_dob"
+              label="Date of birth"
+              type="date"
+              value={biz.spouse?.dateOfBirth ?? ""}
+              onChange={(v) => setSpouse({ dateOfBirth: v })}
+            />
+            <PhoneField
+              id="spouse_contact"
+              label="Contact number"
+              value={biz.spouse?.contactNumber ?? ""}
+              onChange={(v) => setSpouse({ contactNumber: v })}
+            />
+          </FieldRow>
+          <FieldRow>
+            <Field
+              id="spouse_presentAddress"
+              label="Present address"
+              value={biz.spouse?.presentAddress ?? ""}
+              onChange={(v) => setSpouse({ presentAddress: v })}
+            />
+            <Field
+              id="spouse_yrsPresent"
+              label="Yrs of stay (present)"
+              value={biz.spouse?.yearsOfStayPresent ?? ""}
+              onChange={(v) => setSpouse({ yearsOfStayPresent: v })}
+            />
+          </FieldRow>
+          <FieldRow>
+            <Field
+              id="spouse_provincialAddress"
+              label="Provincial address"
+              value={biz.spouse?.provincialAddress ?? ""}
+              onChange={(v) => setSpouse({ provincialAddress: v })}
+            />
+            <Field
+              id="spouse_yrsProvincial"
+              label="Yrs of stay (provincial)"
+              value={biz.spouse?.yearsOfStayProvincial ?? ""}
+              onChange={(v) => setSpouse({ yearsOfStayProvincial: v })}
+            />
+          </FieldRow>
+          <FieldRow>
+            <Field
+              id="spouse_company"
+              label="Company or employer's name"
+              value={biz.spouse?.companyOrEmployerName ?? ""}
+              onChange={(v) => setSpouse({ companyOrEmployerName: v })}
+            />
+            <Field
+              id="spouse_yrsCompany"
+              label="Yrs of stay (company)"
+              value={biz.spouse?.yearsOfStayCompany ?? ""}
+              onChange={(v) => setSpouse({ yearsOfStayCompany: v })}
+            />
+          </FieldRow>
+          <FieldRow>
+            <Field
+              id="spouse_position"
+              label="Position"
+              value={biz.spouse?.position ?? ""}
+              onChange={(v) => setSpouse({ position: v })}
+            />
+            <Field
+              id="spouse_companyAddress"
+              label="Company address"
+              value={biz.spouse?.companyAddress ?? ""}
+              onChange={(v) => setSpouse({ companyAddress: v })}
+            />
+          </FieldRow>
+        </Card>
+      ) : null}
+
+      {isSme ? (
+        <Card>
+          <h2 className={CARD_TITLE}>IV. Income declaration</h2>
+          <p className="mb-3 text-sm text-ink-500">Own monthly income</p>
+          <FieldRow>
+            <Field
+              id="biz_gross"
+              label="Gross income"
+              value={biz.businessGrossIncome ?? ""}
+              onChange={(v) => setBiz({ businessGrossIncome: v })}
+            />
+            <Field
+              id="biz_expenses"
+              label="Less expenses"
+              value={biz.businessLessExpenses ?? ""}
+              onChange={(v) => setBiz({ businessLessExpenses: v })}
+            />
+          </FieldRow>
+          <FieldRow>
+            <Field
+              id="biz_net"
+              label="Net income"
+              value={biz.businessNetIncome ?? ""}
+              onChange={(v) => setBiz({ businessNetIncome: v })}
+            />
+            <Field
+              id="biz_ownMonthly"
+              label="Own monthly income (optional)"
+              value={biz.ownMonthlyIncome ?? ""}
+              onChange={(v) => setBiz({ ownMonthlyIncome: v })}
+            />
+          </FieldRow>
+          <p className="mb-3 mt-4 text-sm text-ink-500">Spouse&apos;s monthly income</p>
+          <FieldRow>
+            <Field
+              id="biz_spouseGross"
+              label="Gross income"
+              value={biz.spouseGrossIncome ?? biz.spouseMonthlyIncome ?? ""}
+              onChange={(v) =>
+                setBiz({ spouseGrossIncome: v, spouseMonthlyIncome: v })
+              }
+            />
+            <Field
+              id="biz_spouseExpenses"
+              label="Less expenses"
+              value={biz.spouseLessExpenses ?? ""}
+              onChange={(v) => setBiz({ spouseLessExpenses: v })}
+            />
+          </FieldRow>
+          <Field
+            id="biz_spouseNet"
+            label="Net income"
+            value={biz.spouseNetIncome ?? biz.spouseMonthlyIncome ?? ""}
+            onChange={(v) => setBiz({ spouseNetIncome: v })}
+          />
+          <p className="mb-3 mt-4 text-sm text-ink-500">Other income</p>
+          <FieldRow>
+            <Field
+              id="biz_source"
+              label="Source of income"
+              value={biz.sourceOfIncome ?? ""}
+              onChange={(v) => setBiz({ sourceOfIncome: v })}
+            />
+            <Field
+              id="biz_otherIncome"
+              label="Monthly income"
+              value={biz.otherIncome ?? ""}
+              onChange={(v) => setBiz({ otherIncome: v })}
+            />
+          </FieldRow>
+          <Field
+            id="biz_totalNet"
+            label="Total net income"
+            value={biz.totalNetIncome ?? ""}
+            onChange={(v) => setBiz({ totalNetIncome: v })}
+          />
+        </Card>
+      ) : null}
 
       {isSme ? (
         <h3 className="mb-2 mt-6 font-display text-sm font-semibold uppercase tracking-wide text-navy-500">
@@ -652,91 +1103,55 @@ export function ApplicantProfileFields({
       ) : null}
       {isSme ? (
         <Card>
-          <h2 className={CARD_TITLE}>
-            {isCorporate ? "II. Facts about the company" : "II. Business / employment"}
-          </h2>
+          <h2 className={CARD_TITLE}>II. Facts about the company</h2>
           <FieldRow>
             <Field
               id="biz_companyName"
-              label={isCorporate ? "Name of company" : "Company or employer's name"}
+              label="Name of company"
               value={biz.companyName ?? ""}
               onChange={(v) => setBiz({ companyName: v })}
             />
-            {isCorporate ? (
-              <Field
-                id="biz_acronym"
-                label="Acronym"
-                value={biz.acronym ?? ""}
-                onChange={(v) => setBiz({ acronym: v })}
-              />
-            ) : (
-              <Field
-                id="biz_position"
-                label="Position"
-                value={biz.position ?? ""}
-                onChange={(v) => setBiz({ position: v })}
-              />
-            )}
+            <Field
+              id="biz_acronym"
+              label="Acronym"
+              value={biz.acronym ?? ""}
+              onChange={(v) => setBiz({ acronym: v })}
+            />
           </FieldRow>
           <Field
             id="biz_address"
-            label={isCorporate ? "Office address" : "Company address"}
-            value={
-              isCorporate
-                ? (biz.officeAddress ?? "")
-                : (biz.companyAddress ?? "")
-            }
-            onChange={(v) =>
-              setBiz(
-                isCorporate ? { officeAddress: v } : { companyAddress: v },
-              )
-            }
+            label="Office address"
+            value={biz.officeAddress ?? ""}
+            onChange={(v) => setBiz({ officeAddress: v })}
+          />
+          <Field
+            id="biz_address_line2"
+            label="Office address line 2"
+            value={biz.officeAddressLine2 ?? ""}
+            onChange={(v) => setBiz({ officeAddressLine2: v })}
           />
           <FieldRow>
             <Field
               id="biz_landline"
-              label={isCorporate ? "Landline nos." : "Contact number"}
-              value={
-                isCorporate
-                  ? (biz.landlineNos ?? "")
-                  : (biz.companyContactNumber ?? "")
-              }
-              onChange={(v) =>
-                setBiz(
-                  isCorporate
-                    ? { landlineNos: v }
-                    : { companyContactNumber: v },
-                )
-              }
+              label="Landline nos."
+              value={biz.landlineNos ?? ""}
+              onChange={(v) => setBiz({ landlineNos: v })}
             />
             <Field
               id="biz_mobile"
-              label={isCorporate ? "Mobile nos." : "Years of stay"}
-              value={
-                isCorporate ? (biz.mobileNos ?? "") : (biz.yearsOfStay ?? "")
-              }
-              onChange={(v) =>
-                setBiz(isCorporate ? { mobileNos: v } : { yearsOfStay: v })
-              }
+              label="Mobile nos."
+              value={biz.mobileNos ?? ""}
+              onChange={(v) => setBiz({ mobileNos: v })}
             />
           </FieldRow>
           <FieldRow>
-            {isCorporate ? (
-              <SelectField
-                id="biz_nature"
-                label="Nature of business"
-                value={biz.natureOfBusiness ?? ""}
-                options={NATURE_OF_BUSINESS_OPTIONS}
-                onChange={(v) => setBiz({ natureOfBusiness: v })}
-              />
-            ) : (
-              <Field
-                id="biz_nature"
-                label="Years of operation"
-                value={biz.yearsOfOperation ?? ""}
-                onChange={(v) => setBiz({ yearsOfOperation: v })}
-              />
-            )}
+            <SelectField
+              id="biz_nature"
+              label="Nature of business"
+              value={biz.natureOfBusiness ?? ""}
+              options={NATURE_OF_BUSINESS_OPTIONS}
+              onChange={(v) => setBiz({ natureOfBusiness: v })}
+            />
             <Field
               id="biz_email"
               label="Business email"
@@ -751,77 +1166,41 @@ export function ApplicantProfileFields({
               value={biz.website ?? ""}
               onChange={(v) => setBiz({ website: v })}
             />
-            {isCorporate ? (
-              <Field
-                id="biz_tin"
-                label="TIN"
-                value={biz.tin ?? ""}
-                onChange={(v) => setBiz({ tin: v })}
-              />
-            ) : (
-              <Field
-                id="biz_prevEmployer"
-                label="Previous employer"
-                value={biz.previousEmployer ?? ""}
-                onChange={(v) => setBiz({ previousEmployer: v })}
-              />
-            )}
+            <Field
+              id="biz_tin"
+              label="TIN"
+              value={biz.tin ?? ""}
+              onChange={(v) => setBiz({ tin: v })}
+            />
           </FieldRow>
-          {isCorporate ? (
-            <>
-              <FieldRow>
-                <Field
-                  id="biz_fax"
-                  label="Fax no."
-                  value={biz.faxNo ?? ""}
-                  onChange={(v) => setBiz({ faxNo: v })}
-                />
-                <Field
-                  id="biz_branches"
-                  label="No. of branches"
-                  value={biz.numberOfBranches ?? ""}
-                  onChange={(v) => setBiz({ numberOfBranches: v })}
-                />
-              </FieldRow>
-              <FieldRow>
-                <Field
-                  id="biz_established"
-                  label="Date established"
-                  value={biz.dateEstablished ?? ""}
-                  onChange={(v) => setBiz({ dateEstablished: v })}
-                />
-                <Field
-                  id="biz_employees"
-                  label="No. of employees"
-                  value={biz.numberOfEmployees ?? ""}
-                  onChange={(v) => setBiz({ numberOfEmployees: v })}
-                />
-              </FieldRow>
-            </>
-          ) : (
-            <>
-              <Field
-                id="biz_prevAddress"
-                label="Previous company address"
-                value={biz.previousCompanyAddress ?? ""}
-                onChange={(v) => setBiz({ previousCompanyAddress: v })}
-              />
-              <FieldRow>
-                <Field
-                  id="biz_prevYears"
-                  label="Previous yrs of stay"
-                  value={biz.previousYearsOfStay ?? ""}
-                  onChange={(v) => setBiz({ previousYearsOfStay: v })}
-                />
-                <Field
-                  id="biz_prevContact"
-                  label="Previous contact number"
-                  value={biz.previousContactNumber ?? ""}
-                  onChange={(v) => setBiz({ previousContactNumber: v })}
-                />
-              </FieldRow>
-            </>
-          )}
+          <FieldRow>
+            <Field
+              id="biz_fax"
+              label="Fax no."
+              value={biz.faxNo ?? ""}
+              onChange={(v) => setBiz({ faxNo: v })}
+            />
+            <Field
+              id="biz_branches"
+              label="No. of branches"
+              value={biz.numberOfBranches ?? ""}
+              onChange={(v) => setBiz({ numberOfBranches: v })}
+            />
+          </FieldRow>
+          <FieldRow>
+            <Field
+              id="biz_established"
+              label="Date established"
+              value={biz.dateEstablished ?? ""}
+              onChange={(v) => setBiz({ dateEstablished: v })}
+            />
+            <Field
+              id="biz_employees"
+              label="No. of employees"
+              value={biz.numberOfEmployees ?? ""}
+              onChange={(v) => setBiz({ numberOfEmployees: v })}
+            />
+          </FieldRow>
         </Card>
       ) : null}
 
@@ -963,220 +1342,35 @@ export function ApplicantProfileFields({
       </Card>
       ) : null}
 
-      {isIndividualSme ? (
+      {isSme ? (
         <Card>
-          <h2 className={CARD_TITLE}>III. Spouse information</h2>
-          <div className="mb-3 grid gap-3 sm:grid-cols-3">
-            <Field
-              id="spouse_lastName"
-              label="Last name"
-              value={biz.spouse?.lastName ?? ""}
-              onChange={(v) => setSpouse({ lastName: v })}
-            />
-            <Field
-              id="spouse_firstName"
-              label="First name"
-              value={biz.spouse?.firstName ?? ""}
-              onChange={(v) => setSpouse({ firstName: v })}
-            />
-            <Field
-              id="spouse_middleName"
-              label="Middle name"
-              value={biz.spouse?.middleName ?? ""}
-              onChange={(v) => setSpouse({ middleName: v })}
-            />
-          </div>
-          <FieldRow>
-            <Field
-              id="spouse_dob"
-              label="Date of birth"
-              type="date"
-              value={biz.spouse?.dateOfBirth ?? ""}
-              onChange={(v) => setSpouse({ dateOfBirth: v })}
-            />
-            <PhoneField
-              id="spouse_contact"
-              label="Contact number"
-              value={biz.spouse?.contactNumber ?? ""}
-              onChange={(v) => setSpouse({ contactNumber: v })}
-            />
-          </FieldRow>
-          <FieldRow>
-            <Field
-              id="spouse_presentAddress"
-              label="Present address"
-              value={biz.spouse?.presentAddress ?? ""}
-              onChange={(v) => setSpouse({ presentAddress: v })}
-            />
-            <Field
-              id="spouse_yrsPresent"
-              label="Yrs of stay (present)"
-              value={biz.spouse?.yearsOfStayPresent ?? ""}
-              onChange={(v) => setSpouse({ yearsOfStayPresent: v })}
-            />
-          </FieldRow>
-          <FieldRow>
-            <Field
-              id="spouse_provincialAddress"
-              label="Provincial address"
-              value={biz.spouse?.provincialAddress ?? ""}
-              onChange={(v) => setSpouse({ provincialAddress: v })}
-            />
-            <Field
-              id="spouse_yrsProvincial"
-              label="Yrs of stay (provincial)"
-              value={biz.spouse?.yearsOfStayProvincial ?? ""}
-              onChange={(v) => setSpouse({ yearsOfStayProvincial: v })}
-            />
-          </FieldRow>
-          <FieldRow>
-            <Field
-              id="spouse_company"
-              label="Company or employer's name"
-              value={biz.spouse?.companyOrEmployerName ?? ""}
-              onChange={(v) => setSpouse({ companyOrEmployerName: v })}
-            />
-            <Field
-              id="spouse_yrsCompany"
-              label="Yrs of stay (company)"
-              value={biz.spouse?.yearsOfStayCompany ?? ""}
-              onChange={(v) => setSpouse({ yearsOfStayCompany: v })}
-            />
-          </FieldRow>
-          <FieldRow>
-            <Field
-              id="spouse_position"
-              label="Position"
-              value={biz.spouse?.position ?? ""}
-              onChange={(v) => setSpouse({ position: v })}
-            />
-            <Field
-              id="spouse_companyAddress"
-              label="Company address"
-              value={biz.spouse?.companyAddress ?? ""}
-              onChange={(v) => setSpouse({ companyAddress: v })}
-            />
-          </FieldRow>
-        </Card>
-      ) : null}
-
-      {isIndividualSme ? (
-        <Card>
-          <h2 className={CARD_TITLE}>IV. Income declaration</h2>
-          <p className="mb-3 text-sm text-ink-500">Own monthly income</p>
-          <FieldRow>
-            <Field
-              id="biz_gross"
-              label="Gross income"
-              value={biz.businessGrossIncome ?? ""}
-              onChange={(v) => setBiz({ businessGrossIncome: v })}
-            />
-            <Field
-              id="biz_expenses"
-              label="Less expenses"
-              value={biz.businessLessExpenses ?? ""}
-              onChange={(v) => setBiz({ businessLessExpenses: v })}
-            />
-          </FieldRow>
-          <FieldRow>
-            <Field
-              id="biz_net"
-              label="Net income"
-              value={biz.businessNetIncome ?? ""}
-              onChange={(v) => setBiz({ businessNetIncome: v })}
-            />
-            <Field
-              id="biz_ownMonthly"
-              label="Own monthly income (optional)"
-              value={biz.ownMonthlyIncome ?? ""}
-              onChange={(v) => setBiz({ ownMonthlyIncome: v })}
-            />
-          </FieldRow>
-          <p className="mb-3 mt-4 text-sm text-ink-500">Spouse&apos;s monthly income</p>
-          <FieldRow>
-            <Field
-              id="biz_spouseGross"
-              label="Gross income"
-              value={biz.spouseGrossIncome ?? biz.spouseMonthlyIncome ?? ""}
-              onChange={(v) =>
-                setBiz({ spouseGrossIncome: v, spouseMonthlyIncome: v })
-              }
-            />
-            <Field
-              id="biz_spouseExpenses"
-              label="Less expenses"
-              value={biz.spouseLessExpenses ?? ""}
-              onChange={(v) => setBiz({ spouseLessExpenses: v })}
-            />
-          </FieldRow>
-          <Field
-            id="biz_spouseNet"
-            label="Net income"
-            value={biz.spouseNetIncome ?? biz.spouseMonthlyIncome ?? ""}
-            onChange={(v) => setBiz({ spouseNetIncome: v })}
+          <RepeatingRows<BusinessOfficer>
+            title="Company officers"
+            addLabel="Add officer"
+            rows={biz.companyOfficers}
+            emptyRow={() => ({ name: "", address: "", position: "" })}
+            columnsClassName="sm:grid-cols-[repeat(3,1fr)_auto]"
+            headers={["Name", "Address", "Position"]}
+            onChange={(companyOfficers) => setBiz({ companyOfficers })}
+            disabled={readOnly}
+            renderRow={(officer, _i, update) => (
+              <>
+                <Input
+                  value={officer.name ?? ""}
+                  onChange={(e) => update({ name: e.target.value })}
+                />
+                <Input
+                  value={officer.address ?? ""}
+                  onChange={(e) => update({ address: e.target.value })}
+                />
+                <InlineSelectField
+                  value={officer.position ?? ""}
+                  options={OFFICER_POSITION_OPTIONS}
+                  onChange={(v) => update({ position: v })}
+                />
+              </>
+            )}
           />
-          <p className="mb-3 mt-4 text-sm text-ink-500">Other income</p>
-          <FieldRow>
-            <Field
-              id="biz_source"
-              label="Source of income"
-              value={biz.sourceOfIncome ?? ""}
-              onChange={(v) => setBiz({ sourceOfIncome: v })}
-            />
-            <Field
-              id="biz_otherIncome"
-              label="Monthly income"
-              value={biz.otherIncome ?? ""}
-              onChange={(v) => setBiz({ otherIncome: v })}
-            />
-          </FieldRow>
-          <Field
-            id="biz_totalNet"
-            label="Total net income"
-            value={biz.totalNetIncome ?? ""}
-            onChange={(v) => setBiz({ totalNetIncome: v })}
-          />
-        </Card>
-      ) : null}
-
-      {isCorporate ? (
-        <Card>
-          <h2 className={CARD_TITLE}>III. Company officers</h2>
-          {padRows<BusinessOfficer>(biz.companyOfficers, 3).map((officer, i) => (
-            <div key={`officer-${i}`} className="mb-3 grid gap-3 sm:grid-cols-3">
-              <Field
-                id={`officer_name_${i}`}
-                label={i === 0 ? "Name" : `Name ${i + 1}`}
-                value={officer.name ?? ""}
-                onChange={(v) => {
-                  const rows = padRows<BusinessOfficer>(biz.companyOfficers, 3);
-                  rows[i] = { ...rows[i], name: v };
-                  setBiz({ companyOfficers: rows });
-                }}
-              />
-              <Field
-                id={`officer_address_${i}`}
-                label="Address"
-                value={officer.address ?? ""}
-                onChange={(v) => {
-                  const rows = padRows<BusinessOfficer>(biz.companyOfficers, 3);
-                  rows[i] = { ...rows[i], address: v };
-                  setBiz({ companyOfficers: rows });
-                }}
-              />
-              <SelectField
-                id={`officer_position_${i}`}
-                label="Position"
-                value={officer.position ?? ""}
-                options={OFFICER_POSITION_OPTIONS}
-                onChange={(v) => {
-                  const rows = padRows<BusinessOfficer>(biz.companyOfficers, 3);
-                  rows[i] = { ...rows[i], position: v };
-                  setBiz({ companyOfficers: rows });
-                }}
-              />
-            </div>
-          ))}
         </Card>
       ) : null}
 
@@ -1397,305 +1591,239 @@ export function ApplicantProfileFields({
       </>
       ) : null}
 
-      {isCorporate ? (
+      {isSme ? (
         <Card>
-          <h2 className={CARD_TITLE}>IV. Major stockholders</h2>
-          {padRows<BusinessStockholder>(biz.majorStockholders, 5)
-            .slice(0, 5)
-            .map((row, i) => (
-              <div
-                key={`stock-${i}`}
-                className="mb-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-4"
-              >
-                <Field
-                  id={`stock_name_${i}`}
-                  label="Name"
+          <RepeatingRows<BusinessStockholder>
+            title="Major stockholders"
+            addLabel="Add stockholder"
+            rows={biz.majorStockholders}
+            emptyRow={() => ({
+              name: "",
+              address: "",
+              position: "",
+              equity: "",
+            })}
+            columnsClassName="sm:grid-cols-[repeat(4,1fr)_auto]"
+            headers={["Name", "Address", "Position", "Equity"]}
+            onChange={(majorStockholders) => setBiz({ majorStockholders })}
+            disabled={readOnly}
+            renderRow={(row, _i, update) => (
+              <>
+                <Input
                   value={row.name ?? ""}
-                  onChange={(v) => {
-                    const rows = padRows<BusinessStockholder>(
-                      biz.majorStockholders,
-                      5,
-                    );
-                    rows[i] = { ...rows[i], name: v };
-                    setBiz({ majorStockholders: rows });
-                  }}
+                  onChange={(e) => update({ name: e.target.value })}
                 />
-                <Field
-                  id={`stock_address_${i}`}
-                  label="Address"
+                <Input
                   value={row.address ?? ""}
-                  onChange={(v) => {
-                    const rows = padRows<BusinessStockholder>(
-                      biz.majorStockholders,
-                      5,
-                    );
-                    rows[i] = { ...rows[i], address: v };
-                    setBiz({ majorStockholders: rows });
-                  }}
+                  onChange={(e) => update({ address: e.target.value })}
                 />
-                <SelectField
-                  id={`stock_position_${i}`}
-                  label="Position"
+                <InlineSelectField
                   value={row.position ?? ""}
                   options={OFFICER_POSITION_OPTIONS}
-                  onChange={(v) => {
-                    const rows = padRows<BusinessStockholder>(
-                      biz.majorStockholders,
-                      5,
-                    );
-                    rows[i] = { ...rows[i], position: v };
-                    setBiz({ majorStockholders: rows });
-                  }}
+                  onChange={(v) => update({ position: v })}
                 />
-                <Field
-                  id={`stock_equity_${i}`}
-                  label="Equity"
+                <Input
                   value={row.equity ?? ""}
-                  onChange={(v) => {
-                    const rows = padRows<BusinessStockholder>(
-                      biz.majorStockholders,
-                      5,
-                    );
-                    rows[i] = { ...rows[i], equity: v };
-                    setBiz({ majorStockholders: rows });
-                  }}
+                  onChange={(e) => update({ equity: e.target.value })}
                 />
-              </div>
-            ))}
+              </>
+            )}
+          />
         </Card>
       ) : null}
 
-      {isCorporate ? (
+      {isSme ? (
         <Card>
-          <h2 className={CARD_TITLE}>V. Trade references</h2>
-          <p className="mb-3 text-sm font-medium text-ink-600">
-            Customers / clients
-          </p>
-          {padRows<TradeParty>(biz.tradeCustomers, 3).map((row, i) => (
-            <div
-              key={`cust-${i}`}
-              className="mb-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-4"
-            >
-              <Field
-                id={`cust_name_${i}`}
-                label="Customer / client"
-                value={row.name ?? ""}
-                onChange={(v) => {
-                  const rows = padRows<TradeParty>(biz.tradeCustomers, 3);
-                  rows[i] = { ...rows[i], name: v };
-                  setBiz({ tradeCustomers: rows });
-                }}
-              />
-              <Field
-                id={`cust_address_${i}`}
-                label="Address"
-                value={row.address ?? ""}
-                onChange={(v) => {
-                  const rows = padRows<TradeParty>(biz.tradeCustomers, 3);
-                  rows[i] = { ...rows[i], address: v };
-                  setBiz({ tradeCustomers: rows });
-                }}
-              />
-              <Field
-                id={`cust_person_${i}`}
-                label="Contact person"
-                value={row.contactPerson ?? ""}
-                onChange={(v) => {
-                  const rows = padRows<TradeParty>(biz.tradeCustomers, 3);
-                  rows[i] = { ...rows[i], contactPerson: v };
-                  setBiz({ tradeCustomers: rows });
-                }}
-              />
-              <Field
-                id={`cust_no_${i}`}
-                label="Contact no."
-                value={row.contactNo ?? ""}
-                onChange={(v) => {
-                  const rows = padRows<TradeParty>(biz.tradeCustomers, 3);
-                  rows[i] = { ...rows[i], contactNo: v };
-                  setBiz({ tradeCustomers: rows });
-                }}
-              />
-            </div>
-          ))}
-          <p className="mb-3 mt-4 text-sm font-medium text-ink-600">Suppliers</p>
-          {padRows<TradeParty>(biz.tradeSuppliers, 3).map((row, i) => (
-            <div
-              key={`supp-${i}`}
-              className="mb-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-4"
-            >
-              <Field
-                id={`supp_name_${i}`}
-                label="Supplier"
-                value={row.name ?? ""}
-                onChange={(v) => {
-                  const rows = padRows<TradeParty>(biz.tradeSuppliers, 3);
-                  rows[i] = { ...rows[i], name: v };
-                  setBiz({ tradeSuppliers: rows });
-                }}
-              />
-              <Field
-                id={`supp_address_${i}`}
-                label="Address"
-                value={row.address ?? ""}
-                onChange={(v) => {
-                  const rows = padRows<TradeParty>(biz.tradeSuppliers, 3);
-                  rows[i] = { ...rows[i], address: v };
-                  setBiz({ tradeSuppliers: rows });
-                }}
-              />
-              <Field
-                id={`supp_person_${i}`}
-                label="Contact person"
-                value={row.contactPerson ?? ""}
-                onChange={(v) => {
-                  const rows = padRows<TradeParty>(biz.tradeSuppliers, 3);
-                  rows[i] = { ...rows[i], contactPerson: v };
-                  setBiz({ tradeSuppliers: rows });
-                }}
-              />
-              <Field
-                id={`supp_no_${i}`}
-                label="Contact no."
-                value={row.contactNo ?? ""}
-                onChange={(v) => {
-                  const rows = padRows<TradeParty>(biz.tradeSuppliers, 3);
-                  rows[i] = { ...rows[i], contactNo: v };
-                  setBiz({ tradeSuppliers: rows });
-                }}
-              />
-            </div>
-          ))}
+          <RepeatingRows<TradeParty>
+            title="Customers / clients"
+            addLabel="Add customer"
+            rows={biz.tradeCustomers}
+            emptyRow={() => ({
+              name: "",
+              address: "",
+              contactPerson: "",
+              contactNo: "",
+            })}
+            columnsClassName="sm:grid-cols-[repeat(4,1fr)_auto]"
+            headers={[
+              "Customer / Client",
+              "Address",
+              "Contact person",
+              "Contact no.",
+            ]}
+            onChange={(tradeCustomers) => setBiz({ tradeCustomers })}
+            disabled={readOnly}
+            renderRow={(row, _i, update) => (
+              <>
+                <Input
+                  value={row.name ?? ""}
+                  onChange={(e) => update({ name: e.target.value })}
+                />
+                <Input
+                  value={row.address ?? ""}
+                  onChange={(e) => update({ address: e.target.value })}
+                />
+                <Input
+                  value={row.contactPerson ?? ""}
+                  onChange={(e) => update({ contactPerson: e.target.value })}
+                />
+                <Input
+                  value={row.contactNo ?? ""}
+                  onChange={(e) => update({ contactNo: e.target.value })}
+                />
+              </>
+            )}
+          />
+          <div className="mt-6">
+            <RepeatingRows<TradeParty>
+              title="Suppliers"
+              addLabel="Add supplier"
+              rows={biz.tradeSuppliers}
+              emptyRow={() => ({
+                name: "",
+                address: "",
+                contactPerson: "",
+                contactNo: "",
+              })}
+              columnsClassName="sm:grid-cols-[repeat(4,1fr)_auto]"
+              headers={[
+                "Supplier",
+                "Address",
+                "Contact person",
+                "Contact no.",
+              ]}
+              onChange={(tradeSuppliers) => setBiz({ tradeSuppliers })}
+              disabled={readOnly}
+              renderRow={(row, _i, update) => (
+                <>
+                  <Input
+                    value={row.name ?? ""}
+                    onChange={(e) => update({ name: e.target.value })}
+                  />
+                  <Input
+                    value={row.address ?? ""}
+                    onChange={(e) => update({ address: e.target.value })}
+                  />
+                  <Input
+                    value={row.contactPerson ?? ""}
+                    onChange={(e) => update({ contactPerson: e.target.value })}
+                  />
+                  <Input
+                    value={row.contactNo ?? ""}
+                    onChange={(e) => update({ contactNo: e.target.value })}
+                  />
+                </>
+              )}
+            />
+          </div>
         </Card>
       ) : null}
 
-      {isCorporate ? (
+      {isSme ? (
         <Card>
-          <h2 className={CARD_TITLE}>VI. Credit references</h2>
-          {padRows<CreditReference>(biz.creditReferences, 3).map((row, i) => (
-            <div
-              key={`credit-${i}`}
-              className="mb-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-5"
-            >
-              <SelectField
-                id={`credit_bank_${i}`}
-                label="Creditor / bank"
-                value={row.creditorBank ?? ""}
-                options={BANK_OPTIONS}
-                onChange={(v) => {
-                  const rows = padRows<CreditReference>(biz.creditReferences, 3);
-                  rows[i] = { ...rows[i], creditorBank: v };
-                  setBiz({ creditReferences: rows });
-                }}
-              />
-              <SelectField
-                id={`credit_type_${i}`}
-                label="Type of loan"
-                value={row.typeOfLoan ?? ""}
-                options={TYPE_OF_LOAN_OPTIONS}
-                onChange={(v) => {
-                  const rows = padRows<CreditReference>(biz.creditReferences, 3);
-                  rows[i] = { ...rows[i], typeOfLoan: v };
-                  setBiz({ creditReferences: rows });
-                }}
-              />
-              <Field
-                id={`credit_bal_${i}`}
-                label="Outstanding balance"
-                value={row.outstandingBalance ?? ""}
-                onChange={(v) => {
-                  const rows = padRows<CreditReference>(biz.creditReferences, 3);
-                  rows[i] = { ...rows[i], outstandingBalance: v };
-                  setBiz({ creditReferences: rows });
-                }}
-              />
-              <Field
-                id={`credit_pay_${i}`}
-                label="Monthly payment"
-                value={row.monthlyPayment ?? ""}
-                onChange={(v) => {
-                  const rows = padRows<CreditReference>(biz.creditReferences, 3);
-                  rows[i] = { ...rows[i], monthlyPayment: v };
-                  setBiz({ creditReferences: rows });
-                }}
-              />
-              <Field
-                id={`credit_no_${i}`}
-                label="Contact no."
-                value={row.contactNo ?? ""}
-                onChange={(v) => {
-                  const rows = padRows<CreditReference>(biz.creditReferences, 3);
-                  rows[i] = { ...rows[i], contactNo: v };
-                  setBiz({ creditReferences: rows });
-                }}
-              />
-            </div>
-          ))}
+          <RepeatingRows<CreditReference>
+            title="Credit references"
+            addLabel="Add credit reference"
+            rows={biz.creditReferences}
+            emptyRow={() => ({
+              creditorBank: "",
+              typeOfLoan: "",
+              outstandingBalance: "",
+              monthlyPayment: "",
+              contactNo: "",
+            })}
+            columnsClassName="sm:grid-cols-[repeat(5,1fr)_auto]"
+            headers={[
+              "Creditors / Banks",
+              "Type of loan",
+              "Outstanding balance",
+              "Monthly payment",
+              "Contact no.",
+            ]}
+            onChange={(creditReferences) => setBiz({ creditReferences })}
+            disabled={readOnly}
+            renderRow={(row, _i, update) => (
+              <>
+                <InlineSelectField
+                  value={row.creditorBank ?? ""}
+                  options={BANK_OPTIONS}
+                  onChange={(v) => update({ creditorBank: v })}
+                />
+                <InlineSelectField
+                  value={row.typeOfLoan ?? ""}
+                  options={TYPE_OF_LOAN_OPTIONS}
+                  onChange={(v) => update({ typeOfLoan: v })}
+                />
+                <Input
+                  value={row.outstandingBalance ?? ""}
+                  onChange={(e) =>
+                    update({ outstandingBalance: e.target.value })
+                  }
+                />
+                <Input
+                  value={row.monthlyPayment ?? ""}
+                  onChange={(e) => update({ monthlyPayment: e.target.value })}
+                />
+                <Input
+                  value={row.contactNo ?? ""}
+                  onChange={(e) => update({ contactNo: e.target.value })}
+                />
+              </>
+            )}
+          />
         </Card>
       ) : null}
 
-      {isCorporate ? (
+      {isSme ? (
         <Card>
-          <h2 className={CARD_TITLE}>VII. Bank accounts</h2>
-          {padRows<BusinessBankAccount>(biz.bankAccounts, 3).map((row, i) => (
-            <div
-              key={`bank-${i}`}
-              className="mb-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-5"
-            >
-              <SelectField
-                id={`bank_name_${i}`}
-                label="Bank name"
-                value={row.bankName ?? ""}
-                options={BANK_OPTIONS}
-                onChange={(v) => {
-                  const rows = padRows<BusinessBankAccount>(biz.bankAccounts, 3);
-                  rows[i] = { ...rows[i], bankName: v };
-                  setBiz({ bankAccounts: rows });
-                }}
-              />
-              <Field
-                id={`bank_branch_${i}`}
-                label="Branch"
-                value={row.branch ?? ""}
-                onChange={(v) => {
-                  const rows = padRows<BusinessBankAccount>(biz.bankAccounts, 3);
-                  rows[i] = { ...rows[i], branch: v };
-                  setBiz({ bankAccounts: rows });
-                }}
-              />
-              <Field
-                id={`bank_acct_${i}`}
-                label="Account no."
-                value={row.accountNo ?? ""}
-                onChange={(v) => {
-                  const rows = padRows<BusinessBankAccount>(biz.bankAccounts, 3);
-                  rows[i] = { ...rows[i], accountNo: v };
-                  setBiz({ bankAccounts: rows });
-                }}
-              />
-              <SelectField
-                id={`bank_type_${i}`}
-                label="Account type"
-                value={row.accountType ?? ""}
-                options={ACCOUNT_TYPE_OPTIONS}
-                onChange={(v) => {
-                  const rows = padRows<BusinessBankAccount>(biz.bankAccounts, 3);
-                  rows[i] = { ...rows[i], accountType: v };
-                  setBiz({ bankAccounts: rows });
-                }}
-              />
-              <Field
-                id={`bank_no_${i}`}
-                label="Contact no."
-                value={row.contactNo ?? ""}
-                onChange={(v) => {
-                  const rows = padRows<BusinessBankAccount>(biz.bankAccounts, 3);
-                  rows[i] = { ...rows[i], contactNo: v };
-                  setBiz({ bankAccounts: rows });
-                }}
-              />
-            </div>
-          ))}
+          <RepeatingRows<BusinessBankAccount>
+            title="Bank accounts"
+            addLabel="Add bank account"
+            rows={biz.bankAccounts}
+            emptyRow={() => ({
+              bankName: "",
+              branch: "",
+              accountNo: "",
+              accountType: "",
+              contactNo: "",
+            })}
+            columnsClassName="sm:grid-cols-[repeat(5,1fr)_auto]"
+            headers={[
+              "Bank name",
+              "Branch",
+              "Account no.",
+              "Account type",
+              "Contact no.",
+            ]}
+            onChange={(bankAccounts) => setBiz({ bankAccounts })}
+            disabled={readOnly}
+            renderRow={(row, _i, update) => (
+              <>
+                <InlineSelectField
+                  value={row.bankName ?? ""}
+                  options={BANK_OPTIONS}
+                  onChange={(v) => update({ bankName: v })}
+                />
+                <Input
+                  value={row.branch ?? ""}
+                  onChange={(e) => update({ branch: e.target.value })}
+                />
+                <Input
+                  value={row.accountNo ?? ""}
+                  onChange={(e) => update({ accountNo: e.target.value })}
+                />
+                <InlineSelectField
+                  value={row.accountType ?? ""}
+                  options={ACCOUNT_TYPE_OPTIONS}
+                  onChange={(v) => update({ accountType: v })}
+                />
+                <Input
+                  value={row.contactNo ?? ""}
+                  onChange={(e) => update({ contactNo: e.target.value })}
+                />
+              </>
+            )}
+          />
           <Field
             id="bank_auth"
             label="Bank name and account number (ADB verification)"
@@ -1708,11 +1836,7 @@ export function ApplicantProfileFields({
       <Card>
         <div className="mb-4 flex items-center justify-between">
           <h2 className="font-display text-lg font-semibold text-navy-900">
-            {isIndividualSme
-              ? "Dependents"
-              : isCorporate
-                ? "Dependents (optional)"
-                : "VI. Dependents / siblings"}
+            {isSme ? "Dependents" : "VI. Dependents / siblings"}
           </h2>
           <Button
             type="button"
@@ -1731,46 +1855,92 @@ export function ApplicantProfileFields({
             Add dependent
           </Button>
         </div>
-        <div className="mb-2 hidden gap-3 text-xs font-semibold uppercase tracking-wide text-ink-400 sm:grid sm:grid-cols-[repeat(4,1fr)_auto]">
-          <span>Name</span>
-          <span>Age</span>
-          <span>Tel / CP number</span>
-          <span>Occupation / school</span>
-          <span className="w-[72px]" aria-hidden />
-        </div>
-        {profile.dependents.map((dep, i) => (
-          <div
-            key={i}
-            className="mb-3 grid gap-3 border-b border-line-soft pb-3 sm:grid-cols-[repeat(4,1fr)_auto]"
-          >
-            {(["name", "age", "contactNo", "occupation"] as const).map((f) => (
-              <Input
-                key={f}
-                value={dep[f] ?? ""}
-                onChange={(e) => {
-                  const deps = [...profile.dependents];
-                  deps[i] = { ...dep, [f]: e.target.value };
-                  onChange({ ...profile, dependents: deps as Dependent[] });
-                }}
-              />
+        {isSme ? (
+          <>
+            <div className="mb-2 hidden gap-3 text-xs font-semibold uppercase tracking-wide text-ink-400 sm:grid sm:grid-cols-[repeat(3,1fr)_auto]">
+              <span>Name</span>
+              <span>Age</span>
+              <span>School Attended / If Working Employer&apos;s Name</span>
+              <span className="w-[72px]" aria-hidden />
+            </div>
+            {profile.dependents.map((dep, i) => (
+              <div
+                key={i}
+                className="mb-3 grid gap-3 border-b border-line-soft pb-3 sm:grid-cols-[repeat(3,1fr)_auto]"
+              >
+                {(["name", "age", "occupation"] as const).map((f) => (
+                  <Input
+                    key={f}
+                    value={dep[f] ?? ""}
+                    onChange={(e) => {
+                      const deps = [...profile.dependents];
+                      deps[i] = { ...dep, [f]: e.target.value };
+                      onChange({ ...profile, dependents: deps as Dependent[] });
+                    }}
+                  />
+                ))}
+                <Button
+                  type="button"
+                  variant="danger-soft"
+                  size="sm"
+                  className="w-[72px] self-center justify-self-end"
+                  aria-label={`Remove dependent ${i + 1}`}
+                  onClick={() =>
+                    onChange({
+                      ...profile,
+                      dependents: profile.dependents.filter((_, idx) => idx !== i),
+                    })
+                  }
+                >
+                  Remove
+                </Button>
+              </div>
             ))}
-            <Button
-              type="button"
-              variant="danger-soft"
-              size="sm"
-              className="w-[72px] self-center justify-self-end"
-              aria-label={`Remove dependent ${i + 1}`}
-              onClick={() =>
-                onChange({
-                  ...profile,
-                  dependents: profile.dependents.filter((_, idx) => idx !== i),
-                })
-              }
-            >
-              Remove
-            </Button>
-          </div>
-        ))}
+          </>
+        ) : (
+          <>
+            <div className="mb-2 hidden gap-3 text-xs font-semibold uppercase tracking-wide text-ink-400 sm:grid sm:grid-cols-[repeat(4,1fr)_auto]">
+              <span>Name</span>
+              <span>Age</span>
+              <span>Tel / CP number</span>
+              <span>Occupation / school</span>
+              <span className="w-[72px]" aria-hidden />
+            </div>
+            {profile.dependents.map((dep, i) => (
+              <div
+                key={i}
+                className="mb-3 grid gap-3 border-b border-line-soft pb-3 sm:grid-cols-[repeat(4,1fr)_auto]"
+              >
+                {(["name", "age", "contactNo", "occupation"] as const).map((f) => (
+                  <Input
+                    key={f}
+                    value={dep[f] ?? ""}
+                    onChange={(e) => {
+                      const deps = [...profile.dependents];
+                      deps[i] = { ...dep, [f]: e.target.value };
+                      onChange({ ...profile, dependents: deps as Dependent[] });
+                    }}
+                  />
+                ))}
+                <Button
+                  type="button"
+                  variant="danger-soft"
+                  size="sm"
+                  className="w-[72px] self-center justify-self-end"
+                  aria-label={`Remove dependent ${i + 1}`}
+                  onClick={() =>
+                    onChange({
+                      ...profile,
+                      dependents: profile.dependents.filter((_, idx) => idx !== i),
+                    })
+                  }
+                >
+                  Remove
+                </Button>
+              </div>
+            ))}
+          </>
+        )}
       </Card>
 
       <Card>
@@ -1932,7 +2102,7 @@ export function ApplicantProfileFields({
             ))}
           </>
         )}
-        {isIndividualSme ? (
+        {isSme ? (
           <div className="mt-4 border-t border-line-soft pt-4">
             <p className="mb-3 text-sm font-medium text-ink-600">
               Relatives living in province

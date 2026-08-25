@@ -11,7 +11,17 @@ import {
   Label,
   LoanStarLogo,
   PhoneInput,
+  Select,
 } from "@/components/ui";
+
+const CIVIL_STATUS_OPTIONS = [
+  "Single",
+  "Married",
+  "Widowed",
+  "Separated",
+  "Annulled",
+  "Legally Separated",
+] as const;
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -83,7 +93,7 @@ export default function RegisterPage() {
             <h3>Check your email</h3>
             <p className="s">
               {confirmationSent
-                ? "We sent a confirmation link to your inbox (via Supabase Auth). Confirm your email, then log in to open your borrower portal."
+                ? "We sent a confirmation link to your inbox (via Supabase Auth). Open it to confirm your email — you will be signed in automatically."
                 : "Your account was created. If you did not receive a confirmation email, Confirm email may be disabled in Supabase Auth settings — you can try logging in, or ask an admin to enable email confirmations."}
             </p>
             <Button
@@ -268,12 +278,18 @@ export default function RegisterPage() {
 
             <div className="mb-[22px]">
               <Label htmlFor="civilStatus">Civil status</Label>
-              <Input
+              <Select
                 id="civilStatus"
-                placeholder="Single, Married, etc."
                 value={civilStatus}
                 onChange={(e) => setCivilStatus(e.target.value)}
-              />
+              >
+                <option value="">Select</option>
+                {CIVIL_STATUS_OPTIONS.map((option) => (
+                  <option key={option} value={option}>
+                    {option}
+                  </option>
+                ))}
+              </Select>
             </div>
 
             <Button

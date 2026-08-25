@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 
 import { writeAuditEvent } from "@/lib/audit/writer";
 import {
+  ORIGINATION_BLOCK_REASON,
   canStartReloan,
   findResumableDraft,
   nextApplicationKind,
@@ -42,6 +43,7 @@ function readSegmentBody(value: unknown): {
   segment?: string | null;
   entityType?: string | null;
   collateralType?: string | null;
+  individualLoanType?: string | null;
 } {
   if (!value || typeof value !== "object") return {};
   const record = value as Record<string, unknown>;
@@ -50,7 +52,11 @@ function readSegmentBody(value: unknown): {
     typeof record.entityType === "string" ? record.entityType : undefined;
   const collateralType =
     typeof record.collateralType === "string" ? record.collateralType : undefined;
-  return { segment, entityType, collateralType };
+  const individualLoanType =
+    typeof record.individualLoanType === "string"
+      ? record.individualLoanType
+      : undefined;
+  return { segment, entityType, collateralType, individualLoanType };
 }
 
 const VALID_COLLATERAL_TYPES = new Set([
@@ -58,6 +64,10 @@ const VALID_COLLATERAL_TYPES = new Set([
   "car_refinancing",
   "real_estate",
 ]);
+
+/** Does not inherit from a prior application on reloan — same as collateralType,
+ * unlike segment/entityType (confirmed decision, 2026-08-25). */
+const VALID_INDIVIDUAL_LOAN_TYPES = new Set(["mpl", "salary"]);
 
 export async function POST(request: Request) {
   try {
@@ -111,6 +121,12 @@ export async function POST(request: Request) {
     }
 
     const kind = nextApplicationKind({ applicationStatuses: statuses });
+    if (!kind) {
+      return NextResponse.json(
+        { error: ORIGINATION_BLOCK_REASON },
+        { status: 400 },
+      );
+    }
     const isReloan = kind === "reloan";
     const latestApp = existingApps?.[0] ?? null;
     const now = new Date().toISOString();
@@ -140,6 +156,23 @@ export async function POST(request: Request) {
       );
     }
 
+    // Read from body only — does not inherit from the borrower's prior
+    // application on reloan, same as collateralType (confirmed 2026-08-25).
+    const individualLoanType: "mpl" | "salary" | null =
+      body.individualLoanType &&
+      VALID_INDIVIDUAL_LOAN_TYPES.has(body.individualLoanType)
+        ? (body.individualLoanType as "mpl" | "salary")
+        : null;
+    if (segment === "individual" && collateralType === "none" && !individualLoanType) {
+      return NextResponse.json(
+        {
+          error:
+            "individualLoanType is required for individual applications with no collateral",
+        },
+        { status: 400 },
+      );
+    }
+
     const { data: application, error: applicationError } = await supabase
       .from("loan_applications")
       .insert({
@@ -158,6 +191,7 @@ export async function POST(request: Request) {
         segment,
         entity_type: entityType,
         collateral_type: collateralType,
+        individual_loan_type: individualLoanType,
       })
       .select(
         "id, status, status_history, is_reloan, parent_application_id, created_at, segment, entity_type",
@@ -195,6 +229,8 @@ export async function POST(request: Request) {
         status: "draft",
         segment,
         entityType,
+        collateralType,
+        individualLoanType,
         segmentInheritedFromParent: segment === "sme" || segment === "individual",
       },
     });
