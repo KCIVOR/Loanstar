@@ -208,6 +208,8 @@ export async function GET(_request: Request, { params }: RouteParams) {
         borrowerNo: data.borrower_no,
         borrowerId: (data.borrower_id as string | null) ?? null,
         loanAccountNo: data.loan_account_no,
+        releaseDate: (data.release_date as string | null) ?? null,
+        firstPaymentDate: (data.first_payment_date as string | null) ?? null,
         segment:
           data.segment === "sme" || data.segment === "individual"
             ? data.segment

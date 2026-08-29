@@ -12,6 +12,7 @@ import {
   Button,
   Card,
   ConfirmDialog,
+  Input,
   Label,
   PageHeader,
   Select,
@@ -63,6 +64,7 @@ type ScheduleRow = {
   amount_due: number;
   amount_paid?: number;
   penalty_amount?: number;
+  discount_amount?: number;
   status: string;
   rolled_into_installment_no?: number | null;
 };
@@ -205,6 +207,8 @@ export default function ArMasterlistDetailPage() {
     null,
   );
   const [viewingId, setViewingId] = useState<string | null>(null);
+  const [simulateDaysInput, setSimulateDaysInput] = useState("95");
+  const [confirmSimulate, setConfirmSimulate] = useState(false);
 
   const load = useCallback(async (opts?: { silent?: boolean }) => {
     if (!opts?.silent) setLoading(true);
@@ -362,6 +366,38 @@ export default function ArMasterlistDetailPage() {
     }
   }
 
+  async function runSimulateAging() {
+    const days = Number(simulateDaysInput);
+    if (!Number.isInteger(days) || days < 1) return;
+    setSaving(true);
+    setMessage(null);
+    setError(null);
+    try {
+      const res = await fetch(`/api/ar/masterlist/${id}/dev-simulate-aging`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ daysPastDue: days }),
+      });
+      const body = (await res.json()) as {
+        error?: string;
+        agingBucket?: string;
+        remedialFlag?: boolean;
+      };
+      if (!res.ok) throw new Error(body.error ?? "Simulation failed");
+      setConfirmSimulate(false);
+      setMessage(
+        `Backdated to ${days} days past due — aging bucket is now "${body.agingBucket}"${
+          body.remedialFlag ? ", account flagged for remedial." : "."
+        }`,
+      );
+      await load({ silent: true });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed");
+    } finally {
+      setSaving(false);
+    }
+  }
+
   async function confirmWriteOff() {
     if (!writeOffTarget) return;
     setSaving(true);
@@ -406,6 +442,8 @@ export default function ArMasterlistDetailPage() {
   const borrowerName = (record.borrower_name as string) ?? "Account";
   const borrowerNo = String(record.borrower_no ?? "");
   const accountNo = (record.loan_account_no as string | null) ?? null;
+  const releaseDate = (record.release_date as string | null) ?? null;
+  const firstPaymentDate = (record.first_payment_date as string | null) ?? null;
   const accountStatus = String(record.account_status ?? "");
   const agingBucket = String(record.aging_bucket ?? "");
   const applicationStatus = String(record.application_status ?? "");
@@ -522,6 +560,7 @@ export default function ArMasterlistDetailPage() {
       dueDate: String(row.due_date),
       target: Number(row.amount_due ?? 0),
       penalty: Number(row.penalty_amount ?? 0),
+      discount: Number(row.discount_amount ?? 0),
       installmentNo: Number(row.installment_no),
       checkNo: checkNoByInstallment.get(Number(row.installment_no)) ?? null,
       status: String(row.status ?? ""),
@@ -619,6 +658,48 @@ export default function ArMasterlistDetailPage() {
             Unassigned
           </Badge>
         )}
+      </div>
+
+      <div className="mb-6 flex flex-wrap gap-x-4 gap-y-1 text-sm text-ink-500">
+        <span>
+          Released{" "}
+          <b className="mono text-ink-800">
+            {releaseDate ? new Date(releaseDate).toLocaleDateString() : "—"}
+          </b>
+        </span>
+        <span>
+          First payment{" "}
+          <b className="mono text-ink-800">
+            {firstPaymentDate ? new Date(firstPaymentDate).toLocaleDateString() : "—"}
+          </b>
+        </span>
+      </div>
+
+      <div className="mb-6 flex flex-wrap items-center gap-2 rounded-[var(--r-sm)] border border-dashed border-line-soft bg-surface-2 px-3 py-2">
+        <span className="text-xs font-semibold uppercase tracking-wide text-ink-400">
+          🧪 Dev tool
+        </span>
+        <span className="text-xs text-ink-500">
+          Simulate this account being delinquent (backdates open installments and runs the
+          real aging/penalty check) —
+        </span>
+        <Input
+          type="number"
+          min="1"
+          max="365"
+          value={simulateDaysInput}
+          onChange={(e) => setSimulateDaysInput(e.target.value)}
+          style={{ width: 90 }}
+        />
+        <span className="text-xs text-ink-500">days past due</span>
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          onClick={() => setConfirmSimulate(true)}
+        >
+          Simulate
+        </Button>
       </div>
 
       {error ? (
@@ -916,7 +997,7 @@ export default function ArMasterlistDetailPage() {
                 >
                   <Button
                     type="button"
-                    variant="ghost"
+                    variant="outline"
                     size="sm"
                     onClick={() => setWriteOffTarget(candidate)}
                   >
@@ -1034,6 +1115,16 @@ export default function ArMasterlistDetailPage() {
           </div>
         )}
       </Card>
+
+      <ConfirmDialog
+        open={confirmSimulate}
+        title="Simulate delinquency on this account?"
+        message={`This backdates every open installment's due date so the earliest one is ${simulateDaysInput || "0"} days past due as of today, then runs the same aging/penalty check used in production. This is a real, non-reversible change to this account's schedule — only use it on a test account.`}
+        confirmLabel="Yes, simulate"
+        loading={saving}
+        onCancel={() => setConfirmSimulate(false)}
+        onConfirm={() => void runSimulateAging()}
+      />
 
       <ConfirmDialog
         open={confirmPaidOff}

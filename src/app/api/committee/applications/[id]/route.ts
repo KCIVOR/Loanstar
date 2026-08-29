@@ -27,6 +27,8 @@ import {
 } from "@/lib/negotiation/service";
 import { requireModulePermission } from "@/lib/permissions/server";
 import { createClient, createServiceClient } from "@/lib/supabase/server";
+import { formatDateLocal } from "@/lib/computation/release-date";
+import { halfUp } from "@/lib/computation/money";
 
 type RouteParams = { params: Promise<{ id: string }> };
 
@@ -108,12 +110,22 @@ export async function GET(_request: Request, { params }: RouteParams) {
       monthlyAmortization: number;
       accountStatus: string;
       remainingInstallments: number;
+      /** Not-yet-due installments only — feeds the Offset early-settlement
+       * discount picker; see docs/revision-plans/feature-early-settlement-discount.md.
+       * Mirrors the identical enrichment in the CSA computation route's GET
+       * handler — this route fetches activeLoans independently, so both must
+       * carry it for the shared ComputationPanel modal to work under Committee too. */
+      futureInstallments: Array<{
+        installmentNo: number;
+        dueDate: string;
+        interestPortion: number;
+      }>;
     }> = [];
     if (borrower?.id) {
       const { data: masterlistRows } = await admin
         .from("masterlist")
         .select(
-          "id, loan_application_id, loan_account_no, outstanding_balance, monthly_amortization, account_status",
+          "id, loan_application_id, loan_account_no, outstanding_balance, monthly_amortization, account_status, computation_id",
         )
         .eq("borrower_id", borrower.id)
         .eq("account_status", "active");
@@ -122,28 +134,72 @@ export async function GET(_request: Request, { params }: RouteParams) {
       // (not N+1) — the same set AR actually allocates against when an
       // Offset transfer posts, so "N months" in the offset picker matches
       // reality instead of an outstanding_balance ÷ monthly approximation.
+      // Also the source for futureInstallments below — one fetch serves both.
       const masterlistIds = (masterlistRows ?? []).map((row) => row.id as string);
       const remainingByMasterlistId = new Map<string, number>();
+      const futureRowsByMasterlistId = new Map<
+        string,
+        Array<{ installmentNo: number; dueDate: string }>
+      >();
+      const today = formatDateLocal(new Date());
       if (masterlistIds.length > 0) {
         const { data: scheduleRows } = await admin
           .from("amortization_schedules")
-          .select("masterlist_id")
+          .select("masterlist_id, installment_no, due_date, status")
           .in("masterlist_id", masterlistIds)
           .in("status", ["pending", "partial", "overdue"]);
         for (const row of scheduleRows ?? []) {
           const mid = row.masterlist_id as string;
           remainingByMasterlistId.set(mid, (remainingByMasterlistId.get(mid) ?? 0) + 1);
+          const dueDate = row.due_date as string;
+          if (dueDate > today) {
+            const list = futureRowsByMasterlistId.get(mid) ?? [];
+            list.push({ installmentNo: row.installment_no as number, dueDate });
+            futureRowsByMasterlistId.set(mid, list);
+          }
         }
       }
 
-      activeLoans = (masterlistRows ?? []).map((row) => ({
-        loanApplicationId: (row.loan_application_id as string | null) ?? "",
-        loanAccountNo: (row.loan_account_no as string | null) ?? "Active Account",
-        outstandingBalance: Number(row.outstanding_balance ?? 0),
-        monthlyAmortization: Number(row.monthly_amortization ?? 0),
-        accountStatus: (row.account_status as string | null) ?? "active",
-        remainingInstallments: remainingByMasterlistId.get(row.id as string) ?? 0,
-      }));
+      const computationIds = Array.from(
+        new Set(
+          (masterlistRows ?? [])
+            .map((row) => row.computation_id as string | null)
+            .filter((cid): cid is string => Boolean(cid)),
+        ),
+      );
+      const interestPerRowByComputationId = new Map<string, number>();
+      if (computationIds.length > 0) {
+        const { data: computationRows } = await admin
+          .from("computations")
+          .select("id, total_interest, terms, payment_frequency")
+          .in("id", computationIds);
+        for (const row of computationRows ?? []) {
+          const terms = Number(row.terms) || 1;
+          const interestPerMonth = halfUp(Number(row.total_interest) / terms);
+          const isSemiMonthly = row.payment_frequency === "semi_monthly";
+          interestPerRowByComputationId.set(
+            row.id as string,
+            isSemiMonthly ? halfUp(interestPerMonth / 2) : interestPerMonth,
+          );
+        }
+      }
+
+      activeLoans = (masterlistRows ?? []).map((row) => {
+        const mid = row.id as string;
+        const interestPortion =
+          interestPerRowByComputationId.get(row.computation_id as string) ?? 0;
+        return {
+          loanApplicationId: (row.loan_application_id as string | null) ?? "",
+          loanAccountNo: (row.loan_account_no as string | null) ?? "Active Account",
+          outstandingBalance: Number(row.outstanding_balance ?? 0),
+          monthlyAmortization: Number(row.monthly_amortization ?? 0),
+          accountStatus: (row.account_status as string | null) ?? "active",
+          remainingInstallments: remainingByMasterlistId.get(mid) ?? 0,
+          futureInstallments: (futureRowsByMasterlistId.get(mid) ?? [])
+            .sort((a, b) => a.installmentNo - b.installmentNo)
+            .map((inst) => ({ ...inst, interestPortion })),
+        };
+      });
     }
 
     const negotiation = await getNegotiation(supabase, id);
@@ -263,6 +319,16 @@ export async function GET(_request: Request, { params }: RouteParams) {
         collateralType: resolveCommitteeCollateralType(
           application.collateral_type as string | null,
         ),
+        paymentSchedule:
+          application.payment_schedule === "mpl" ||
+          application.payment_schedule === "salary" ||
+          application.payment_schedule === "weekly" ||
+          application.payment_schedule === "bi_monthly" ||
+          application.payment_schedule === "quarterly" ||
+          application.payment_schedule === "two_monthly" ||
+          application.payment_schedule === "daily"
+            ? application.payment_schedule
+            : "monthly",
         statusHistory: application.status_history,
         canDecide:
           (application.status === "for_approval" ||
@@ -323,7 +389,9 @@ export async function GET(_request: Request, { params }: RouteParams) {
             netReleased: computation.netReleased,
             totalLoan: computation.totalLoan,
             monthlyAmortization: computation.monthlyAmortization,
+            releaseDate: computation.releaseDate ?? null,
             firstPaymentDate: computation.firstPaymentDate,
+            dueDay: computation.dueDay ?? null,
             lineItems: computation.lineItems,
             signedAt: computation.signedAt,
             witnessedBy: computation.witnessedBy,
@@ -346,6 +414,7 @@ export async function GET(_request: Request, { params }: RouteParams) {
             adminRate: computation.adminRate,
             chattelRate: computation.chattelRate,
             chattelFee: computation.chattelFee,
+            originationDiscounts: computation.originationDiscounts ?? null,
             otherDeductions: computation.otherDeductions ?? null,
             otherDeductionsTotal: computation.otherDeductionsTotal,
           }

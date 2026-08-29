@@ -57,66 +57,10 @@ describe("createApplicationSchema (SME Phase 1)", () => {
     const parsed = createApplicationSchema.parse({
       ...base,
       segment: "individual",
-      individualLoanType: "mpl",
+      paymentSchedule: "mpl",
     });
     assert.equal(parsed.segment, "individual");
     assert.equal(parsed.entityType, undefined);
-  });
-});
-
-describe("createApplicationSchema (Salary/MPL individual sub-type)", () => {
-  it("rejects individual + no-collateral without individualLoanType", () => {
-    const result = createApplicationSchema.safeParse({
-      ...base,
-      segment: "individual",
-    });
-    assert.equal(result.success, false);
-  });
-
-  it("accepts individual + no-collateral with individualLoanType mpl", () => {
-    const parsed = createApplicationSchema.parse({
-      ...base,
-      segment: "individual",
-      individualLoanType: "mpl",
-    });
-    assert.equal(parsed.individualLoanType, "mpl");
-  });
-
-  it("accepts individual + no-collateral with individualLoanType salary", () => {
-    const parsed = createApplicationSchema.parse({
-      ...base,
-      segment: "individual",
-      individualLoanType: "salary",
-    });
-    assert.equal(parsed.individualLoanType, "salary");
-  });
-
-  it("rejects individualLoanType when collateralType is not none", () => {
-    const result = createApplicationSchema.safeParse({
-      ...base,
-      segment: "individual",
-      collateralType: "car_refinancing",
-      individualLoanType: "mpl",
-    });
-    assert.equal(result.success, false);
-  });
-
-  it("rejects individualLoanType for sme segment", () => {
-    const result = createApplicationSchema.safeParse({
-      ...base,
-      segment: "sme",
-      entityType: "individual",
-      individualLoanType: "mpl",
-    });
-    assert.equal(result.success, false);
-  });
-
-  it("does not require individualLoanType for seafarer", () => {
-    const parsed = createApplicationSchema.parse({
-      ...base,
-      segment: "seafarer",
-    });
-    assert.equal(parsed.individualLoanType, undefined);
   });
 });
 
@@ -161,5 +105,101 @@ describe("createApplicationSchema collateralType (Phase 3)", () => {
       collateralType: "none",
     });
     assert.equal(parsed.collateralType, "none");
+  });
+});
+
+describe("createApplicationSchema paymentSchedule (payment-schedule unification)", () => {
+  it("defaults paymentSchedule to monthly", () => {
+    const parsed = createApplicationSchema.parse(base);
+    assert.equal(parsed.paymentSchedule, "monthly");
+  });
+
+  it("accepts every one of the 8 schedule values for sme", () => {
+    for (const paymentSchedule of [
+      "mpl",
+      "salary",
+      "monthly",
+      "weekly",
+      "bi_monthly",
+      "quarterly",
+      "two_monthly",
+      "daily",
+    ] as const) {
+      const parsed = createApplicationSchema.parse({
+        ...base,
+        segment: "sme",
+        entityType: "corporate",
+        paymentSchedule,
+      });
+      assert.equal(parsed.paymentSchedule, paymentSchedule);
+    }
+  });
+
+  it("accepts every one of the 8 schedule values for individual (cross-segment access)", () => {
+    for (const paymentSchedule of [
+      "mpl",
+      "salary",
+      "monthly",
+      "weekly",
+      "bi_monthly",
+      "quarterly",
+      "two_monthly",
+      "daily",
+    ] as const) {
+      const parsed = createApplicationSchema.parse({
+        ...base,
+        segment: "individual",
+        paymentSchedule,
+      });
+      assert.equal(parsed.paymentSchedule, paymentSchedule);
+    }
+  });
+
+  it("individual + quarterly succeeds (previously meaningless under the old two-field design)", () => {
+    const parsed = createApplicationSchema.parse({
+      ...base,
+      segment: "individual",
+      paymentSchedule: "quarterly",
+    });
+    assert.equal(parsed.paymentSchedule, "quarterly");
+  });
+
+  it("sme + mpl succeeds (previously an individual-only value)", () => {
+    const parsed = createApplicationSchema.parse({
+      ...base,
+      segment: "sme",
+      entityType: "corporate",
+      paymentSchedule: "mpl",
+    });
+    assert.equal(parsed.paymentSchedule, "mpl");
+  });
+
+  it("rejects a non-monthly paymentSchedule for seafarer", () => {
+    const result = createApplicationSchema.safeParse({
+      ...base,
+      segment: "seafarer",
+      paymentSchedule: "weekly",
+    });
+    assert.equal(result.success, false);
+  });
+
+  it("accepts sme with a collateral type and a non-monthly paymentSchedule together (orthogonal facts)", () => {
+    const parsed = createApplicationSchema.parse({
+      ...base,
+      segment: "sme",
+      entityType: "corporate",
+      collateralType: "car_refinancing",
+      paymentSchedule: "quarterly",
+    });
+    assert.equal(parsed.collateralType, "car_refinancing");
+    assert.equal(parsed.paymentSchedule, "quarterly");
+  });
+
+  it("does not require paymentSchedule for seafarer", () => {
+    const parsed = createApplicationSchema.parse({
+      ...base,
+      segment: "seafarer",
+    });
+    assert.equal(parsed.paymentSchedule, "monthly");
   });
 });

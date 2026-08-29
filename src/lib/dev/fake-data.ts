@@ -852,6 +852,72 @@ export function fakePdcDetails(
   }));
 }
 
+/** Terms + rate inputs for the Computation form. Segment- and schedule-type-
+ * aware so the generated values pass the same validation the real form does
+ * — e.g. Quarterly/Two-monthly need terms divisible by 3/2, Invoice (weekly)
+ * is capped at 1-3 months, Seafarer's due day must be 5/15/25, and Daily
+ * needs a payment date after today. */
+export type FakeComputationInputs = {
+  inputMode: "NET_SARADO" | "NET_LESS_SECURITY" | "PRINCIPAL";
+  amount: number;
+  terms: number;
+  addonMonths: number;
+  dueDay?: number;
+  interestRatePct?: number;
+  pfRatePct?: number;
+  adminRatePct?: number;
+  chattelRatePct?: number;
+  paymentDate?: string;
+};
+
+export function fakeComputationInputs(
+  segment: "seafarer" | "sme" | "individual",
+  scheduleType?:
+    | "mpl"
+    | "salary"
+    | "monthly"
+    | "weekly"
+    | "bi_monthly"
+    | "quarterly"
+    | "two_monthly"
+    | "daily",
+): FakeComputationInputs {
+  const amount = num(50, 300) * 1000;
+  const terms =
+    scheduleType === "weekly"
+      ? pick([1, 2, 3])
+      : scheduleType === "quarterly"
+        ? pick([6, 9, 12])
+        : scheduleType === "two_monthly"
+          ? pick([4, 6, 8, 10, 12])
+          : pick([6, 12, 24]);
+
+  const base: FakeComputationInputs = {
+    inputMode: "PRINCIPAL",
+    amount,
+    terms,
+    addonMonths: 0,
+  };
+
+  if (segment === "seafarer") {
+    return { ...base, dueDay: pick([5, 15, 25]) };
+  }
+
+  const withRates: FakeComputationInputs = {
+    ...base,
+    interestRatePct: pick([2, 2.5, 3, 3.25, 3.5]),
+    pfRatePct: pick([5, 7, 8, 10]),
+    adminRatePct: 0,
+    chattelRatePct: 0,
+  };
+
+  if (scheduleType === "daily") {
+    return { ...withRates, paymentDate: futureDate(5, 14) };
+  }
+
+  return withRates;
+}
+
 export function fakeCommitteeAssessment() {
   return {
     characterNotes:

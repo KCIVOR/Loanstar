@@ -20,7 +20,15 @@ import { parseBorrowerNameParts } from "@/lib/csa/leads";
 type LoanSegment = "seafarer" | "sme" | "individual";
 type EntityType = "individual" | "corporate";
 type CollateralType = "none" | "car_refinancing" | "real_estate";
-type IndividualLoanType = "mpl" | "salary";
+type PaymentSchedule =
+  | "mpl"
+  | "salary"
+  | "monthly"
+  | "weekly"
+  | "bi_monthly"
+  | "quarterly"
+  | "two_monthly"
+  | "daily";
 
 function CsaNewApplicationForm() {
   const router = useRouter();
@@ -41,24 +49,27 @@ function CsaNewApplicationForm() {
   const [segment, setSegment] = useState<LoanSegment>("seafarer");
   const [entityType, setEntityType] = useState<EntityType>("individual");
   const [collateralType, setCollateralType] = useState<CollateralType>("none");
-  const [individualLoanType, setIndividualLoanType] = useState<IndividualLoanType | "">("");
+  /** SME or Individual — the loan's unified schedule/product choice, decided
+   * here at intake rather than as a separate choice later at compute time.
+   * Both segments have access to the full 8-value list (confirmed
+   * 2026-08-29 — see docs/payment-schedule-unification-plan.md). Defaults
+   * to Regular monthly. */
+  const [paymentSchedule, setPaymentSchedule] = useState<PaymentSchedule>("monthly");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [existingWarning, setExistingWarning] = useState<string | null>(null);
 
   const collateralEligible = segment === "sme" || segment === "individual";
-  const individualLoanTypeEligible =
-    segment === "individual" && collateralType === "none";
+  const paymentScheduleEligible = segment === "sme" || segment === "individual";
 
   function handleSegmentChange(next: LoanSegment) {
     setSegment(next);
     if (next === "seafarer") setCollateralType("none");
-    if (next !== "individual") setIndividualLoanType("");
+    if (next !== "sme" && next !== "individual") setPaymentSchedule("monthly");
   }
 
   function handleCollateralTypeChange(next: CollateralType) {
     setCollateralType(next);
-    if (next !== "none") setIndividualLoanType("");
   }
 
   async function handleEmailBlur() {
@@ -100,14 +111,14 @@ function CsaNewApplicationForm() {
   function fillIntake(
     nextSegment: LoanSegment,
     nextEntityType: EntityType,
-    nextIndividualLoanType: IndividualLoanType | "" = "",
+    nextPaymentSchedule: PaymentSchedule = "monthly",
   ) {
     const rand = Math.floor(Math.random() * 100000);
     const names = { first: "Juan", last: "Dela Cruz" };
     setSegment(nextSegment);
     setEntityType(nextEntityType);
     setCollateralType("none");
-    setIndividualLoanType(nextIndividualLoanType);
+    setPaymentSchedule(nextPaymentSchedule);
     setEmail(`autofill.${rand}@example.local`);
     setFirstName(names.first);
     setLastName(names.last);
@@ -129,9 +140,7 @@ function CsaNewApplicationForm() {
         segment,
         entityType: segment === "sme" ? entityType : undefined,
         collateralType: collateralEligible ? collateralType : undefined,
-        individualLoanType: individualLoanTypeEligible
-          ? individualLoanType || undefined
-          : undefined,
+        paymentSchedule: paymentScheduleEligible ? paymentSchedule : undefined,
       };
 
       const res = await fetch(
@@ -237,22 +246,22 @@ function CsaNewApplicationForm() {
               </Select>
             </div>
           ) : null}
-          {individualLoanTypeEligible ? (
+          {paymentScheduleEligible ? (
             <div className="sm:col-span-2">
-              <Label htmlFor="individualLoanType" required>
-                Individual loan type
-              </Label>
+              <Label htmlFor="paymentSchedule">Loan schedule</Label>
               <Select
-                id="individualLoanType"
-                value={individualLoanType}
-                onChange={(e) =>
-                  setIndividualLoanType(e.target.value as IndividualLoanType)
-                }
-                required
+                id="paymentSchedule"
+                value={paymentSchedule}
+                onChange={(e) => setPaymentSchedule(e.target.value as PaymentSchedule)}
               >
-                <option value="">Select loan type</option>
+                <option value="monthly">Regular (Monthly)</option>
                 <option value="mpl">MPL (Multi-Purpose Loan)</option>
-                <option value="salary">Salary</option>
+                <option value="salary">Salary (semi-monthly)</option>
+                <option value="weekly">Invoice Financing (Weekly)</option>
+                <option value="bi_monthly">Bi-monthly (every 15 days)</option>
+                <option value="quarterly">Quarterly</option>
+                <option value="two_monthly">Two-monthly</option>
+                <option value="daily">Daily</option>
               </Select>
             </div>
           ) : null}
@@ -331,6 +340,10 @@ function CsaNewApplicationForm() {
           {
             label: "Fill: Individual (Salary)",
             onClick: () => fillIntake("individual", "individual", "salary"),
+          },
+          {
+            label: "Fill: SME (MPL)",
+            onClick: () => fillIntake("sme", "individual", "mpl"),
           },
         ]}
       />

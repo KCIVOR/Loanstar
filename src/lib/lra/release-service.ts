@@ -2,8 +2,14 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { ValidationError } from "@/lib/api/errors";
 import { writeAuditEvent } from "@/lib/audit/writer";
-import { initializeArAccount } from "@/lib/ar/masterlist";
+import { initializeArAccount, invoiceScheduleToInstallments } from "@/lib/ar/masterlist";
+import {
+  generateBiMonthlySchedule,
+  generateQuarterlySchedule,
+  generateTwoMonthlySchedule,
+} from "@/lib/ar/schedule";
 import { mapBorrowerRow, type BorrowerRow } from "@/lib/borrowers/types";
+import { computeInvoiceLoan } from "@/lib/computation/invoice";
 import { extractDeductionTargets } from "@/lib/computation/deduction-breakdown";
 import { halfUp } from "@/lib/computation/money";
 import { addScheduleMonths, advanceSemiMonthly } from "@/lib/computation/release-date";
@@ -208,6 +214,76 @@ export async function getReleaseFile(
   return mapReleaseFileRow(data);
 }
 
+/**
+ * Builds the expected {amount, date} PDC check schedule for the 5 schedule
+ * types added after the original monthly/semi-monthly-only PDC logic
+ * (Invoice/Bi-Monthly/Quarterly/Two-Monthly/Daily). Reuses the exact same
+ * generators/engines `initializeArAccount` (ar/masterlist.ts) uses to build
+ * the real AR masterlist schedule at release — so a CSA encoding PDC checks
+ * before release can never produce a schedule that disagrees with what
+ * actually gets billed after release. Monthly and semi-monthly (Salary) are
+ * not handled here — they keep their own original, untouched logic inline
+ * in `savePdcChecks` below.
+ */
+function buildExpectedPdcSchedule(
+  computation: NonNullable<Awaited<ReturnType<typeof getActiveComputation>>>,
+): Array<{ amount: number; date: string }> {
+  if (computation.paymentFrequency === "daily") {
+    // Single manually-dated payment — doesn't anchor off releaseDate at all,
+    // just the CSA-entered firstPaymentDate (already validated above this
+    // call) and the already-computed principal+interest total.
+    return [{ amount: computation.totalLoan, date: computation.firstPaymentDate! }];
+  }
+
+  // Every other new schedule type anchors its due dates off releaseDate.
+  if (!computation.releaseDate) {
+    throw new ValidationError(
+      "This application's computation has no release date recorded — recompute it before saving PDC checks.",
+    );
+  }
+  const releaseDate = new Date(computation.releaseDate);
+
+  if (computation.paymentFrequency === "weekly") {
+    const result = computeInvoiceLoan({
+      principal: computation.principal,
+      terms: computation.terms,
+      releaseDate,
+    });
+    return invoiceScheduleToInstallments(result).map((row) => ({
+      amount: row.amountDue,
+      date: row.dueDate,
+    }));
+  }
+
+  if (computation.paymentFrequency === "bi_monthly") {
+    return generateBiMonthlySchedule({
+      terms: computation.terms,
+      monthlyAmortization: computation.monthlyAmortization,
+      releaseDate,
+      totalLoan: computation.totalLoan,
+    }).map((row) => ({ amount: row.amountDue, date: row.dueDate }));
+  }
+
+  if (computation.paymentFrequency === "quarterly") {
+    return generateQuarterlySchedule({
+      terms: computation.terms,
+      totalLoan: computation.totalLoan,
+      totalInterest: computation.totalInterest,
+      releaseDate,
+      dueDay: computation.dueDay ?? 10,
+    }).map((row) => ({ amount: row.amountDue, date: row.dueDate }));
+  }
+
+  // two_monthly — the only remaining case among the 5 new schedule types.
+  return generateTwoMonthlySchedule({
+    terms: computation.terms,
+    totalLoan: computation.totalLoan,
+    totalInterest: computation.totalInterest,
+    releaseDate,
+    dueDay: computation.dueDay ?? 10,
+  }).map((row) => ({ amount: row.amountDue, date: row.dueDate }));
+}
+
 export async function savePdcChecks(
   supabase: SupabaseClient,
   releaseFileId: string,
@@ -243,14 +319,34 @@ export async function savePdcChecks(
 
   // Salary loans (semi-monthly) need terms*2 checks, each half the monthly
   // amortization (last one absorbing rounding against totalLoan), on
-  // alternating 15th/end-of-month dates. Every other cadence (Seafarer, SME,
-  // MPL) is unchanged: `terms` checks, flat monthlyAmortization, addScheduleMonths.
+  // alternating 15th/end-of-month dates. Seafarer/SME/MPL (the original
+  // "everything else" cadence) is unchanged: `terms` checks, flat
+  // monthlyAmortization, addScheduleMonths. Invoice/Bi-Monthly/Quarterly/
+  // Two-Monthly/Daily each build a full expected schedule via
+  // buildExpectedPdcSchedule instead — their count/amount/date shapes don't
+  // fit the flat-monthly or halved-semi-monthly patterns at all.
   const isSemiMonthly = computation.paymentFrequency === "semi_monthly";
-  const expectedCount = isSemiMonthly ? computation.terms * 2 : computation.terms;
+  const isNewScheduleType =
+    computation.paymentFrequency === "weekly" ||
+    computation.paymentFrequency === "bi_monthly" ||
+    computation.paymentFrequency === "quarterly" ||
+    computation.paymentFrequency === "two_monthly" ||
+    computation.paymentFrequency === "daily";
+  const expectedSchedule = isNewScheduleType
+    ? buildExpectedPdcSchedule(computation)
+    : null;
+
+  const expectedCount = expectedSchedule
+    ? expectedSchedule.length
+    : isSemiMonthly
+      ? computation.terms * 2
+      : computation.terms;
 
   if (checks.length !== expectedCount) {
     throw new ValidationError(
-      `Number of checks must equal ${isSemiMonthly ? "twice the loan term" : "the loan term"} (${expectedCount})`,
+      expectedSchedule
+        ? `Number of checks must equal ${expectedCount} for this loan's schedule`
+        : `Number of checks must equal ${isSemiMonthly ? "twice the loan term" : "the loan term"} (${expectedCount})`,
     );
   }
 
@@ -271,7 +367,16 @@ export async function savePdcChecks(
     computation.totalLoan - halfUp(halfAmortization * (expectedCount - 1)),
   );
 
-  if (isSemiMonthly) {
+  if (expectedSchedule) {
+    normalizedChecks.forEach((row, index) => {
+      const expectedAmount = expectedSchedule[index].amount;
+      if (row.amount !== expectedAmount) {
+        throw new ValidationError(
+          `Check amount must equal ₱${expectedAmount} for PDC #${index + 1}`,
+        );
+      }
+    });
+  } else if (isSemiMonthly) {
     normalizedChecks.forEach((row, index) => {
       const expectedAmount =
         index === expectedCount - 1
@@ -298,9 +403,11 @@ export async function savePdcChecks(
   }
 
   normalizedChecks.forEach((row, index) => {
-    const expectedDate = isSemiMonthly
-      ? advanceSemiMonthly(computation.firstPaymentDate!, index)
-      : addScheduleMonths(computation.firstPaymentDate!, index);
+    const expectedDate = expectedSchedule
+      ? expectedSchedule[index].date
+      : isSemiMonthly
+        ? advanceSemiMonthly(computation.firstPaymentDate!, index)
+        : addScheduleMonths(computation.firstPaymentDate!, index);
     if (row.checkDate !== expectedDate) {
       throw new ValidationError(
         `PDC #${index + 1} date must be ${expectedDate} (got ${row.checkDate}) — dates must follow the computed payment schedule`,
@@ -984,6 +1091,16 @@ export async function recordRelease(
     })
     .eq("id", releaseFileId);
 
+  // Overwrite the CSA-time estimate with the actual release day — service
+  // role since the computation is already signed by this point, and CSA's
+  // own RLS cannot update a signed row (see persistComputation's identical
+  // deactivate-prior-actives comment).
+  const admin = createServiceClient();
+  await admin
+    .from("computations")
+    .update({ release_date: new Date().toISOString().slice(0, 10) })
+    .eq("id", file.computationId);
+
   await syncApplicationBlocker(supabase, file.loanApplicationId, "released", {
     actorId,
     applicationStatus: "released",
@@ -1066,6 +1183,15 @@ export async function createPendingInternalTransfers(
         months: target.months,
         amount: target.amount,
         created_by: actorId,
+        // Early-settlement discount (Phase 5/6) — carried onto the transfer
+        // row so post_internal_transfer can apply it atomically at posting
+        // time; a rejected transfer never touches the schedule rows at all.
+        ...(target.discountAmount
+          ? {
+              discount_amount: target.discountAmount,
+              discounted_installment_nos: target.discountedInstallmentNos ?? [],
+            }
+          : {}),
       });
     }
   } catch (err) {

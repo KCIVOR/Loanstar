@@ -21,38 +21,45 @@ export const createApplicationSchema = z
     collateralType: z
       .enum(["none", "car_refinancing", "real_estate"])
       .default("none"),
-    /** Individual + no-collateral only — MPL (monthly) vs Salary (semi-monthly) payment rule. */
-    individualLoanType: z.enum(["mpl", "salary"]).optional(),
+    /** SME or Individual only — the loan's unified schedule/product choice
+     * (MPL/Salary/Regular/Invoice/Bi-monthly/Quarterly/Two-monthly/Daily),
+     * decided here at intake rather than as a free choice at compute time.
+     * Both segments have access to the full 8-value list (a deliberate
+     * product decision, confirmed 2026-08-29 — see
+     * docs/payment-schedule-unification-plan.md). Defaults to "monthly" —
+     * the overwhelming common case, so an ordinary application needs no
+     * extra input. Ignored for Seafarer (always "monthly"). */
+    paymentSchedule: z
+      .enum([
+        "mpl",
+        "salary",
+        "monthly",
+        "weekly",
+        "bi_monthly",
+        "quarterly",
+        "two_monthly",
+        "daily",
+      ])
+      .default("monthly"),
   })
   .refine((data) => data.segment !== "sme" || data.entityType != null, {
     message: "entityType is required when segment is sme",
     path: ["entityType"],
   })
+  .refine(
+    (data) =>
+      data.segment === "sme" || data.segment === "individual"
+        ? true
+        : data.paymentSchedule === "monthly",
+    {
+      message: "paymentSchedule only applies to SME and Individual applications",
+      path: ["paymentSchedule"],
+    },
+  )
   .refine((data) => data.segment !== "seafarer" || data.collateralType === "none", {
     message: "Seafarer applications cannot carry collateral",
     path: ["collateralType"],
-  })
-  .refine(
-    (data) =>
-      !(data.segment === "individual" && data.collateralType === "none") ||
-      data.individualLoanType != null,
-    {
-      message:
-        "individualLoanType is required for individual applications with no collateral",
-      path: ["individualLoanType"],
-    },
-  )
-  .refine(
-    (data) =>
-      data.segment === "individual" && data.collateralType === "none"
-        ? true
-        : data.individualLoanType == null,
-    {
-      message:
-        "individualLoanType only applies to individual applications with no collateral",
-      path: ["individualLoanType"],
-    },
-  );
+  });
 
 export type CreateApplicationInput = z.infer<typeof createApplicationSchema>;
 
@@ -118,7 +125,7 @@ export async function createCsaApplication(
       segment: body.segment,
       entity_type: body.entityType ?? null,
       collateral_type: body.collateralType,
-      individual_loan_type: body.individualLoanType ?? null,
+      payment_schedule: body.paymentSchedule,
       status_history: [
         {
           status: "submitted",
@@ -158,7 +165,7 @@ export async function createCsaApplication(
       segment: body.segment,
       entityType: body.entityType ?? null,
       collateralType: body.collateralType,
-      individualLoanType: body.individualLoanType ?? null,
+      paymentSchedule: body.paymentSchedule,
     },
   });
 

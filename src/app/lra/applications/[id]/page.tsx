@@ -28,6 +28,12 @@ import { fakePdcDetails, fakeRemark } from "@/lib/dev/fake-data";
 import { GeneratedDocPanel } from "@/components/documents/GeneratedDocPanel";
 import { addScheduleMonths, advanceSemiMonthly } from "@/lib/computation/release-date";
 import { halfUp } from "@/lib/computation/money";
+import { computeInvoiceLoan } from "@/lib/computation/invoice";
+import {
+  generateBiMonthlySchedule,
+  generateQuarterlySchedule,
+  generateTwoMonthlySchedule,
+} from "@/lib/ar/schedule";
 import {
   formatStatusLabel,
   statusBadgeVariant,
@@ -47,46 +53,116 @@ import {
 import { releasePipelineSteps } from "@/lib/lra/release-pipeline";
 import { createClient } from "@/lib/supabase/client";
 
-/** Salary loans (semi-monthly) need twice as many PDC checks as their term
- * count; every other cadence (Seafarer, SME, MPL) is unchanged: one per term. */
-function pdcCheckCount(computation: {
+type PdcComputation = {
+  principal: number;
+  monthlyAmortization: number;
+  totalLoan: number;
+  totalInterest: number;
   terms: number;
-  paymentFrequency: "monthly" | "semi_monthly" | null;
-}): number {
-  return computation.paymentFrequency === "semi_monthly"
-    ? computation.terms * 2
-    : computation.terms;
-}
+  releaseDate: string | null;
+  firstPaymentDate: string | null;
+  dueDay: number | null;
+  paymentFrequency:
+    | "monthly"
+    | "semi_monthly"
+    | "weekly"
+    | "bi_monthly"
+    | "quarterly"
+    | "two_monthly"
+    | "daily"
+    | null;
+};
 
-/** Date + amount for PDC check `index` (0-based) of `count` total checks.
- * Semi-monthly: alternates 15th/end-of-month, half the monthly amortization
- * per check, with the last check absorbing the rounding remainder against
- * totalLoan (same pattern already used for the monthly AR schedule). Every
- * other cadence is untouched — flat monthlyAmortization, `addScheduleMonths`. */
-function pdcCheckAt(
-  computation: {
-    monthlyAmortization: number;
-    totalLoan: number;
-    paymentFrequency: "monthly" | "semi_monthly" | null;
-  },
+/**
+ * Builds the full expected PDC check schedule (one row per physical check)
+ * for every payment frequency. Monthly and semi-monthly (Salary) anchor off
+ * `pdcDate` (= computation.firstPaymentDate) exactly as originally built —
+ * untouched. Invoice/Bi-Monthly/Quarterly/Two-Monthly anchor off
+ * `computation.releaseDate` and reuse the exact same pure generators the
+ * server (`release-service.ts`'s buildExpectedPdcSchedule) and the real AR
+ * masterlist schedule (`ar/masterlist.ts`) use — Daily is a single row on
+ * firstPaymentDate — so the schedule built here can never disagree with what
+ * the server accepts on save, or with what actually gets billed after
+ * release. These are pure client-safe functions (no Supabase/server imports),
+ * safe to call directly in this "use client" component.
+ */
+function buildPdcRows(
+  computation: PdcComputation,
   pdcDate: string,
-  index: number,
-  count: number,
-): { checkDate: string; amount: number } {
+): Array<{ checkDate: string; amount: number }> {
   if (computation.paymentFrequency === "semi_monthly") {
-    const checkDate = advanceSemiMonthly(pdcDate, index);
+    const count = computation.terms * 2;
     const half = halfUp(computation.monthlyAmortization / 2);
-    if (index === count - 1) {
-      const priorTotal = halfUp(half * (count - 1));
-      const remainder = halfUp(computation.totalLoan - priorTotal);
-      return { checkDate, amount: remainder > 0 ? remainder : half };
-    }
-    return { checkDate, amount: half };
+    return Array.from({ length: count }, (_, index) => {
+      const checkDate = advanceSemiMonthly(pdcDate, index);
+      if (index === count - 1) {
+        const priorTotal = halfUp(half * (count - 1));
+        const remainder = halfUp(computation.totalLoan - priorTotal);
+        return { checkDate, amount: remainder > 0 ? remainder : half };
+      }
+      return { checkDate, amount: half };
+    });
   }
-  return {
+
+  if (computation.paymentFrequency === "weekly") {
+    if (!computation.releaseDate) return [];
+    const result = computeInvoiceLoan({
+      principal: computation.principal,
+      terms: computation.terms,
+      releaseDate: new Date(computation.releaseDate),
+    });
+    const rows = result.weeklySchedule.map((week) => ({
+      checkDate: week.dueDate,
+      amount: week.amountDue,
+    }));
+    rows.push({ checkDate: result.principalDueDate, amount: result.principalAmount });
+    return rows;
+  }
+
+  if (computation.paymentFrequency === "daily") {
+    // Single manually-dated payment — no releaseDate anchoring needed.
+    return computation.firstPaymentDate
+      ? [{ checkDate: computation.firstPaymentDate, amount: computation.totalLoan }]
+      : [];
+  }
+
+  if (computation.paymentFrequency === "bi_monthly") {
+    if (!computation.releaseDate) return [];
+    return generateBiMonthlySchedule({
+      terms: computation.terms,
+      monthlyAmortization: computation.monthlyAmortization,
+      releaseDate: new Date(computation.releaseDate),
+      totalLoan: computation.totalLoan,
+    }).map((row) => ({ checkDate: row.dueDate, amount: row.amountDue }));
+  }
+
+  if (computation.paymentFrequency === "quarterly") {
+    if (!computation.releaseDate) return [];
+    return generateQuarterlySchedule({
+      terms: computation.terms,
+      totalLoan: computation.totalLoan,
+      totalInterest: computation.totalInterest,
+      releaseDate: new Date(computation.releaseDate),
+      dueDay: computation.dueDay ?? 10,
+    }).map((row) => ({ checkDate: row.dueDate, amount: row.amountDue }));
+  }
+
+  if (computation.paymentFrequency === "two_monthly") {
+    if (!computation.releaseDate) return [];
+    return generateTwoMonthlySchedule({
+      terms: computation.terms,
+      totalLoan: computation.totalLoan,
+      totalInterest: computation.totalInterest,
+      releaseDate: new Date(computation.releaseDate),
+      dueDay: computation.dueDay ?? 10,
+    }).map((row) => ({ checkDate: row.dueDate, amount: row.amountDue }));
+  }
+
+  // Monthly (Seafarer/SME/MPL) — unchanged, original logic.
+  return Array.from({ length: computation.terms }, (_, index) => ({
     checkDate: addScheduleMonths(pdcDate, index),
     amount: computation.monthlyAmortization,
-  };
+  }));
 }
 
 type LraWorkspace = {
@@ -138,9 +214,20 @@ type LraWorkspace = {
     principal: number;
     monthlyAmortization: number;
     totalLoan: number;
+    totalInterest: number;
     terms: number;
+    releaseDate: string | null;
     firstPaymentDate: string | null;
-    paymentFrequency: "monthly" | "semi_monthly" | null;
+    dueDay: number | null;
+    paymentFrequency:
+      | "monthly"
+      | "semi_monthly"
+      | "weekly"
+      | "bi_monthly"
+      | "quarterly"
+      | "two_monthly"
+      | "daily"
+      | null;
   } | null;
   blriPreview: {
     principal: number;
@@ -265,6 +352,18 @@ export default function LraApplicationPage() {
   // matches "Monthly amount" right next to it, which reads straight from
   // the computation with no separate state either.
   const pdcDate = data?.computation?.firstPaymentDate ?? "";
+  // The expected schedule this loan's frequency actually produces — for
+  // monthly/semi-monthly this is a flat, uniform-count schedule (display
+  // simplifies to "N terms" / one flat amount below); for Invoice/Bi-Monthly/
+  // Quarterly/Two-Monthly/Daily the count and per-check amount both vary, so
+  // the summary fields below read off this instead of the raw `terms`/
+  // `monthlyAmortization` fields, which would otherwise show a misleading
+  // number (e.g. "3" for a 3-month Invoice loan that actually needs 13 checks).
+  const expectedPdcRows = data?.computation ? buildPdcRows(data.computation, pdcDate) : [];
+  const isFlatSchedule =
+    data?.computation?.paymentFrequency === "monthly" ||
+    data?.computation?.paymentFrequency === "semi_monthly" ||
+    data?.computation?.paymentFrequency == null;
 
   const load = useCallback(
     async (opts?: { silent?: boolean }) => {
@@ -410,17 +509,13 @@ export default function LraApplicationPage() {
       return;
     }
     setError(null);
-    const count = pdcCheckCount(data.computation);
-    const rows: PdcDraftRow[] = [];
-    for (let i = 0; i < count; i += 1) {
-      const { checkDate, amount } = pdcCheckAt(data.computation, pdcDate, i, count);
-      rows.push({
-        checkNumber: pdcDraft[i]?.checkNumber ?? "",
-        amount,
-        checkDate,
-        bankName: pdcDraft[i]?.bankName ?? "",
-      });
-    }
+    const expected = buildPdcRows(data.computation, pdcDate);
+    const rows: PdcDraftRow[] = expected.map(({ checkDate, amount }, i) => ({
+      checkNumber: pdcDraft[i]?.checkNumber ?? "",
+      amount,
+      checkDate,
+      bankName: pdcDraft[i]?.bankName ?? "",
+    }));
     setPdcDraft(rows);
   }
 
@@ -450,8 +545,8 @@ export default function LraApplicationPage() {
       return;
     }
     const computation = data.computation;
-    const count = pdcCheckCount(computation);
-    if (pdcDraft.length !== count) {
+    const expected = buildPdcRows(computation, pdcDate);
+    if (pdcDraft.length !== expected.length) {
       setError("Build the complete PDC schedule before saving.");
       return;
     }
@@ -472,7 +567,7 @@ export default function LraApplicationPage() {
     setSaving(true);
     setError(null);
     const checks = pdcDraft.map((row, index) => {
-      const { checkDate, amount } = pdcCheckAt(computation, pdcDate, index, count);
+      const { checkDate, amount } = expected[index];
       return {
         ...row,
         amount,
@@ -1061,24 +1156,30 @@ export default function LraApplicationPage() {
                   <Label>Number of checks</Label>
                   <Input
                     type="number"
-                    value={data.computation?.terms ?? ""}
+                    value={expectedPdcRows.length || ""}
                     disabled
                     className="mono"
                   />
-                  {data.computation?.terms != null ? (
+                  {isFlatSchedule && data.computation?.terms != null ? (
                     <p className="mt-1 text-xs text-ink-500">
                       Loan terms: {data.computation.terms} amortizations
+                    </p>
+                  ) : !isFlatSchedule ? (
+                    <p className="mt-1 text-xs text-ink-500">
+                      Derived from this loan&apos;s schedule type, not the raw term count
                     </p>
                   ) : null}
                 </div>
                 <div>
-                  <Label>Monthly amount</Label>
+                  <Label>{isFlatSchedule ? "Monthly amount" : "Amount"}</Label>
                   <Input
                     type="text"
                     value={
-                      data.computation?.monthlyAmortization != null
-                        ? `₱${formatMoney(data.computation.monthlyAmortization)}`
-                        : ""
+                      isFlatSchedule
+                        ? data.computation?.monthlyAmortization != null
+                          ? `₱${formatMoney(data.computation.monthlyAmortization)}`
+                          : ""
+                        : "Varies per check — see schedule below"
                     }
                     disabled
                     className="mono"

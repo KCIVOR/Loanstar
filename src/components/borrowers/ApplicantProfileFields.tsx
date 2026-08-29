@@ -402,6 +402,146 @@ export function ApplicantProfileFields({
         />
       </Card>
 
+      {isSme ? (
+        <h3 className="mb-2 mt-6 font-display text-sm font-semibold uppercase tracking-wide text-navy-500">
+          Business Application
+        </h3>
+      ) : null}
+      {isSme ? (
+        <Card>
+          <h2 className={CARD_TITLE}>II. Facts about the company</h2>
+          <FieldRow>
+            <Field
+              id="biz_companyName"
+              label="Name of company"
+              value={biz.companyName ?? ""}
+              onChange={(v) => setBiz({ companyName: v })}
+            />
+            <Field
+              id="biz_acronym"
+              label="Acronym"
+              value={biz.acronym ?? ""}
+              onChange={(v) => setBiz({ acronym: v })}
+            />
+          </FieldRow>
+          <Field
+            id="biz_address"
+            label="Office address"
+            value={biz.officeAddress ?? ""}
+            onChange={(v) => setBiz({ officeAddress: v })}
+          />
+          <Field
+            id="biz_address_line2"
+            label="Office address line 2"
+            value={biz.officeAddressLine2 ?? ""}
+            onChange={(v) => setBiz({ officeAddressLine2: v })}
+          />
+          <FieldRow>
+            <Field
+              id="biz_landline"
+              label="Landline nos."
+              value={biz.landlineNos ?? ""}
+              onChange={(v) => setBiz({ landlineNos: v })}
+            />
+            <Field
+              id="biz_mobile"
+              label="Mobile nos."
+              value={biz.mobileNos ?? ""}
+              onChange={(v) => setBiz({ mobileNos: v })}
+            />
+          </FieldRow>
+          <FieldRow>
+            <SelectField
+              id="biz_nature"
+              label="Nature of business"
+              value={biz.natureOfBusiness ?? ""}
+              options={NATURE_OF_BUSINESS_OPTIONS}
+              onChange={(v) => setBiz({ natureOfBusiness: v })}
+            />
+            <Field
+              id="biz_email"
+              label="Business email"
+              value={biz.companyEmail ?? ""}
+              onChange={(v) => setBiz({ companyEmail: v })}
+            />
+          </FieldRow>
+          <FieldRow>
+            <Field
+              id="biz_website"
+              label="Website"
+              value={biz.website ?? ""}
+              onChange={(v) => setBiz({ website: v })}
+            />
+            <Field
+              id="biz_tin"
+              label="TIN"
+              value={biz.tin ?? ""}
+              onChange={(v) => setBiz({ tin: v })}
+            />
+          </FieldRow>
+          <FieldRow>
+            <Field
+              id="biz_fax"
+              label="Fax no."
+              value={biz.faxNo ?? ""}
+              onChange={(v) => setBiz({ faxNo: v })}
+            />
+            <Field
+              id="biz_branches"
+              label="No. of branches"
+              value={biz.numberOfBranches ?? ""}
+              onChange={(v) => setBiz({ numberOfBranches: v })}
+            />
+          </FieldRow>
+          <FieldRow>
+            <Field
+              id="biz_established"
+              label="Date established"
+              value={biz.dateEstablished ?? ""}
+              onChange={(v) => setBiz({ dateEstablished: v })}
+            />
+            <Field
+              id="biz_employees"
+              label="No. of employees"
+              value={biz.numberOfEmployees ?? ""}
+              onChange={(v) => setBiz({ numberOfEmployees: v })}
+            />
+          </FieldRow>
+        </Card>
+      ) : null}
+
+      {isSme ? (
+        <Card>
+          <RepeatingRows<BusinessOfficer>
+            title="Company officers"
+            addLabel="Add officer"
+            rows={biz.companyOfficers}
+            emptyRow={() => ({ name: "", address: "", position: "" })}
+            columnsClassName="sm:grid-cols-[repeat(3,1fr)_auto]"
+            headers={["Name", "Address", "Position"]}
+            onChange={(companyOfficers) => setBiz({ companyOfficers })}
+            disabled={readOnly}
+            renderRow={(officer, _i, update) => (
+              <>
+                <Input
+                  value={officer.name ?? ""}
+                  onChange={(e) => update({ name: e.target.value })}
+                />
+                <Input
+                  value={officer.address ?? ""}
+                  onChange={(e) => update({ address: e.target.value })}
+                />
+                <InlineSelectField
+                  value={officer.position ?? ""}
+                  options={OFFICER_POSITION_OPTIONS}
+                  onChange={(v) => update({ position: v })}
+                />
+              </>
+            )}
+          />
+        </Card>
+      ) : null}
+
       <h3 className="mb-2 mt-6 font-display text-sm font-semibold uppercase tracking-wide text-navy-500">
         Individual / Representative Application
       </h3>
@@ -610,6 +750,142 @@ export function ApplicantProfileFields({
             value={contact.purposeOfLoan ?? ""}
             options={PURPOSE_OF_LOAN_OPTIONS}
             onChange={(v) => setProfileData({ purposeOfLoan: v })}
+          />
+        </FieldRow>
+      </Card>
+
+      <Card>
+        <h2 className={CARD_TITLE}>II. Manning agency</h2>
+        <FieldRow>
+          <Field
+            id="ma_name"
+            label="Manning agency"
+            value={profile.manningAgency.name ?? ""}
+            onChange={(v) =>
+              onChange({
+                ...profile,
+                manningAgency: { ...profile.manningAgency, name: v } as ManningAgency,
+              })
+            }
+          />
+          <Field
+            id="ma_crewingManager"
+            label="Crewing manager"
+            value={profile.manningAgency.crewingManager ?? ""}
+            onChange={(v) =>
+              onChange({
+                ...profile,
+                manningAgency: {
+                  ...profile.manningAgency,
+                  crewingManager: v,
+                } as ManningAgency,
+              })
+            }
+          />
+        </FieldRow>
+        <FieldRow>
+          <Field
+            id="pic_vessel"
+            label="Name of vessel"
+            value={profile.picWork.vessel ?? ""}
+            onChange={(v) =>
+              onChange({ ...profile, picWork: { ...profile.picWork, vessel: v } })
+            }
+          />
+          <Field
+            id="ma_crewingManagerContact"
+            label="Contact number"
+            value={profile.manningAgency.crewingManagerContact ?? ""}
+            onChange={(v) =>
+              onChange({
+                ...profile,
+                manningAgency: {
+                  ...profile.manningAgency,
+                  crewingManagerContact: v,
+                } as ManningAgency,
+              })
+            }
+          />
+        </FieldRow>
+        <FieldRow>
+          <Field
+            id="ma_yearsOfStay"
+            label="Years of stay"
+            value={profile.manningAgency.yearsOfStay ?? ""}
+            onChange={(v) =>
+              onChange({
+                ...profile,
+                manningAgency: { ...profile.manningAgency, yearsOfStay: v } as ManningAgency,
+              })
+            }
+          />
+          <Field
+            id="pic_contractDuration"
+            label="Contract duration"
+            value={profile.picWork.contractDuration ?? ""}
+            onChange={(v) =>
+              onChange({
+                ...profile,
+                picWork: { ...profile.picWork, contractDuration: v },
+              })
+            }
+          />
+        </FieldRow>
+        <FieldRow>
+          <Field
+            id="ma_departureDate"
+            label="Departure date"
+            value={profile.manningAgency.departureDate ?? ""}
+            onChange={(v) =>
+              onChange({
+                ...profile,
+                manningAgency: { ...profile.manningAgency, departureDate: v } as ManningAgency,
+              })
+            }
+          />
+          <Field
+            id="ma_previousAgency"
+            label="Prev. manning agency"
+            value={profile.manningAgency.previousAgency ?? ""}
+            onChange={(v) =>
+              onChange({
+                ...profile,
+                manningAgency: {
+                  ...profile.manningAgency,
+                  previousAgency: v,
+                } as ManningAgency,
+              })
+            }
+          />
+        </FieldRow>
+        <FieldRow>
+          <Field
+            id="ma_previousSignOffDate"
+            label="Previous sign-off date"
+            value={profile.manningAgency.previousSignOffDate ?? ""}
+            onChange={(v) =>
+              onChange({
+                ...profile,
+                manningAgency: {
+                  ...profile.manningAgency,
+                  previousSignOffDate: v,
+                } as ManningAgency,
+              })
+            }
+          />
+          <Field
+            id="ma_reasonForTransfer"
+            label="Reason of transfer / years"
+            value={profile.manningAgency.reasonForTransfer ?? ""}
+            onChange={(v) =>
+              onChange({
+                ...profile,
+                manningAgency: {
+                  ...profile.manningAgency,
+                  reasonForTransfer: v,
+                } as ManningAgency,
+              })
+            }
           />
         </FieldRow>
       </Card>
@@ -1092,284 +1368,6 @@ export function ApplicantProfileFields({
             label="Total net income"
             value={biz.totalNetIncome ?? ""}
             onChange={(v) => setBiz({ totalNetIncome: v })}
-          />
-        </Card>
-      ) : null}
-
-      {isSme ? (
-        <h3 className="mb-2 mt-6 font-display text-sm font-semibold uppercase tracking-wide text-navy-500">
-          Business Application
-        </h3>
-      ) : null}
-      {isSme ? (
-        <Card>
-          <h2 className={CARD_TITLE}>II. Facts about the company</h2>
-          <FieldRow>
-            <Field
-              id="biz_companyName"
-              label="Name of company"
-              value={biz.companyName ?? ""}
-              onChange={(v) => setBiz({ companyName: v })}
-            />
-            <Field
-              id="biz_acronym"
-              label="Acronym"
-              value={biz.acronym ?? ""}
-              onChange={(v) => setBiz({ acronym: v })}
-            />
-          </FieldRow>
-          <Field
-            id="biz_address"
-            label="Office address"
-            value={biz.officeAddress ?? ""}
-            onChange={(v) => setBiz({ officeAddress: v })}
-          />
-          <Field
-            id="biz_address_line2"
-            label="Office address line 2"
-            value={biz.officeAddressLine2 ?? ""}
-            onChange={(v) => setBiz({ officeAddressLine2: v })}
-          />
-          <FieldRow>
-            <Field
-              id="biz_landline"
-              label="Landline nos."
-              value={biz.landlineNos ?? ""}
-              onChange={(v) => setBiz({ landlineNos: v })}
-            />
-            <Field
-              id="biz_mobile"
-              label="Mobile nos."
-              value={biz.mobileNos ?? ""}
-              onChange={(v) => setBiz({ mobileNos: v })}
-            />
-          </FieldRow>
-          <FieldRow>
-            <SelectField
-              id="biz_nature"
-              label="Nature of business"
-              value={biz.natureOfBusiness ?? ""}
-              options={NATURE_OF_BUSINESS_OPTIONS}
-              onChange={(v) => setBiz({ natureOfBusiness: v })}
-            />
-            <Field
-              id="biz_email"
-              label="Business email"
-              value={biz.companyEmail ?? ""}
-              onChange={(v) => setBiz({ companyEmail: v })}
-            />
-          </FieldRow>
-          <FieldRow>
-            <Field
-              id="biz_website"
-              label="Website"
-              value={biz.website ?? ""}
-              onChange={(v) => setBiz({ website: v })}
-            />
-            <Field
-              id="biz_tin"
-              label="TIN"
-              value={biz.tin ?? ""}
-              onChange={(v) => setBiz({ tin: v })}
-            />
-          </FieldRow>
-          <FieldRow>
-            <Field
-              id="biz_fax"
-              label="Fax no."
-              value={biz.faxNo ?? ""}
-              onChange={(v) => setBiz({ faxNo: v })}
-            />
-            <Field
-              id="biz_branches"
-              label="No. of branches"
-              value={biz.numberOfBranches ?? ""}
-              onChange={(v) => setBiz({ numberOfBranches: v })}
-            />
-          </FieldRow>
-          <FieldRow>
-            <Field
-              id="biz_established"
-              label="Date established"
-              value={biz.dateEstablished ?? ""}
-              onChange={(v) => setBiz({ dateEstablished: v })}
-            />
-            <Field
-              id="biz_employees"
-              label="No. of employees"
-              value={biz.numberOfEmployees ?? ""}
-              onChange={(v) => setBiz({ numberOfEmployees: v })}
-            />
-          </FieldRow>
-        </Card>
-      ) : null}
-
-      {isSeafarer ? (
-      <Card>
-        <h2 className={CARD_TITLE}>II. Manning agency</h2>
-        <FieldRow>
-          <Field
-            id="ma_name"
-            label="Manning agency"
-            value={profile.manningAgency.name ?? ""}
-            onChange={(v) =>
-              onChange({
-                ...profile,
-                manningAgency: { ...profile.manningAgency, name: v } as ManningAgency,
-              })
-            }
-          />
-          <Field
-            id="ma_crewingManager"
-            label="Crewing manager"
-            value={profile.manningAgency.crewingManager ?? ""}
-            onChange={(v) =>
-              onChange({
-                ...profile,
-                manningAgency: {
-                  ...profile.manningAgency,
-                  crewingManager: v,
-                } as ManningAgency,
-              })
-            }
-          />
-        </FieldRow>
-        <FieldRow>
-          <Field
-            id="pic_vessel"
-            label="Name of vessel"
-            value={profile.picWork.vessel ?? ""}
-            onChange={(v) =>
-              onChange({ ...profile, picWork: { ...profile.picWork, vessel: v } })
-            }
-          />
-          <Field
-            id="ma_crewingManagerContact"
-            label="Contact number"
-            value={profile.manningAgency.crewingManagerContact ?? ""}
-            onChange={(v) =>
-              onChange({
-                ...profile,
-                manningAgency: {
-                  ...profile.manningAgency,
-                  crewingManagerContact: v,
-                } as ManningAgency,
-              })
-            }
-          />
-        </FieldRow>
-        <FieldRow>
-          <Field
-            id="ma_yearsOfStay"
-            label="Years of stay"
-            value={profile.manningAgency.yearsOfStay ?? ""}
-            onChange={(v) =>
-              onChange({
-                ...profile,
-                manningAgency: { ...profile.manningAgency, yearsOfStay: v } as ManningAgency,
-              })
-            }
-          />
-          <Field
-            id="pic_contractDuration"
-            label="Contract duration"
-            value={profile.picWork.contractDuration ?? ""}
-            onChange={(v) =>
-              onChange({
-                ...profile,
-                picWork: { ...profile.picWork, contractDuration: v },
-              })
-            }
-          />
-        </FieldRow>
-        <FieldRow>
-          <Field
-            id="ma_departureDate"
-            label="Departure date"
-            value={profile.manningAgency.departureDate ?? ""}
-            onChange={(v) =>
-              onChange({
-                ...profile,
-                manningAgency: { ...profile.manningAgency, departureDate: v } as ManningAgency,
-              })
-            }
-          />
-          <Field
-            id="ma_previousAgency"
-            label="Prev. manning agency"
-            value={profile.manningAgency.previousAgency ?? ""}
-            onChange={(v) =>
-              onChange({
-                ...profile,
-                manningAgency: {
-                  ...profile.manningAgency,
-                  previousAgency: v,
-                } as ManningAgency,
-              })
-            }
-          />
-        </FieldRow>
-        <FieldRow>
-          <Field
-            id="ma_previousSignOffDate"
-            label="Previous sign-off date"
-            value={profile.manningAgency.previousSignOffDate ?? ""}
-            onChange={(v) =>
-              onChange({
-                ...profile,
-                manningAgency: {
-                  ...profile.manningAgency,
-                  previousSignOffDate: v,
-                } as ManningAgency,
-              })
-            }
-          />
-          <Field
-            id="ma_reasonForTransfer"
-            label="Reason of transfer / years"
-            value={profile.manningAgency.reasonForTransfer ?? ""}
-            onChange={(v) =>
-              onChange({
-                ...profile,
-                manningAgency: {
-                  ...profile.manningAgency,
-                  reasonForTransfer: v,
-                } as ManningAgency,
-              })
-            }
-          />
-        </FieldRow>
-      </Card>
-      ) : null}
-
-      {isSme ? (
-        <Card>
-          <RepeatingRows<BusinessOfficer>
-            title="Company officers"
-            addLabel="Add officer"
-            rows={biz.companyOfficers}
-            emptyRow={() => ({ name: "", address: "", position: "" })}
-            columnsClassName="sm:grid-cols-[repeat(3,1fr)_auto]"
-            headers={["Name", "Address", "Position"]}
-            onChange={(companyOfficers) => setBiz({ companyOfficers })}
-            disabled={readOnly}
-            renderRow={(officer, _i, update) => (
-              <>
-                <Input
-                  value={officer.name ?? ""}
-                  onChange={(e) => update({ name: e.target.value })}
-                />
-                <Input
-                  value={officer.address ?? ""}
-                  onChange={(e) => update({ address: e.target.value })}
-                />
-                <InlineSelectField
-                  value={officer.position ?? ""}
-                  options={OFFICER_POSITION_OPTIONS}
-                  onChange={(v) => update({ position: v })}
-                />
-              </>
-            )}
           />
         </Card>
       ) : null}

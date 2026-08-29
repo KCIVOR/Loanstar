@@ -23,6 +23,8 @@ export function simulateAgingStep(input: {
     amountPaid: number;
     penaltyAmount: number;
     rolledAt: string | null;
+    /** Origination or Offset discount sitting on this row (Phase 0/5). */
+    discountAmount?: number;
   }>;
   asOf: string;
   penaltyRate?: number;
@@ -52,15 +54,27 @@ export function simulateAgingStep(input: {
       intoInstallmentNo: number;
       rollAmount: number;
     },
+    // Origination-discount reversion (Phase 3) — set-based across every open
+    // row on the account, independent of whether there's an overdue
+    // installment at all, so it's computed before that early return below.
+    discountsCleared: [] as string[],
   };
+
+  for (const s of input.schedules) {
+    if (s.status === "paid" || s.status === "rolled") continue;
+    if ((s.discountAmount ?? 0) > 0 && daysPastDue(s.dueDate, asOf) >= 0) {
+      result.discountsCleared.push(s.id);
+    }
+  }
 
   if (!overdue || daysPastDue(overdue.dueDate, asOf) < 1) {
     return result;
   }
 
   let finalPenalty = overdue.penaltyAmount;
-  const outstanding =
-    overdue.amountDue - overdue.amountPaid + overdue.penaltyAmount;
+  // Base unpaid balance only — accrued penalty is deliberately excluded so a
+  // repeat run recomputes the same figure and no-ops (see posting.ts).
+  const outstanding = overdue.amountDue - overdue.amountPaid;
   const penalty = calculatePenaltyAmount(outstanding, rate);
   if (penalty > overdue.penaltyAmount) {
     result.penaltyWritten = {
@@ -202,6 +216,46 @@ describe("simulateAgingStep (Phase 7 parity fixtures)", () => {
     );
   });
 
+  it("repeat run on the SAME overdue installment — no second penalty write", () => {
+    // Regression: penalty used to be computed on (balance + accrued penalty),
+    // so every re-run produced a larger figure and another `penalties` row.
+    // Observed live on masterlist 93986c2f: installment #6 accrued four
+    // separate charges (6604.83 + 330.24 + 16.51 + 0.83) within 43 seconds,
+    // converging toward rate/(1-rate) = 5.26% instead of the configured 5%.
+    const alreadyPenalized = {
+      ...base,
+      dueDate: "2026-07-16",
+      status: "overdue",
+      penaltyAmount: 500,
+    };
+    const out = simulateAgingStep({
+      schedules: [alreadyPenalized, { ...next, dueDate: "2026-08-16" }],
+      asOf: "2026-07-17T12:00:00.000Z",
+      penaltyRate: 0.05,
+    });
+    // 5% of the 10000 base is still 500 — not greater than what's stored, so
+    // nothing is written a second time.
+    assert.equal(out.penaltyWritten, null);
+    assert.equal(out.rollover, null);
+  });
+
+  it("penalty is stable across many runs — converges to rate, not rate/(1-rate)", () => {
+    let penaltyAmount = 0;
+    for (let i = 0; i < 25; i += 1) {
+      const out = simulateAgingStep({
+        schedules: [
+          { ...base, dueDate: "2026-07-16", status: "overdue", penaltyAmount },
+          { ...next, dueDate: "2026-08-16" },
+        ],
+        asOf: "2026-07-17T12:00:00.000Z",
+        penaltyRate: 0.05,
+      });
+      if (out.penaltyWritten) penaltyAmount = out.penaltyWritten.penaltyAmount;
+    }
+    // Exactly one 5% charge, no matter how many times aging ran.
+    assert.equal(penaltyAmount, 500);
+  });
+
   it("30 dpd — single rollover into next installment", () => {
     const out = simulateAgingStep({
       schedules: [{ ...base, dueDate: "2026-06-17" }, next],
@@ -236,5 +290,109 @@ describe("simulateAgingStep (Phase 7 parity fixtures)", () => {
     // next is due 2026-07-01 → 17 dpd, not yet 30; may get penalty but not from rolled
     assert.equal(out.rollover, null);
     assert.notEqual(out.penaltyWritten?.installmentId, "i1");
+  });
+});
+
+describe("origination-discount reversion (Phase 3 parity fixtures)", () => {
+  const base = {
+    id: "i1",
+    installmentNo: 1,
+    dueDate: "2026-06-01",
+    status: "pending",
+    amountDue: 10000,
+    amountPaid: 0,
+    penaltyAmount: 0,
+    rolledAt: null as string | null,
+  };
+  const next = {
+    id: "i2",
+    installmentNo: 2,
+    dueDate: "2026-07-01",
+    status: "pending",
+    amountDue: 10000,
+    amountPaid: 0,
+    penaltyAmount: 0,
+    rolledAt: null as string | null,
+  };
+
+  it("a discount on a not-yet-due installment survives a run", () => {
+    const out = simulateAgingStep({
+      schedules: [
+        { ...base, dueDate: "2026-08-01", discountAmount: 500 },
+        { ...next, dueDate: "2026-09-01" },
+      ],
+      asOf: "2026-07-17T12:00:00.000Z",
+    });
+    assert.deepEqual(out.discountsCleared, []);
+  });
+
+  it("a discount on a now-due installment is cleared (due date arriving is enough — unpaid or not)", () => {
+    const out = simulateAgingStep({
+      schedules: [
+        { ...base, dueDate: "2026-07-17", discountAmount: 500 },
+        { ...next, dueDate: "2026-09-01" },
+      ],
+      asOf: "2026-07-17T12:00:00.000Z",
+    });
+    assert.deepEqual(out.discountsCleared, ["i1"]);
+  });
+
+  it("a discount on a past-due installment is cleared, independent of the penalty/rollover it also triggers", () => {
+    const out = simulateAgingStep({
+      schedules: [
+        { ...base, dueDate: "2026-06-17", discountAmount: 500 },
+        next,
+      ],
+      asOf: "2026-07-17T12:00:00.000Z",
+      penaltyRate: 0.05,
+    });
+    assert.deepEqual(out.discountsCleared, ["i1"]);
+    // The reversion is a separate concern from the penalty it happens to
+    // co-occur with here — both fire on the same run, neither blocks the other.
+    assert.ok(out.penaltyWritten);
+  });
+
+  it("a paid installment's discount is left alone even past due date", () => {
+    const out = simulateAgingStep({
+      schedules: [
+        { ...base, dueDate: "2026-06-17", status: "paid", discountAmount: 500 },
+        next,
+      ],
+      asOf: "2026-07-17T12:00:00.000Z",
+    });
+    assert.deepEqual(out.discountsCleared, []);
+  });
+
+  it("a rolled installment's discount is left alone (it has already moved to the next row)", () => {
+    const out = simulateAgingStep({
+      schedules: [
+        { ...base, dueDate: "2026-06-17", status: "rolled", discountAmount: 500, rolledAt: "2026-07-01T00:00:00.000Z" },
+        next,
+      ],
+      asOf: "2026-07-17T12:00:00.000Z",
+    });
+    assert.deepEqual(out.discountsCleared, []);
+  });
+
+  it("reversion is stable across many runs — clears once, stays cleared, never re-triggers", () => {
+    let discountAmount = 500;
+    let clearedCount = 0;
+    for (let i = 0; i < 25; i += 1) {
+      const out = simulateAgingStep({
+        schedules: [
+          { ...base, dueDate: "2026-06-17", discountAmount },
+          next,
+        ],
+        asOf: "2026-07-17T12:00:00.000Z",
+        penaltyRate: 0.05,
+      });
+      if (out.discountsCleared.includes("i1")) {
+        clearedCount += 1;
+        discountAmount = 0; // mirrors the real UPDATE actually taking effect
+      }
+    }
+    // The SQL's own WHERE clause (`discount_amount > 0`) makes every run after
+    // the first a no-op — this proves the JS mirror agrees.
+    assert.equal(clearedCount, 1);
   });
 });

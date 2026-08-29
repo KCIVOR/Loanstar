@@ -140,8 +140,11 @@ export async function GET(_request: Request, { params }: RouteParams) {
             principal: computation.principal,
             monthlyAmortization: computation.monthlyAmortization,
             totalLoan: computation.totalLoan,
+            totalInterest: computation.totalInterest,
             terms: computation.terms,
+            releaseDate: computation.releaseDate,
             firstPaymentDate: computation.firstPaymentDate,
+            dueDay: computation.dueDay,
             paymentFrequency: computation.paymentFrequency,
           }
         : null,

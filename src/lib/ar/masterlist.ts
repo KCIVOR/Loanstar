@@ -9,6 +9,43 @@ import {
   PaidOffEligibilityError,
 } from "@/lib/ar/paid-off";
 import { generateAmortizationSchedule } from "@/lib/ar/schedule";
+import type { AmortizationInstallment } from "@/lib/ar/schedule";
+import { halfUp } from "@/lib/computation/money";
+import { computeInvoiceLoan } from "@/lib/computation/invoice";
+import type { InvoiceComputeResult } from "@/lib/computation/invoice";
+import { buildDiscountUnits } from "@/lib/computation/discount-units";
+
+/**
+ * Adapter: Invoice computation result → amortization schedule rows.
+ * Invoice has weekly interest-only payments (installmentNo 1..N) plus one
+ * final principal payment (installmentNo N+1). Exported — also used by
+ * `lra/release-service.ts`'s `savePdcChecks` to build the same shape as the
+ * expected PDC check schedule, so PDC and the real AR masterlist schedule
+ * can never diverge (same source function, not two parallel implementations).
+ */
+export function invoiceScheduleToInstallments(
+  result: InvoiceComputeResult,
+): AmortizationInstallment[] {
+  const installments: AmortizationInstallment[] = [];
+
+  // Weekly interest payments (installmentNo 1..12/8/4 depending on terms)
+  result.weeklySchedule.forEach((week) => {
+    installments.push({
+      installmentNo: week.weekNo,
+      dueDate: week.dueDate,
+      amountDue: week.amountDue,
+    });
+  });
+
+  // Principal payment (installmentNo N+1, one week after final interest)
+  installments.push({
+    installmentNo: result.weeklySchedule.length + 1,
+    dueDate: result.principalDueDate,
+    amountDue: result.principalAmount,
+  });
+
+  return installments;
+}
 
 /**
  * Denormalized employment/identity columns on masterlist.
@@ -160,27 +197,95 @@ export async function initializeArAccount(
     throw new Error(mlError?.message ?? "Failed to create masterlist record");
   }
 
-  const schedule = generateAmortizationSchedule({
-    terms: computation.terms,
-    monthlyAmortization: computation.monthlyAmortization,
-    releaseDate,
-    addonMonths: computation.addonMonths,
-    dueDay: computation.dueDay ?? 10,
-    totalLoan: computation.totalLoan,
-    // Reuse the already-computed, segment-correct date instead of letting
-    // generateAmortizationSchedule recompute it with the Seafarer-only rule.
-    firstPaymentDate: computation.firstPaymentDate,
+  // Invoice Financing (weekly) uses a different computation engine — it has
+  // weekly interest-only payments plus one final principal payment, not the
+  // standard principal+interest split. Branch before generateAmortizationSchedule.
+  const schedule =
+    computation.paymentFrequency === "weekly"
+      ? invoiceScheduleToInstallments(
+          computeInvoiceLoan({
+            principal: computation.principal,
+            terms: computation.terms,
+            releaseDate: new Date(releaseDate),
+          }),
+        )
+      : computation.paymentFrequency === "daily"
+        ? // Daily Interest is a single manually-dated payment — persistComputation
+          // already stored the CSA-entered payment date as firstPaymentDate and
+          // the principal+interest total as totalLoan, so there's nothing left
+          // to compute here, just one row.
+          [
+            {
+              installmentNo: 1,
+              dueDate: computation.firstPaymentDate ?? releaseDate,
+              amountDue: computation.totalLoan,
+            } satisfies AmortizationInstallment,
+          ]
+        : generateAmortizationSchedule({
+          terms: computation.terms,
+          monthlyAmortization: computation.monthlyAmortization,
+          releaseDate,
+          addonMonths: computation.addonMonths,
+          dueDay: computation.dueDay ?? 10,
+          totalLoan: computation.totalLoan,
+          totalInterest: computation.totalInterest,
+          // Reuse the already-computed, segment-correct date instead of letting
+          // generateAmortizationSchedule recompute it with the Seafarer-only rule.
+          firstPaymentDate: computation.firstPaymentDate,
+          paymentFrequency: computation.paymentFrequency,
+        });
+
+  // Origination discounts (see docs/revision-plans/feature-new-loan-origination-discount.md)
+  // target a real, frequency-aware discount unit (Month/Quarter/Payment N —
+  // see discount-units.ts), not raw schedule rows directly. A unit's real
+  // interest amount, and which raw installment_no rows it covers, come from
+  // the exact same generators used to build `schedule` above — a flat
+  // average was wrong for Invoice's escalating rate and for Quarterly/
+  // Two-monthly's interest-only structure (fixed 2026-08-28). Monthly/
+  // Salary/Bi-Monthly split a unit's interest evenly across however many raw
+  // rows it covers (1 for Monthly, 2 for Salary/Bi-Monthly) — Invoice's
+  // 4-weeks-per-month split works the same way, since each week within one
+  // Invoice month already carries an equal share.
+  const discountUnits = buildDiscountUnits({
     paymentFrequency: computation.paymentFrequency,
+    terms: computation.terms,
+    principal: computation.principal,
+    totalInterest: computation.totalInterest,
+    totalLoan: computation.totalLoan,
+    releaseDate,
+    firstPaymentDate: computation.firstPaymentDate,
+    dueDay: computation.dueDay ?? 10,
   });
+  const discountByUnit = new Map<number, number>(
+    (computation.originationDiscounts ?? []).map((d) => [d.installmentNo, d.percent]),
+  );
+  const unitNoByInstallmentNo = new Map<number, number>();
+  const interestPerRowByInstallmentNo = new Map<number, number>();
+  for (const unit of discountUnits) {
+    const perRow = halfUp(unit.interestAmount / unit.installmentNos.length);
+    for (const no of unit.installmentNos) {
+      unitNoByInstallmentNo.set(no, unit.unitNo);
+      interestPerRowByInstallmentNo.set(no, perRow);
+    }
+  }
 
   const { error: schedError } = await supabase.from("amortization_schedules").insert(
-    schedule.map((row) => ({
-      masterlist_id: masterlist.id,
-      installment_no: row.installmentNo,
-      due_date: row.dueDate,
-      amount_due: row.amountDue,
-      status: "pending",
-    })),
+    schedule.map((row) => {
+      const unitNo = unitNoByInstallmentNo.get(row.installmentNo);
+      const percent = unitNo != null ? discountByUnit.get(unitNo) : undefined;
+      const interestPerRow = interestPerRowByInstallmentNo.get(row.installmentNo) ?? 0;
+      const discountAmount =
+        percent != null ? halfUp((percent / 100) * interestPerRow) : 0;
+      return {
+        masterlist_id: masterlist.id,
+        installment_no: row.installmentNo,
+        due_date: row.dueDate,
+        amount_due: row.amountDue,
+        discount_amount: discountAmount,
+        line_type: row.lineType ?? "standard",
+        status: "pending",
+      };
+    }),
   );
 
   if (schedError) {

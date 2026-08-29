@@ -11,8 +11,15 @@ import {
   computeSmeFirstPaymentDate,
   formatDateLocal,
 } from "@/lib/computation/release-date";
+import { computeDailyInterestLoan } from "@/lib/computation/daily";
+import {
+  buildDiscountUnits,
+  maxDiscountUnits,
+  type ScheduleType,
+} from "@/lib/computation/discount-units";
 import { computeSfLoan } from "@/lib/computation/sf";
 import { computeSmeLoan } from "@/lib/computation/sme";
+import { halfUp } from "@/lib/computation/money";
 import type {
   InputMode,
   OtherDeductions,
@@ -29,9 +36,34 @@ export type PersistComputationInput = {
   /** Application segment — selects SF vs SME engine. Individual reuses the SME
    * engine (confirmed 2026-08-19 — same calculator, same rates). Defaults to seafarer. */
   segment?: "seafarer" | "sme" | "individual" | null;
-  /** Individual only — MPL (monthly, reuses SME's date rule) vs Salary
-   * (semi-monthly). Drives first-payment-date and payment_frequency. */
-  individualLoanType?: "mpl" | "salary" | null;
+  /** SME/Individual only — "car_refinancing" or "real_estate" routes to the
+   * SF net-method engine instead of SME gross-up (net method fix). Seafarer
+   * never carries collateral (validated at application creation), so this is
+   * ignored when segment resolves to seafarer. Default "none". */
+  collateralType?: "none" | "car_refinancing" | "real_estate" | null;
+  /** Unified schedule/product choice (loan_applications.payment_schedule) —
+   * valid for SME **or** Individual, any of the 8 values, either segment
+   * (confirmed 2026-08-29: SME may pick MPL/Salary, Individual may pick
+   * Invoice/Bi-monthly/Quarterly/Two-monthly/Daily — a deliberate product
+   * decision, not a restriction inherited from the old two-field design —
+   * see docs/payment-schedule-unification-plan.md). Ignored for Seafarer
+   * (always "monthly", enforced by the DB CHECK). Decided at intake, not a
+   * free choice at CSA's normal compute time by default — but CSA's compute
+   * route and Committee's override path may both pass a *different* value
+   * than the application's own payment_schedule (both retain override
+   * authority, confirmed 2026-08-28/29). Never leaks past persistComputation
+   * as a literal "mpl"/"salary" string — translated into
+   * computations.payment_frequency's own, unrelated, 7-value vocabulary. */
+  paymentSchedule?:
+    | "mpl"
+    | "salary"
+    | "monthly"
+    | "weekly"
+    | "bi_monthly"
+    | "quarterly"
+    | "two_monthly"
+    | "daily"
+    | null;
   loanTypeId?: string | null;
   loanTypeName?: string | null;
   inputMode: InputMode;
@@ -51,8 +83,107 @@ export type PersistComputationInput = {
   releaseDate?: string | null;
   dueDay?: number;
   monthlyIncome?: number | null;
+  /** Proposed per-installment discount percentages for this loan's own
+   * future schedule, set by CSA/Committee at computation time — applied to
+   * the real amortization_schedules rows at release. See
+   * docs/revision-plans/feature-new-loan-origination-discount.md. */
+  originationDiscounts?: OriginationDiscount[];
+  /** Daily Interest only — CSA-entered manual payment date (single payment,
+   * not a recurring schedule). Required when the resolved schedule type is
+   * "daily"; ignored otherwise. */
+  manualPaymentDate?: string | null;
   computedBy: string;
 };
+
+export type OriginationDiscount = {
+  installmentNo: number;
+  percent: number;
+};
+
+/** Seafarer's due date must be the borrower's actual payday — one of 5, 15,
+ * or 25, never a free-typed number and never silently defaulted (the old
+ * default of 10 was never a valid payday). SME/Individual are unrestricted.
+ * Returns an error message if invalid, `null` if OK. Shared by the CSA
+ * computation route and the Committee override path so the rule can't drift
+ * between them — pure so it's testable without a Supabase client. */
+export function validateSeafarerDueDay(
+  segment: string,
+  dueDay: number | undefined,
+): string | null {
+  if (segment !== "seafarer") return null;
+  if (dueDay === undefined || ![5, 15, 25].includes(dueDay)) {
+    return "Due date must be 5, 15, or 25 for Seafarer loans";
+  }
+  return null;
+}
+
+/** Quarterly and Two-Monthly are interest-only until a final combined
+ * interest+principal payment, which only lands cleanly if `terms` divides
+ * evenly by the frequency (3 months for quarterly, 2 for two-monthly) — e.g.
+ * a 7-month quarterly loan has no clean final quarter. Weekly (Invoice) has
+ * its own 1-3 month cap enforced inside `computeInvoiceLoan` and isn't
+ * covered here. Returns an error message if invalid, `null` if OK (including
+ * every frequency this rule doesn't apply to). Pure so it's testable without
+ * a Supabase client — same shape as `validateSeafarerDueDay`. */
+export function validateFrequencyTerms(
+  paymentFrequency: string | null | undefined,
+  terms: number,
+): string | null {
+  if (paymentFrequency === "quarterly" && terms % 3 !== 0) {
+    return "Quarterly terms must be divisible by 3 (e.g. 6, 9, or 12 months)";
+  }
+  if (paymentFrequency === "two_monthly" && terms % 2 !== 0) {
+    return "Two-monthly terms must be divisible by 2 (e.g. 4, 6, 8, 10, or 12 months)";
+  }
+  return null;
+}
+
+/** Which computation engine a loan uses: "sf" (net method — principal stays
+ * as entered, fees deducted) for Seafarer always, and for SME/Individual
+ * WITH collateral (Auto/REM net-method fix); "sme" (gross-up — fees added
+ * on top) for SME/Individual with no collateral. Pure so the P1 routing
+ * decision itself is directly testable without a Supabase client, same
+ * pattern as `validateSeafarerDueDay`. */
+export function resolveComputationEngine(
+  segment: "seafarer" | "sme" | "individual",
+  collateralType: "none" | "car_refinancing" | "real_estate" | null | undefined,
+): "sme" | "sf" {
+  const hasCollateral =
+    collateralType === "car_refinancing" || collateralType === "real_estate";
+  if ((segment === "sme" || segment === "individual") && !hasCollateral) {
+    return "sme";
+  }
+  return "sf";
+}
+
+/** Each proposed origination discount must target a real discount unit of
+ * this loan and be a valid percentage (0-100). "Unit" means different
+ * things per schedule type — a calendar month for Monthly/Salary/Bi-Monthly/
+ * Invoice, a quarter for Quarterly, a payment for Two-monthly — see
+ * `maxDiscountUnits`. Daily has zero valid units (a single already-fixed
+ * payment, nothing to discount). Returns an error message for the first
+ * invalid entry found, `null` if every entry is valid (including an empty/
+ * undefined list). Pure so it's testable without a Supabase client — same
+ * shape as `validateSeafarerDueDay`. */
+export function validateOriginationDiscounts(
+  terms: number,
+  discounts: OriginationDiscount[] | undefined,
+  paymentFrequency?: ScheduleType,
+): string | null {
+  if (!discounts || discounts.length === 0) return null;
+  const maxUnit = maxDiscountUnits(paymentFrequency, terms);
+  for (const { installmentNo, percent } of discounts) {
+    if (!Number.isInteger(installmentNo) || installmentNo < 1 || installmentNo > maxUnit) {
+      return maxUnit === 0
+        ? "This loan's schedule has no discountable installments"
+        : `Discount installment number ${installmentNo} is not a valid unit for this ${maxUnit}-unit schedule`;
+    }
+    if (percent < 0 || percent > 100) {
+      return `Discount percent ${percent} must be between 0 and 100`;
+    }
+  }
+  return null;
+}
 
 export function buildLineItems(result: SfComputeResult) {
   return [
@@ -130,6 +261,7 @@ export function mapComputationRow(row: Record<string, unknown>) {
     releaseDate: row.release_date as string | null,
     firstPaymentDate: row.first_payment_date as string | null,
     dueDay: row.due_day as number | null,
+    originationDiscounts: (row.origination_discounts as OriginationDiscount[] | null) ?? null,
     lineItems: row.line_items as Array<{ key: string; label: string; amount: number }>,
     coverageRatio: row.coverage_ratio != null ? Number(row.coverage_ratio) : null,
     coverageWarning: Boolean(row.coverage_warning),
@@ -138,7 +270,14 @@ export function mapComputationRow(row: Record<string, unknown>) {
     chattelFee: row.chattel_fee != null ? Number(row.chattel_fee) : null,
     withDsAndNotary:
       row.with_ds_and_notary != null ? Boolean(row.with_ds_and_notary) : null,
-    paymentFrequency: row.payment_frequency as "monthly" | "semi_monthly",
+    paymentFrequency: row.payment_frequency as
+      | "monthly"
+      | "semi_monthly"
+      | "weekly"
+      | "bi_monthly"
+      | "quarterly"
+      | "two_monthly"
+      | "daily",
     computedBy: row.computed_by as string | null,
     signedAt: row.signed_at as string | null,
     signedBy: row.signed_by as string | null,
@@ -157,10 +296,15 @@ export async function persistComputation(
       ? input.segment
       : "seafarer";
 
+  const hasCollateral =
+    input.collateralType === "car_refinancing" ||
+    input.collateralType === "real_estate";
+  const engine = resolveComputationEngine(segment, input.collateralType);
+
   let result: SfComputeResult;
   // Set only on the sme/individual branch below; stays null for seafarer.
   let smeChattelFee: number | null = null;
-  if (segment === "sme" || segment === "individual") {
+  if (engine === "sme") {
     // Loan Desired mode: CSA `amount` is treated as loan_desired (extraction §4).
     // SF inputMode is still stored for DB CHECK compatibility; it does not drive SME math.
     const sme = computeSmeLoan({
@@ -177,11 +321,15 @@ export async function persistComputation(
     smeChattelFee = sme.chattelFee;
     result = smeToSfResult(input, sme);
   } else {
+    // Seafarer (always), and now also SME/Individual WITH collateral (Auto/REM) —
+    // same net-method engine. addonMonths must NOT silently pick up sf.ts's own
+    // `?? 2` default for a collateral SME/Individual loan — that default exists
+    // for Seafarer's real cutoff-driven cadence, not this product.
     result = computeSfLoan({
       inputMode: input.inputMode,
       amount: input.amount,
       terms: input.terms,
-      addonMonths: input.addonMonths,
+      addonMonths: input.addonMonths ?? 0,
       pfRate: input.pfRate,
       interestRate: input.interestRate,
       securityFeeRate: input.securityFeeRate,
@@ -242,19 +390,49 @@ export async function persistComputation(
 
   const releaseDate = input.releaseDate ? new Date(input.releaseDate) : new Date();
   const dueDay = input.dueDay ?? 10;
-  // SME, and MPL (individual_loan_type "mpl"): release + 1 month, same day,
-  // no cutoff, no addon-months adjustment. Salary (individual_loan_type
-  // "salary"): semi-monthly — next 15th/end-of-month on or after release.
-  // Seafarer, Auto/REM, and any individual row with no individual_loan_type
-  // set keep the old 22nd-cutoff rule unchanged.
-  const firstPayment =
-    segment === "sme" || input.individualLoanType === "mpl"
-      ? computeSmeFirstPaymentDate(releaseDate)
-      : input.individualLoanType === "salary"
-        ? computeSalaryFirstPaymentDate(releaseDate)
+
+  // Unified schedule choice — SME or Individual, any of the 8 values,
+  // sourced from the application's own payment_schedule (decided at intake)
+  // unless CSA's compute route or Committee's override path pass a
+  // different value explicitly. Seafarer ignores it entirely — always
+  // "monthly", enforced by the DB CHECK. "mpl"/"salary" never reach
+  // computations.payment_frequency as literal strings — this is the
+  // translation boundary: mpl behaves exactly like "monthly", salary like
+  // "semi_monthly"; every other value passes through unchanged regardless
+  // of segment. See docs/payment-schedule-unification-plan.md.
+  const paymentFrequency =
+    segment === "sme" || segment === "individual"
+      ? input.paymentSchedule === "mpl"
+        ? "monthly"
+        : input.paymentSchedule === "salary"
+          ? "semi_monthly"
+          : (input.paymentSchedule ?? "monthly")
+      : "monthly";
+  const isDaily = paymentFrequency === "daily";
+
+  if (isDaily && !input.manualPaymentDate) {
+    throw new Error("Daily Interest loans require a manual payment date");
+  }
+
+  // Salary needs a real 15th/end-of-month anchor date regardless of segment
+  // (SME picking "salary" produces a semi-monthly schedule too, per the
+  // paymentFrequency derivation above, and advanceSemiMonthly downstream
+  // depends on this anchor's phase being correct) — checked before the
+  // segment branch, not after. Every other SME/Individual pick (mpl,
+  // monthly, weekly, bi_monthly, quarterly, two_monthly) shares the same
+  // "release + 1 month, same day" base rule SME already used for all 6 of
+  // its schedule types — the frequency-specific generators (invoice.ts,
+  // schedule.ts) build their own real due dates from releaseDate directly
+  // and only use this as a stored display fallback. Seafarer alone keeps
+  // the old 22nd-cutoff rule. Daily Interest is a single manually-dated
+  // payment, not derived at all.
+  const firstPayment = isDaily
+    ? new Date(input.manualPaymentDate!)
+    : input.paymentSchedule === "salary"
+      ? computeSalaryFirstPaymentDate(releaseDate, result.addonMonths)
+      : segment === "sme" || segment === "individual"
+        ? computeSmeFirstPaymentDate(releaseDate, result.addonMonths)
         : computeFirstPaymentDate(releaseDate, result.addonMonths, dueDay);
-  const paymentFrequency: "monthly" | "semi_monthly" =
-    input.individualLoanType === "salary" ? "semi_monthly" : "monthly";
 
   // Deactivate prior actives with service role: CSA RLS cannot update rows
   // that already have signed_at set, which left multiple is_active=true rows
@@ -270,6 +448,58 @@ export async function persistComputation(
     throw new Error(
       `Failed to deactivate prior computations: ${deactivateError.message}`,
     );
+  }
+
+  // Apply origination discounts to the stored totals so that the displayed
+  // computation and the amortization schedule built at release both reflect
+  // the actual amounts the borrower will pay. Each discount's basis is the
+  // REAL interest carried by that discount unit (Month/Quarter/Payment N,
+  // see discount-units.ts) — not a flat totalInterest/terms average, which
+  // is wrong for Invoice's escalating rate and for Quarterly/Two-monthly's
+  // interest-only-until-final structure. totalInterest, totalLoan, and
+  // monthlyAmortization are all reduced by the total discounted peso amount.
+  // The origination_discounts JSON column is kept as-is for audit and
+  // schedule reference.
+  let effectiveTotalInterest = result.totalInterest;
+  let effectiveTotalLoan = result.totalLoan;
+  let effectiveMonthlyAmortization = result.monthlyAmortization;
+
+  if (isDaily) {
+    // Daily Interest replaces the standard monthly-amortization totals
+    // entirely — interest accrues per actual day elapsed to the manually
+    // entered payment date, not per calendar month, and the loan is a
+    // single payment (principal + interest), not an amortized schedule.
+    const daily = computeDailyInterestLoan({
+      principal: result.principal,
+      monthlyRate: input.interestRate,
+      releaseDate,
+      paymentDate: firstPayment,
+    });
+    effectiveTotalInterest = daily.interest;
+    effectiveTotalLoan = daily.totalDue;
+    effectiveMonthlyAmortization = daily.totalDue;
+  } else if (input.originationDiscounts && input.originationDiscounts.length > 0) {
+    const units = buildDiscountUnits({
+      paymentFrequency,
+      terms: result.terms,
+      principal: result.principal,
+      totalInterest: result.totalInterest,
+      totalLoan: result.totalLoan,
+      releaseDate,
+      firstPaymentDate: firstPayment,
+      dueDay,
+    });
+    const unitByNo = new Map(units.map((u) => [u.unitNo, u]));
+    let totalDiscountPeso = 0;
+    for (const { installmentNo, percent } of input.originationDiscounts) {
+      const unit = unitByNo.get(installmentNo);
+      if (!unit) continue; // validateOriginationDiscounts already rejects this before compute
+      totalDiscountPeso += halfUp((percent / 100) * unit.interestAmount);
+    }
+    totalDiscountPeso = halfUp(totalDiscountPeso);
+    effectiveTotalInterest = halfUp(result.totalInterest - totalDiscountPeso);
+    effectiveTotalLoan = halfUp(result.principal + effectiveTotalInterest);
+    effectiveMonthlyAmortization = halfUp(effectiveTotalLoan / result.terms);
   }
 
   const { count } = await supabase
@@ -289,7 +519,9 @@ export async function persistComputation(
       pf_rate: input.pfRate,
       interest_rate: input.interestRate,
       security_fee_rate:
-        segment === "sme" || segment === "individual" ? 0 : input.securityFeeRate,
+        segment === "sme" || segment === "individual" || hasCollateral
+          ? 0
+          : input.securityFeeRate,
       loan_type_id: input.loanTypeId ?? null,
       loan_type_name: input.loanTypeName ?? null,
       other_deductions: result.otherDeductions,
@@ -302,13 +534,19 @@ export async function persistComputation(
       other_deductions_total: result.otherDeductionsTotal,
       total_deductions: result.totalDeductions,
       net_released: result.netReleased,
-      total_interest: result.totalInterest,
-      total_loan: result.totalLoan,
-      monthly_amortization: result.monthlyAmortization,
+      total_interest: effectiveTotalInterest,
+      total_loan: effectiveTotalLoan,
+      monthly_amortization: effectiveMonthlyAmortization,
       release_date: releaseDate.toISOString().slice(0, 10),
       first_payment_date: formatDateLocal(firstPayment),
       due_day: dueDay,
-      line_items: buildLineItems(result),
+      origination_discounts: input.originationDiscounts ?? null,
+      line_items: buildLineItems({
+        ...result,
+        totalInterest: effectiveTotalInterest,
+        totalLoan: effectiveTotalLoan,
+        monthlyAmortization: effectiveMonthlyAmortization,
+      }),
       coverage_ratio: coverage.ratio,
       coverage_warning: coverage.warning,
       admin_rate: input.adminRate ?? null,

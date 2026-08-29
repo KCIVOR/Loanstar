@@ -3,6 +3,8 @@ export type LedgerSchedule = {
   dueDate: string;
   target: number;
   penalty: number;
+  /** Early-settlement or origination discount on this installment, if any. */
+  discount?: number;
   installmentNo?: number;
   /** Physical check encoded during LRA release, paired positionally. */
   checkNo?: string | null;
@@ -40,6 +42,7 @@ export type AccountLedgerRow = {
   dueDate: string | null;
   target: number | null;
   penalty: number | null;
+  discount: number | null;
   date: string | null;
   referenceNo: string | null;
   status: string | null;
@@ -53,6 +56,14 @@ export type AccountLedgerRow = {
 
 function halfUpMoney(value: number): number {
   return Math.round((value + Number.EPSILON) * 100) / 100;
+}
+
+/** `formatLedgerMoneyCell` already renders 0 as a dash, same as null — this
+ * just normalizes an absent/undefined discount to 0 before halfUp so a
+ * missing field can't slip through as NaN. */
+function discountOrNull(value: number | undefined): number | null {
+  const amount = Number(value) || 0;
+  return amount > 0 ? halfUpMoney(amount) : null;
 }
 
 function statusLabel(status: string | null | undefined): string | null {
@@ -109,6 +120,7 @@ export function buildAccountLedgerRows(
       dueDate: null,
       target: null,
       penalty: null,
+      discount: null,
       date: null,
       referenceNo: null,
       status: null,
@@ -136,6 +148,7 @@ export function buildAccountLedgerRows(
       dueDate: schedule?.dueDate ?? null,
       target: schedule ? halfUpMoney(schedule.target) : null,
       penalty: schedule ? halfUpMoney(schedule.penalty) : null,
+      discount: schedule ? discountOrNull(schedule.discount) : null,
       date: payment.paymentDate,
       referenceNo: payment.referenceNo?.trim() || null,
       status: statusLabel(schedule?.status),
@@ -158,6 +171,7 @@ export function buildAccountLedgerRows(
         dueDate: schedule.dueDate,
         target: halfUpMoney(schedule.target),
         penalty: halfUpMoney(schedule.penalty),
+        discount: discountOrNull(schedule.discount),
         date: null,
         referenceNo: null,
         status: statusLabel(schedule.status),
@@ -182,6 +196,7 @@ export function buildAccountLedgerRows(
     dueDate: null,
     target: null,
     penalty: null,
+    discount: null,
     date: null,
     referenceNo: null,
     status: null,

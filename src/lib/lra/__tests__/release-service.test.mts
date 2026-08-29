@@ -3,6 +3,13 @@ import { describe, it } from "node:test";
 
 import { addScheduleMonths, advanceSemiMonthly } from "@/lib/computation/release-date";
 import { halfUp } from "@/lib/computation/money";
+import { computeInvoiceLoan } from "@/lib/computation/invoice";
+import {
+  generateBiMonthlySchedule,
+  generateQuarterlySchedule,
+  generateTwoMonthlySchedule,
+} from "@/lib/ar/schedule";
+import { invoiceScheduleToInstallments } from "@/lib/ar/masterlist";
 
 import { savePdcChecks } from "../release-service";
 
@@ -11,8 +18,19 @@ type StubOpts = {
   monthlyAmortization: number;
   releasePath?: string;
   firstPaymentDate?: string | null;
-  paymentFrequency?: "monthly" | "semi_monthly";
+  paymentFrequency?:
+    | "monthly"
+    | "semi_monthly"
+    | "weekly"
+    | "bi_monthly"
+    | "quarterly"
+    | "two_monthly"
+    | "daily";
   totalLoan?: number;
+  totalInterest?: number;
+  releaseDate?: string | null;
+  principal?: number;
+  dueDay?: number;
 };
 
 const FIRST_PAYMENT_DATE = "2026-08-12";
@@ -84,17 +102,20 @@ function makeSavePdcStub(opts: StubOpts) {
     other_deductions_total: 0,
     total_deductions: 0,
     net_released: 100000,
-    total_interest: 0,
+    total_interest: opts.totalInterest ?? 0,
     total_loan: opts.totalLoan ?? 100000,
-    release_date: null,
+    release_date: opts.releaseDate === undefined ? null : opts.releaseDate,
     first_payment_date:
       opts.firstPaymentDate === undefined
         ? FIRST_PAYMENT_DATE
         : opts.firstPaymentDate,
-    due_day: null,
+    due_day: opts.dueDay ?? null,
     line_items: [],
     payment_frequency: opts.paymentFrequency ?? "monthly",
   };
+  if (opts.principal !== undefined) {
+    computationRow.principal = opts.principal;
+  }
 
   const supabase = {
     from(table: string) {
@@ -499,5 +520,224 @@ describe("savePdcChecks hard lock (semi-monthly / Salary)", () => {
     }
     const sum = inserted.reduce((total, row) => halfUp(total + row.amount), 0);
     assert.equal(sum, TOTAL_LOAN);
+  });
+});
+
+describe("savePdcChecks hard lock (Invoice / weekly)", () => {
+  const RELEASE_DATE = "2026-09-01";
+  const expected = invoiceScheduleToInstallments(
+    computeInvoiceLoan({
+      principal: 100000,
+      terms: 3,
+      releaseDate: new Date(RELEASE_DATE),
+    }),
+  );
+
+  function makeStub() {
+    return makeSavePdcStub({
+      terms: 3,
+      monthlyAmortization: 0,
+      paymentFrequency: "weekly",
+      releaseDate: RELEASE_DATE,
+      totalLoan: 100000,
+      principal: 100000,
+    });
+  }
+
+  function checksFromExpected() {
+    return expected.map((row, i) => ({
+      checkNumber: String(1001 + i),
+      amount: row.amountDue,
+      checkDate: row.dueDate,
+      bankName: "Test Bank",
+    }));
+  }
+
+  it("requires exactly 13 checks (12 weekly interest + 1 principal)", async () => {
+    const stub = makeStub();
+    await assert.rejects(
+      () =>
+        savePdcChecks(
+          stub.supabase,
+          "rf-1",
+          checksFromExpected().slice(0, 12),
+          undefined,
+          "actor-1",
+        ),
+      /Number of checks must equal 13/,
+    );
+  });
+
+  it("rejects a flat monthly-shaped amount instead of the escalating weekly schedule", async () => {
+    const stub = makeStub();
+    const checks = checksFromExpected();
+    checks[8] = { ...checks[8], amount: 1000 }; // week 9 should be 2500, not 1000
+    await assert.rejects(
+      () => savePdcChecks(stub.supabase, "rf-1", checks, undefined, "actor-1"),
+      /Check amount must equal ₱2500 for PDC #9/,
+    );
+  });
+
+  it("succeeds with the correct 13-check Invoice schedule", async () => {
+    const stub = makeStub();
+    const result = await savePdcChecks(
+      stub.supabase,
+      "rf-1",
+      checksFromExpected(),
+      undefined,
+      "actor-1",
+    );
+    assert.equal(result.status, "ready_generate");
+    const inserted = stub.getInsertedChecks() as Array<{ amount: number }>;
+    assert.equal(inserted.length, 13);
+    assert.equal(inserted[12].amount, 100000); // final principal check
+  });
+});
+
+describe("savePdcChecks hard lock (Daily)", () => {
+  it("requires exactly 1 check, for computation.totalLoan on firstPaymentDate", async () => {
+    const stub = makeSavePdcStub({
+      terms: 1,
+      monthlyAmortization: 0,
+      paymentFrequency: "daily",
+      firstPaymentDate: "2026-08-25",
+      totalLoan: 100500,
+    });
+
+    await assert.rejects(
+      () =>
+        savePdcChecks(
+          stub.supabase,
+          "rf-1",
+          [
+            { checkNumber: "1001", amount: 100500, checkDate: "2026-08-26", bankName: "Test Bank" },
+          ],
+          undefined,
+          "actor-1",
+        ),
+      /PDC #1 date must be 2026-08-25/,
+    );
+
+    const result = await savePdcChecks(
+      stub.supabase,
+      "rf-1",
+      [
+        { checkNumber: "1001", amount: 100500, checkDate: "2026-08-25", bankName: "Test Bank" },
+      ],
+      undefined,
+      "actor-1",
+    );
+    assert.equal(result.status, "ready_generate");
+    const inserted = stub.getInsertedChecks() as Array<{ amount: number; check_date: string }>;
+    assert.equal(inserted.length, 1);
+    assert.equal(inserted[0].amount, 100500);
+    assert.equal(inserted[0].check_date, "2026-08-25");
+  });
+});
+
+describe("savePdcChecks hard lock (Bi-Monthly)", () => {
+  const RELEASE_DATE = "2026-09-01";
+  const expected = generateBiMonthlySchedule({
+    terms: 6,
+    monthlyAmortization: 20000,
+    releaseDate: new Date(RELEASE_DATE),
+    totalLoan: 120000,
+  });
+
+  it("requires 12 checks (terms × 2), 15 days apart, half the monthly amount each", async () => {
+    const stub = makeSavePdcStub({
+      terms: 6,
+      monthlyAmortization: 20000,
+      paymentFrequency: "bi_monthly",
+      releaseDate: RELEASE_DATE,
+      totalLoan: 120000,
+    });
+
+    const checks = expected.map((row, i) => ({
+      checkNumber: String(1001 + i),
+      amount: row.amountDue,
+      checkDate: row.dueDate,
+      bankName: "Test Bank",
+    }));
+
+    const result = await savePdcChecks(stub.supabase, "rf-1", checks, undefined, "actor-1");
+    assert.equal(result.status, "ready_generate");
+    const inserted = stub.getInsertedChecks() as Array<{ amount: number; check_date: string }>;
+    assert.equal(inserted.length, 12);
+    assert.equal(inserted[0].check_date, "2026-09-16"); // release + 15 days
+    assert.equal(inserted[0].amount, 10000);
+  });
+});
+
+describe("savePdcChecks hard lock (Quarterly / Two-monthly dual-line)", () => {
+  it("requires interest+principal dual rows on the same final due date (Quarterly)", async () => {
+    const RELEASE_DATE = "2026-09-01";
+    const expected = generateQuarterlySchedule({
+      terms: 6,
+      totalLoan: 60000,
+      totalInterest: 5000,
+      releaseDate: new Date(RELEASE_DATE),
+      dueDay: 10,
+    });
+
+    const stub = makeSavePdcStub({
+      terms: 6,
+      monthlyAmortization: 0,
+      paymentFrequency: "quarterly",
+      releaseDate: RELEASE_DATE,
+      totalLoan: 60000,
+      totalInterest: 5000,
+      dueDay: 10,
+    });
+
+    const checks = expected.map((row, i) => ({
+      checkNumber: String(1001 + i),
+      amount: row.amountDue,
+      checkDate: row.dueDate,
+      bankName: "Test Bank",
+    }));
+
+    const result = await savePdcChecks(stub.supabase, "rf-1", checks, undefined, "actor-1");
+    assert.equal(result.status, "ready_generate");
+    const inserted = stub.getInsertedChecks() as Array<{ amount: number; check_date: string }>;
+    assert.equal(inserted.length, 4); // 2 quarters × 2 lines
+    assert.equal(inserted[0].check_date, inserted[1].check_date); // same due date
+    assert.equal(inserted[0].amount, 2500); // interest
+    assert.equal(inserted[1].amount, 27500); // principal
+  });
+
+  it("requires the correct dual-line schedule for Two-monthly", async () => {
+    const RELEASE_DATE = "2026-09-01";
+    const expected = generateTwoMonthlySchedule({
+      terms: 4,
+      totalLoan: 40000,
+      totalInterest: 2000,
+      releaseDate: new Date(RELEASE_DATE),
+      dueDay: 10,
+    });
+
+    const stub = makeSavePdcStub({
+      terms: 4,
+      monthlyAmortization: 0,
+      paymentFrequency: "two_monthly",
+      releaseDate: RELEASE_DATE,
+      totalLoan: 40000,
+      totalInterest: 2000,
+      dueDay: 10,
+    });
+
+    const checks = expected.map((row, i) => ({
+      checkNumber: String(1001 + i),
+      amount: row.amountDue,
+      checkDate: row.dueDate,
+      bankName: "Test Bank",
+    }));
+
+    const result = await savePdcChecks(stub.supabase, "rf-1", checks, undefined, "actor-1");
+    assert.equal(result.status, "ready_generate");
+    const inserted = stub.getInsertedChecks() as Array<{ amount: number }>;
+    assert.equal(inserted.length, 4); // 2 payments × 2 lines
+    assert.equal(inserted[0].amount, 1000); // interest
+    assert.equal(inserted[1].amount, 19000); // principal
   });
 });

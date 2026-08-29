@@ -7,6 +7,9 @@ import { assertCsaCanEdit } from "@/lib/csa/application";
 import {
   getActiveComputation,
   persistComputation,
+  validateFrequencyTerms,
+  validateOriginationDiscounts,
+  validateSeafarerDueDay,
 } from "@/lib/csa/computation";
 import {
   findCrossBucketAccountNos,
@@ -15,6 +18,8 @@ import {
 import { assertInterviewRecordedForComputation } from "@/lib/csa/initial-interview";
 import { requireModulePermission } from "@/lib/permissions/server";
 import { createClient, createServiceClient } from "@/lib/supabase/server";
+import { formatDateLocal } from "@/lib/computation/release-date";
+import { halfUp } from "@/lib/computation/money";
 
 type RouteParams = { params: Promise<{ id: string }> };
 
@@ -22,7 +27,7 @@ const computeSchema = z.object({
   inputMode: z.enum(["NET_SARADO", "NET_LESS_SECURITY", "PRINCIPAL"]),
   amount: z.number().positive(),
   terms: z.number().int().min(1),
-  /** SF requires ≥1 (G1); SME allows 0 (workbook default). */
+  /** All segments allow 0 (workbook default). */
   addonMonths: z.number().int().min(0).optional(),
   loanTypeId: z.string().uuid().optional(),
   securityFeeRate: z.number().min(0).optional(),
@@ -48,6 +53,10 @@ const computeSchema = z.object({
           z.object({
             accountNo: z.string().nullable(),
             amount: z.number().min(0),
+            // Early-settlement discount breakdown (Phase 5) — optional,
+            // present only when a discount was applied in the modal.
+            discountAmount: z.number().min(0).optional(),
+            discountedInstallmentNos: z.array(z.number().int().positive()).optional(),
           }),
         )
         .optional(),
@@ -66,20 +75,47 @@ const computeSchema = z.object({
     })
     .superRefine((val, ctx) => {
       for (const dup of findDuplicateAccountNos(val.otherLoans)) {
-        ctx.addIssue(`Duplicate account "${dup}" in Other Loan entries`);
+        ctx.addIssue(`Duplicate account "${dup}" in Offset entries`);
       }
       for (const dup of findDuplicateAccountNos(val.offsets)) {
-        ctx.addIssue(`Duplicate account "${dup}" in Offset entries`);
+        ctx.addIssue(`Duplicate account "${dup}" in Other Loan entries`);
       }
       for (const dup of findCrossBucketAccountNos(val.otherLoans, val.offsets)) {
         ctx.addIssue(
-          `Account "${dup}" cannot be targeted by both Other Loan and Offset in the same computation`,
+          `Account "${dup}" cannot be targeted by both Offset and Other Loan in the same computation`,
         );
       }
     })
     .optional(),
   releaseDate: z.string().optional(),
   dueDay: z.number().int().min(1).max(28).optional(),
+  originationDiscounts: z
+    .array(
+      z.object({
+        installmentNo: z.number().int().positive(),
+        percent: z.number().min(0).max(100),
+      }),
+    )
+    .optional(),
+  /** Daily Interest only — CSA-entered manual payment date. Required when
+   * the resolved schedule type is "daily"; ignored otherwise. */
+  paymentDate: z.string().optional(),
+  /** SME or Individual — overrides the application's own intake-level
+   * payment_schedule for this computation. Omitted → defaults to the
+   * application's value (unchanged behavior). CSA and Committee both may
+   * set this. Ignored for Seafarer. */
+  paymentSchedule: z
+    .enum([
+      "mpl",
+      "salary",
+      "monthly",
+      "weekly",
+      "bi_monthly",
+      "quarterly",
+      "two_monthly",
+      "daily",
+    ])
+    .optional(),
 });
 
 export async function GET(_request: Request, { params }: RouteParams) {
@@ -102,6 +138,15 @@ export async function GET(_request: Request, { params }: RouteParams) {
       monthlyAmortization: number;
       accountStatus: string;
       remainingInstallments: number;
+      /** Not-yet-due installments only (Rule 2 — due/passed months are never
+       * discount-eligible, so they're excluded here rather than merely
+       * flagged). Feeds the Offset early-settlement discount picker; see
+       * docs/revision-plans/feature-early-settlement-discount.md. */
+      futureInstallments: Array<{
+        installmentNo: number;
+        dueDate: string;
+        interestPortion: number;
+      }>;
     }> = [];
 
     if (appRow?.borrower_id) {
@@ -113,7 +158,7 @@ export async function GET(_request: Request, { params }: RouteParams) {
       const { data: masterlistRows } = await admin
         .from("masterlist")
         .select(
-          "id, loan_application_id, loan_account_no, outstanding_balance, monthly_amortization, account_status",
+          "id, loan_application_id, loan_account_no, outstanding_balance, monthly_amortization, account_status, computation_id",
         )
         .eq("borrower_id", appRow.borrower_id)
         .eq("account_status", "active");
@@ -122,28 +167,82 @@ export async function GET(_request: Request, { params }: RouteParams) {
       // (not N+1) — the same set AR actually allocates against when an
       // Offset transfer posts, so "N months" in the offset picker matches
       // reality instead of an outstanding_balance ÷ monthly approximation.
+      // Also the source for futureInstallments below — one fetch serves both.
       const masterlistIds = (masterlistRows ?? []).map((row) => row.id as string);
       const remainingByMasterlistId = new Map<string, number>();
+      const futureRowsByMasterlistId = new Map<
+        string,
+        Array<{ installmentNo: number; dueDate: string }>
+      >();
+      const today = formatDateLocal(new Date());
       if (masterlistIds.length > 0) {
         const { data: scheduleRows } = await admin
           .from("amortization_schedules")
-          .select("masterlist_id")
+          .select("masterlist_id, installment_no, due_date, status")
           .in("masterlist_id", masterlistIds)
           .in("status", ["pending", "partial", "overdue"]);
         for (const row of scheduleRows ?? []) {
           const mid = row.masterlist_id as string;
           remainingByMasterlistId.set(mid, (remainingByMasterlistId.get(mid) ?? 0) + 1);
+          const dueDate = row.due_date as string;
+          // Rule 2: only future, not-yet-due installments are eligible —
+          // excluded entirely here, not just flagged, so the modal (Phase 5)
+          // can never render an ineligible option in the first place.
+          if (dueDate > today) {
+            const list = futureRowsByMasterlistId.get(mid) ?? [];
+            list.push({ installmentNo: row.installment_no as number, dueDate });
+            futureRowsByMasterlistId.set(mid, list);
+          }
         }
       }
 
-      activeLoans = (masterlistRows ?? []).map((row) => ({
-        loanApplicationId: (row.loan_application_id as string | null) ?? "",
-        loanAccountNo: (row.loan_account_no as string | null) ?? "Active Account",
-        outstandingBalance: Number(row.outstanding_balance ?? 0),
-        monthlyAmortization: Number(row.monthly_amortization ?? 0),
-        accountStatus: (row.account_status as string | null) ?? "active",
-        remainingInstallments: remainingByMasterlistId.get(row.id as string) ?? 0,
-      }));
+      // Interest portion per installment isn't stored anywhere (amount_due is
+      // principal+interest blended) — derive it from each loan's own active
+      // computation, same even-split convention (totalInterest ÷ terms) used
+      // for origination discounts (Phase 2) and the existing "Add-on
+      // interest" display in ComputationPanel.tsx. Semi-monthly rows are half
+      // a calendar month each, so their interest is halved too — same
+      // reasoning as Phase 2's isSemiMonthly handling.
+      const computationIds = Array.from(
+        new Set(
+          (masterlistRows ?? [])
+            .map((row) => row.computation_id as string | null)
+            .filter((id): id is string => Boolean(id)),
+        ),
+      );
+      const interestPerRowByComputationId = new Map<string, number>();
+      if (computationIds.length > 0) {
+        const { data: computationRows } = await admin
+          .from("computations")
+          .select("id, total_interest, terms, payment_frequency")
+          .in("id", computationIds);
+        for (const row of computationRows ?? []) {
+          const terms = Number(row.terms) || 1;
+          const interestPerMonth = halfUp(Number(row.total_interest) / terms);
+          const isSemiMonthly = row.payment_frequency === "semi_monthly";
+          interestPerRowByComputationId.set(
+            row.id as string,
+            isSemiMonthly ? halfUp(interestPerMonth / 2) : interestPerMonth,
+          );
+        }
+      }
+
+      activeLoans = (masterlistRows ?? []).map((row) => {
+        const mid = row.id as string;
+        const interestPortion =
+          interestPerRowByComputationId.get(row.computation_id as string) ?? 0;
+        return {
+          loanApplicationId: (row.loan_application_id as string | null) ?? "",
+          loanAccountNo: (row.loan_account_no as string | null) ?? "Active Account",
+          outstandingBalance: Number(row.outstanding_balance ?? 0),
+          monthlyAmortization: Number(row.monthly_amortization ?? 0),
+          accountStatus: (row.account_status as string | null) ?? "active",
+          remainingInstallments: remainingByMasterlistId.get(mid) ?? 0,
+          futureInstallments: (futureRowsByMasterlistId.get(mid) ?? [])
+            .sort((a, b) => a.installmentNo - b.installmentNo)
+            .map((inst) => ({ ...inst, interestPortion })),
+        };
+      });
     }
 
     return jsonOk({ computation, activeLoans });
@@ -234,20 +333,74 @@ export async function POST(request: Request, { params }: RouteParams) {
       application.segment === "sme" || application.segment === "individual"
         ? application.segment
         : "seafarer";
-    const individualLoanType =
-      application.individual_loan_type === "mpl" ||
-      application.individual_loan_type === "salary"
-        ? application.individual_loan_type
-        : null;
     const securityFeeRate =
       segment === "sme" || segment === "individual"
         ? 0
         : (body.securityFeeRate ?? Number(loanType.interest_rate));
 
+    const dueDayError = validateSeafarerDueDay(segment, body.dueDay);
+    if (dueDayError) {
+      return NextResponse.json({ error: dueDayError }, { status: 400 });
+    }
+
+    // Unified schedule choice defaults to the application's own
+    // intake-level value (loan_applications.payment_schedule) — CSA (and
+    // Committee, via the override endpoint) may explicitly override it for
+    // this computation, without rewriting what the application originally
+    // requested. Valid for SME or Individual; ignored for Seafarer.
+    const applicationPaymentSchedule =
+      application.payment_schedule === "mpl" ||
+      application.payment_schedule === "salary" ||
+      application.payment_schedule === "weekly" ||
+      application.payment_schedule === "bi_monthly" ||
+      application.payment_schedule === "quarterly" ||
+      application.payment_schedule === "two_monthly" ||
+      application.payment_schedule === "daily"
+        ? application.payment_schedule
+        : "monthly";
+    const paymentSchedule = body.paymentSchedule ?? applicationPaymentSchedule;
+
+    // validateOriginationDiscounts/validateFrequencyTerms operate on the
+    // 7-value computations.payment_frequency vocabulary, not the 8-value
+    // payment_schedule — translate the same way persistComputation does
+    // ("mpl" behaves like "monthly", "salary" like "semi_monthly") so these
+    // checks agree with what actually gets persisted.
+    const derivedPaymentFrequency =
+      paymentSchedule === "mpl"
+        ? "monthly"
+        : paymentSchedule === "salary"
+          ? "semi_monthly"
+          : paymentSchedule;
+
+    const originationDiscountsError = validateOriginationDiscounts(
+      body.terms,
+      body.originationDiscounts,
+      derivedPaymentFrequency,
+    );
+    if (originationDiscountsError) {
+      return NextResponse.json({ error: originationDiscountsError }, { status: 400 });
+    }
+
+    const frequencyTermsError = validateFrequencyTerms(derivedPaymentFrequency, body.terms);
+    if (frequencyTermsError) {
+      return NextResponse.json({ error: frequencyTermsError }, { status: 400 });
+    }
+
+    if (paymentSchedule === "daily" && !body.paymentDate) {
+      return NextResponse.json(
+        { error: "Payment date is required for Daily Interest loans" },
+        { status: 400 },
+      );
+    }
+
     const saved = await persistComputation(supabase, {
       loanApplicationId: id,
       segment,
-      individualLoanType,
+      collateralType:
+        application.collateral_type === "car_refinancing" ||
+        application.collateral_type === "real_estate"
+          ? application.collateral_type
+          : "none",
       loanTypeId: loanType.id,
       loanTypeName: loanType.name,
       inputMode: body.inputMode,
@@ -273,6 +426,9 @@ export async function POST(request: Request, { params }: RouteParams) {
       otherDeductions: body.otherDeductions,
       releaseDate: body.releaseDate,
       dueDay: body.dueDay,
+      paymentSchedule,
+      originationDiscounts: body.originationDiscounts,
+      manualPaymentDate: body.paymentDate,
       monthlyIncome,
       computedBy: user.id,
     });

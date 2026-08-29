@@ -32,23 +32,25 @@ export function computeFirstPaymentDate(
 }
 
 /**
- * SME (`segment === "sme"`) *and* MPL (`segment === "individual"` with
- * `individual_loan_type === "mpl"`) first-payment rule, confirmed 2026-08-25:
- * exactly one month after release, same day-of-month — no 22nd-cutoff, no
- * fixed due-day, and (per the locked decision) no addon-months adjustment
- * either, unlike `computeFirstPaymentDate`. Short target months clamp to
- * their last day (e.g. Jan 31 release → Feb 28/29), same technique as
- * `computeFirstPaymentDate`. MPL reuses this function verbatim — confirmed no
- * separate function is needed for it (Salary/MPL plan, Audit #7). Do not use
- * this for individual Auto/REM or any `individual` row with no
- * `individual_loan_type` — they keep `computeFirstPaymentDate`.
+ * SME and Individual (`payment_schedule` anything other than "salary")
+ * first-payment rule, updated 2026-08-29 (see
+ * docs/payment-schedule-unification-plan.md): one month after release plus
+ * `addonMonths`, same day-of-month — no 22nd-cutoff, no fixed due-day,
+ * unlike `computeFirstPaymentDate`. Short target months clamp to their last
+ * day (e.g. Jan 31 release → Feb 28/29), same technique as
+ * `computeFirstPaymentDate`. MPL reuses this function verbatim — confirmed
+ * no separate function is needed for it (Salary/MPL plan, Audit #7). Only
+ * Seafarer keeps `computeFirstPaymentDate`.
  */
-export function computeSmeFirstPaymentDate(releaseDate: Date): Date {
+export function computeSmeFirstPaymentDate(
+  releaseDate: Date,
+  addonMonths = 0,
+): Date {
   const year = releaseDate.getFullYear();
   const month = releaseDate.getMonth();
   const day = releaseDate.getDate();
 
-  const targetMonth = month + 1;
+  const targetMonth = month + 1 + addonMonths;
   const targetYear = year + Math.floor(targetMonth / 12);
   const normalizedMonth = ((targetMonth % 12) + 12) % 12;
   const lastDay = new Date(targetYear, normalizedMonth + 1, 0).getDate();
@@ -58,23 +60,34 @@ export function computeSmeFirstPaymentDate(releaseDate: Date): Date {
 }
 
 /**
- * Salary (`segment === "individual"`, `individual_loan_type === "salary"`)
- * first-payment rule, confirmed 2026-08-25: the next occurrence of {15th,
- * end-of-month} on or after the release date — release day ≤ 15 → that
- * month's 15th; else → that month's last day. This is only the *starting*
- * point; the full semi-monthly cadence for every subsequent payment is
- * `advanceSemiMonthly`, below.
+ * Salary (`payment_schedule === "salary"`, SME or Individual) first-payment
+ * rule, updated 2026-08-29 (see docs/payment-schedule-unification-plan.md):
+ * the next occurrence of {15th,
+ * end-of-month} on or after the release date, plus `addonMonths` full months
+ * — release day ≤ 15 → that month's 15th; else → that month's last day; then
+ * shifted forward by `addonMonths` while keeping the same 15th/end-of-month
+ * phase (mirrors `computeFirstPaymentDate` / `computeSmeFirstPaymentDate`).
+ * This is only the *starting* point; the full semi-monthly cadence for every
+ * subsequent payment is `advanceSemiMonthly`, below.
  */
-export function computeSalaryFirstPaymentDate(releaseDate: Date): Date {
+export function computeSalaryFirstPaymentDate(
+  releaseDate: Date,
+  addonMonths = 0,
+): Date {
   const year = releaseDate.getFullYear();
   const month = releaseDate.getMonth();
   const day = releaseDate.getDate();
+  const isFifteenth = day <= 15;
 
-  if (day <= 15) {
-    return new Date(year, month, 15);
+  const targetMonth = month + addonMonths;
+  const targetYear = year + Math.floor(targetMonth / 12);
+  const normalizedMonth = ((targetMonth % 12) + 12) % 12;
+
+  if (isFifteenth) {
+    return new Date(targetYear, normalizedMonth, 15);
   }
-  const lastDay = new Date(year, month + 1, 0).getDate();
-  return new Date(year, month, lastDay);
+  const lastDay = new Date(targetYear, normalizedMonth + 1, 0).getDate();
+  return new Date(targetYear, normalizedMonth, lastDay);
 }
 
 /**

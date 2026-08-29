@@ -3,6 +3,14 @@ export type InputMode = "NET_SARADO" | "NET_LESS_SECURITY" | "PRINCIPAL";
 export type LoanDeductionEntry = {
   accountNo: string | null;
   amount: number;
+  /**
+   * Early-settlement discount detail (Offset/full-settlement rows only —
+   * see docs/revision-plans/feature-early-settlement-discount.md). `amount`
+   * above is already net of the discount; these fields are the transparent
+   * breakdown, not additional money to subtract.
+   */
+  discountAmount?: number;
+  discountedInstallmentNos?: number[];
 };
 
 export type OffsetDeductionEntry = LoanDeductionEntry & {

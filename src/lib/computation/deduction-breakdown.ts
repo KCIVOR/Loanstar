@@ -3,13 +3,13 @@ import type { OtherDeductions } from "./types";
 export type DeductionBreakdownRow = { label: string; amount: number };
 
 function offsetLabel(accountNo: string | null, months: number | null): string {
-  if (!accountNo) return "Offset";
-  if (months) return `Offset (${accountNo} · ${months} mo${months > 1 ? "s" : ""})`;
-  return `Offset (${accountNo})`;
+  if (!accountNo) return "Other Loan";
+  if (months) return `Other Loan (${accountNo} · ${months} mo${months > 1 ? "s" : ""})`;
+  return `Other Loan (${accountNo})`;
 }
 
 function otherLoanLabel(accountNo: string | null): string {
-  return accountNo ? `Other Loan (${accountNo})` : "Other Loan";
+  return accountNo ? `Offset (${accountNo})` : "Offset";
 }
 
 /**
@@ -60,6 +60,14 @@ export type DeductionTarget = {
   amount: number;
   transferType: "other_loan" | "offset";
   months: number | null;
+  /**
+   * Early-settlement discount detail (Phase 5/6) — only ever set on
+   * "other_loan" targets (the Offset/full-settlement UI section). Carried
+   * through to the `internal_transfers` row so `post_internal_transfer` can
+   * apply it atomically at posting time.
+   */
+  discountAmount?: number;
+  discountedInstallmentNos?: number[];
 };
 
 /**
@@ -87,6 +95,12 @@ export function extractDeductionTargets(
         amount: entry.amount,
         transferType: "other_loan",
         months: null,
+        ...(entry.discountAmount
+          ? {
+              discountAmount: entry.discountAmount,
+              discountedInstallmentNos: entry.discountedInstallmentNos ?? [],
+            }
+          : {}),
       });
     }
   }

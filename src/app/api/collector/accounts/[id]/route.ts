@@ -50,6 +50,8 @@ export async function GET(_request: Request, { params }: RouteParams) {
         loan_account_no,
         loan_application_id,
         release_file_id,
+        release_date,
+        first_payment_date,
         segment,
         outstanding_balance,
         account_status,
@@ -110,6 +112,8 @@ export async function GET(_request: Request, { params }: RouteParams) {
         borrowerNo: (data.borrower_no as string | null) ?? null,
         borrowerId: (data.borrower_id as string | null) ?? null,
         loanAccountNo: (data.loan_account_no as string | null) ?? null,
+        releaseDate: (data.release_date as string | null) ?? null,
+        firstPaymentDate: (data.first_payment_date as string | null) ?? null,
         segment:
           data.segment === "sme" || data.segment === "individual"
             ? data.segment

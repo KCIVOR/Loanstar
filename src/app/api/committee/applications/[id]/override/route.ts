@@ -28,6 +28,32 @@ const overrideSchema = z.object({
   adminRate: z.number().min(0).optional(),
   chattelRate: z.number().min(0).optional(),
   withDsAndNotary: z.boolean().optional(),
+  dueDay: z.number().int().min(1).max(28).optional(),
+  /** SME or Individual — unified schedule/product choice. Defaults to the
+   * application's own payment_schedule (set at intake); Committee may
+   * override it here. */
+  paymentSchedule: z
+    .enum([
+      "mpl",
+      "salary",
+      "monthly",
+      "weekly",
+      "bi_monthly",
+      "quarterly",
+      "two_monthly",
+      "daily",
+    ])
+    .optional(),
+  originationDiscounts: z
+    .array(
+      z.object({
+        installmentNo: z.number().int().positive(),
+        percent: z.number().min(0).max(100),
+      }),
+    )
+    .optional(),
+  /** Daily Interest only — manual payment date. */
+  paymentDate: z.string().optional(),
   message: z.string().trim().max(2000).optional(),
   otherDeductions: z
     .object({
@@ -41,6 +67,10 @@ const overrideSchema = z.object({
           z.object({
             accountNo: z.string().nullable(),
             amount: z.number().min(0),
+            // Early-settlement discount breakdown (Phase 5) — optional,
+            // present only when a discount was applied in the modal.
+            discountAmount: z.number().min(0).optional(),
+            discountedInstallmentNos: z.array(z.number().int().positive()).optional(),
           }),
         )
         .optional(),
@@ -59,14 +89,14 @@ const overrideSchema = z.object({
     })
     .superRefine((val, ctx) => {
       for (const dup of findDuplicateAccountNos(val.otherLoans)) {
-        ctx.addIssue(`Duplicate account "${dup}" in Other Loan entries`);
+        ctx.addIssue(`Duplicate account "${dup}" in Offset entries`);
       }
       for (const dup of findDuplicateAccountNos(val.offsets)) {
-        ctx.addIssue(`Duplicate account "${dup}" in Offset entries`);
+        ctx.addIssue(`Duplicate account "${dup}" in Other Loan entries`);
       }
       for (const dup of findCrossBucketAccountNos(val.otherLoans, val.offsets)) {
         ctx.addIssue(
-          `Account "${dup}" cannot be targeted by both Other Loan and Offset in the same computation`,
+          `Account "${dup}" cannot be targeted by both Offset and Other Loan in the same computation`,
         );
       }
     })

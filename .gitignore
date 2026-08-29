@@ -41,3 +41,8 @@ yarn-error.log*
 next-env.d.ts
 
 .vercel
+
+# editor/tool-local config — .kiro/settings/mcp.json carries live Supabase
+# credentials in plaintext, never commit it
+.vscode/
+.kiro/

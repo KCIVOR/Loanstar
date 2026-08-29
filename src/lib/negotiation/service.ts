@@ -3,7 +3,14 @@ import { createHash } from "crypto";
 
 import { appendStatusHistory } from "@/lib/applications/status";
 import { writeAuditEvent } from "@/lib/audit/writer";
-import { getActiveComputation, persistComputation } from "@/lib/csa/computation";
+import {
+  getActiveComputation,
+  persistComputation,
+  validateFrequencyTerms,
+  validateOriginationDiscounts,
+  validateSeafarerDueDay,
+  type OriginationDiscount,
+} from "@/lib/csa/computation";
 import type { InputMode, OtherDeductions } from "@/lib/computation/types";
 import { createServiceClient } from "@/lib/supabase/server";
 
@@ -323,6 +330,31 @@ type OverrideInput = {
   adminRate?: number;
   chattelRate?: number;
   withDsAndNotary?: boolean;
+  /** Seafarer only — must be 5, 15, or 25 (the borrower's actual payday).
+   * Same explicit-wins/omission-preserves-existing rule as the fields above.
+   * SME/Individual ignore this (optional, unrestricted 1-28, defaults to 10). */
+  dueDay?: number;
+  /** SME or Individual — the loan's unified schedule/product choice.
+   * Defaults to the application's own payment_schedule (set at intake);
+   * Committee retains full authority to override it here, unlike
+   * collateralType which even Committee cannot change (confirmed
+   * 2026-08-28/29 — see docs/payment-schedule-unification-plan.md). Same
+   * explicit-wins/omission-preserves-existing rule as the fields above. */
+  paymentSchedule?:
+    | "mpl"
+    | "salary"
+    | "monthly"
+    | "weekly"
+    | "bi_monthly"
+    | "quarterly"
+    | "two_monthly"
+    | "daily";
+  /** Same explicit-wins/omission-preserves-existing rule as the fields
+   * above. See docs/revision-plans/feature-new-loan-origination-discount.md. */
+  originationDiscounts?: OriginationDiscount[];
+  /** Daily Interest only — CSA/Committee-entered manual payment date. Same
+   * explicit-wins/omission-preserves-existing rule as the fields above. */
+  paymentDate?: string;
 };
 
 /** Shared by both committee override paths: resolve the loan type, persist a new computation snapshot, and clear any prior signature since the amount changed. */
@@ -335,7 +367,7 @@ async function persistOverrideComputation(
   const { data: existingComp } = await supabase
     .from("computations")
     .select(
-      "loan_type_id, pf_rate, interest_rate, security_fee_rate, terms, addon_months, input_mode, other_deductions, admin_rate, chattel_rate, with_ds_and_notary",
+      "loan_type_id, pf_rate, interest_rate, security_fee_rate, terms, addon_months, input_mode, other_deductions, admin_rate, chattel_rate, with_ds_and_notary, due_day, origination_discounts, payment_frequency, first_payment_date",
     )
     .eq("loan_application_id", applicationId)
     .eq("is_active", true)
@@ -370,17 +402,78 @@ async function persistOverrideComputation(
 
   const { data: appRow } = await supabase
     .from("loan_applications")
-    .select("segment")
+    .select("segment, collateral_type, payment_schedule")
     .eq("id", applicationId)
     .maybeSingle();
   const segment =
     appRow?.segment === "sme" || appRow?.segment === "individual"
       ? appRow.segment
       : "seafarer";
+  const collateralType =
+    appRow?.collateral_type === "car_refinancing" ||
+    appRow?.collateral_type === "real_estate"
+      ? appRow.collateral_type
+      : "none";
+
+  // Explicit-wins/omission-preserves-existing, same pattern as the other
+  // Seafarer-ignored-by-SME fields above — but if there's no existing value to
+  // preserve either (e.g. this loan predates the picker), that's still invalid.
+  const resolvedDueDay = input.dueDay ?? existingComp?.due_day ?? undefined;
+  const dueDayError = validateSeafarerDueDay(segment, resolvedDueDay);
+  if (dueDayError) throw new Error(dueDayError);
+
+  // Same explicit-wins/omission-preserves-existing rule as dueDay above,
+  // extended one level further: explicit override wins, else the prior
+  // computation's own schedule (so an in-progress negotiation doesn't reset
+  // on an unrelated amount tweak), else the application's own intake-level
+  // default — never silently falls all the way back to a bare "monthly"
+  // default. existingComp only stores the 7-value payment_frequency (mpl
+  // already translated away), so the fallback reverses that translation:
+  // "semi_monthly" is unambiguously "salary" (the only paymentSchedule value
+  // that ever produces it), everything else passes through under its own
+  // name — "mpl" itself can't be recovered, but "mpl" and "monthly" compute
+  // byte-identically (see computation.ts), so this fallback is safe.
+  const resolvedPaymentSchedule =
+    input.paymentSchedule ??
+    (existingComp?.payment_frequency === "semi_monthly"
+      ? "salary"
+      : (existingComp?.payment_frequency as OverrideInput["paymentSchedule"] | undefined)) ??
+    (appRow?.payment_schedule as OverrideInput["paymentSchedule"] | undefined);
+
+  // validateOriginationDiscounts/validateFrequencyTerms operate on the
+  // 7-value computations.payment_frequency vocabulary — translate the same
+  // way persistComputation does.
+  const resolvedPaymentFrequency =
+    resolvedPaymentSchedule === "mpl"
+      ? "monthly"
+      : resolvedPaymentSchedule === "salary"
+        ? "semi_monthly"
+        : resolvedPaymentSchedule;
+
+  const resolvedOriginationDiscounts =
+    input.originationDiscounts ??
+    (existingComp?.origination_discounts as OriginationDiscount[] | null) ??
+    undefined;
+  const originationDiscountsError = validateOriginationDiscounts(
+    input.terms,
+    resolvedOriginationDiscounts,
+    resolvedPaymentFrequency,
+  );
+  if (originationDiscountsError) throw new Error(originationDiscountsError);
+
+  const frequencyTermsError = validateFrequencyTerms(resolvedPaymentFrequency, input.terms);
+  if (frequencyTermsError) throw new Error(frequencyTermsError);
+
+  const resolvedPaymentDate =
+    input.paymentDate ?? (existingComp?.first_payment_date as string | null) ?? undefined;
+  if (resolvedPaymentSchedule === "daily" && !resolvedPaymentDate) {
+    throw new Error("Payment date is required for Daily Interest loans");
+  }
 
   const saved = await persistComputation(supabase, {
     loanApplicationId: applicationId,
     segment,
+    collateralType,
     loanTypeId: loanType.id,
     loanTypeName: loanType.name,
     inputMode: input.inputMode,
@@ -389,7 +482,7 @@ async function persistOverrideComputation(
     addonMonths:
       input.addonMonths ??
       existingComp?.addon_months ??
-      (segment === "sme" ? 0 : 2),
+      (segment === "sme" || collateralType !== "none" ? 0 : 2),
     // SME/Individual: a typed rate override wins; omitting it preserves the
     // active computation's own rate (not the generic loan-type rate) — same
     // pattern as otherDeductions below. Seafarer is untouched: always loanType.
@@ -419,6 +512,10 @@ async function persistOverrideComputation(
         : undefined),
     withDsAndNotary:
       input.withDsAndNotary ?? existingComp?.with_ds_and_notary ?? undefined,
+    dueDay: resolvedDueDay,
+    paymentSchedule: resolvedPaymentSchedule,
+    manualPaymentDate: resolvedPaymentDate,
+    originationDiscounts: resolvedOriginationDiscounts,
     securityFeeRate:
       segment === "sme"
         ? 0

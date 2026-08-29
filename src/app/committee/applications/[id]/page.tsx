@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useCallback, useEffect, useState } from "react";
+import { FormEvent, useCallback, useEffect, useRef, useState } from "react";
 import { useParams } from "next/navigation";
 
 import {
@@ -21,7 +21,10 @@ import {
   Modal,
 } from "@/components/ui";
 import { DocumentChecklist } from "@/components/DocumentChecklist";
-import { ComputationPanel } from "@/components/csa/ComputationPanel";
+import {
+  ComputationPanel,
+  type ComputationPanelHandle,
+} from "@/components/csa/ComputationPanel";
 import { ApplicantProfileFields } from "@/components/borrowers/ApplicantProfileFields";
 import { AutofillOverlay } from "@/components/dev/AutofillOverlay";
 import { fakeCommitteeAssessment, fakeRemark } from "@/lib/dev/fake-data";
@@ -63,6 +66,7 @@ import {
   type RemInspection,
 } from "@/lib/cig/collateral-inspection";
 import type { BorrowerProfile } from "@/lib/borrowers/types";
+import { halfUp } from "@/lib/computation/money";
 import { CSA_ONLY_INTAKE_SLUGS } from "@/lib/documents/csa-only-intake";
 
 type CommitteeDetail = {
@@ -75,6 +79,15 @@ type CommitteeDetail = {
     isReloan: boolean;
     segment: "seafarer" | "sme" | "individual";
     entityType: "individual" | "corporate" | null;
+    paymentSchedule:
+      | "mpl"
+      | "salary"
+      | "monthly"
+      | "weekly"
+      | "bi_monthly"
+      | "quarterly"
+      | "two_monthly"
+      | "daily";
     collateralType: "none" | "car_refinancing" | "real_estate";
     statusHistory: StatusHistoryEntry[] | null;
     canDecide: boolean;
@@ -140,6 +153,7 @@ type CommitteeDetail = {
     netReleased: number;
     totalLoan: number;
     monthlyAmortization: number;
+    releaseDate: string | null;
     firstPaymentDate: string | null;
     lineItems: Array<{ key: string; label: string; amount: number }>;
     terms: number;
@@ -174,6 +188,7 @@ type CommitteeDetail = {
       advancePayment?: number;
       accountOpening?: number;
     } | null;
+    originationDiscounts?: Array<{ installmentNo: number; percent: number }> | null;
     otherDeductionsTotal: number;
   } | null;
   activeLoans: Array<{
@@ -385,6 +400,10 @@ export default function CommitteeApplicationPage() {
   const applicationId = params.id as string;
 
   const [data, setData] = useState<CommitteeDetail | null>(null);
+  // Guards against an in-flight `load()` (e.g. from a recompute) resolving
+  // after a newer one and overwriting fresher data with a stale snapshot.
+  const loadSeq = useRef(0);
+  const computationPanelRef = useRef<ComputationPanelHandle>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -418,12 +437,14 @@ export default function CommitteeApplicationPage() {
   });
 
   const load = useCallback(async (opts?: { silent?: boolean }) => {
+    const seq = ++loadSeq.current;
     if (!opts?.silent) setLoading(true);
     setError(null);
     try {
       const res = await fetch(`/api/committee/applications/${applicationId}`);
       if (!res.ok) throw new Error("Failed to load application");
       const body = (await res.json()) as CommitteeDetail;
+      if (seq !== loadSeq.current) return;
       setData(body);
       if (!opts?.silent) {
         setAssessmentForm({
@@ -434,9 +455,10 @@ export default function CommitteeApplicationPage() {
         });
       }
     } catch (err) {
+      if (seq !== loadSeq.current) return;
       setError(err instanceof Error ? err.message : "Failed to load");
     } finally {
-      if (!opts?.silent) setLoading(false);
+      if (seq === loadSeq.current && !opts?.silent) setLoading(false);
     }
   }, [applicationId]);
 
@@ -1879,7 +1901,7 @@ export default function CommitteeApplicationPage() {
                     {otherLoanRows.map((row, i) => (
                       <div key={`other-loan-${i}`} className="row2">
                         <span>
-                          Other Loan
+                          Offset
                           {row.accountNo ? (
                             <span className="ml-1 text-xs font-normal opacity-80">
                               ({row.accountNo})
@@ -1892,7 +1914,7 @@ export default function CommitteeApplicationPage() {
                     {offsetRows.map((row, i) => (
                       <div key={`offset-${i}`} className="row2">
                         <span>
-                          Offset amount
+                          Other Loan amount
                           {row.accountNo ? (
                             <span className="ml-1 text-xs font-normal opacity-80">
                               ({row.accountNo}
@@ -1906,6 +1928,39 @@ export default function CommitteeApplicationPage() {
                   </>
                 );
               })()}
+              {(() => {
+                const discounts = data.computation!.originationDiscounts;
+                if (!discounts || discounts.length === 0) return null;
+                const c = data.computation!;
+                const grossTotalInterest = halfUp(
+                  c.principal * c.interestRate * (c.terms + c.addonMonths),
+                );
+                const interestPerInstallment = halfUp(grossTotalInterest / c.terms);
+                let discountTotal = 0;
+                for (const { percent } of discounts) {
+                  discountTotal += halfUp((percent / 100) * interestPerInstallment);
+                }
+                discountTotal = halfUp(discountTotal);
+                if (discountTotal <= 0) return null;
+                return (
+                  <div className="row2" style={{ color: "var(--teal-400)" }}>
+                    <span>Origination discount ({discounts.length} mo)</span>
+                    <b>−₱{formatMoney(discountTotal)}</b>
+                  </div>
+                );
+              })()}
+              {data.computation.releaseDate ? (
+                <div className="row2" style={{ borderTop: "1px dashed rgba(255,255,255,.2)" }}>
+                  <span>Release date</span>
+                  <b>{new Date(data.computation.releaseDate).toLocaleDateString()}</b>
+                </div>
+              ) : null}
+              {data.computation.firstPaymentDate ? (
+                <div className="row2">
+                  <span>First payment date</span>
+                  <b>{new Date(data.computation.firstPaymentDate).toLocaleDateString()}</b>
+                </div>
+              ) : null}
               <div className="row2" style={{ borderTop: "1px dashed rgba(255,255,255,.2)" }}>
                 <span className="flex items-center gap-2">
                   <i
@@ -2010,6 +2065,7 @@ export default function CommitteeApplicationPage() {
             </div>
           ) : null}
           <ComputationPanel
+            ref={computationPanelRef}
             mode="committee"
             applicationId={applicationId}
             loanTypeId={data.computation?.loanTypeId ?? null}
@@ -2018,6 +2074,7 @@ export default function CommitteeApplicationPage() {
             computation={data.computation}
             rateHistory={data.rateHistory}
             onUpdated={handleComputationUpdated}
+            paymentSchedule={data.application.paymentSchedule}
             extraFields={
               !data.application.canAdjustPreDecision && overrideMessage.trim()
                 ? { message: overrideMessage.trim() }
@@ -2523,6 +2580,10 @@ export default function CommitteeApplicationPage() {
               setRevisitComment(fakeRemark("returnToCsa"));
               setAssessmentForm(fakeCommitteeAssessment());
             },
+          },
+          {
+            label: "Fill Computation",
+            onClick: () => computationPanelRef.current?.fillComputation(),
           },
         ]}
       />

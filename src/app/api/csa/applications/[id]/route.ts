@@ -132,6 +132,16 @@ export async function GET(_request: Request, { params }: RouteParams) {
           application.entity_type === "corporate"
             ? application.entity_type
             : null,
+        paymentSchedule:
+          application.payment_schedule === "mpl" ||
+          application.payment_schedule === "salary" ||
+          application.payment_schedule === "weekly" ||
+          application.payment_schedule === "bi_monthly" ||
+          application.payment_schedule === "quarterly" ||
+          application.payment_schedule === "two_monthly" ||
+          application.payment_schedule === "daily"
+            ? application.payment_schedule
+            : "monthly",
         isReloan: application.is_reloan,
         endorsedAt: application.endorsed_at,
         privacyOrientationAt:

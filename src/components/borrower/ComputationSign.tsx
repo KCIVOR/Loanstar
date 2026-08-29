@@ -34,6 +34,8 @@ type ComputationSummary = {
     previousLoanBalance?: number;
     accountOpening?: number;
   } | null;
+  releaseDate?: string | null;
+  firstPaymentDate?: string | null;
   signedAt: string | null;
   loanTypeName: string | null;
 };
@@ -188,6 +190,22 @@ export function ComputationSign({
             </div>
           );
         })}
+        {computation.releaseDate ? (
+          <div className="flex justify-between border-b border-line-soft py-1.5 text-sm">
+            <span className="text-ink-500">Release date</span>
+            <span className="mono font-medium tabular-nums text-ink-900">
+              {new Date(computation.releaseDate).toLocaleDateString()}
+            </span>
+          </div>
+        ) : null}
+        {computation.firstPaymentDate ? (
+          <div className="flex justify-between border-b border-line-soft py-1.5 text-sm">
+            <span className="text-ink-500">First payment date</span>
+            <span className="mono font-medium tabular-nums text-ink-900">
+              {new Date(computation.firstPaymentDate).toLocaleDateString()}
+            </span>
+          </div>
+        ) : null}
       </div>
 
       {error ? (

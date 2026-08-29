@@ -99,6 +99,7 @@ export function AccountLedger({
             <Th>Due Date</Th>
             <Th num>Target</Th>
             <Th num>Penalty</Th>
+            <Th num>Discount</Th>
             <Th>Date</Th>
             <Th>Reference No.</Th>
             <Th num>Debit</Th>
@@ -125,6 +126,9 @@ export function AccountLedger({
                   </Td>
                   <Td num className="mono">
                     {moneyCell(row.penalty)}
+                  </Td>
+                  <Td num className="mono">
+                    {moneyCell(row.discount)}
                   </Td>
                   <Td className="mono">{formatLedgerDateCell(row.date)}</Td>
                   <Td className="mono">
@@ -175,6 +179,9 @@ export function AccountLedger({
                   <Td num className="mono">
                     {moneyCell(first.penalty)}
                   </Td>
+                  <Td num className="mono">
+                    {moneyCell(first.discount)}
+                  </Td>
                   <Td className="mono">
                     <span className="inline-flex items-center gap-1.5 text-teal-600">
                       <span aria-hidden>{isOpen ? "▾" : "▸"}</span>
@@ -206,6 +213,9 @@ export function AccountLedger({
                       <tr key={r.key} className="bg-surface-2/50">
                         <Td className="mono text-ink-400">{""}</Td>
                         <Td className="mono text-ink-400">{""}</Td>
+                        <Td num className="mono text-ink-400">
+                          —
+                        </Td>
                         <Td num className="mono text-ink-400">
                           —
                         </Td>

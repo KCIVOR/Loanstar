@@ -1,9 +1,19 @@
 "use client";
 
-import { FormEvent, useEffect, useState } from "react";
+import {
+  FormEvent,
+  forwardRef,
+  useEffect,
+  useImperativeHandle,
+  useMemo,
+  useState,
+} from "react";
 
 import { buildDeductionBreakdownRows } from "@/lib/computation/deduction-breakdown";
+import { buildDiscountUnits } from "@/lib/computation/discount-units";
+import { fakeComputationInputs } from "@/lib/dev/fake-data";
 import { halfUp } from "@/lib/computation/money";
+import { computeOffsetDiscount } from "@/lib/computation/offset-discount";
 import {
   Alert,
   Button,
@@ -35,6 +45,12 @@ type ActiveLoanOption = {
   monthlyAmortization: number;
   accountStatus: string;
   remainingInstallments?: number;
+  /** Not-yet-due installments only — feeds the early-settlement discount modal. */
+  futureInstallments?: Array<{
+    installmentNo: number;
+    dueDate: string;
+    interestPortion: number;
+  }>;
 };
 
 /** Never more than what's actually owed, rounded to centavos. */
@@ -43,10 +59,21 @@ function cappedOffsetAmount(monthly: number, monthCount: number, balance: number
 }
 
 /** One "Other Loan" row in the CSA form — account is optional (blank = manual/external). */
-type OtherLoanRow = { accountNo: string; amount: string };
+type OtherLoanRow = {
+  accountNo: string;
+  amount: string;
+  /** Early-settlement discount breakdown, set only once the discount modal is applied. */
+  discountAmount?: number;
+  discountedInstallmentNos?: number[];
+};
 
 /** An applied offset selection, one per targeted loan account. */
 type OffsetEntry = { accountNo: string | null; amount: number; months: number };
+
+/** One row of this loan's own origination discount — free-typed strings,
+ * converted to numbers only at payload-build time, same convention as
+ * OtherLoanRow. */
+type OriginationDiscountRow = { installmentNo: string; percent: string };
 
 /** A loan block being edited live inside the offset modal, before Apply. */
 type OffsetBlock = { accountNo: string; months: Set<number> };
@@ -72,7 +99,12 @@ export type Computation = {
     offset?: number;
     offsetAccountNo?: string | null;
     offsetMonths?: number | null;
-    otherLoans?: Array<{ accountNo: string | null; amount: number }>;
+    otherLoans?: Array<{
+      accountNo: string | null;
+      amount: number;
+      discountAmount?: number;
+      discountedInstallmentNos?: number[];
+    }>;
     offsets?: Array<{ accountNo: string | null; amount: number; months: number | null }>;
     advancePayment?: number;
     accountOpening?: number;
@@ -83,7 +115,11 @@ export type Computation = {
   totalInterest: number;
   totalLoan: number;
   monthlyAmortization: number;
+  releaseDate?: string | null;
   firstPaymentDate?: string | null;
+  dueDay?: number | null;
+  paymentFrequency?: string | null;
+  originationDiscounts?: Array<{ installmentNo: number; percent: number }> | null;
   adminRate?: number | null;
   chattelRate?: number | null;
   chattelFee?: number | null;
@@ -128,6 +164,31 @@ type ComputationPanelProps = {
    * `message` (logged as a negotiation offer note), which this shared panel
    * has no UI of its own for. */
   extraFields?: Record<string, unknown>;
+  /** SME or Individual — the loan's unified schedule/product choice, decided
+   * at intake (loan_applications.payment_schedule) rather than as a free
+   * choice here by default. Both segments have access to the full 8-value
+   * list (confirmed 2026-08-29 — see
+   * docs/payment-schedule-unification-plan.md). Editable here in both "csa"
+   * and "committee" mode — either may override it for this computation
+   * without rewriting what the application originally requested. Defaults
+   * to "monthly". */
+  paymentSchedule?:
+    | "mpl"
+    | "salary"
+    | "monthly"
+    | "weekly"
+    | "bi_monthly"
+    | "quarterly"
+    | "two_monthly"
+    | "daily";
+};
+
+/** Imperative handle for the dev Autofill overlay — parent pages own their
+ * own single `<AutofillOverlay>` instance (matching every other screen's
+ * convention), so this panel exposes a fill action for it to call rather
+ * than rendering a second floating button of its own. */
+export type ComputationPanelHandle = {
+  fillComputation: () => void;
 };
 
 export function formatMoney(value: number) {
@@ -191,6 +252,25 @@ function buildComputationSteps(c: Computation) {
       formula: `Total loan ÷ ${c.terms} months`,
       value: c.monthlyAmortization,
     },
+    ...(c.originationDiscounts && c.originationDiscounts.length > 0
+      ? (() => {
+          const grossTotalInterest = halfUp(
+            c.principal * c.interestRate * (c.terms + c.addonMonths),
+          );
+          const interestPerInstallment = halfUp(grossTotalInterest / c.terms);
+          let discountTotal = 0;
+          for (const { percent } of c.originationDiscounts) {
+            discountTotal += halfUp((percent / 100) * interestPerInstallment);
+          }
+          return [
+            {
+              label: `Origination discount (${c.originationDiscounts.length} mo)`,
+              formula: `−₱${formatMoney(halfUp(discountTotal))} interest waived over selected months`,
+              value: -halfUp(discountTotal),
+            },
+          ];
+        })()
+      : []),
   ];
 }
 
@@ -292,15 +372,15 @@ export function buildDetailedComputationBreakdown(
       title: "Step 4 — Other deductions",
       rows: [
         ...otherLoanRows.map((r, i) => ({
-          label: `Other loan${otherLoanRows.length > 1 ? ` #${i + 1}` : ""}`,
+          label: `Offset${otherLoanRows.length > 1 ? ` #${i + 1}` : ""}`,
           formula: r.accountNo ? `Deducted against account ${r.accountNo}` : "Manual / external — no linked account",
           value: money(r.amount),
         })),
         ...offsetRows.map((r, i) => ({
-          label: `Offset${offsetRows.length > 1 ? ` #${i + 1}` : ""}`,
+          label: `Other loan${offsetRows.length > 1 ? ` #${i + 1}` : ""}`,
           formula: r.accountNo
             ? `${r.months ?? "—"} month(s) applied against ${r.accountNo}`
-            : "Manual offset amount",
+            : "Manual other-loan amount",
           value: money(r.amount),
         })),
         ...(od?.advancePayment
@@ -389,21 +469,35 @@ const KEY_AMOUNT_KEYS = new Set([
 
 const AMORT_KEYS = new Set(["monthly_amortization", "monthlyAmortization"]);
 
-export function ComputationPanel({
-  applicationId,
-  loanTypeId,
-  segment,
-  editable,
-  computation,
-  rateHistory = [],
-  onUpdated,
-  interviewComplete = true,
-  interviewBlockReason = null,
-  mode = "csa",
-  extraFields,
-}: ComputationPanelProps) {
+/** Extra interest attributable to add-on months alone — principal × rate ×
+ * addonMonths, the addon-only slice of the engines' `principal × rate ×
+ * (terms + addonMonths)` total-interest formula (sf.ts / sme.ts). Display
+ * only; not a parallel computation of the persisted total. */
+function addonInterestAmount(c: Computation): number {
+  return c.principal * c.interestRate * c.addonMonths;
+}
+
+export const ComputationPanel = forwardRef<ComputationPanelHandle, ComputationPanelProps>(
+  function ComputationPanel(
+    {
+      applicationId,
+      loanTypeId,
+      segment,
+      editable,
+      computation,
+      rateHistory = [],
+      onUpdated,
+      interviewComplete = true,
+      interviewBlockReason = null,
+      mode = "csa",
+      extraFields,
+      paymentSchedule: paymentScheduleProp = "monthly",
+    }: ComputationPanelProps,
+    ref,
+  ) {
   const isRateEditableSegment = segment === "sme" || segment === "individual";
   const isIndividual = segment === "individual";
+  const isSeafarer = segment === "seafarer";
   const [loanTypes, setLoanTypes] = useState<LoanType[]>([]);
   const [activeLoans, setActiveLoans] = useState<ActiveLoanOption[]>([]);
 
@@ -425,6 +519,38 @@ export function ComputationPanel({
   const [amount, setAmount] = useState("");
   const [terms, setTerms] = useState("6");
   const [addonMonths, setAddonMonths] = useState("2");
+  // Seafarer only — one of "5" / "15" / "25" (the borrower's actual payday).
+  // No default: the old silent default of 10 was never a valid payday.
+  const [dueDay, setDueDay] = useState("");
+  // Unified schedule/product choice — SME or Individual, decided at intake
+  // (see the `paymentSchedule` prop doc). Editable via the Select further
+  // below in either mode. Seeded from the prop, then re-seeded from the
+  // active computation's own stored value once one exists (so a resumed
+  // negotiation shows the last-overridden value, not the original intake
+  // default).
+  const [selectedScheduleType, setSelectedScheduleType] = useState<
+    | "mpl"
+    | "salary"
+    | "monthly"
+    | "weekly"
+    | "bi_monthly"
+    | "quarterly"
+    | "two_monthly"
+    | "daily"
+  >(paymentScheduleProp);
+  // buildDiscountUnits/validateFrequencyTerms operate on the 7-value
+  // computations.payment_frequency vocabulary, not the 8-value
+  // payment_schedule choice — translate the same way persistComputation
+  // does ("mpl" behaves like "monthly", "salary" like "semi_monthly").
+  const derivedPaymentFrequency =
+    selectedScheduleType === "mpl"
+      ? "monthly"
+      : selectedScheduleType === "salary"
+        ? "semi_monthly"
+        : selectedScheduleType;
+  // Daily Interest only — manual payment date (single payment, not a
+  // recurring schedule). Required when the schedule type is "daily".
+  const [paymentDate, setPaymentDate] = useState("");
   const [selectedLoanTypeId, setSelectedLoanTypeId] = useState(loanTypeId ?? "");
   // sme/individual free-text rates — percent-typed (e.g. "8" for 8%), converted
   // to decimal (0.08) only when building the POST body.
@@ -432,9 +558,38 @@ export function ComputationPanel({
   const [pfRatePct, setPfRatePct] = useState("");
   const [adminRatePct, setAdminRatePct] = useState("");
   const [chattelRatePct, setChattelRatePct] = useState("");
+
+  useImperativeHandle(ref, () => ({
+    fillComputation: () => {
+      const fake = fakeComputationInputs(segment, selectedScheduleType);
+      setInputMode(fake.inputMode);
+      setAmount(String(fake.amount));
+      setTerms(String(fake.terms));
+      setAddonMonths(String(fake.addonMonths));
+      if (isSeafarer && fake.dueDay != null) {
+        setDueDay(String(fake.dueDay));
+      }
+      if (isRateEditableSegment) {
+        setInterestRatePct(String(fake.interestRatePct ?? ""));
+        setPfRatePct(String(fake.pfRatePct ?? ""));
+        setAdminRatePct(String(fake.adminRatePct ?? "0"));
+        setChattelRatePct(String(fake.chattelRatePct ?? "0"));
+      }
+      if (fake.paymentDate) {
+        setPaymentDate(fake.paymentDate);
+      }
+    },
+  }));
   const [otherLoanRows, setOtherLoanRows] = useState<OtherLoanRow[]>([
     { accountNo: "", amount: "" },
   ]);
+  const [originationDiscountRows, setOriginationDiscountRows] = useState<
+    OriginationDiscountRow[]
+  >([]);
+  const [originationDiscountModalOpen, setOriginationDiscountModalOpen] = useState(false);
+  const [originationModalDiscounts, setOriginationModalDiscounts] = useState<
+    Map<number, string>
+  >(new Map());
   const [offsetEntries, setOffsetEntries] = useState<OffsetEntry[]>([]);
   const [offsetManualAmount, setOffsetManualAmount] = useState("");
   const [offsetModalOpen, setOffsetModalOpen] = useState(false);
@@ -446,6 +601,11 @@ export function ComputationPanel({
   const [modalBlocks, setModalBlocks] = useState<OffsetBlock[]>([
     { accountNo: "", months: new Set() },
   ]);
+  /** Which Offset row's early-settlement discount modal is open (null = closed). */
+  const [discountModalRowIndex, setDiscountModalRowIndex] = useState<number | null>(null);
+  const [discountModalDiscounts, setDiscountModalDiscounts] = useState<Map<number, string>>(
+    new Map(),
+  );
   const [computing, setComputing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [coverageMessage, setCoverageMessage] = useState<string | null>(null);
@@ -490,6 +650,7 @@ export function ComputationPanel({
   // Hydrate inputs from the saved active computation so refresh keeps the
   // last calculated loan params instead of blank/default fields.
   const otherDeductionsKey = JSON.stringify(computation?.otherDeductions ?? null);
+  const originationDiscountsKey = JSON.stringify(computation?.originationDiscounts ?? null);
   useEffect(() => {
     if (!computation) return;
     if (
@@ -502,6 +663,43 @@ export function ComputationPanel({
     setAmount(String(computation.inputAmount));
     setTerms(String(computation.terms));
     setAddonMonths(String(computation.addonMonths));
+    if (computation.dueDay) {
+      setDueDay(String(computation.dueDay));
+    }
+    // computation.paymentFrequency only carries the 7-value translated
+    // vocabulary — "semi_monthly" maps back unambiguously to "salary" (the
+    // only payment_schedule value that ever produces it); "mpl" can't be
+    // recovered from "monthly" (ambiguous), so that case falls back to
+    // "monthly" — computationally identical either way (see computation.ts).
+    if (
+      computation.paymentFrequency === "monthly" ||
+      computation.paymentFrequency === "semi_monthly" ||
+      computation.paymentFrequency === "weekly" ||
+      computation.paymentFrequency === "bi_monthly" ||
+      computation.paymentFrequency === "quarterly" ||
+      computation.paymentFrequency === "two_monthly" ||
+      computation.paymentFrequency === "daily"
+    ) {
+      setSelectedScheduleType(
+        computation.paymentFrequency === "semi_monthly"
+          ? "salary"
+          : computation.paymentFrequency,
+      );
+      if (computation.paymentFrequency === "daily" && computation.firstPaymentDate) {
+        setPaymentDate(computation.firstPaymentDate);
+      }
+    }
+    const savedDiscountsMap = new Map<number, string>();
+    for (const d of computation.originationDiscounts ?? []) {
+      savedDiscountsMap.set(d.installmentNo, String(d.percent));
+    }
+    setOriginationModalDiscounts(savedDiscountsMap);
+    setOriginationDiscountRows(
+      (computation.originationDiscounts ?? []).map((d) => ({
+        installmentNo: String(d.installmentNo),
+        percent: String(d.percent),
+      })),
+    );
     if (computation.loanTypeId) {
       setSelectedLoanTypeId(computation.loanTypeId);
     }
@@ -517,6 +715,12 @@ export function ComputationPanel({
         od.otherLoans.map((e) => ({
           accountNo: e.accountNo ?? "",
           amount: String(e.amount),
+          ...(e.discountAmount
+            ? {
+                discountAmount: e.discountAmount,
+                discountedInstallmentNos: e.discountedInstallmentNos ?? [],
+              }
+            : {}),
         })),
       );
     } else if (od?.otherLoan) {
@@ -563,6 +767,7 @@ export function ComputationPanel({
     computation?.chattelRate,
     isRateEditableSegment,
     otherDeductionsKey,
+    originationDiscountsKey,
   ]);
 
   // Pre-fill sme/individual rate inputs from the borrower's most recent past
@@ -672,6 +877,125 @@ export function ComputationPanel({
     );
   }
 
+  // -- Origination discount modal (this loan's own future schedule) ------
+
+  /** Derive per-installment interest from current form values.
+   * Always calculates gross (undiscounted) interest so discount percentages
+   * scale against the full interest portion. */
+  const originationSchedule = useMemo(() => {
+    const termsN = Number(terms) || 0;
+    if (termsN < 1) return [];
+    // Daily has no discount concept — a single already-fixed payment.
+    if (selectedScheduleType === "daily") return [];
+
+    const principal = computation?.principal ?? (Number(amount) || 0);
+    const addonN = Number(addonMonths) || 0;
+    const rateDecimal =
+      isRateEditableSegment
+        ? (Number(interestRatePct) || 0) / 100
+        : (computation?.interestRate ?? loanTypes.find((lt) => lt.id === selectedLoanTypeId)?.interestRate ?? 0);
+    // Pre-compute estimate (used until Compute is first clicked) — same
+    // gross-interest formula the SME/SF engines use. Once a real
+    // computation exists, its own totalInterest/totalLoan are used instead,
+    // so this estimate only matters for the very first preview.
+    const grossTotalInterest = halfUp(principal * rateDecimal * (termsN + addonN));
+    const totalInterest = computation?.totalInterest ?? grossTotalInterest;
+    const totalLoan = computation?.totalLoan ?? halfUp(principal + grossTotalInterest);
+    const releaseDate = computation?.releaseDate ?? new Date().toISOString().slice(0, 10);
+    const firstPaymentDate: string | null = computation?.firstPaymentDate ?? null;
+
+    // This preview re-runs on every keystroke, including transient/invalid
+    // in-progress states (e.g. the Terms field's "6" default is invalid for
+    // a schedule type that just got switched to Weekly/Quarterly/Two-monthly
+    // before the CSA has retyped it) — the underlying generators correctly
+    // throw on those for the real Compute step, but a live preview must
+    // fail soft (no discount options yet) rather than crash the page.
+    let units: ReturnType<typeof buildDiscountUnits>;
+    try {
+      units = buildDiscountUnits({
+        paymentFrequency: derivedPaymentFrequency,
+        terms: termsN,
+        principal,
+        totalInterest,
+        totalLoan,
+        releaseDate,
+        firstPaymentDate,
+        dueDay: Number(dueDay) || null,
+      });
+    } catch {
+      return [];
+    }
+
+    return units.map((u) => ({
+      installmentNo: u.unitNo,
+      label: u.label,
+      dueDate: u.dueDate,
+      interestAmount: u.interestAmount,
+    }));
+  }, [
+    terms,
+    addonMonths,
+    amount,
+    computation,
+    isRateEditableSegment,
+    interestRatePct,
+    loanTypes,
+    selectedLoanTypeId,
+    derivedPaymentFrequency,
+    dueDay,
+  ]);
+
+  function openOriginationDiscountModal() {
+    setOriginationDiscountModalOpen(true);
+  }
+
+  function closeOriginationDiscountModal() {
+    setOriginationDiscountModalOpen(false);
+  }
+
+  function toggleOriginationDiscountMonth(installmentNo: number, checked: boolean) {
+    setOriginationModalDiscounts((prev) => {
+      const next = new Map(prev);
+      if (checked) next.set(installmentNo, "100");
+      else next.delete(installmentNo);
+      return next;
+    });
+  }
+
+  function updateOriginationDiscountPercent(installmentNo: number, percent: string) {
+    setOriginationModalDiscounts((prev) => {
+      const next = new Map(prev);
+      next.set(installmentNo, percent);
+      return next;
+    });
+  }
+
+  function applyOriginationDiscountModal() {
+    const rows: OriginationDiscountRow[] = [];
+    for (const [no, pct] of Array.from(originationModalDiscounts.entries()).sort(
+      (a, b) => a[0] - b[0],
+    )) {
+      rows.push({ installmentNo: String(no), percent: pct });
+    }
+    setOriginationDiscountRows(rows);
+    setOriginationDiscountModalOpen(false);
+  }
+
+  /** Total peso discount preview shown in the summary and modal footer. */
+  const originationDiscountTotalPeso = useMemo(() => {
+    let total = 0;
+    for (const inst of originationSchedule) {
+      const pctStr = originationModalDiscounts.get(inst.installmentNo);
+      if (pctStr !== undefined) {
+        const pct = Number(pctStr);
+        if (!isNaN(pct)) {
+          total += halfUp((pct / 100) * inst.interestAmount);
+        }
+      }
+    }
+    return halfUp(total);
+  }, [originationSchedule, originationModalDiscounts]);
+
   // -- Offset modal ------------------------------------------------------
   const rateHistoryYears = Array.from(
     new Set(rateHistory.map((h) => String(new Date(h.createdAt).getFullYear()))),
@@ -780,6 +1104,96 @@ export function ComputationPanel({
     setOffsetModalOpen(false);
   }
 
+  // -- Offset (full settlement) early-settlement discount modal ----------
+  function openDiscountModal(index: number) {
+    const row = otherLoanRows[index];
+    const initial = new Map<number, string>();
+    for (const no of row?.discountedInstallmentNos ?? []) {
+      initial.set(no, "100");
+    }
+    setDiscountModalDiscounts(initial);
+    setDiscountModalRowIndex(index);
+  }
+
+  function closeDiscountModal() {
+    setDiscountModalRowIndex(null);
+    setDiscountModalDiscounts(new Map());
+  }
+
+  function toggleDiscountMonth(installmentNo: number, checked: boolean) {
+    setDiscountModalDiscounts((prev) => {
+      const next = new Map(prev);
+      if (checked) next.set(installmentNo, "100");
+      else next.delete(installmentNo);
+      return next;
+    });
+  }
+
+  function updateDiscountMonthPercent(installmentNo: number, percent: string) {
+    setDiscountModalDiscounts((prev) => {
+      const next = new Map(prev);
+      next.set(installmentNo, percent);
+      return next;
+    });
+  }
+
+  function removeRowDiscount(index: number) {
+    setOtherLoanRows((rows) =>
+      rows.map((r, i) => {
+        if (i !== index) return r;
+        const match = activeLoans.find((l) => l.loanAccountNo === r.accountNo);
+        return {
+          accountNo: r.accountNo,
+          amount: match ? match.outstandingBalance.toFixed(2) : r.amount,
+        };
+      }),
+    );
+  }
+
+  const discountModalRow =
+    discountModalRowIndex !== null ? otherLoanRows[discountModalRowIndex] : null;
+  const discountModalLoan = discountModalRow?.accountNo
+    ? activeLoans.find((l) => l.loanAccountNo === discountModalRow.accountNo)
+    : undefined;
+  const discountModalFutureInstallments = discountModalLoan?.futureInstallments ?? [];
+
+  const discountModalSelectionMap = useMemo(() => {
+    const map = new Map<number, number>();
+    for (const [no, pctStr] of discountModalDiscounts.entries()) {
+      const pct = Number(pctStr);
+      if (!isNaN(pct)) {
+        map.set(no, pct);
+      }
+    }
+    return map;
+  }, [discountModalDiscounts]);
+
+  const {
+    grossInterest: discountModalGrossInterest,
+    terminationFee: discountModalTerminationFee,
+    netDiscount: discountModalNet,
+  } = computeOffsetDiscount(discountModalFutureInstallments, discountModalSelectionMap);
+
+  function applyDiscountModal() {
+    if (discountModalRowIndex === null || !discountModalLoan) return;
+    const netDiscount = discountModalNet;
+    const finalAmount = Math.max(0, halfUp(discountModalLoan.outstandingBalance - netDiscount));
+    const installmentNos = Array.from(discountModalDiscounts.keys()).sort((a, b) => a - b);
+    setOtherLoanRows((rows) =>
+      rows.map((r, i) =>
+        i === discountModalRowIndex
+          ? {
+              accountNo: r.accountNo,
+              amount: finalAmount.toFixed(2),
+              discountAmount: netDiscount,
+              discountedInstallmentNos: installmentNos,
+            }
+          : r,
+      ),
+    );
+    closeDiscountModal();
+  }
+
   const usedOffsetAccounts = new Set(
     modalBlocks.map((b) => b.accountNo).filter(Boolean),
   );
@@ -795,13 +1209,45 @@ export function ComputationPanel({
   async function handleCompute(e: FormEvent) {
     e.preventDefault();
     if (!editable || !interviewComplete) return;
+    if (isSeafarer && !["5", "15", "25"].includes(dueDay)) {
+      setError("Due date must be 5, 15, or 25 for Seafarer loans");
+      return;
+    }
+    if (selectedScheduleType === "quarterly" && Number(terms) % 3 !== 0) {
+      setError("Quarterly terms must be divisible by 3 (e.g. 6, 9, or 12 months)");
+      return;
+    }
+    if (selectedScheduleType === "two_monthly" && Number(terms) % 2 !== 0) {
+      setError("Two-monthly terms must be divisible by 2 (e.g. 4, 6, 8, 10, or 12 months)");
+      return;
+    }
+    if (selectedScheduleType === "daily" && !paymentDate) {
+      setError("Payment date is required for Daily Interest loans");
+      return;
+    }
     setComputing(true);
     setError(null);
     setCoverageMessage(null);
     try {
       const otherLoansPayload = otherLoanRows
         .filter((r) => Number(r.amount) > 0)
-        .map((r) => ({ accountNo: r.accountNo || null, amount: Number(r.amount) }));
+        .map((r) => ({
+          accountNo: r.accountNo || null,
+          amount: Number(r.amount),
+          ...(r.discountAmount
+            ? {
+                discountAmount: r.discountAmount,
+                discountedInstallmentNos: r.discountedInstallmentNos ?? [],
+              }
+            : {}),
+        }));
+
+      const originationDiscountsPayload = originationDiscountRows
+        .filter((r) => r.installmentNo.trim() !== "" && r.percent.trim() !== "")
+        .map((r) => ({
+          installmentNo: Number(r.installmentNo),
+          percent: Number(r.percent),
+        }));
 
       const offsetsPayload =
         offsetEntries.length > 0
@@ -830,6 +1276,16 @@ export function ComputationPanel({
             terms: Number(terms),
             addonMonths: Number(addonMonths),
             loanTypeId: selectedLoanTypeId || loanTypeId,
+            ...(isSeafarer ? { dueDay: Number(dueDay) } : {}),
+            // Schedule choice defaults to the application's own intake value
+            // server-side when omitted — sending it explicitly here (CSA or
+            // Committee) overrides that default for this computation only,
+            // without rewriting what the application originally requested.
+            ...(segment === "sme" || segment === "individual"
+              ? { paymentSchedule: selectedScheduleType }
+              : {}),
+            ...(selectedScheduleType === "daily" ? { paymentDate } : {}),
+            originationDiscounts: originationDiscountsPayload,
             ...(otherLoansPayload.length > 0 || offsetsPayload.length > 0
               ? {
                   otherDeductions: {
@@ -935,6 +1391,7 @@ export function ComputationPanel({
                 value={interestRatePct}
                 onChange={(e) => setInterestRatePct(e.target.value)}
                 mono
+                className="lead"
               />
               <span className="add">%/mo</span>
             </div>
@@ -953,6 +1410,7 @@ export function ComputationPanel({
                 value={pfRatePct}
                 onChange={(e) => setPfRatePct(e.target.value)}
                 mono
+                className="lead"
               />
               <span className="add">%</span>
             </div>
@@ -971,6 +1429,7 @@ export function ComputationPanel({
                 value={adminRatePct}
                 onChange={(e) => setAdminRatePct(e.target.value)}
                 mono
+                className="lead"
               />
               <span className="add">%</span>
             </div>
@@ -989,6 +1448,7 @@ export function ComputationPanel({
                 value={chattelRatePct}
                 onChange={(e) => setChattelRatePct(e.target.value)}
                 mono
+                className="lead"
               />
               <span className="add">%</span>
             </div>
@@ -1032,6 +1492,76 @@ export function ComputationPanel({
           <option value="PRINCIPAL">Principal</option>
         </Select>
       </div>
+      {(segment === "sme" || segment === "individual") && (
+        <div className="sm:col-span-2">
+          <Label htmlFor="scheduleType">
+            Loan schedule
+            <span className="text-ink-400 ml-1 text-xs">
+              (defaults to what was requested at intake — changing it here only affects this computation)
+            </span>
+          </Label>
+          <Select
+            id="scheduleType"
+            value={selectedScheduleType}
+            onChange={(e) =>
+              setSelectedScheduleType(
+                e.target.value as
+                  | "mpl"
+                  | "salary"
+                  | "monthly"
+                  | "weekly"
+                  | "bi_monthly"
+                  | "quarterly"
+                  | "two_monthly"
+                  | "daily",
+              )
+            }
+          >
+            <option value="monthly">Regular (Monthly)</option>
+            <option value="mpl">MPL (Multi-Purpose Loan)</option>
+            <option value="salary">Salary (semi-monthly)</option>
+            <option value="weekly">Weekly (Invoice Financing)</option>
+            <option value="bi_monthly">Bi-monthly (every 15 days)</option>
+            <option value="quarterly">Quarterly</option>
+            <option value="two_monthly">Two-monthly</option>
+            <option value="daily">Daily</option>
+          </Select>
+          {selectedScheduleType === "weekly" && (
+            <p className="text-xs text-ink-500 mt-1">
+              Invoice: 1-3 month terms only, weekly interest-only payments
+            </p>
+          )}
+          {selectedScheduleType === "quarterly" && (
+            <p className="text-xs text-ink-500 mt-1">
+              Terms must be divisible by 3 (e.g. 6, 9, 12 months) — interest-only every quarter, principal on the last payment
+            </p>
+          )}
+          {selectedScheduleType === "two_monthly" && (
+            <p className="text-xs text-ink-500 mt-1">
+              Terms must be divisible by 2 (e.g. 4, 6, 8, 10, 12 months) — interest-only every 2 months, principal on the last payment
+            </p>
+          )}
+          {selectedScheduleType === "daily" && (
+            <p className="text-xs text-ink-500 mt-1">
+              Single payment — interest accrues per actual day to the payment date below
+            </p>
+          )}
+        </div>
+      )}
+      {selectedScheduleType === "daily" && (
+        <div className="sm:col-span-2">
+          <Label htmlFor="paymentDate" required>
+            Payment date
+          </Label>
+          <Input
+            id="paymentDate"
+            type="date"
+            required
+            value={paymentDate}
+            onChange={(e) => setPaymentDate(e.target.value)}
+          />
+        </div>
+      )}
       <div className="sm:col-span-2">
         <Label htmlFor="amount" required>
           Amount
@@ -1076,7 +1606,7 @@ export function ComputationPanel({
           <Input
             id="addonMonths"
             type="number"
-            min="1"
+            min={0}
             required
             value={addonMonths}
             onChange={(e) => setAddonMonths(e.target.value)}
@@ -1084,6 +1614,80 @@ export function ComputationPanel({
             className="lead"
           />
           <span className="add">mo</span>
+        </div>
+      </div>
+      {isSeafarer ? (
+        <div>
+          <Label htmlFor="dueDay" required>
+            Due date
+          </Label>
+          <Select
+            id="dueDay"
+            required
+            value={dueDay}
+            onChange={(e) => setDueDay(e.target.value)}
+          >
+            <option value="">Select payday</option>
+            <option value="5">5th</option>
+            <option value="15">15th</option>
+            <option value="25">25th</option>
+          </Select>
+        </div>
+      ) : null}
+      <div className="sm:col-span-2">
+        <div className="rounded-[var(--r-md)] border border-line-soft bg-surface-2/50 p-3.5">
+          <div className="mb-3 flex items-center justify-between">
+            <span className="text-xs font-semibold uppercase tracking-wide text-ink-400">
+              Origination discount{" "}
+              <span className="normal-case font-normal text-ink-400">(optional)</span>
+            </span>
+            {originationModalDiscounts.size > 0 ? (
+              <span className="text-xs font-medium text-teal-700">
+                {originationModalDiscounts.size} selected — ₱{formatMoney(originationDiscountTotalPeso)} discount
+              </span>
+            ) : null}
+          </div>
+
+          {/* Summary rows (read-only) */}
+          {originationDiscountRows.length > 0 ? (
+            <div className="mb-2.5 flex flex-col gap-1.5">
+              {originationDiscountRows.map((row) => {
+                const inst = originationSchedule.find(
+                  (s) => s.installmentNo === Number(row.installmentNo),
+                );
+                const pctNum = Number(row.percent);
+                const pesoAmt = inst ? halfUp((pctNum / 100) * inst.interestAmount) : null;
+                return (
+                  <div
+                    key={row.installmentNo}
+                    className="flex items-center justify-between rounded-[var(--r-sm)] border border-line-soft bg-surface-1 px-3 py-1.5 text-xs"
+                  >
+                    <span className="font-medium text-ink-700">
+                      {inst?.label ?? `Month ${row.installmentNo}`}
+                    </span>
+                    <span className="mono text-ink-500">
+                      {row.percent}% off ·{" "}
+                      {pesoAmt !== null ? `₱${formatMoney(pesoAmt)}` : "—"}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          ) : null}
+
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            disabled={originationSchedule.length === 0}
+            onClick={openOriginationDiscountModal}
+          >
+            {originationDiscountRows.length > 0 ? "✎ Edit discount" : "+ Select discount…"}
+          </Button>
+          <p className="mt-1 text-[11px] text-ink-400">
+            Percent off that installment&apos;s interest, on this loan&apos;s own future
+            schedule — reverts automatically once the due date arrives.
+          </p>
         </div>
       </div>
       <div className="sm:col-span-2">
@@ -1100,9 +1704,9 @@ export function ComputationPanel({
           </div>
 
           <div className="grid gap-4 lg:grid-cols-2">
-            {/* Other Loan Section */}
+            {/* Other Loan Section (labeled "Offset" — full settlement) */}
             <div className="flex flex-col gap-2 rounded-[var(--r-md)] border border-line-soft bg-surface-1 p-3">
-              <Label>Other Loan{otherLoanRows.length > 1 ? "s" : ""} (full buyout)</Label>
+              <Label>Offset{otherLoanRows.length > 1 ? "s" : ""} (full settlement)</Label>
               <div className="flex flex-col gap-2.5">
                 {otherLoanRows.map((row, index) => {
                   const rowOptions = activeLoans.filter(
@@ -1111,55 +1715,115 @@ export function ComputationPanel({
                       (!usedOtherLoanAccounts.has(l.loanAccountNo) &&
                         !usedOffsetAccounts.has(l.loanAccountNo)),
                   );
+                  const match = row.accountNo
+                    ? activeLoans.find((l) => l.loanAccountNo === row.accountNo)
+                    : undefined;
+                  const hasDiscount = (row.discountAmount ?? 0) > 0;
+                  const canDiscount = (match?.futureInstallments?.length ?? 0) > 0;
                   return (
-                    <div key={index} className="flex items-start gap-1.5">
-                      <div className="grid flex-1 grid-cols-2 gap-1.5">
-                        {activeLoans.length > 0 ? (
-                          <Select
-                            aria-label={`Target loan ${index + 1}`}
-                            value={row.accountNo}
-                            onChange={(e) => updateOtherLoanRowAccount(index, e.target.value)}
-                            title={
-                              row.accountNo
-                                ? `${row.accountNo} — ₱${formatMoney(
-                                    activeLoans.find((l) => l.loanAccountNo === row.accountNo)
-                                      ?.outstandingBalance ?? 0,
-                                  )} balance`
-                                : undefined
-                            }
-                          >
-                            <option value="">None / Custom external loan</option>
-                            {rowOptions.map((l) => (
-                              <option key={l.loanAccountNo} value={l.loanAccountNo}>
-                                {l.loanAccountNo} — ₱{formatMoney(l.outstandingBalance)} bal
-                              </option>
-                            ))}
-                          </Select>
-                        ) : (
-                          <span className="flex items-center text-xs text-ink-500">Custom / external</span>
-                        )}
-                        <div className="affix">
-                          <span className="add">₱</span>
-                          <Input
-                            aria-label={`Amount ${index + 1}`}
-                            type="number"
-                            min="0"
-                            step="0.01"
-                            value={row.amount}
-                            onChange={(e) => updateOtherLoanRowAmount(index, e.target.value)}
-                            placeholder="0.00"
-                            mono
-                          />
+                    <div key={index} className="flex flex-col gap-1">
+                      <div className="flex items-start gap-1.5">
+                        <div className="grid flex-1 grid-cols-2 gap-1.5">
+                          {activeLoans.length > 0 ? (
+                            <Select
+                              aria-label={`Target loan ${index + 1}`}
+                              value={row.accountNo}
+                              onChange={(e) => updateOtherLoanRowAccount(index, e.target.value)}
+                              title={
+                                row.accountNo
+                                  ? `${row.accountNo} — ₱${formatMoney(
+                                      activeLoans.find((l) => l.loanAccountNo === row.accountNo)
+                                        ?.outstandingBalance ?? 0,
+                                    )} balance`
+                                  : undefined
+                              }
+                            >
+                              <option value="">None / Custom external loan</option>
+                              {rowOptions.map((l) => (
+                                <option key={l.loanAccountNo} value={l.loanAccountNo}>
+                                  {l.loanAccountNo} — ₱{formatMoney(l.outstandingBalance)} bal
+                                </option>
+                              ))}
+                            </Select>
+                          ) : (
+                            <span className="input flex items-center text-xs text-ink-500">
+                              Custom / external
+                            </span>
+                          )}
+                          {hasDiscount ? (
+                            <span className="input mono flex items-center text-xs font-medium text-navy-900">
+                              ₱{formatMoney(Number(row.amount))}
+                            </span>
+                          ) : (
+                            <div className="affix">
+                              <span className="add">₱</span>
+                              <Input
+                                aria-label={`Amount ${index + 1}`}
+                                type="number"
+                                min="0"
+                                step="0.01"
+                                value={row.amount}
+                                onChange={(e) => updateOtherLoanRowAmount(index, e.target.value)}
+                                placeholder="0.00"
+                                mono
+                              />
+                            </div>
+                          )}
                         </div>
+                        <button
+                          type="button"
+                          onClick={() => removeOtherLoanRow(index)}
+                          className="mt-1 px-1 text-xs text-ink-400 hover:text-danger-700"
+                          aria-label="Remove row"
+                        >
+                          ×
+                        </button>
                       </div>
-                      <button
-                        type="button"
-                        onClick={() => removeOtherLoanRow(index)}
-                        className="mt-1 px-1 text-xs text-ink-400 hover:text-danger-700"
-                        aria-label="Remove row"
-                      >
-                        ×
-                      </button>
+
+                      {hasDiscount ? (
+                        <div className="flex flex-col gap-0.5 rounded-[var(--r-sm)] border border-line-soft bg-surface-2 px-2 py-1.5 text-[11px]">
+                          <div className="flex items-center justify-between">
+                            <span className="text-ink-400">Balance</span>
+                            <span className="mono">₱{formatMoney(match?.outstandingBalance ?? 0)}</span>
+                          </div>
+                          <div className="flex items-center justify-between">
+                            <span className="text-ink-400">Early-settlement discount</span>
+                            <span className="mono text-teal-700">
+                              −₱{formatMoney(row.discountAmount ?? 0)}
+                            </span>
+                          </div>
+                          <div className="flex items-center justify-between font-medium">
+                            <span className="text-ink-700">Final amount</span>
+                            <span className="mono text-navy-900">₱{formatMoney(Number(row.amount))}</span>
+                          </div>
+                          <div className="flex gap-3 pt-0.5">
+                            <button
+                              type="button"
+                              className="text-teal-700 hover:underline"
+                              onClick={() => openDiscountModal(index)}
+                            >
+                              Edit discount
+                            </button>
+                            <button
+                              type="button"
+                              className="text-danger-700 hover:underline"
+                              onClick={() => removeRowDiscount(index)}
+                            >
+                              Remove discount
+                            </button>
+                          </div>
+                        </div>
+                      ) : canDiscount ? (
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          className="self-start"
+                          onClick={() => openDiscountModal(index)}
+                        >
+                          Apply early-settlement discount
+                        </Button>
+                      ) : null}
                     </div>
                   );
                 })}
@@ -1168,14 +1832,14 @@ export function ComputationPanel({
                 + Add another loan
               </Button>
               <p className="text-[11px] text-ink-400">
-                Full payoff amount(s) deducted from proceeds — account balance auto-fills, editable per row.
+                Full settlement amount(s) deducted from proceeds — account balance auto-fills, editable per row.
               </p>
             </div>
 
-            {/* Offset Amount Section */}
+            {/* Offset Amount Section (labeled "Other Loan" — partial payment) */}
             <div className="flex flex-col gap-2 rounded-[var(--r-md)] border border-line-soft bg-surface-1 p-3">
               <div className="flex items-center justify-between gap-2">
-                <Label>Offset amount</Label>
+                <Label>Other Loan amount</Label>
                 {activeLoans.length > 0 ? (
                   <Button type="button" variant="ghost" size="sm" onClick={openOffsetModal}>
                     {offsetEntries.length > 0 ? "Edit selection" : "Select loan & months"}
@@ -1196,17 +1860,17 @@ export function ComputationPanel({
                     </div>
                   ))}
                   <div className="flex items-center justify-between px-0.5 pt-0.5 text-xs">
-                    <span className="text-ink-400">Combined offset total</span>
+                    <span className="text-ink-400">Combined other-loan total</span>
                     <span className="mono font-semibold text-navy-900">₱{formatMoney(offsetEntriesTotal)}</span>
                   </div>
                 </div>
               ) : activeLoans.length === 0 ? (
                 <div>
-                  <Label htmlFor="offsetManualAmount">Offset amount (₱)</Label>
                   <div className="affix">
                     <span className="add">₱</span>
                     <Input
                       id="offsetManualAmount"
+                      aria-label="Other Loan amount"
                       type="number"
                       min="0"
                       step="0.01"
@@ -1226,7 +1890,7 @@ export function ComputationPanel({
                   <div className="affix mt-1">
                     <span className="add">₱</span>
                     <Input
-                      aria-label="Custom offset amount"
+                      aria-label="Custom other-loan amount"
                       type="number"
                       min="0"
                       step="0.01"
@@ -1245,7 +1909,7 @@ export function ComputationPanel({
 
       <Modal
         open={offsetModalOpen}
-        title="Select loans & months to offset"
+        title="Select loans & months (other loan)"
         onClose={() => setOffsetModalOpen(false)}
         footer={
           <>
@@ -1340,9 +2004,187 @@ export function ComputationPanel({
           </Button>
 
           <div className="flex items-center justify-between rounded-[var(--r-sm)] border border-line-soft bg-surface-2 px-3 py-2">
-            <span className="text-xs font-medium text-ink-700">Combined offset total</span>
+            <span className="text-xs font-medium text-ink-700">Combined other-loan total</span>
             <span className="mono text-sm font-semibold text-navy-900">₱{formatMoney(modalGrandTotal)}</span>
           </div>
+        </div>
+      </Modal>
+
+      <Modal
+        open={discountModalRowIndex !== null}
+        title="Early-settlement discount"
+        onClose={closeDiscountModal}
+        className="!max-w-2xl"
+        footer={
+          <>
+            <Button type="button" variant="ghost" onClick={closeDiscountModal}>
+              Cancel
+            </Button>
+            <Button type="button" onClick={applyDiscountModal}>
+              Apply
+            </Button>
+          </>
+        }
+      >
+        <div className="flex flex-col gap-3">
+          {discountModalLoan ? (
+            <>
+              <p className="text-[11px] text-ink-400">
+                Tick the future installments to discount. Due/passed months are never eligible.
+                The discount is the ticked months&apos; interest, minus one month&apos;s interest
+                as a termination fee — floored at ₱0.
+              </p>
+              {discountModalFutureInstallments.length > 0 ? (
+                <div className="flex max-h-72 flex-col gap-2 overflow-y-auto pr-1">
+                  {discountModalFutureInstallments.map((inst) => {
+                    const isChecked = discountModalDiscounts.has(inst.installmentNo);
+                    const currentPercent = discountModalDiscounts.get(inst.installmentNo) ?? "100";
+                    return (
+                      <div
+                        key={inst.installmentNo}
+                        className="flex flex-col gap-2 rounded-[var(--r-sm)] border border-line-soft bg-surface-1 p-2.5 sm:flex-row sm:items-center sm:justify-between"
+                      >
+                        <Checkbox
+                          id={`discount-month-${inst.installmentNo}`}
+                          checked={isChecked}
+                          onChange={(checked) => toggleDiscountMonth(inst.installmentNo, checked)}
+                          label={`Month ${inst.installmentNo} — due ${inst.dueDate}`}
+                          description={`₱${formatMoney(inst.interestPortion)} interest`}
+                        />
+                        {isChecked ? (
+                          <div className="flex items-center gap-2 self-end sm:self-center">
+                            <span className="text-xs text-ink-500 whitespace-nowrap">Discount:</span>
+                            <div className="affix" style={{ width: 135 }}>
+                              <Input
+                                aria-label={`Discount percent for Month ${inst.installmentNo}`}
+                                type="number"
+                                min="0"
+                                max="100"
+                                step="0.01"
+                                value={currentPercent}
+                                onChange={(e) =>
+                                  updateDiscountMonthPercent(inst.installmentNo, e.target.value)
+                                }
+                                mono
+                                className="lead"
+                              />
+                              <span className="add">%</span>
+                            </div>
+                          </div>
+                        ) : null}
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <p className="text-xs text-ink-500">No future installments to discount.</p>
+              )}
+              <div className="flex flex-col gap-1 rounded-[var(--r-sm)] border border-line-soft bg-surface-2 px-3 py-2 text-xs">
+                <div className="flex items-center justify-between">
+                  <span className="text-ink-400">Gross interest selected</span>
+                  <span className="mono">₱{formatMoney(discountModalGrossInterest)}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-ink-400">Less termination fee (1 month)</span>
+                  <span className="mono">−₱{formatMoney(discountModalTerminationFee)}</span>
+                </div>
+                <div className="flex items-center justify-between font-semibold">
+                  <span className="text-ink-700">Net discount</span>
+                  <span className="mono text-navy-900">₱{formatMoney(discountModalNet)}</span>
+                </div>
+              </div>
+            </>
+          ) : (
+            <p className="text-xs text-ink-500">No target loan selected for this row.</p>
+          )}
+        </div>
+      </Modal>
+
+      <Modal
+        open={originationDiscountModalOpen}
+        title="Origination discount"
+        onClose={closeOriginationDiscountModal}
+        className="!max-w-2xl"
+        footer={
+          <>
+            <Button type="button" variant="ghost" onClick={closeOriginationDiscountModal}>
+              Cancel
+            </Button>
+            <Button type="button" onClick={applyOriginationDiscountModal}>
+              Apply
+            </Button>
+          </>
+        }
+      >
+        <div className="flex flex-col gap-3">
+          <p className="text-[11px] text-ink-400">
+            Tick the installments you want to discount. Enter the percentage of that
+            installment&apos;s interest to waive. The schedule is derived from this
+            loan&apos;s current terms and rate.
+          </p>
+          {originationSchedule.length > 0 ? (
+            <div className="flex max-h-72 flex-col gap-2 overflow-y-auto pr-1">
+              {originationSchedule.map((inst) => {
+                const isChecked = originationModalDiscounts.has(inst.installmentNo);
+                const currentPercent = originationModalDiscounts.get(inst.installmentNo) ?? "100";
+                return (
+                  <div
+                    key={inst.installmentNo}
+                    className="flex flex-col gap-2 rounded-[var(--r-sm)] border border-line-soft bg-surface-1 p-2.5 sm:flex-row sm:items-center sm:justify-between"
+                  >
+                    <Checkbox
+                      id={`orig-discount-month-${inst.installmentNo}`}
+                      checked={isChecked}
+                      onChange={(checked) =>
+                        toggleOriginationDiscountMonth(inst.installmentNo, checked)
+                      }
+                      label={
+                        inst.dueDate
+                          ? `${inst.label} — due ${inst.dueDate}`
+                          : inst.label
+                      }
+                      description={`₱${formatMoney(inst.interestAmount)} interest`}
+                    />
+                    {isChecked ? (
+                      <div className="flex items-center gap-2 self-end sm:self-center">
+                        <span className="whitespace-nowrap text-xs text-ink-500">Discount:</span>
+                        <div className="affix" style={{ width: 135 }}>
+                          <Input
+                            aria-label={`Origination discount percent for ${inst.label}`}
+                            type="number"
+                            min="0"
+                            max="100"
+                            step="0.01"
+                            value={currentPercent}
+                            onChange={(e) =>
+                              updateOriginationDiscountPercent(inst.installmentNo, e.target.value)
+                            }
+                            mono
+                            className="lead"
+                          />
+                          <span className="add">%</span>
+                        </div>
+                      </div>
+                    ) : null}
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            <p className="text-xs text-ink-500">No installments — fill in Terms to continue.</p>
+          )}
+          {originationModalDiscounts.size > 0 ? (
+            <div className="flex flex-col gap-1 rounded-[var(--r-sm)] border border-line-soft bg-surface-2 px-3 py-2 text-xs">
+              <div className="flex items-center justify-between">
+                <span className="text-ink-400">Months selected</span>
+                <span className="mono">{originationModalDiscounts.size}</span>
+              </div>
+              <div className="flex items-center justify-between font-semibold">
+                <span className="text-ink-700">Total interest discount</span>
+                <span className="mono text-navy-900">₱{formatMoney(originationDiscountTotalPeso)}</span>
+              </div>
+            </div>
+          ) : null}
         </div>
       </Modal>
 
@@ -1528,7 +2370,7 @@ export function ComputationPanel({
                     <div className="mono text-xs text-ink-400">{step.formula}</div>
                   </div>
                   <div className="mono shrink-0 text-sm font-semibold text-ink-900">
-                    ₱{formatMoney(step.value)}
+                    {step.value < 0 ? `−₱${formatMoney(-step.value)}` : `₱${formatMoney(step.value)}`}
                   </div>
                 </div>
               ))}
@@ -1543,6 +2385,10 @@ export function ComputationPanel({
               </span>
               <span>
                 Security <b className="mono text-ink-700">{pct(computation.securityFeeRate)}</b>
+              </span>
+              <span>
+                Add-on ({computation.addonMonths} mo{computation.addonMonths === 1 ? "" : "s"}){" "}
+                <b className="mono text-ink-700">₱{formatMoney(addonInterestAmount(computation))}</b>
               </span>
             </div>
           </div>
@@ -1571,8 +2417,48 @@ export function ComputationPanel({
               <b>{formatMoney(computation.chattelFee)}</b>
             </div>
           ) : null}
-          {computation.firstPaymentDate ? (
+          <div className="row2">
+            <span>
+              Add-on interest ({computation.addonMonths} mo
+              {computation.addonMonths === 1 ? "" : "s"})
+            </span>
+            <b>₱{formatMoney(addonInterestAmount(computation))}</b>
+          </div>
+          {(() => {
+            const discounts = computation.originationDiscounts;
+            if (!discounts || discounts.length === 0) return null;
+            // The stored totalInterest is already net of discounts. To show the
+            // discount amount we recompute it the same way persistComputation does:
+            // gross interest = totalInterest / (1 - discountFraction) is not stored,
+            // so we instead derive: grossInterest ≈ totalInterest + discountTotal,
+            // using the stored line_items' pre-discount total_interest if available,
+            // or simply recalculate from principal × rate × terms.
+            // Cleanest: sum (percent/100 × interestPerInstallment) using raw formula.
+            const grossTotalInterest = halfUp(
+              computation.principal * computation.interestRate * (computation.terms + computation.addonMonths)
+            );
+            const interestPerInstallment = halfUp(grossTotalInterest / computation.terms);
+            let discountTotal = 0;
+            for (const { percent } of discounts) {
+              discountTotal += halfUp((percent / 100) * interestPerInstallment);
+            }
+            discountTotal = halfUp(discountTotal);
+            if (discountTotal <= 0) return null;
+            return (
+              <div className="row2" style={{ color: "var(--teal-400)" }}>
+                <span>Origination discount ({discounts.length} mo)</span>
+                <b>−₱{formatMoney(discountTotal)}</b>
+              </div>
+            );
+          })()}
+          {computation.releaseDate ? (
             <div className="row2" style={{ borderTop: "1px dashed rgba(255,255,255,.2)" }}>
+              <span>Release date</span>
+              <b>{new Date(computation.releaseDate).toLocaleDateString()}</b>
+            </div>
+          ) : null}
+          {computation.firstPaymentDate ? (
+            <div className="row2">
               <span>First payment date</span>
               <b>{new Date(computation.firstPaymentDate).toLocaleDateString()}</b>
             </div>
@@ -1631,4 +2517,5 @@ export function ComputationPanel({
       {editable ? form : <p className="text-sm text-ink-500">Nothing to show.</p>}
     </Card>
   );
-}
+  },
+);

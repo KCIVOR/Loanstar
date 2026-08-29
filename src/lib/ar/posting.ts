@@ -400,7 +400,7 @@ export async function refreshMasterlistAging(
   const { data: schedules } = await supabase
     .from("amortization_schedules")
     .select(
-      "id, installment_no, due_date, status, amount_due, amount_paid, penalty_amount, rolled_at",
+      "id, installment_no, due_date, status, amount_due, amount_paid, penalty_amount, rolled_at, discount_amount",
     )
     .eq("masterlist_id", masterlistId)
     .neq("status", "paid")
@@ -432,10 +432,17 @@ export async function refreshMasterlistAging(
   let finalPenalty = Number(overdue?.penalty_amount ?? 0);
 
   if (overdue && daysPastDue(overdue.due_date as string, asOf) >= 1) {
+    // Penalty is charged on the installment's own unpaid balance only — NOT on
+    // the penalty already accrued against it. Including accrued penalty here
+    // made this non-idempotent: every re-run (nightly cron, each Collector
+    // accounts GET, each dev-simulate click) computed a strictly larger figure
+    // and inserted another `penalties` row, converging to rate/(1-rate) instead
+    // of rate. Month-over-month compounding is delivered by the 30-day rollover
+    // below, which folds balance + penalty into the next installment — that
+    // installment's amount_due then carries it, so compounding still happens
+    // once per month, exactly as `penalty_rate*` config ("per month") intends.
     const outstanding =
-      Number(overdue.amount_due) -
-      Number(overdue.amount_paid) +
-      Number(overdue.penalty_amount ?? 0);
+      Number(overdue.amount_due) - Number(overdue.amount_paid);
     const penalty = calculatePenaltyAmount(outstanding, penaltyRate);
 
     if (penalty > Number(overdue.penalty_amount ?? 0)) {
@@ -500,6 +507,28 @@ export async function refreshMasterlistAging(
         });
       }
     }
+  }
+
+  // Origination-discount reversion (feature-new-loan-origination-discount.md,
+  // Rule 6) — a separate concern from the penalty/rollover logic above, not
+  // merged into it and not conditioned on `overdue`/`agingBucket`: any
+  // installment whose due date has arrived — discounted or not, paid or not
+  // by the time this runs — loses its origination discount. Idempotent by
+  // construction: clearing an already-zero discount_amount is a no-op, so
+  // this is safe under the same repeat-call conditions that caused the
+  // penalty bug this function was fixed for (nightly cron, every Collector
+  // accounts GET, dev-simulate calls).
+  const expiredDiscountIds = (schedules ?? [])
+    .filter((row) => row.status !== "rolled")
+    .filter((row) => Number(row.discount_amount ?? 0) > 0)
+    .filter((row) => daysPastDue(row.due_date as string, asOf) >= 0)
+    .map((row) => row.id as string);
+
+  if (expiredDiscountIds.length > 0) {
+    await supabase
+      .from("amortization_schedules")
+      .update({ discount_amount: 0 })
+      .in("id", expiredDiscountIds);
   }
 
   const remedialFlag = agingBucket === "91+";

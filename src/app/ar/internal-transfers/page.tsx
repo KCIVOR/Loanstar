@@ -34,8 +34,8 @@ type TransferRow = {
 };
 
 function transferLabel(row: TransferRow): string {
-  if (row.transferType === "other_loan") return "Other Loan (full payoff)";
-  return row.months ? `Offset (${row.months} mo${row.months > 1 ? "s" : ""})` : "Offset";
+  if (row.transferType === "other_loan") return "Offset (full payoff)";
+  return row.months ? `Other Loan (${row.months} mo${row.months > 1 ? "s" : ""})` : "Other Loan";
 }
 
 export default function ArInternalTransfersPage() {

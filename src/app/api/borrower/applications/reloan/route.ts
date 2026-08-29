@@ -43,7 +43,7 @@ function readSegmentBody(value: unknown): {
   segment?: string | null;
   entityType?: string | null;
   collateralType?: string | null;
-  individualLoanType?: string | null;
+  paymentSchedule?: string | null;
 } {
   if (!value || typeof value !== "object") return {};
   const record = value as Record<string, unknown>;
@@ -52,11 +52,9 @@ function readSegmentBody(value: unknown): {
     typeof record.entityType === "string" ? record.entityType : undefined;
   const collateralType =
     typeof record.collateralType === "string" ? record.collateralType : undefined;
-  const individualLoanType =
-    typeof record.individualLoanType === "string"
-      ? record.individualLoanType
-      : undefined;
-  return { segment, entityType, collateralType, individualLoanType };
+  const paymentSchedule =
+    typeof record.paymentSchedule === "string" ? record.paymentSchedule : undefined;
+  return { segment, entityType, collateralType, paymentSchedule };
 }
 
 const VALID_COLLATERAL_TYPES = new Set([
@@ -65,9 +63,22 @@ const VALID_COLLATERAL_TYPES = new Set([
   "real_estate",
 ]);
 
-/** Does not inherit from a prior application on reloan — same as collateralType,
- * unlike segment/entityType (confirmed decision, 2026-08-25). */
-const VALID_INDIVIDUAL_LOAN_TYPES = new Set(["mpl", "salary"]);
+/** SME or Individual — the loan's unified schedule/product choice, decided
+ * here at intake rather than as a separate choice later at compute time.
+ * Does not inherit from a prior application on reloan — same as
+ * collateralType (confirmed decision, 2026-08-25). Both segments have
+ * access to the full 8-value list (confirmed 2026-08-29 — see
+ * docs/payment-schedule-unification-plan.md). */
+const VALID_PAYMENT_SCHEDULES = new Set([
+  "mpl",
+  "salary",
+  "monthly",
+  "weekly",
+  "bi_monthly",
+  "quarterly",
+  "two_monthly",
+  "daily",
+]);
 
 export async function POST(request: Request) {
   try {
@@ -158,20 +169,30 @@ export async function POST(request: Request) {
 
     // Read from body only — does not inherit from the borrower's prior
     // application on reloan, same as collateralType (confirmed 2026-08-25).
-    const individualLoanType: "mpl" | "salary" | null =
-      body.individualLoanType &&
-      VALID_INDIVIDUAL_LOAN_TYPES.has(body.individualLoanType)
-        ? (body.individualLoanType as "mpl" | "salary")
-        : null;
-    if (segment === "individual" && collateralType === "none" && !individualLoanType) {
-      return NextResponse.json(
-        {
-          error:
-            "individualLoanType is required for individual applications with no collateral",
-        },
-        { status: 400 },
-      );
-    }
+    // Defaults to "monthly" for Seafarer, matching the DB CHECK
+    // (loan_applications_payment_schedule_scope).
+    const paymentSchedule:
+      | "mpl"
+      | "salary"
+      | "monthly"
+      | "weekly"
+      | "bi_monthly"
+      | "quarterly"
+      | "two_monthly"
+      | "daily" =
+      (segment === "sme" || segment === "individual") &&
+      body.paymentSchedule &&
+      VALID_PAYMENT_SCHEDULES.has(body.paymentSchedule)
+        ? (body.paymentSchedule as
+            | "mpl"
+            | "salary"
+            | "monthly"
+            | "weekly"
+            | "bi_monthly"
+            | "quarterly"
+            | "two_monthly"
+            | "daily")
+        : "monthly";
 
     const { data: application, error: applicationError } = await supabase
       .from("loan_applications")
@@ -191,7 +212,7 @@ export async function POST(request: Request) {
         segment,
         entity_type: entityType,
         collateral_type: collateralType,
-        individual_loan_type: individualLoanType,
+        payment_schedule: paymentSchedule,
       })
       .select(
         "id, status, status_history, is_reloan, parent_application_id, created_at, segment, entity_type",
@@ -230,7 +251,7 @@ export async function POST(request: Request) {
         segment,
         entityType,
         collateralType,
-        individualLoanType,
+        paymentSchedule,
         segmentInheritedFromParent: segment === "sme" || segment === "individual",
       },
     });

@@ -26,16 +26,16 @@ test("legacy scalar fields produce one row each", () => {
     offsetMonths: 2,
   });
   assert.deepEqual(rows, [
-    { label: "Other Loan (AN1)", amount: 5_000 },
-    { label: "Offset (AN2 · 2 mos)", amount: 3_000 },
+    { label: "Offset (AN1)", amount: 5_000 },
+    { label: "Other Loan (AN2 · 2 mos)", amount: 3_000 },
   ]);
 });
 
 test("legacy scalar without an account number falls back to a plain label", () => {
   const rows = buildDeductionBreakdownRows({ otherLoan: 5_000, offset: 3_000 });
   assert.deepEqual(rows, [
-    { label: "Other Loan", amount: 5_000 },
-    { label: "Offset", amount: 3_000 },
+    { label: "Offset", amount: 5_000 },
+    { label: "Other Loan", amount: 3_000 },
   ]);
 });
 
@@ -51,10 +51,10 @@ test("multi-entry arrays produce one row per entry", () => {
     ],
   });
   assert.deepEqual(rows, [
-    { label: "Other Loan (AN1)", amount: 5_000 },
-    { label: "Other Loan (AN2)", amount: 3_000 },
-    { label: "Offset (AN3 · 1 mo)", amount: 4_250.4 },
-    { label: "Offset (AN4 · 2 mos)", amount: 8_500.8 },
+    { label: "Offset (AN1)", amount: 5_000 },
+    { label: "Offset (AN2)", amount: 3_000 },
+    { label: "Other Loan (AN3 · 1 mo)", amount: 4_250.4 },
+    { label: "Other Loan (AN4 · 2 mos)", amount: 8_500.8 },
   ]);
 });
 
@@ -66,8 +66,8 @@ test("array wins over legacy scalar when both are present", () => {
     offsets: [{ accountNo: "AN2", amount: 3_000, months: 1 }],
   });
   assert.deepEqual(rows, [
-    { label: "Other Loan (AN1)", amount: 5_000 },
-    { label: "Offset (AN2 · 1 mo)", amount: 3_000 },
+    { label: "Offset (AN1)", amount: 5_000 },
+    { label: "Other Loan (AN2 · 1 mo)", amount: 3_000 },
   ]);
 });
 

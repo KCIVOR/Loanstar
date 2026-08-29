@@ -91,8 +91,8 @@ function segmentBadge(segment: "sme" | "seafarer" | "individual" | null | undefi
 }
 
 function transferTypeLabel(row: InternalTransferHistoryRow): string {
-  if (row.transferType === "other_loan") return "Other Loan (full payoff)";
-  return row.months ? `Offset (${row.months} mo${row.months > 1 ? "s" : ""})` : "Offset";
+  if (row.transferType === "other_loan") return "Offset (full payoff)";
+  return row.months ? `Other Loan (${row.months} mo${row.months > 1 ? "s" : ""})` : "Other Loan";
 }
 
 function transferStatusBadge(status: "posted" | "rejected") {

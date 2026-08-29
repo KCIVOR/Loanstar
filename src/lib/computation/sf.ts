@@ -197,9 +197,6 @@ function solvePrincipal(
  */
 export function computeSfLoan(input: SfComputeInput): SfComputeResult {
   const addonMonths = input.addonMonths ?? 2;
-  if (addonMonths < 1) {
-    throw new Error("addonMonths must be at least 1 (G1)");
-  }
 
   const other = normalizeOtherDeductions(input.otherDeductions);
   const otherTotal = otherDeductionsTotal(other);

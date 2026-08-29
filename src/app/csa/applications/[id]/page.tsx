@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, ReactNode, useCallback, useEffect, useState } from "react";
+import { FormEvent, ReactNode, useCallback, useEffect, useRef, useState } from "react";
 import { useParams } from "next/navigation";
 
 import {
@@ -20,7 +20,10 @@ import {
   Stepper,
   Textarea,
 } from "@/components/ui";
-import { ComputationPanel } from "@/components/csa/ComputationPanel";
+import {
+  ComputationPanel,
+  type ComputationPanelHandle,
+} from "@/components/csa/ComputationPanel";
 import { ConnectBorrowerAccountPanel } from "@/components/csa/ConnectBorrowerAccountPanel";
 import { NegotiationPanel } from "@/components/csa/NegotiationPanel";
 import { ApplicantProfileFields } from "@/components/borrowers/ApplicantProfileFields";
@@ -64,6 +67,15 @@ type ApplicationWorkspace = {
     blocker: string | null;
     segment: "seafarer" | "sme" | "individual";
     entityType: "individual" | "corporate" | null;
+    paymentSchedule:
+      | "mpl"
+      | "salary"
+      | "monthly"
+      | "weekly"
+      | "bi_monthly"
+      | "quarterly"
+      | "two_monthly"
+      | "daily";
     isReloan: boolean;
     createdAt: string;
     updatedAt: string;
@@ -99,6 +111,7 @@ type ApplicationWorkspace = {
     totalInterest: number;
     totalLoan: number;
     monthlyAmortization: number;
+    releaseDate: string | null;
     firstPaymentDate: string | null;
     adminRate?: number | null;
     chattelRate?: number | null;
@@ -263,9 +276,15 @@ export default function CsaApplicationPage() {
   const [confirmClearHold, setConfirmClearHold] = useState(false);
   const [confirmWitnessSign, setConfirmWitnessSign] = useState(false);
   const [interviewNotes, setInterviewNotes] = useState("");
+  // Guards against an in-flight `load()` (e.g. from a recompute) resolving
+  // after a newer one and overwriting fresher data with a stale snapshot —
+  // Compute → refetch has no server-side ordering guarantee.
+  const loadSeq = useRef(0);
+  const computationPanelRef = useRef<ComputationPanelHandle>(null);
 
   const load = useCallback(
     async (opts?: { silent?: boolean }) => {
+      const seq = ++loadSeq.current;
       if (!opts?.silent) setLoading(true);
       setError(null);
       try {
@@ -275,6 +294,7 @@ export default function CsaApplicationPage() {
         ]);
         if (!appRes.ok) throw new Error("Failed to load application");
         const appData = (await appRes.json()) as ApplicationWorkspace;
+        if (seq !== loadSeq.current) return;
         setData(appData);
         setInterviewNotes(appData.application.initialInterviewNotes ?? "");
 
@@ -317,9 +337,10 @@ export default function CsaApplicationPage() {
           setDuplicationMatches(checksData.duplication?.matches ?? []);
         }
       } catch (err) {
+        if (seq !== loadSeq.current) return;
         setError(err instanceof Error ? err.message : "Failed to load");
       } finally {
-        if (!opts?.silent) setLoading(false);
+        if (seq === loadSeq.current && !opts?.silent) setLoading(false);
       }
     },
     [applicationId],
@@ -1248,6 +1269,7 @@ export default function CsaApplicationPage() {
         ) : null}
 
         <ComputationPanel
+          ref={computationPanelRef}
           applicationId={applicationId}
           loanTypeId={data.details?.loanTypeId ?? null}
           segment={data.application.segment}
@@ -1261,6 +1283,7 @@ export default function CsaApplicationPage() {
               ? null
               : INITIAL_INTERVIEW_COMPUTATION_ERROR
           }
+          paymentSchedule={data.application.paymentSchedule}
         />
 
         <Card>
@@ -1461,6 +1484,10 @@ export default function CsaApplicationPage() {
               }));
               setHoldReason(fakeRemark("hold"));
             },
+          },
+          {
+            label: "Fill Computation",
+            onClick: () => computationPanelRef.current?.fillComputation(),
           },
         ]}
       />

@@ -80,7 +80,15 @@ const HISTORY_PAGE_SIZE = 5;
 type StartSegment = "seafarer" | "sme" | "individual";
 type StartEntityType = "individual" | "corporate";
 type StartCollateralType = "none" | "car_refinancing" | "real_estate";
-type StartIndividualLoanType = "mpl" | "salary";
+type StartPaymentSchedule =
+  | "mpl"
+  | "salary"
+  | "monthly"
+  | "weekly"
+  | "bi_monthly"
+  | "quarterly"
+  | "two_monthly"
+  | "daily";
 
 function formatMoney(value: number) {
   return value.toLocaleString("en-PH", {
@@ -186,9 +194,12 @@ export default function BorrowerDashboardPage() {
     useState<StartEntityType>("individual");
   const [pickerCollateralType, setPickerCollateralType] =
     useState<StartCollateralType>("none");
-  const [pickerIndividualLoanType, setPickerIndividualLoanType] = useState<
-    StartIndividualLoanType | ""
-  >("");
+  /** SME or Individual — the loan's unified schedule/product choice,
+   * decided here at intake. Both segments have access to the full 8-value
+   * list (confirmed 2026-08-29 — see
+   * docs/payment-schedule-unification-plan.md). */
+  const [pickerPaymentSchedule, setPickerPaymentSchedule] =
+    useState<StartPaymentSchedule>("monthly");
   const [confirmDeleteDraft, setConfirmDeleteDraft] = useState(false);
   const [deleteDraftLoading, setDeleteDraftLoading] = useState(false);
   const [historySearch, setHistorySearch] = useState("");
@@ -267,7 +278,7 @@ export default function BorrowerDashboardPage() {
     segment: StartSegment;
     entityType?: StartEntityType;
     collateralType?: StartCollateralType;
-    individualLoanType?: StartIndividualLoanType;
+    paymentSchedule?: StartPaymentSchedule;
   }) {
     setStartAppLoading(true);
     setError(null);
@@ -317,12 +328,12 @@ export default function BorrowerDashboardPage() {
           : "individual",
       );
       setPickerCollateralType("none");
-      setPickerIndividualLoanType("");
+      setPickerPaymentSchedule("monthly");
     } else {
       setPickerSegment("seafarer");
       setPickerEntityType("individual");
       setPickerCollateralType("none");
-      setPickerIndividualLoanType("");
+      setPickerPaymentSchedule("monthly");
     }
     setShowSegmentPicker(true);
   }
@@ -330,16 +341,15 @@ export default function BorrowerDashboardPage() {
   function handlePickerSegmentChange(next: StartSegment) {
     setPickerSegment(next);
     if (next === "seafarer") setPickerCollateralType("none");
-    if (next !== "individual") setPickerIndividualLoanType("");
+    if (next !== "sme" && next !== "individual") setPickerPaymentSchedule("monthly");
   }
 
   function handlePickerCollateralTypeChange(next: StartCollateralType) {
     setPickerCollateralType(next);
-    if (next !== "none") setPickerIndividualLoanType("");
   }
 
-  const pickerIndividualLoanTypeEligible =
-    pickerSegment === "individual" && pickerCollateralType === "none";
+  const pickerPaymentScheduleEligible =
+    pickerSegment === "sme" || pickerSegment === "individual";
 
   function handleConfirmSegmentPicker() {
     void handleStartApplication(
@@ -348,12 +358,13 @@ export default function BorrowerDashboardPage() {
             segment: "sme",
             entityType: pickerEntityType,
             collateralType: pickerCollateralType,
+            paymentSchedule: pickerPaymentSchedule,
           }
         : {
             segment: pickerSegment,
             collateralType: pickerCollateralType,
-            individualLoanType: pickerIndividualLoanTypeEligible
-              ? pickerIndividualLoanType || undefined
+            paymentSchedule: pickerPaymentScheduleEligible
+              ? pickerPaymentSchedule
               : undefined,
           },
     );
@@ -1047,24 +1058,24 @@ export default function BorrowerDashboardPage() {
               </Select>
             </div>
           ) : null}
-          {pickerIndividualLoanTypeEligible ? (
+          {pickerPaymentScheduleEligible ? (
             <div>
-              <Label htmlFor="start-individual-loan-type" required>
-                Individual loan type
-              </Label>
+              <Label htmlFor="start-schedule-type">Loan schedule</Label>
               <Select
-                id="start-individual-loan-type"
-                value={pickerIndividualLoanType}
+                id="start-schedule-type"
+                value={pickerPaymentSchedule}
                 onChange={(e) =>
-                  setPickerIndividualLoanType(
-                    e.target.value as StartIndividualLoanType,
-                  )
+                  setPickerPaymentSchedule(e.target.value as StartPaymentSchedule)
                 }
-                required
               >
-                <option value="">Select loan type</option>
+                <option value="monthly">Regular (Monthly)</option>
                 <option value="mpl">MPL (Multi-Purpose Loan)</option>
-                <option value="salary">Salary</option>
+                <option value="salary">Salary (semi-monthly)</option>
+                <option value="weekly">Invoice Financing (Weekly)</option>
+                <option value="bi_monthly">Bi-monthly (every 15 days)</option>
+                <option value="quarterly">Quarterly</option>
+                <option value="two_monthly">Two-monthly</option>
+                <option value="daily">Daily</option>
               </Select>
             </div>
           ) : null}

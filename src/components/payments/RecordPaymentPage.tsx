@@ -25,6 +25,8 @@ type Account = {
   borrowerNo: string | null;
   borrowerId: string | null;
   loanAccountNo: string | null;
+  releaseDate?: string | null;
+  firstPaymentDate?: string | null;
   segment: "seafarer" | "sme" | "individual";
   outstandingBalance: number;
   accountStatus: string;
@@ -157,11 +159,26 @@ export function RecordPaymentPage({
         description={`${account.loanAccountNo ?? account.borrowerNo ?? "Loan account"} · Outstanding ₱${formatMoney(account.outstandingBalance)}`}
       />
 
-      <div className="mb-5 flex flex-wrap items-center gap-2">
+      <div className="mb-3 flex flex-wrap items-center gap-2">
         <Badge variant={account.segment === "sme" ? "navy" : account.segment === "individual" ? "warning" : "teal"} dot>
           {account.segment === "sme" ? "SME" : account.segment === "individual" ? "Individual" : "Seafarer"}
         </Badge>
         <Badge variant="neutral">{account.accountStatus}</Badge>
+      </div>
+
+      <div className="mb-5 flex flex-wrap gap-x-4 gap-y-1 text-sm text-ink-500">
+        <span>
+          Released{" "}
+          <b className="mono text-ink-800">
+            {account.releaseDate ? new Date(account.releaseDate).toLocaleDateString() : "—"}
+          </b>
+        </span>
+        <span>
+          First payment{" "}
+          <b className="mono text-ink-800">
+            {account.firstPaymentDate ? new Date(account.firstPaymentDate).toLocaleDateString() : "—"}
+          </b>
+        </span>
       </div>
 
       {error ? (

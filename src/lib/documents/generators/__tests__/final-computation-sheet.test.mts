@@ -72,8 +72,8 @@ test("buildDeductionRows: one row per deduction entry, no renegotiation", () => 
     false,
   );
   assert.deepEqual(rows, [
-    { label: "Other Loan (AN1)", original: "5,000.00", renegotiated: "" },
-    { label: "Other Loan (AN2)", original: "3,000.00", renegotiated: "" },
+    { label: "Offset (AN1)", original: "5,000.00", renegotiated: "" },
+    { label: "Offset (AN2)", original: "3,000.00", renegotiated: "" },
   ]);
 });
 
@@ -88,8 +88,8 @@ test("buildDeductionRows: pairs by label across original/renegotiated, blank whe
     true,
   );
   const byLabel = Object.fromEntries(rows.map((r) => [r.label, r]));
-  assert.equal(byLabel["Other Loan (AN1)"]!.original, "5,000.00");
-  assert.equal(byLabel["Other Loan (AN1)"]!.renegotiated, "5,000.00");
-  assert.equal(byLabel["Offset (AN2 · 1 mo)"]!.original, "0.00");
-  assert.equal(byLabel["Offset (AN2 · 1 mo)"]!.renegotiated, "2,000.00");
+  assert.equal(byLabel["Offset (AN1)"]!.original, "5,000.00");
+  assert.equal(byLabel["Offset (AN1)"]!.renegotiated, "5,000.00");
+  assert.equal(byLabel["Other Loan (AN2 · 1 mo)"]!.original, "0.00");
+  assert.equal(byLabel["Other Loan (AN2 · 1 mo)"]!.renegotiated, "2,000.00");
 });

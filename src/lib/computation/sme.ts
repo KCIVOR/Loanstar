@@ -12,7 +12,7 @@ export type SmeComputeInput = {
   /** Amount in Loan Desired mode (extraction §4). */
   loanDesired: number;
   terms: number;
-  /** Workbook default observed: 0 (unlike SF G1 which requires ≥ 1). */
+  /** Workbook default observed: 0. */
   addonMonths?: number;
   pfRate: number;
   interestRate: number;

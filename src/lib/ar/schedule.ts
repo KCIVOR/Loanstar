@@ -1,8 +1,8 @@
 import {
   advanceSemiMonthly,
   computeFirstPaymentDate,
-} from "@/lib/computation/release-date";
-import { halfUp } from "@/lib/computation/money";
+} from "../computation/release-date";
+import { halfUp } from "../computation/money";
 
 function formatDateLocal(d: Date): string {
   const mm = String(d.getMonth() + 1).padStart(2, "0");
@@ -14,6 +14,7 @@ export type AmortizationInstallment = {
   installmentNo: number;
   dueDate: string;
   amountDue: number;
+  lineType?: "standard" | "interest" | "principal";
 };
 
 export function generateAmortizationSchedule(input: {
@@ -44,8 +45,10 @@ export function generateAmortizationSchedule(input: {
    * computed by `computeSalaryFirstPaymentDate`) — the recompute-from-
    * releaseDate fallback above is not semi-monthly-aware and was never meant
    * to produce one. Every other
-   * cadence (the default) is completely unchanged by this parameter. */
-  paymentFrequency?: "monthly" | "semi_monthly";
+   * cadences (the default) are completely unchanged by this parameter.
+   */
+  paymentFrequency?: "monthly" | "semi_monthly" | "weekly" | "bi_monthly" | "quarterly" | "two_monthly" | "daily";
+  totalInterest?: number;
 }): AmortizationInstallment[] {
   const firstPayment = input.firstPaymentDate
     ? input.firstPaymentDate instanceof Date
@@ -58,6 +61,55 @@ export function generateAmortizationSchedule(input: {
         input.addonMonths,
         input.dueDay ?? 10,
       );
+
+  if (input.paymentFrequency === "weekly" || input.paymentFrequency === "daily") {
+    // Both are built directly by masterlist.ts's initializeArAccount, which
+    // branches before ever calling this function — weekly needs
+    // computeInvoiceLoan's escalating-rate engine, and daily is a single
+    // manually-dated payment, neither of which fits this function's
+    // "N installments spaced from firstPayment" shape. Throwing here (rather
+    // than silently falling through to the monthly branch below) turns a
+    // caller that reaches this by mistake into a loud failure instead of a
+    // wrong schedule.
+    throw new Error(
+      `generateAmortizationSchedule does not handle "${input.paymentFrequency}" — build this schedule directly instead (see initializeArAccount)`,
+    );
+  }
+
+  if (input.paymentFrequency === "quarterly") {
+    if (!input.totalLoan || !input.totalInterest) {
+      throw new Error("Quarterly loans require totalLoan and totalInterest");
+    }
+    return generateQuarterlySchedule({
+      terms: input.terms,
+      totalLoan: input.totalLoan,
+      totalInterest: input.totalInterest,
+      releaseDate: input.releaseDate,
+      dueDay: input.dueDay,
+    });
+  }
+
+  if (input.paymentFrequency === "two_monthly") {
+    if (!input.totalLoan || !input.totalInterest) {
+      throw new Error("Two-monthly loans require totalLoan and totalInterest");
+    }
+    return generateTwoMonthlySchedule({
+      terms: input.terms,
+      totalLoan: input.totalLoan,
+      totalInterest: input.totalInterest,
+      releaseDate: input.releaseDate,
+      dueDay: input.dueDay,
+    });
+  }
+
+  if (input.paymentFrequency === "bi_monthly") {
+    return generateBiMonthlySchedule({
+      terms: input.terms,
+      monthlyAmortization: input.monthlyAmortization,
+      releaseDate: input.releaseDate,
+      totalLoan: input.totalLoan,
+    });
+  }
 
   if (input.paymentFrequency === "semi_monthly") {
     const anchor = formatDateLocal(firstPayment);
@@ -134,4 +186,140 @@ export function calculatePenaltyAmount(
   penaltyRate: number,
 ): number {
   return halfUp(outstanding * penaltyRate);
+}
+
+/**
+ * Bi-monthly schedule — payment every 15 days (not twice-monthly on specific dates).
+ * Creates 2 installments per calendar month: terms × 2 total rows.
+ */
+export function generateBiMonthlySchedule(input: {
+  terms: number;
+  monthlyAmortization: number;
+  releaseDate: string | Date;
+  totalLoan?: number;
+}): AmortizationInstallment[] {
+  const release =
+    input.releaseDate instanceof Date ? input.releaseDate : new Date(input.releaseDate);
+  const count = input.terms * 2;
+  const half = halfUp(input.monthlyAmortization / 2);
+  const installments: AmortizationInstallment[] = [];
+
+  for (let i = 0; i < count; i += 1) {
+    const due = new Date(release);
+    due.setDate(due.getDate() + (i + 1) * 15);
+    
+    let amountDue = half;
+    if (i === count - 1 && input.totalLoan != null) {
+      const prior = halfUp(half * (count - 1));
+      const last = halfUp(input.totalLoan - prior);
+      if (last > 0) amountDue = last;
+    }
+    
+    installments.push({
+      installmentNo: i + 1,
+      dueDate: formatDateLocal(due),
+      amountDue,
+    });
+  }
+  
+  return installments;
+}
+
+/**
+ * Shared by generateQuarterlySchedule/generateTwoMonthlySchedule — both are
+ * "N interest-only payments then one final interest+principal payment"
+ * schedules, differing only in the number of months between payments.
+ * Dual-lines every payment (a due date has an "interest" row and a
+ * "principal" row) rather than only the final one, so every row a reader
+ * sees is unambiguously typed instead of mixing bare "installment" rows
+ * with occasional split ones.
+ */
+function generateInterestPrincipalSplitSchedule(input: {
+  terms: number;
+  totalLoan: number;
+  totalInterest: number;
+  releaseDate: string | Date;
+  dueDay?: number;
+  frequencyMonths: 2 | 3;
+}): AmortizationInstallment[] {
+  const release =
+    input.releaseDate instanceof Date ? input.releaseDate : new Date(input.releaseDate);
+  const dueDay = input.dueDay ?? 10;
+  const principal = input.totalLoan - input.totalInterest;
+  const numPayments = input.terms / input.frequencyMonths;
+
+  const paymentAmount = halfUp(input.totalLoan / numPayments);
+  const interestPerPayment = halfUp(input.totalInterest / numPayments);
+  const principalPerPayment = halfUp(paymentAmount - interestPerPayment);
+
+  const installments: AmortizationInstallment[] = [];
+  let installmentNo = 1;
+
+  for (let i = 1; i <= numPayments; i += 1) {
+    const monthOffset = i * input.frequencyMonths;
+    const dueDate = new Date(release);
+    dueDate.setMonth(dueDate.getMonth() + monthOffset);
+    dueDate.setDate(dueDay);
+
+    const dueDateStr = formatDateLocal(dueDate);
+
+    installments.push({
+      installmentNo: installmentNo++,
+      dueDate: dueDateStr,
+      amountDue: interestPerPayment,
+      lineType: "interest",
+    });
+
+    let principalAmount = principalPerPayment;
+    if (i === numPayments) {
+      const priorPrincipal = halfUp(principalPerPayment * (numPayments - 1));
+      principalAmount = halfUp(principal - priorPrincipal);
+    }
+
+    installments.push({
+      installmentNo: installmentNo++,
+      dueDate: dueDateStr,
+      amountDue: principalAmount,
+      lineType: "principal",
+    });
+  }
+
+  return installments;
+}
+
+/**
+ * Quarterly schedule — interest-only payments every 3 months, dual-line
+ * (interest + principal, split on the same due date) at every payment.
+ * `terms` must be divisible by 3 (e.g. 6, 9, 12 months) — a non-divisible
+ * term has no clean final quarter to land the principal on.
+ */
+export function generateQuarterlySchedule(input: {
+  terms: number;
+  totalLoan: number;
+  totalInterest: number;
+  releaseDate: string | Date;
+  dueDay?: number;
+}): AmortizationInstallment[] {
+  if (input.terms % 3 !== 0) {
+    throw new Error("Quarterly loans require terms divisible by 3 (e.g. 6, 9, or 12 months)");
+  }
+  return generateInterestPrincipalSplitSchedule({ ...input, frequencyMonths: 3 });
+}
+
+/**
+ * Two-monthly schedule — interest-only payments every 2 months, dual-line
+ * (interest + principal, split on the same due date) at every payment.
+ * `terms` must be divisible by 2 (e.g. 4, 6, 8, 10, 12 months).
+ */
+export function generateTwoMonthlySchedule(input: {
+  terms: number;
+  totalLoan: number;
+  totalInterest: number;
+  releaseDate: string | Date;
+  dueDay?: number;
+}): AmortizationInstallment[] {
+  if (input.terms % 2 !== 0) {
+    throw new Error("Two-monthly loans require terms divisible by 2 (e.g. 4, 6, 8, 10, or 12 months)");
+  }
+  return generateInterestPrincipalSplitSchedule({ ...input, frequencyMonths: 2 });
 }
