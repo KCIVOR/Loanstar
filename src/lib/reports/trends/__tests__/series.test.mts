@@ -102,6 +102,7 @@ describe("computeCollectionTrend", () => {
         dueDate: "2026-06-10",
         amountDue: 10_000,
         penaltyAmount: 500,
+        discountAmount: 0,
       },
     ],
     postings: [
@@ -117,6 +118,15 @@ describe("computeCollectionTrend", () => {
   it("adds penalty to the amount that fell due", () => {
     const group = computeCollectionTrend(base, WINDOWS);
     assert.deepEqual(valuesOf(group, "collections.due"), [0, 0, 0, 10_500, 0, 0]);
+  });
+
+  it("subtracts an active discount from the amount that fell due (fixed 2026-08-31)", () => {
+    const discounted = inputs({
+      schedules: [{ ...base.schedules[0]!, discountAmount: 2_000 }],
+      postings: base.postings,
+    });
+    const group = computeCollectionTrend(discounted, WINDOWS);
+    assert.deepEqual(valuesOf(group, "collections.due"), [0, 0, 0, 8_500, 0, 0]);
   });
 
   it("computes efficiency against what was billed that month", () => {

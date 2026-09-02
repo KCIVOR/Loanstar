@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
+import { netInstallmentDue } from "@/lib/computation/money";
 import { buildExecutiveSummary } from "@/lib/reports/aggregates";
 
 import { averageDays, bucketByDay, bucketByMonth, bucketByWeek, daysAgoIso } from "./buckets";
@@ -374,7 +375,7 @@ export async function buildCollectionWidget(
         .gte("payment_date", cutoffDate),
       supabase
         .from("amortization_schedules")
-        .select("due_date, amount_due")
+        .select("due_date, amount_due, discount_amount")
         .gte("due_date", cutoffDate),
       supabase.from("dcr").select("id", { count: "exact", head: true }).eq("status", "draft"),
       supabase.from("dcr").select("id", { count: "exact", head: true }).eq("status", "submitted"),
@@ -393,7 +394,10 @@ export async function buildCollectionWidget(
   const due = bucketByWeek(
     (dueRes.data ?? []).map((r) => ({
       at: r.due_date as string,
-      value: Number(r.amount_due),
+      value: netInstallmentDue({
+        amountDue: Number(r.amount_due),
+        discountAmount: r.discount_amount as number | null,
+      }),
     })),
     WEEKS,
   );

@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
+import { netInstallmentDue } from "@/lib/computation/money";
 import { computeDelta, priorPeriod } from "../period";
 import type { MetricDef, MetricValue, Period } from "./types";
 
@@ -194,12 +195,18 @@ async function sumDueInPeriod(
 ): Promise<number> {
   const { data, error } = await supabase
     .from("amortization_schedules")
-    .select("amount_due, penalty_amount, due_date")
+    .select("amount_due, penalty_amount, discount_amount, due_date")
     .gte("due_date", period.from)
     .lte("due_date", period.to);
   if (error) throw new Error(error.message);
   return (data ?? []).reduce(
-    (s, r) => s + Number(r.amount_due) + Number(r.penalty_amount ?? 0),
+    (s, r) =>
+      s +
+      netInstallmentDue({
+        amountDue: Number(r.amount_due),
+        discountAmount: r.discount_amount,
+        penaltyAmount: r.penalty_amount,
+      }),
     0,
   );
 }
@@ -249,7 +256,7 @@ async function sumProjectedInflow(
   const horizon = toIsoDate(addDays(new Date(), withinDays));
   const { data, error } = await supabase
     .from("amortization_schedules")
-    .select("amount_due, penalty_amount, amount_paid, due_date, status")
+    .select("amount_due, penalty_amount, discount_amount, amount_paid, due_date, status")
     .neq("status", "paid")
     .gte("due_date", today)
     .lte("due_date", horizon);
@@ -257,9 +264,12 @@ async function sumProjectedInflow(
   return (data ?? []).reduce(
     (s, r) =>
       s +
-      Number(r.amount_due) +
-      Number(r.penalty_amount ?? 0) -
-      Number(r.amount_paid ?? 0),
+      netInstallmentDue({
+        amountDue: Number(r.amount_due),
+        discountAmount: r.discount_amount,
+        penaltyAmount: r.penalty_amount,
+        amountPaid: r.amount_paid,
+      }),
     0,
   );
 }
@@ -318,7 +328,7 @@ export async function computeMoneyMetrics(
     sumDueInPeriod(supabase, prior),
     computeAvgDaysToCollect(supabase, period),
     computeAvgDaysToCollect(supabase, prior),
-    supabase.from("amortization_schedules").select("amount_due, penalty_amount"),
+    supabase.from("amortization_schedules").select("amount_due, penalty_amount, discount_amount"),
     supabase.from("masterlist").select("outstanding_balance"),
     sumAllTimeCollected(supabase),
     sumProjectedInflow(supabase, 30),
@@ -331,7 +341,13 @@ export async function computeMoneyMetrics(
   if (outstandingRows.error) throw new Error(outstandingRows.error.message);
 
   const receivable = (receivableRows.data ?? []).reduce(
-    (s, r) => s + Number(r.amount_due) + Number(r.penalty_amount ?? 0),
+    (s, r) =>
+      s +
+      netInstallmentDue({
+        amountDue: Number(r.amount_due),
+        discountAmount: r.discount_amount,
+        penaltyAmount: r.penalty_amount,
+      }),
     0,
   );
   const outstanding = (outstandingRows.data ?? []).reduce(

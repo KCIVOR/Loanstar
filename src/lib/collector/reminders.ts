@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
+import { netInstallmentDue } from "@/lib/computation/money";
 import { sendEmail } from "@/lib/email/send";
 import { shouldSendChannel } from "@/lib/notifications/should-send-channel";
 import { sendSms } from "@/lib/sms/send";
@@ -41,12 +42,14 @@ type AccountRow = {
         installment_no: number;
         due_date: string;
         amount_due: number;
+        discount_amount: number | null;
         status: string;
       }>
     | {
         installment_no: number;
         due_date: string;
         amount_due: number;
+        discount_amount: number | null;
         status: string;
       }
     | null;
@@ -137,7 +140,7 @@ export async function runPaymentDueReminders(
     .select(
       `
       id, loan_account_no, borrower_name, aging_bucket,
-      amortization_schedules ( installment_no, due_date, amount_due, status ),
+      amortization_schedules ( installment_no, due_date, amount_due, discount_amount, status ),
       borrowers ( email, mobile_phone, user_id )
     `,
     )
@@ -163,11 +166,20 @@ export async function runPaymentDueReminders(
       installmentNo: Number(s.installment_no),
       dueDate: s.due_date as string,
       amountDue: Number(s.amount_due),
+      discountAmount: Number(s.discount_amount ?? 0),
       status: s.status as string,
     }));
 
     const upcoming = pickUpcomingInstallment(schedules, todayStr, windowEnd);
     if (!upcoming) continue;
+
+    // Net of discount — a borrower being reminded about an upcoming payment
+    // should be told what they'll really owe, not the gross figure (fixed
+    // 2026-08-31, see docs/payment-flow-discount-audit-and-fix-plan.md).
+    const upcomingNetAmountDue = netInstallmentDue({
+      amountDue: upcoming.amountDue,
+      discountAmount: upcoming.discountAmount,
+    });
 
     const borrowerRaw = account.borrowers;
     const borrower = Array.isArray(borrowerRaw) ? borrowerRaw[0] : borrowerRaw;
@@ -206,7 +218,7 @@ export async function runPaymentDueReminders(
               borrower_name: account.borrower_name,
               loan_account_no: account.loan_account_no ?? "",
               due_date: upcoming.dueDate,
-              amount_due: upcoming.amountDue.toFixed(2),
+              amount_due: upcomingNetAmountDue.toFixed(2),
             },
           });
           await recordReminderLog(
@@ -256,7 +268,7 @@ export async function runPaymentDueReminders(
               borrowerName: account.borrower_name,
               loanAccountNo: account.loan_account_no ?? "",
               dueDate: upcoming.dueDate,
-              amountDue: upcoming.amountDue.toFixed(2),
+              amountDue: upcomingNetAmountDue.toFixed(2),
             }),
           });
           if (smsResult.status === "sent") {

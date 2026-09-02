@@ -20,6 +20,7 @@ import {
   buildAccountLedgerRows,
   checkNumbersByInstallmentNo,
   ledgerEntriesFromPostings,
+  mapScheduleRowForLedger,
   type LedgerPdcCheck,
 } from "@/lib/ledger/build-account-ledger-rows";
 import {
@@ -61,7 +62,11 @@ type ScheduleRow = {
   amount_due: number;
   status: string;
   penalty_amount: number;
+  discount_amount?: number;
   rolled_into_installment_no?: number | null;
+  moved_at?: string | null;
+  move_surcharge_amount?: number | null;
+  move_of_payment_batch_id?: string | null;
 };
 
 type PaymentRow = {
@@ -313,15 +318,12 @@ export function LoanActivePanel({
   const checkNoByInstallment = checkNumbersByInstallmentNo(pdcChecks);
   const ledgerRows = buildAccountLedgerRows({
     openingDebit: totalLoan > 0 ? totalLoan : scheduleTotal,
-    schedules: schedules.map((row) => ({
-      id: String(row.id),
-      dueDate: String(row.due_date),
-      target: Number(row.amount_due ?? 0),
-      penalty: Number(row.penalty_amount ?? 0),
-      installmentNo: Number(row.installment_no),
-      checkNo: checkNoByInstallment.get(Number(row.installment_no)) ?? null,
-      status: String(row.status ?? ""),
-    })),
+    schedules: schedules.map((row) =>
+      mapScheduleRowForLedger(
+        row,
+        checkNoByInstallment.get(Number(row.installment_no)) ?? null,
+      ),
+    ),
     payments: [
       ...ledgerEntriesFromPostings(postings),
       ...internalTransferCredits.map((row) => ({

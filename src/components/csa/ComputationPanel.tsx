@@ -10,7 +10,11 @@ import {
 } from "react";
 
 import { buildDeductionBreakdownRows } from "@/lib/computation/deduction-breakdown";
-import { buildDiscountUnits } from "@/lib/computation/discount-units";
+import {
+  buildDiscountUnits,
+  maxDiscountUnits,
+  type ScheduleType,
+} from "@/lib/computation/discount-units";
 import { fakeComputationInputs } from "@/lib/dev/fake-data";
 import { halfUp } from "@/lib/computation/money";
 import { computeOffsetDiscount } from "@/lib/computation/offset-discount";
@@ -137,6 +141,11 @@ type ComputationPanelProps = {
   /** Drives which rate-input UI renders — free-text rates for sme/individual,
    * the existing loan-type-driven flow for seafarer. */
   segment: "seafarer" | "sme" | "individual";
+  /** Drives the schedule picker's collateral lock — Auto/Real Estate loans
+   * can only use the Regular (Monthly) schedule, confirmed against the real
+   * Excel calculator and the paper application form (2026-08-30). Defaults
+   * to "none" for callers that don't pass it (Seafarer screens, tests). */
+  collateralType?: "none" | "car_refinancing" | "real_estate";
   editable: boolean;
   computation: Computation | null;
   /** Borrower's past sme/individual rates, most recent first — read-only
@@ -257,7 +266,14 @@ function buildComputationSteps(c: Computation) {
           const grossTotalInterest = halfUp(
             c.principal * c.interestRate * (c.terms + c.addonMonths),
           );
-          const interestPerInstallment = halfUp(grossTotalInterest / c.terms);
+          // Divide by the real discount-unit count, not raw `terms` — Salary/
+          // Bi-Monthly have terms*2 real units (one per payment, confirmed
+          // 2026-08-31), Quarterly/Two-monthly have fewer than `terms` (grouped
+          // by real due date). Using `terms` here understated the per-unit
+          // interest for those and overstated the resulting discount total.
+          const unitCount =
+            maxDiscountUnits(c.paymentFrequency as ScheduleType, c.terms) || c.terms;
+          const interestPerInstallment = halfUp(grossTotalInterest / unitCount);
           let discountTotal = 0;
           for (const { percent } of c.originationDiscounts) {
             discountTotal += halfUp((percent / 100) * interestPerInstallment);
@@ -483,6 +499,7 @@ export const ComputationPanel = forwardRef<ComputationPanelHandle, ComputationPa
       applicationId,
       loanTypeId,
       segment,
+      collateralType = "none",
       editable,
       computation,
       rateHistory = [],
@@ -498,6 +515,12 @@ export const ComputationPanel = forwardRef<ComputationPanelHandle, ComputationPa
   const isRateEditableSegment = segment === "sme" || segment === "individual";
   const isIndividual = segment === "individual";
   const isSeafarer = segment === "seafarer";
+  /** Auto/Real Estate collateral locks the schedule picker to Regular
+   * (Monthly) — confirmed against the real Excel calculator and the paper
+   * application form (2026-08-30): collateral and schedule are never
+   * independent choices there, a collateral loan is always monthly cadence. */
+  const paymentScheduleLocked =
+    collateralType === "car_refinancing" || collateralType === "real_estate";
   const [loanTypes, setLoanTypes] = useState<LoanType[]>([]);
   const [activeLoans, setActiveLoans] = useState<ActiveLoanOption[]>([]);
 
@@ -548,6 +571,11 @@ export const ComputationPanel = forwardRef<ComputationPanelHandle, ComputationPa
       : selectedScheduleType === "salary"
         ? "semi_monthly"
         : selectedScheduleType;
+  useEffect(() => {
+    if (paymentScheduleLocked && selectedScheduleType !== "monthly") {
+      setSelectedScheduleType("monthly");
+    }
+  }, [paymentScheduleLocked, selectedScheduleType]);
   // Daily Interest only — manual payment date (single payment, not a
   // recurring schedule). Required when the schedule type is "daily".
   const [paymentDate, setPaymentDate] = useState("");
@@ -894,15 +922,48 @@ export const ComputationPanel = forwardRef<ComputationPanelHandle, ComputationPa
       isRateEditableSegment
         ? (Number(interestRatePct) || 0) / 100
         : (computation?.interestRate ?? loanTypes.find((lt) => lt.id === selectedLoanTypeId)?.interestRate ?? 0);
-    // Pre-compute estimate (used until Compute is first clicked) — same
-    // gross-interest formula the SME/SF engines use. Once a real
-    // computation exists, its own totalInterest/totalLoan are used instead,
-    // so this estimate only matters for the very first preview.
+    // The stored computation's own totalInterest/totalLoan/firstPaymentDate
+    // were only ever computed for WHATEVER schedule was active at the time
+    // of the last Recalculate — if CSA has since switched the Loan Schedule
+    // dropdown without recalculating, those stored values describe a
+    // different schedule and must not be trusted here. Confirmed live
+    // 2026-08-31: switching to Salary right after a Monthly compute reused
+    // Monthly's stored firstPaymentDate (e.g. Sep 30) as if it were already
+    // a valid semi-monthly anchor, producing a real-looking but wrong
+    // sequence (Sep 30 → Oct 15 → Oct 31...) instead of the correct one
+    // anchored on the real Salary rule. "mpl"/"monthly" and each other
+    // schedule that maps to the same translated frequency are still
+    // considered a match — they're computationally identical, no need to
+    // invalidate between them.
+    const computationMatchesSelectedSchedule =
+      computation != null && computation.paymentFrequency === derivedPaymentFrequency;
+    // Pre-compute estimate (used until Compute is first clicked, or
+    // whenever the schedule above doesn't match) — same gross-interest
+    // formula the SME/SF engines use. Once a real computation exists for
+    // THIS schedule with NO discount applied yet, its own
+    // totalInterest/totalLoan are used instead. But once a discount HAS
+    // been applied, `computation.totalInterest` is already net of it —
+    // reusing it here would scale a *second* discount pass against an
+    // already-shrunk base (confirmed live 2026-08-31: re-opening the
+    // discount modal after Recalculate showed ₱1,375/payment instead of
+    // the real ₱1,650, and the summary badge showed −₱6,600 for a
+    // discount that had actually only reduced interest by ₱3,300). Always
+    // reconstruct the true gross figure so percentages keep scaling
+    // against the full, undiscounted interest portion, matching this
+    // function's own doc comment above.
+    const hasActiveDiscount = (computation?.originationDiscounts?.length ?? 0) > 0;
     const grossTotalInterest = halfUp(principal * rateDecimal * (termsN + addonN));
-    const totalInterest = computation?.totalInterest ?? grossTotalInterest;
-    const totalLoan = computation?.totalLoan ?? halfUp(principal + grossTotalInterest);
+    const totalInterest =
+      computationMatchesSelectedSchedule && computation!.totalInterest != null && !hasActiveDiscount
+        ? computation!.totalInterest
+        : grossTotalInterest;
+    const totalLoan =
+      computationMatchesSelectedSchedule && computation!.totalLoan != null && !hasActiveDiscount
+        ? computation!.totalLoan
+        : halfUp(principal + grossTotalInterest);
     const releaseDate = computation?.releaseDate ?? new Date().toISOString().slice(0, 10);
-    const firstPaymentDate: string | null = computation?.firstPaymentDate ?? null;
+    const firstPaymentDate: string | null =
+      computationMatchesSelectedSchedule ? (computation!.firstPaymentDate ?? null) : null;
 
     // This preview re-runs on every keystroke, including transient/invalid
     // in-progress states (e.g. the Terms field's "6" default is invalid for
@@ -1497,12 +1558,15 @@ export const ComputationPanel = forwardRef<ComputationPanelHandle, ComputationPa
           <Label htmlFor="scheduleType">
             Loan schedule
             <span className="text-ink-400 ml-1 text-xs">
-              (defaults to what was requested at intake — changing it here only affects this computation)
+              {paymentScheduleLocked
+                ? "(locked to Regular Monthly — Auto/Real Estate loans don't use other schedules)"
+                : "(defaults to what was requested at intake — changing it here only affects this computation)"}
             </span>
           </Label>
           <Select
             id="scheduleType"
             value={selectedScheduleType}
+            disabled={paymentScheduleLocked}
             onChange={(e) =>
               setSelectedScheduleType(
                 e.target.value as
@@ -1518,13 +1582,17 @@ export const ComputationPanel = forwardRef<ComputationPanelHandle, ComputationPa
             }
           >
             <option value="monthly">Regular (Monthly)</option>
-            <option value="mpl">MPL (Multi-Purpose Loan)</option>
-            <option value="salary">Salary (semi-monthly)</option>
-            <option value="weekly">Weekly (Invoice Financing)</option>
-            <option value="bi_monthly">Bi-monthly (every 15 days)</option>
-            <option value="quarterly">Quarterly</option>
-            <option value="two_monthly">Two-monthly</option>
-            <option value="daily">Daily</option>
+            {!paymentScheduleLocked ? (
+              <>
+                <option value="mpl">MPL (Multi-Purpose Loan)</option>
+                <option value="salary">Salary (semi-monthly)</option>
+                <option value="weekly">Weekly (Invoice Financing)</option>
+                <option value="bi_monthly">Bi-monthly (every 15 days)</option>
+                <option value="quarterly">Quarterly</option>
+                <option value="two_monthly">Two-monthly</option>
+                <option value="daily">Daily</option>
+              </>
+            ) : null}
           </Select>
           {selectedScheduleType === "weekly" && (
             <p className="text-xs text-ink-500 mt-1">
@@ -2437,7 +2505,12 @@ export const ComputationPanel = forwardRef<ComputationPanelHandle, ComputationPa
             const grossTotalInterest = halfUp(
               computation.principal * computation.interestRate * (computation.terms + computation.addonMonths)
             );
-            const interestPerInstallment = halfUp(grossTotalInterest / computation.terms);
+            // Divide by the real discount-unit count, not raw `terms` — see
+            // the matching fix in buildComputationSteps above.
+            const unitCount =
+              maxDiscountUnits(computation.paymentFrequency as ScheduleType, computation.terms) ||
+              computation.terms;
+            const interestPerInstallment = halfUp(grossTotalInterest / unitCount);
             let discountTotal = 0;
             for (const { percent } of discounts) {
               discountTotal += halfUp((percent / 100) * interestPerInstallment);

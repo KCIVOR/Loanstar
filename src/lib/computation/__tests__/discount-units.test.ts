@@ -2,15 +2,20 @@ import { describe, expect, it } from "vitest";
 import { buildDiscountUnits, maxDiscountUnits } from "../discount-units";
 
 describe("maxDiscountUnits", () => {
-  it("Monthly/Salary/Bi-Monthly: one unit per term", () => {
+  it("Monthly: one unit per term", () => {
     expect(maxDiscountUnits("monthly", 6)).toBe(6);
-    expect(maxDiscountUnits("semi_monthly", 6)).toBe(6);
-    expect(maxDiscountUnits("bi_monthly", 6)).toBe(6);
     expect(maxDiscountUnits(undefined, 6)).toBe(6);
   });
 
-  it("Invoice: one unit per term (per invoice month)", () => {
-    expect(maxDiscountUnits("weekly", 3)).toBe(3);
+  it("Salary/Bi-Monthly: one unit per real payment — terms * 2, not terms (per-payment discount, confirmed 2026-08-31)", () => {
+    expect(maxDiscountUnits("semi_monthly", 6)).toBe(12);
+    expect(maxDiscountUnits("bi_monthly", 6)).toBe(12);
+    expect(maxDiscountUnits("semi_monthly", 3)).toBe(6);
+  });
+
+  it("Invoice: one unit per real weekly payment — terms * 4, not terms (per-payment discount, confirmed 2026-08-31)", () => {
+    expect(maxDiscountUnits("weekly", 3)).toBe(12);
+    expect(maxDiscountUnits("weekly", 1)).toBe(4);
   });
 
   it("Quarterly: terms / 3, not terms", () => {
@@ -27,8 +32,8 @@ describe("maxDiscountUnits", () => {
   });
 });
 
-describe("buildDiscountUnits — Invoice (weekly)", () => {
-  it("groups the 12 weekly rows into 3 real months with the true escalating totals, excludes the final principal row", () => {
+describe("buildDiscountUnits — Invoice (weekly), one unit per real payment (confirmed 2026-08-31)", () => {
+  it("12 real weekly units for a 3-month loan, each its own real interest amount, excludes the final principal row", () => {
     const units = buildDiscountUnits({
       paymentFrequency: "weekly",
       terms: 3,
@@ -38,16 +43,32 @@ describe("buildDiscountUnits — Invoice (weekly)", () => {
       releaseDate: new Date("2026-09-01"),
     });
 
-    expect(units).toHaveLength(3);
-    expect(units[0].interestAmount).toBe(4_000); // 4 weeks × 1%
-    expect(units[0].installmentNos).toEqual([1, 2, 3, 4]);
-    expect(units[1].interestAmount).toBe(8_000); // 4 weeks × 2%
-    expect(units[1].installmentNos).toEqual([5, 6, 7, 8]);
-    expect(units[2].interestAmount).toBe(10_000); // 4 weeks × 2.5%
-    expect(units[2].installmentNos).toEqual([9, 10, 11, 12]);
-    // Installment 13 (the final principal row) never appears in any unit.
+    expect(units).toHaveLength(12); // 3 months x 4 real weekly payments
+    expect(units[0].label).toBe("Week 1");
+    expect(units[0].interestAmount).toBe(1_000); // 1% of 100,000
+    expect(units[0].installmentNos).toEqual([1]);
+    expect(units[3].interestAmount).toBe(1_000); // week 4, still 1%
+    expect(units[4].label).toBe("Week 5");
+    expect(units[4].interestAmount).toBe(2_000); // 2% of 100,000
+    expect(units[8].label).toBe("Week 9");
+    expect(units[8].interestAmount).toBe(2_500); // 2.5% of 100,000
+    expect(units[11].interestAmount).toBe(2_500); // week 12, still 2.5%
+    // Installment 13 (the final principal row) never appears as its own unit.
     const allInstallmentNos = units.flatMap((u) => u.installmentNos);
     expect(allInstallmentNos).not.toContain(13);
+    expect(allInstallmentNos).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]);
+  });
+
+  it("maxDiscountUnits and buildDiscountUnits agree on unit count", () => {
+    const units = buildDiscountUnits({
+      paymentFrequency: "weekly",
+      terms: 3,
+      principal: 100_000,
+      totalInterest: 22_000,
+      totalLoan: 122_000,
+      releaseDate: new Date("2026-09-01"),
+    });
+    expect(units).toHaveLength(maxDiscountUnits("weekly", 3));
   });
 });
 
@@ -87,8 +108,8 @@ describe("buildDiscountUnits — Quarterly / Two-monthly", () => {
   });
 });
 
-describe("buildDiscountUnits — Bi-Monthly / Salary", () => {
-  it("Bi-Monthly: terms units, each covering 2 real rows, flat interest split evenly", () => {
+describe("buildDiscountUnits — Bi-Monthly / Salary (one unit per real payment, confirmed 2026-08-31)", () => {
+  it("Bi-Monthly: terms * 2 units, one real row each, flat interest split evenly across all real payments", () => {
     const units = buildDiscountUnits({
       paymentFrequency: "bi_monthly",
       terms: 6,
@@ -98,13 +119,16 @@ describe("buildDiscountUnits — Bi-Monthly / Salary", () => {
       releaseDate: new Date("2026-09-01"),
     });
 
-    expect(units).toHaveLength(6);
-    expect(units[0].interestAmount).toBeCloseTo(20_000 / 6, 2);
-    expect(units[0].installmentNos).toEqual([1, 2]);
-    expect(units[5].installmentNos).toEqual([11, 12]);
+    expect(units).toHaveLength(12); // 6 months x 2 real payments
+    expect(units[0].label).toBe("Payment 1");
+    expect(units[0].dueDate).toBe("2026-09-16"); // release + 15
+    expect(units[0].interestAmount).toBeCloseTo(20_000 / 12, 2);
+    expect(units[0].installmentNos).toEqual([1]);
+    expect(units[11].dueDate).toBe("2027-02-28"); // release + 180
+    expect(units[11].installmentNos).toEqual([12]);
   });
 
-  it("Salary (semi_monthly): same 2-rows-per-unit pattern as Bi-Monthly", () => {
+  it("Salary (semi_monthly): terms * 2 units, one real row each, real alternating 15th/end-of-month dates", () => {
     const units = buildDiscountUnits({
       paymentFrequency: "semi_monthly",
       terms: 3,
@@ -115,9 +139,54 @@ describe("buildDiscountUnits — Bi-Monthly / Salary", () => {
       firstPaymentDate: "2026-09-15",
     });
 
-    expect(units).toHaveLength(3);
-    expect(units[0].installmentNos).toEqual([1, 2]);
-    expect(units[1].installmentNos).toEqual([3, 4]);
+    expect(units).toHaveLength(6); // 3 months x 2 real payments
+    expect(units[0].label).toBe("Payment 1");
+    expect(units[0].dueDate).toBe("2026-09-15");
+    expect(units[1].dueDate).toBe("2026-09-30");
+    expect(units[2].dueDate).toBe("2026-10-15");
+    expect(units[3].dueDate).toBe("2026-10-31");
+    expect(units[4].dueDate).toBe("2026-11-15");
+    expect(units[5].dueDate).toBe("2026-11-30");
+    for (const unit of units) {
+      expect(unit.interestAmount).toBeCloseTo(6_000 / 6, 2);
+      expect(unit.installmentNos).toHaveLength(1);
+    }
+  });
+
+  it("Salary: returns no units when firstPaymentDate isn't available yet (no anchor to derive real dates from)", () => {
+    const units = buildDiscountUnits({
+      paymentFrequency: "semi_monthly",
+      terms: 3,
+      principal: 60_000,
+      totalInterest: 6_000,
+      totalLoan: 66_000,
+      releaseDate: new Date("2026-09-01"),
+    });
+
+    expect(units).toHaveLength(0);
+  });
+
+  it("maxDiscountUnits and buildDiscountUnits agree on unit count", () => {
+    const biMonthlyUnits = buildDiscountUnits({
+      paymentFrequency: "bi_monthly",
+      terms: 6,
+      principal: 100_000,
+      totalInterest: 20_000,
+      totalLoan: 120_000,
+      releaseDate: new Date("2026-09-01"),
+    });
+    expect(biMonthlyUnits).toHaveLength(maxDiscountUnits("bi_monthly", 6));
+
+    const salaryUnits = buildDiscountUnits({
+      paymentFrequency: "semi_monthly",
+      terms: 3,
+      principal: 60_000,
+      totalInterest: 6_000,
+      totalLoan: 66_000,
+      releaseDate: new Date("2026-09-01"),
+      firstPaymentDate: "2026-09-15",
+    });
+    expect(salaryUnits).toHaveLength(maxDiscountUnits("semi_monthly", 3));
   });
 });
 
@@ -136,6 +205,20 @@ describe("buildDiscountUnits — Monthly (default) and Daily", () => {
     expect(units).toHaveLength(6);
     expect(units[0].installmentNos).toEqual([1]);
     expect(units[0].interestAmount).toBeCloseTo(19_800 / 6, 2);
+  });
+
+  it("Monthly: clamps to Feb 28 instead of overflowing to March (month-overflow bug fix, 2026-08-30)", () => {
+    const units = buildDiscountUnits({
+      paymentFrequency: "monthly",
+      terms: 6,
+      principal: 110_000,
+      totalInterest: 19_800,
+      totalLoan: 129_800,
+      releaseDate: new Date("2026-08-30"),
+      firstPaymentDate: "2026-09-30",
+    });
+
+    expect(units[5].dueDate).toBe("2027-02-28"); // not 2027-03-02
   });
 
   it("Daily: no units at all — a single already-fixed payment has nothing to discount", () => {

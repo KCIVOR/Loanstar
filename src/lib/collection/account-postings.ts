@@ -13,7 +13,7 @@ export async function fetchAccountPostings(
   const { data } = await admin
     .from("postings")
     .select(
-      "id, amortization_schedule_id, amount, payments ( payment_date, reference_no, channel, status )",
+      "id, amortization_schedule_id, amount, payments ( payment_date, reference_no, channel, status, move_of_payment_batch_id )",
     )
     .eq("masterlist_id", masterlistId)
     .order("posted_at", { ascending: true });

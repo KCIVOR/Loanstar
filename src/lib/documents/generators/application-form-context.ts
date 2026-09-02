@@ -62,6 +62,10 @@ export type BuildApplicationFormContextInput = {
   applicationCreatedAt?: string | null;
   profile: BorrowerProfile;
   computation?: ApplicationFormComputationSlice;
+  /** Co-Borrower feature: from `loan_applications.co_borrowers`. Empty/absent
+   * on the vast majority of applications, which then render exactly as before
+   * (blank name, `hasCoBorrower` false). */
+  coBorrowers?: Array<{ fullName: string; address: string }>;
 };
 
 function money(value: number | null | undefined): string {
@@ -150,7 +154,17 @@ export function buildApplicationFormContext(
     applicationNo: str(input.applicationNo),
     applicationDate: formatDate(input.applicationCreatedAt ?? null),
     borrowerName: [borrower.firstName, borrower.lastName].filter(Boolean).join(" "),
-    coBorrowerName: "",
+    coBorrowerName: (input.coBorrowers ?? [])
+      .map((c) => str(c.fullName))
+      .filter(Boolean)
+      .join("; "),
+    coBorrowerAddress: (input.coBorrowers ?? [])
+      .map((c) => str(c.address))
+      .filter(Boolean)
+      .join("; "),
+    hasCoBorrower: (input.coBorrowers ?? []).some(
+      (c) => str(c.fullName) && str(c.address),
+    ),
     borrowerNo: borrower.borrowerNo,
     address: joinAddress(borrower.presentAddress),
     loanType: computation?.loanTypeName ?? "",

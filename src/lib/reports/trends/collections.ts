@@ -25,7 +25,12 @@ export function computeCollectionTrend(
     let dueInMonth = 0;
     for (const schedule of inputs.schedules) {
       if (inWindow(schedule.dueDate, window)) {
-        dueInMonth += schedule.amountDue + schedule.penaltyAmount;
+        // Net of discount — what's really billed, not the gross figure
+        // (fixed 2026-08-31, see docs/payment-flow-discount-audit-and-fix-plan.md).
+        dueInMonth += Math.max(
+          0,
+          schedule.amountDue - schedule.discountAmount + schedule.penaltyAmount,
+        );
       }
     }
 

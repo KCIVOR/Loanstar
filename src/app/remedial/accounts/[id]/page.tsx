@@ -67,6 +67,10 @@ type ScheduleRow = {
   penaltyAmount: number;
   status: string;
   paidAt: string | null;
+  movedAt?: string | null;
+  moveSurchargeAmount?: number | null;
+  moveOfPaymentBatchId?: string | null;
+  deferredFromMoveOfPaymentBatchId?: string | null;
 };
 
 type PaymentRow = {

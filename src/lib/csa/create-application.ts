@@ -2,6 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { z } from "zod";
 
 import { writeAuditEvent } from "@/lib/audit/writer";
+import { validateCollateralPaymentSchedule } from "@/lib/csa/computation";
 import { ensureDocumentSlots } from "@/lib/documents/checklist";
 import {
   isOriginationStatus,
@@ -59,7 +60,16 @@ export const createApplicationSchema = z
   .refine((data) => data.segment !== "seafarer" || data.collateralType === "none", {
     message: "Seafarer applications cannot carry collateral",
     path: ["collateralType"],
-  });
+  })
+  .refine(
+    (data) =>
+      validateCollateralPaymentSchedule(data.collateralType, data.paymentSchedule) ===
+      null,
+    {
+      message: "Auto and Real Estate loans can only use the Regular (Monthly) schedule",
+      path: ["paymentSchedule"],
+    },
+  );
 
 export type CreateApplicationInput = z.infer<typeof createApplicationSchema>;
 

@@ -46,10 +46,10 @@ describe("Twilio token masking (Phase 12)", () => {
 
 describe("reminder due-window scan (Phase 12)", () => {
   const rows: ReminderScheduleRow[] = [
-    { installmentNo: 1, dueDate: "2026-07-10", amountDue: 1000, status: "paid" },
-    { installmentNo: 2, dueDate: "2026-07-18", amountDue: 1000, status: "due" },
-    { installmentNo: 3, dueDate: "2026-07-25", amountDue: 1000, status: "due" },
-    { installmentNo: 4, dueDate: "2026-08-01", amountDue: 1000, status: "due" },
+    { installmentNo: 1, dueDate: "2026-07-10", amountDue: 1000, discountAmount: 0, status: "paid" },
+    { installmentNo: 2, dueDate: "2026-07-18", amountDue: 1000, discountAmount: 0, status: "due" },
+    { installmentNo: 3, dueDate: "2026-07-25", amountDue: 1000, discountAmount: 0, status: "due" },
+    { installmentNo: 4, dueDate: "2026-08-01", amountDue: 1000, discountAmount: 0, status: "due" },
   ];
 
   it("picks earliest unpaid non-rolled installment within 7-day window", () => {
@@ -58,15 +58,16 @@ describe("reminder due-window scan (Phase 12)", () => {
       installmentNo: 2,
       dueDate: "2026-07-18",
       amountDue: 1000,
+      discountAmount: 0,
       status: "due",
     });
   });
 
   it("skips paid and rolled", () => {
     const mixed: ReminderScheduleRow[] = [
-      { installmentNo: 1, dueDate: "2026-07-18", amountDue: 1, status: "paid" },
-      { installmentNo: 2, dueDate: "2026-07-19", amountDue: 1, status: "rolled" },
-      { installmentNo: 3, dueDate: "2026-07-20", amountDue: 1, status: "due" },
+      { installmentNo: 1, dueDate: "2026-07-18", amountDue: 1, discountAmount: 0, status: "paid" },
+      { installmentNo: 2, dueDate: "2026-07-19", amountDue: 1, discountAmount: 0, status: "rolled" },
+      { installmentNo: 3, dueDate: "2026-07-20", amountDue: 1, discountAmount: 0, status: "due" },
     ];
     const picked = pickUpcomingInstallment(mixed, "2026-07-17", "2026-07-24");
     assert.equal(picked?.installmentNo, 3);
@@ -77,5 +78,13 @@ describe("reminder due-window scan (Phase 12)", () => {
       pickUpcomingInstallment(rows, "2026-08-10", "2026-08-17"),
       null,
     );
+  });
+
+  it("carries discountAmount through on the picked installment, so the reminder text can be net (fixed 2026-08-31)", () => {
+    const discounted: ReminderScheduleRow[] = [
+      { installmentNo: 1, dueDate: "2026-07-18", amountDue: 1080, discountAmount: 1080, status: "due" },
+    ];
+    const picked = pickUpcomingInstallment(discounted, "2026-07-17", "2026-07-24");
+    assert.equal(picked?.discountAmount, 1080);
   });
 });

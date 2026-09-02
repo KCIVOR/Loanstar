@@ -113,7 +113,13 @@ export function computeDelinquencyTrend(
         const dueAt = parseDate(schedule.dueDate);
         if (!dueAt || dueAt >= window.end) break;
 
-        const owed = schedule.amountDue + schedule.penaltyAmount;
+        // Net of discount — an unpaid, still-discounted installment isn't
+        // actually delinquent for the waived portion (fixed 2026-08-31, see
+        // docs/payment-flow-discount-audit-and-fix-plan.md).
+        const owed = Math.max(
+          0,
+          schedule.amountDue - schedule.discountAmount + schedule.penaltyAmount,
+        );
         let shortfall = owed - (cursor.paidBySchedule.get(schedule.id) ?? 0);
         if (shortfall > 0 && pool > 0) {
           const applied = Math.min(pool, shortfall);

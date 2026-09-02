@@ -12,7 +12,19 @@ export type DeskLedgerSchedule = {
   dueDate: string;
   amountDue: number;
   penaltyAmount: number;
+  /** Origination or early-settlement discount on this installment, if any. */
+  discountAmount?: number;
   status: string;
+  /** Move of Payment (see
+   * docs/revision-plans/feature-move-of-payment-implementation-plan.md) —
+   * without these, a moved installment renders as a plain pending row
+   * instead of collapsing into the one-line "moved" summary row. */
+  movedAt?: string | null;
+  moveSurchargeAmount?: number | null;
+  moveOfPaymentBatchId?: string | null;
+  /** Fixes Plan Phase 4b — set on a Move of Payment extension row; used to
+   * flag "replacement check needed" until one is recorded. */
+  deferredFromMoveOfPaymentBatchId?: string | null;
 };
 
 export type DeskLedgerPosting = Parameters<
@@ -50,9 +62,15 @@ export function buildDeskLedgerRows({
       dueDate: row.dueDate,
       target: Number(row.amountDue ?? 0),
       penalty: Number(row.penaltyAmount ?? 0),
+      discount: Number(row.discountAmount ?? 0),
       installmentNo: row.installmentNo,
       checkNo: checkNoByInstallment.get(row.installmentNo) ?? null,
       status: row.status,
+      movedAt: row.movedAt ?? null,
+      moveSurchargeAmount: row.moveSurchargeAmount ?? null,
+      moveOfPaymentBatchId: row.moveOfPaymentBatchId ?? null,
+      deferredFromMoveOfPaymentBatchId:
+        row.deferredFromMoveOfPaymentBatchId ?? null,
     })),
     payments: ledgerEntriesFromPostings(postings),
   });

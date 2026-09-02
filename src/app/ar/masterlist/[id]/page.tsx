@@ -31,6 +31,7 @@ import {
   buildAccountLedgerRows,
   checkNumbersByInstallmentNo,
   ledgerEntriesFromPostings,
+  mapScheduleRowForLedger,
   type LedgerPaymentEntry,
   type LedgerPdcCheck,
 } from "@/lib/ledger/build-account-ledger-rows";
@@ -67,6 +68,9 @@ type ScheduleRow = {
   discount_amount?: number;
   status: string;
   rolled_into_installment_no?: number | null;
+  moved_at?: string | null;
+  move_surcharge_amount?: number | null;
+  move_of_payment_batch_id?: string | null;
 };
 
 type WriteOffTarget =
@@ -555,16 +559,12 @@ export default function ArMasterlistDetailPage() {
   const checkNoByInstallment = checkNumbersByInstallmentNo(pdcChecks);
   const ledgerRows = buildAccountLedgerRows({
     openingDebit,
-    schedules: schedules.map((row) => ({
-      id: String(row.id),
-      dueDate: String(row.due_date),
-      target: Number(row.amount_due ?? 0),
-      penalty: Number(row.penalty_amount ?? 0),
-      discount: Number(row.discount_amount ?? 0),
-      installmentNo: Number(row.installment_no),
-      checkNo: checkNoByInstallment.get(Number(row.installment_no)) ?? null,
-      status: String(row.status ?? ""),
-    })),
+    schedules: schedules.map((row) =>
+      mapScheduleRowForLedger(
+        row,
+        checkNoByInstallment.get(Number(row.installment_no)) ?? null,
+      ),
+    ),
     payments: [
       ...ledgerEntriesFromPostings(postings),
       ...writeOffEntries,
@@ -800,7 +800,12 @@ export default function ArMasterlistDetailPage() {
           </div>
           <div>
             <span className="text-navy-200">Terms </span>
-            <span className="mono font-semibold">{terms} mo</span>
+            {/* Live row count, not the frozen origination `terms` — so a
+                Move of Payment that appended a final installment (Addendum 2
+                Gap 1) is reflected here, matching the "Installments paid X/Y"
+                denominator above. Falls back to `terms` when there are no
+                tracked rows. */}
+            <span className="mono font-semibold">{trackedCount || terms} mo</span>
           </div>
           {netReleased > 0 ? (
             <div>
@@ -811,6 +816,18 @@ export default function ArMasterlistDetailPage() {
             </div>
           ) : null}
         </div>
+        {/* Move of Payment (Phase 7, see
+            docs/revision-plans/feature-move-of-payment-implementation-plan.md)
+            — read-only surfacing of masterlist.move_of_payment_used_at,
+            already written by applyMoveOfPayment (Phase 2). No new logic
+            here, just display. */}
+        {record.move_of_payment_used_at ? (
+          <p className="mt-3 text-xs text-navy-200">
+            Move of Payment already used on{" "}
+            {formatDate(record.move_of_payment_used_at as string)}. This
+            account cannot use it again.
+          </p>
+        ) : null}
         {!isPaidOff ? (
           <div className="mt-4">
             <Button

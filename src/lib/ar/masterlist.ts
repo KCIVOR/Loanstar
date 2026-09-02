@@ -10,7 +10,7 @@ import {
 } from "@/lib/ar/paid-off";
 import { generateAmortizationSchedule } from "@/lib/ar/schedule";
 import type { AmortizationInstallment } from "@/lib/ar/schedule";
-import { halfUp } from "@/lib/computation/money";
+import { halfUp, netInstallmentDue } from "@/lib/computation/money";
 import { computeInvoiceLoan } from "@/lib/computation/invoice";
 import type { InvoiceComputeResult } from "@/lib/computation/invoice";
 import { buildDiscountUnits } from "@/lib/computation/discount-units";
@@ -75,6 +75,36 @@ export function resolveMasterlistEmploymentFields(input: {
   return {
     manningAgency: (input.manningAgencyName ?? "").trim() || null,
     vesselName: (input.vesselName ?? "").trim() || null,
+  };
+}
+
+/**
+ * A newly-created installment row's initial status. A row whose net due is
+ * already ≤0 the moment the origination discount is fixed at release (a
+ * 100%-discounted installment) is born already settled — no cash will ever
+ * be posted against it, and no rounding write-off applies (both of those
+ * are the only other two places a row ever becomes "paid"), so leaving it
+ * "pending" means it never becomes "paid" and later matches the
+ * discount-reversion rule's `status <> 'paid'` filter, resurrecting the
+ * waived amount once its due date arrives (F1/F3, see
+ * docs/ledger-balance-consistency-fix-implementation-plan.md Phase 2). A
+ * row's net due can only ever reach ≤0 this way (fixed at creation) or via
+ * cash posted later (handled separately by `postSingleDcrItem`) — there is
+ * no third path, so this only needs to run once, at creation.
+ */
+export function initialScheduleRowStatus(input: {
+  amountDue: number;
+  discountAmount: number;
+  releaseDate: string;
+}): { status: "paid" | "pending"; paidAt: string | null } {
+  const netDue = netInstallmentDue({
+    amountDue: input.amountDue,
+    discountAmount: input.discountAmount,
+  });
+  const settledByDiscount = netDue <= 0;
+  return {
+    status: settledByDiscount ? "paid" : "pending",
+    paidAt: settledByDiscount ? input.releaseDate : null,
   };
 }
 
@@ -197,6 +227,20 @@ export async function initializeArAccount(
     throw new Error(mlError?.message ?? "Failed to create masterlist record");
   }
 
+  // Gross (pre-discount) basis for building the real schedule — using the
+  // NET totalLoan/totalInterest/monthlyAmortization here (as this used to)
+  // silently diluted the discount evenly across every installment via the
+  // blended payment amount, instead of concentrating it on the specific
+  // installments CSA selected: an undiscounted row would show a payment
+  // already-reduced by 1/terms of the WHOLE discount, on top of which the
+  // selected rows' discount_amount got subtracted a second time. Principal
+  // is never discounted, so gross total loan is just principal + gross
+  // interest (confirmed 2026-08-31 on AN300434 — see
+  // docs/discount-basis-mismatch-audit-and-fix-plan.md).
+  const grossTotalInterest = computation.grossTotalInterest;
+  const grossTotalLoan = halfUp(computation.principal + grossTotalInterest);
+  const grossMonthlyAmortization = halfUp(grossTotalLoan / computation.terms);
+
   // Invoice Financing (weekly) uses a different computation engine — it has
   // weekly interest-only payments plus one final principal payment, not the
   // standard principal+interest split. Branch before generateAmortizationSchedule.
@@ -213,7 +257,8 @@ export async function initializeArAccount(
         ? // Daily Interest is a single manually-dated payment — persistComputation
           // already stored the CSA-entered payment date as firstPaymentDate and
           // the principal+interest total as totalLoan, so there's nothing left
-          // to compute here, just one row.
+          // to compute here, just one row. Daily has zero discount units
+          // (maxDiscountUnits), so gross vs net is moot here.
           [
             {
               installmentNo: 1,
@@ -223,12 +268,12 @@ export async function initializeArAccount(
           ]
         : generateAmortizationSchedule({
           terms: computation.terms,
-          monthlyAmortization: computation.monthlyAmortization,
+          monthlyAmortization: grossMonthlyAmortization,
           releaseDate,
           addonMonths: computation.addonMonths,
           dueDay: computation.dueDay ?? 10,
-          totalLoan: computation.totalLoan,
-          totalInterest: computation.totalInterest,
+          totalLoan: grossTotalLoan,
+          totalInterest: grossTotalInterest,
           // Reuse the already-computed, segment-correct date instead of letting
           // generateAmortizationSchedule recompute it with the Seafarer-only rule.
           firstPaymentDate: computation.firstPaymentDate,
@@ -236,22 +281,24 @@ export async function initializeArAccount(
         });
 
   // Origination discounts (see docs/revision-plans/feature-new-loan-origination-discount.md)
-  // target a real, frequency-aware discount unit (Month/Quarter/Payment N —
-  // see discount-units.ts), not raw schedule rows directly. A unit's real
-  // interest amount, and which raw installment_no rows it covers, come from
-  // the exact same generators used to build `schedule` above — a flat
-  // average was wrong for Invoice's escalating rate and for Quarterly/
-  // Two-monthly's interest-only structure (fixed 2026-08-28). Monthly/
-  // Salary/Bi-Monthly split a unit's interest evenly across however many raw
-  // rows it covers (1 for Monthly, 2 for Salary/Bi-Monthly) — Invoice's
-  // 4-weeks-per-month split works the same way, since each week within one
-  // Invoice month already carries an equal share.
+  // target a real, frequency-aware discount unit (Month/Week/Quarter/
+  // Payment N — see discount-units.ts), not raw schedule rows directly. A
+  // unit's real interest amount, and which raw installment_no rows it
+  // covers, come from the exact same generators used to build `schedule`
+  // above — a flat average was wrong for Invoice's escalating rate and for
+  // Quarterly/Two-monthly's interest-only structure (fixed 2026-08-28).
+  // Every frequency's unit covers exactly 1 real row now (confirmed
+  // 2026-08-31: CSA discounts a specific payment, never a bundle of several
+  // — Salary/Bi-Monthly used to bundle 2 real payments per unit and Invoice
+  // used to bundle 4, neither does anymore). Same gross basis as `schedule`
+  // above, so amount_due and discount_amount are computed from the same
+  // baseline and never double-discount.
   const discountUnits = buildDiscountUnits({
     paymentFrequency: computation.paymentFrequency,
     terms: computation.terms,
     principal: computation.principal,
-    totalInterest: computation.totalInterest,
-    totalLoan: computation.totalLoan,
+    totalInterest: grossTotalInterest,
+    totalLoan: grossTotalLoan,
     releaseDate,
     firstPaymentDate: computation.firstPaymentDate,
     dueDay: computation.dueDay ?? 10,
@@ -276,14 +323,21 @@ export async function initializeArAccount(
       const interestPerRow = interestPerRowByInstallmentNo.get(row.installmentNo) ?? 0;
       const discountAmount =
         percent != null ? halfUp((percent / 100) * interestPerRow) : 0;
+      const initialStatus = initialScheduleRowStatus({
+        amountDue: row.amountDue,
+        discountAmount,
+        releaseDate,
+      });
       return {
         masterlist_id: masterlist.id,
         installment_no: row.installmentNo,
         due_date: row.dueDate,
         amount_due: row.amountDue,
         discount_amount: discountAmount,
+        amount_paid: 0,
         line_type: row.lineType ?? "standard",
-        status: "pending",
+        status: initialStatus.status,
+        paid_at: initialStatus.paidAt,
       };
     }),
   );

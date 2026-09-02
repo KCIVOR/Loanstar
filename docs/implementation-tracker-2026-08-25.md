@@ -71,20 +71,35 @@ Every item below carries an **Audit** line — the concrete evidence (file:line,
 - **Known pre-existing gap, out of scope for this fix:** the *last* installment in a schedule never compounds — compounding is delivered by the 30-day rollover folding into the *next* installment, but the final installment has no "next," so it accrues once and then never grows again no matter how long it stays unpaid.
 - **Status: DONE — fixed, live-verified, and all known corrupted data repaired.**
 
-### [ ] 10. Invoice Financing incorrectly allows "Add-on Month" — **BLOCKED, not actually actionable yet**
+### [~] 10. Invoice Financing incorrectly allows "Add-on Month" — **mostly moot now, minor UI cleanup left**
 - **Issue as written:** Add-on Month is selectable for Invoice Financing loans, which shouldn't have it.
-- **Audit:** "Invoice Financing" does not exist anywhere — zero matches in `src/` (grepped case-insensitive), and zero rows in `loan_types` (`select * from loan_types where name ilike '%invoice%'` → empty). There is no loan type to gate the Add-on Month field against.
-- **Status: Cannot be fixed as written — Invoice Financing isn't a selectable loan type in this system at all.** This needs to be reclassified as part of building an Invoice Financing loan type (if that's still wanted), not a standalone fix.
+- **Original audit (2026-08-26):** "Invoice Financing" did not exist — no loan type, no code.
+- **Re-audit (2026-09-01):** Invoice Financing now exists, delivered as the `weekly` payment frequency (migration `20260828130000_add_weekly_payment_frequency.sql`, plus [invoice.ts](../src/lib/computation/invoice.ts) — weekly interest-only, 1–3 month terms, principal due one week after the last interest payment). It is selectable in [ComputationPanel.tsx:1589](../src/components/csa/ComputationPanel.tsx:1589) as `Weekly (Invoice Financing)`.
+  - **Functionally already safe:** the weekly path routes through `computeInvoiceLoan`, which does not take `addonMonths` at all ([computation.ts:239-245](../src/lib/csa/computation.ts:239)) — any add-on value entered is silently ignored for Invoice loans, so it can't corrupt the schedule.
+  - **Remaining gap (cosmetic):** the "Addon months" input at [ComputationPanel.tsx:1669-1686](../src/components/csa/ComputationPanel.tsx:1669) is still rendered (and `required`) for every schedule type including `weekly` — it should be hidden/disabled when `selectedScheduleType === "weekly"`, the same way the Seafarer-only "Due date" picker is conditionally rendered.
+- **Status: IN PROGRESS — no longer blocked; the underlying bug (add-on affecting Invoice math) can't happen, only the field's visibility for the weekly type still needs a small conditional.
 
-### [ ] 11. Discounts can currently be applied to overdue/due amounts — **DUPLICATE of Feature #1, not a separate item**
-- **Audit:** Grepped the entire `src/` tree for `discount` (case-insensitive) — **zero matches**, anywhere. There is no discount feature at all to add a restriction to. This item only makes sense as a requirement *inside* Feature #1's build (below) — the transcript's discount discussion explicitly frames it as one implicit rule of the same feature, not documented as a separate rule in the meeting minutes ("only future, not-yet-due months qualify" per the meeting-minutes doc's item 4, second bullet — but not stated in those exact words in the transcript excerpt reviewed).
-- **Recommendation:** Remove as a standalone tracker item; fold into Feature #1's acceptance criteria.
+### [x] 11. Discounts can currently be applied to overdue/due amounts — **RESOLVED as part of Feature #1**
+- **Original audit (2026-08-26):** No discount feature existed at all — this only made sense as a rule *inside* Feature #1's build.
+- **Re-audit (2026-09-01):** Feature #1 (early-settlement discount) is now built, and the due-date cutoff is enforced mechanically, not left to staff judgment — only not-yet-due installments are ever offered as discount targets. Backend: [offset-discount.ts](../src/lib/computation/offset-discount.ts), [discount-units.ts](../src/lib/computation/discount-units.ts); the modal in [ComputationPanel.tsx](../src/components/csa/ComputationPanel.tsx) excludes due/passed installments; regression test [discount-never-negative.test.mts](../src/lib/csa/__tests__/discount-never-negative.test.mts).
+- **Status: DONE — the "no discount on due/overdue amounts" rule is enforced by Feature #1's implementation.**
 
 ---
 
 ## 🆕 Features to Build (Not Yet in the System)
 
-### [ ] 1. Early-settlement discount calculator
+### [x] 1. Early-settlement discount calculator — **BUILT (combined plan, Phases 0–9 + 5b)**
+- **Re-audit (2026-09-01):** Built together with Feature #4 (new-loan origination discount) under [feature-loan-discounts-implementation-plan.md](revision-plans/feature-loan-discounts-implementation-plan.md) (note: that plan's header still reads "Plan only" — stale; the body carries per-phase "corrected during validation" notes and a Phase 5b added after the Phase 9 walkthrough).
+  - **Schema:** `amortization_schedules.discount_amount`, `computations.origination_discounts` — migrations `20260828100000_loan_discounts_schema.sql`, `20260828110000_origination_discount_reversion.sql`, `20260828120000_offset_discount_closure.sql`, plus balance/rollover fixes (`20260831040000`, `20260831050000`) and live-data repairs (`20260831150000_repair_orphaned_discounted_rows.sql`, `20260831170000_repair_an300430_discount_decision.sql` — real corruption was found and fixed, i.e. this has been exercised on live data).
+  - **Offset (early-settlement) math:** [offset-discount.ts](../src/lib/computation/offset-discount.ts) — gross interest of ticked future installments − one-month termination fee, floored at 0. Per-installment target data exposed on the CSA computation `activeLoans` response; modal + row breakdown in [ComputationPanel.tsx](../src/components/csa/ComputationPanel.tsx) (`openDiscountModal`, `discountModalDiscounts`); closure wiring via `post_internal_transfer` (subtracts `discount_amount` in its payoff threshold).
+  - **Origination discount:** stored/validated on both CSA ([computation.ts](../src/lib/csa/computation.ts), [computation/route.ts](../src/app/api/csa/applications/[id]/computation/route.ts)) and Committee ([override/route.ts](../src/app/api/committee/applications/[id]/override/route.ts), [negotiation/service.ts](../src/lib/negotiation/service.ts)) paths; per-installment percent input UI in ComputationPanel (`originationDiscountRows`, `originationModalDiscounts`); applied at release in `initializeArAccount`; reverts to 0 when the due date passes via the nightly aging job (TS + SQL twin).
+  - **Ledger:** shared `Discount` column in [AccountLedger.tsx:121](../src/components/ledger/AccountLedger.tsx:121).
+  - **Tests:** `offset-discount.test.mts`, `offset-discount-closure.test.mts`, `discount-never-negative.test.mts`, `masterlist-discount-basis.test.mts`, `net-installment-due.test.mts`, `discount-units.test.ts`.
+- **Still open:** the separate penalty-balance discount for Collection/Remedial (see new Fix/Feature item below) is explicitly **not** part of this and remains unbuilt.
+- **Status: DONE — implemented on both CSA and Committee paths, ledger-visible, tested, and exercised against live data (repair migrations).**
+
+<details><summary>Original 2026-08-26 audit (rules confirmed from transcript)</summary>
+
 - **Audit:** Confirmed via the full raw transcript, now saved at [transcription-2026-08-25.md](transcription-2026-08-25.md) — Conference: *"Nasa calculator po kaya yun?"* / rovick: *"Na, hindi. Wala siya sa calculator."* Zero `discount` matches anywhere in `src/` — genuinely not built.
 - **All rules below are independently re-verified against the raw transcript (not the meeting-minutes summary) — the two items previously marked "not yet confirmed" are now closed:**
   - **Interest-only — principal always paid back in full:** *"ang bumabalik lang sa company, yung principal... pero yung ibang interest na dini-discount, i-we-waive."*
@@ -94,25 +109,48 @@ Every item below carries an **Audit** line — the concrete evidence (file:line,
   - **Due-date cutoff rule — CONFIRMED (previously open):** anything already at or past its due date is "due and demandable" and cannot be discounted at all — only future, not-yet-due installments qualify. Directly stated, repeatedly: *"once na lumagpas kasi ng due date, eto due and demandable na to. Ibig sabihin, wala ng discount to... Bawal na pong discount."* and *"Basta anything na lumabas sa due date, automatic. Yung next na due date, due and demandable... Hindi mo siya pwedeng applyan ng discount."* The transcript also flags this as a **current informal malpractice to fix**: staff sometimes give an ad-hoc "one month" or "50%" discount on an already-due amount to appease a difficult borrower even though the rule forbids it — *"May scenario kasi na pag nainis sila sa borrower... Minsan, binibigyan lang nila ng isang buwan na discount... Kaya, inanok ko na mas maganda kung tickable na lang siya"* — i.e., the ticket's per-month-selectable UI is explicitly meant to close this loophole by making eligible months mechanically enforced, not staff-judgment-based.
   - **Committee/CSA approval-vs-entry split — CONFIRMED (previously open):** CSA can **enter/request** a discount as early as the application stage (*"kay CSA pa lang, nagre-request na sila ng discount"*), but CSA **cannot decide** — *"since si CSA, hindi siya makadesight... ang pwede lang magbigay ng discount, sa committee."* Explicit decision on access: rather than restrict the entry field to one role (risk of becoming a bottleneck — *"baka magiging blocker siya ng computation"*), **anyone with calculator access can enter/edit the proposed discount, but only Committee actually grants it** — matches the ticket's existing framing exactly. Collection/Collector has **no role** in this particular discount — *"Walang nang kinalaman si collection ngayon"* — this scenario is CSA/Committee only, at application/computation time.
 - **New, out-of-scope finding — flag for a separate ticket, not part of this build:** the transcript describes a **second, distinct discount scenario** already loosely known from the meeting-minutes (penalty section) but not yet its own tracked item: Collection/Remedial can offer a discount on an **already-accumulated penalty balance** to get a delinquent borrower to settle immediately — *"malami na yung penalty niya... bayaran niyo ako ngayon, kahit i-discount ko na itong, ano, kalahati, 30% o 20%."* This is **not** interest-on-a-future-installment (this Feature #1) — it's a different discount, on penalty, owned by Collection/Remedial, not CSA/Committee. Recommend adding as its own tracker item rather than folding into this one, since the rules, owner, and trigger point are all different.
-- **Status: NOT STARTED.**
+- **Status (2026-08-26): NOT STARTED.**
 
-### [ ] 2. "Move of Payment" feature
-- **Audit:** Zero matches for `moveOfPayment`/`move_of_payment`/"Move of Payment" anywhere in `src/`. Genuinely not built.
-- **Status: NOT STARTED.**
+</details>
 
-### [ ] 3. Co-Borrower section on the application form
+### [x] 2. "Move of Payment" feature — **BUILT + live-verified 2026-09-01 (core); one addendum not started**
+- **Original audit (2026-08-26):** Zero matches anywhere in `src/`. Not built.
+- **Re-audit (2026-09-01):** Core feature shipped under [feature-move-of-payment-implementation-plan.md](revision-plans/feature-move-of-payment-implementation-plan.md) (Phases 1–7).
+  - **Schema:** migrations `20260901010000_move_of_payment_schema.sql`, `20260901020000_move_of_payment_revert_sql_twin.sql` (adds `masterlist.move_of_payment_used_at`, `amortization_schedules.status='moved'` + `moved_at`/`move_of_payment_batch_id`/`move_of_payment_deadline`/`move_surcharge_amount`).
+  - **Logic:** [move-of-payment.ts](../src/lib/ar/move-of-payment.ts) — one-time-per-loan, Collector-chosen open due date, surcharge = one month's real interest (`buildDiscountUnits`), Invoice (weekly) excluded, deadline required and must be a real future date; reverts via the aging job (TS + SQL twin) if the deadline passes unpaid.
+  - **UI/route:** [collector/accounts/[id]/move-of-payment/page.tsx](../src/app/collector/accounts/[id]/move-of-payment/page.tsx) + [route.ts](../src/app/api/collector/accounts/[id]/move-of-payment/route.ts), with a per-installment candidate list (`listMoveOfPaymentCandidates`) so the Collector picks which due date to move.
+  - **Tests:** `move-of-payment.test.mts`, `refresh-masterlist-aging-move-of-payment.test.mts`.
+  - **Live-verified 2026-09-01** — see [feature-move-of-payment-validation-checklist.md](revision-plans/feature-move-of-payment-validation-checklist.md) (happy path + already-used guard observed live).
+- **Addendum NOT started:** making the surcharge a real posted `payments` row (via `addPaymentToDcr`), appending the deferred final installment row (`deferred_from_move_of_payment_batch_id`), collecting reference no./channel in the form, and the "Terms" label fallback on [ar/masterlist/[id]/page.tsx](../src/app/ar/masterlist/[id]/page.tsx). Two open decisions block it (schedule updates immediately vs. on AR posting; what happens to the surcharge cash on revert) — see the implementation plan's addendum.
+- **Status: DONE (core, live-verified). Addendum pending your call on 2 decisions.**
+
+### [x] 3. Co-Borrower section on the application form — **BUILT (2026-09-01)**
 - **Audit:** No real co-borrower data capture exists. The only trace is a hardcoded empty placeholder in a PDF template context: [application-form-context.ts:153](../src/lib/documents/generators/application-form-context.ts:153) — `coBorrowerName: ""`, always blank. Confirms this is unbuilt, and explains why generated documents currently show an empty co-borrower field rather than omitting it.
-- **Status: NOT STARTED.**
+- **Context (transcript, 2026-08-25):** Discussion started from the Promissory Note template, which has a right-side co-borrower slot (name + address). A co-borrower is a second person who also signs the loan documents — distinct from the SME business *representative* (a business application can have both).
+- **Expected result:**
+  1. **Co-Borrower section on the application form** — repeatable rows (multiple co-borrowers allowed, *"pwede yung madami din"*), each with **Full Name** and **Address** minimum. Optional / not required by default.
+  2. **Approving-officer "co-borrower required" flag** at the approval/Committee stage — the approving officer is the one who dictates it, when the primary borrower's capacity isn't sufficient. This is a distinct flag, not a general send-back-for-revision.
+  3. **Routing:** flagging it sends the application back to CSA to fill in the co-borrower name/address; after CSA saves, it proceeds **straight to LRA, bypassing CIG** (approval already happened).
+  4. **Persistence + propagation:** stored on the application, visible in CI/CIG views, and fed into the document generators so the PN / application form render the real co-borrower details instead of a blank slot.
+  5. **Applies to any loan type, secured or unsecured** — *"Hindi, sa lahat yan eh"* was Rovick correcting the idea that it's only for car/collateral loans. It is **not** collateral-only.
+  6. **Seafarer segment must NOT see the co-borrower section** — confirmed by Rovick, 2026-09-01. (The transcript's "sa lahat" was about loan types, not segments; seafarer is explicitly excluded.)
+- **Plan + build log:** [feature-co-borrower-section.md](revision-plans/feature-co-borrower-section.md) — all 10 phases (0–9) DONE 2026-09-01. `co_borrower_required` + `co_borrowers` jsonb on `loan_applications` (migration `20260901050000`, applied live); Committee sets the requirement via a checkbox on **Approve** (not a revisit / re-vote); a dedicated service-client route (`PATCH /api/applications/[id]/co-borrowers`, `intake.edit` or `committee.execute_trigger`) fills it pre- **and** post-approval with no RLS change; **advisory only** — `queueForLra` / release path untouched, LRA shows an amber "you may still proceed" warning when requested-and-empty; docs populate `coBorrowerName`/`coBorrowerAddress`/`hasCoBorrower`; seafarer excluded at 3 points. Bypassing CIG + a second vote is automatic (the flag never routes anywhere).
+- **Verification:** test suite 1509/1509; live end-to-end on the dev server for every path demo data allows (CSA render + edit + persist + audit + reload, all 5 route rejections, application-form PDF containing the co-borrower name, seafarer-exclusion); committee-approval + LRA-render paths locked by unit/source-scan tests (see the plan's Phase 9 status).
+- **Status: DONE.**
 
 ### [x] 4. Automatic/sequential loan-account numbering — **ALREADY DONE, tracker was wrong**
 - **Issue as written:** Loan account number is manually entered; needs auto-generation matching the loan-number series.
 - **Audit:** `loan_account_no` is set directly from `app.application_no` at masterlist creation ([masterlist.ts:130](../src/lib/ar/masterlist.ts:130) — `loan_account_no: app.application_no`). `application_no` itself has a DB-level default: `select column_default from information_schema.columns where table_name='loan_applications' and column_name='application_no'` → `generate_application_no()`. No manual-entry UI for this field was found anywhere under `src/app/ar/masterlist` (only read-only display).
 - **Status: This already works exactly as requested — auto-generated, sequential, follows the loan-number series. No action needed. Recommend closing this item, not building it.**
 
-### [ ] 5. Bi-Monthly (and other) payment frequency options — **PREMISE IS FALSE, needs re-scoping**
-- **Issue as written:** "The calculator already supports Bi-Monthly, Quarterly, and other payment frequency structures" — just needs surfacing on the application form.
-- **Audit:** Grepped `src/lib/computation` and the whole `src/` tree for `bi-monthly`, `quarterly`, `payment_frequency`/`paymentFrequency` — **the only frequency variants that exist anywhere are `monthly` and `semi_monthly`** (Salary/MPL individual loans use semi-monthly per [release-date.ts:91](../src/lib/computation/release-date.ts:91) `advanceSemiMonthly`). There is no Bi-Monthly or Quarterly logic anywhere in the computation engine to "surface."
-- **Status: The premise in the ticket is incorrect — this isn't a UI-surfacing task, it would be building Bi-Monthly/Quarterly computation logic from scratch. Needs a real spec (like the semi-monthly rules got) before any work starts, not just a form-field addition.**
+### [x] 5. Bi-Monthly (and other) payment frequency options — **BUILT**
+- **Original audit (2026-08-26):** Only `monthly` and `semi_monthly` existed; this would be building the computation logic from scratch, not a UI-surfacing task.
+- **Re-audit (2026-09-01):** The full set of extra frequencies now has real computation logic and a schedule-type selector in [ComputationPanel.tsx:1589-1592](../src/components/csa/ComputationPanel.tsx:1589) (`Weekly (Invoice Financing)`, `Bi-monthly (every 15 days)`, `Quarterly`, `Two-monthly`) plus `Daily`.
+  - **Migrations:** `20260828130000_add_weekly_payment_frequency.sql`, `20260828140000_add_bi_monthly_payment_frequency.sql`, `20260828140448_add_loan_applications_schedule_type.sql`, `20260828150001_add_quarterly_two_monthly_frequencies.sql`, `20260828160000_add_daily_payment_frequency.sql`.
+  - **Generators:** `generateBiMonthlySchedule`, `generateQuarterlySchedule`, `generateTwoMonthlySchedule` in [ar/schedule.ts](../src/lib/ar/schedule.ts); `computeInvoiceLoan` in [invoice.ts](../src/lib/computation/invoice.ts); all wired through [csa/computation.ts](../src/lib/csa/computation.ts) and consumed by `buildDiscountUnits`, PDC, and AR off the same generators.
+  - **Term guards:** Quarterly must be divisible by 3, Two-monthly by 2, Invoice capped at 1–3 months — enforced client-side ([ComputationPanel.tsx:1277-1281](../src/components/csa/ComputationPanel.tsx:1277)) and in `computeInvoiceLoan`.
+  - **Tests:** `schedule.test.ts`, `schedule-f2.test.mts`, `invoice.test.ts`, `release-date.test.mts`, `discount-units.test.ts`.
+- **Status: DONE — Bi-Monthly, Quarterly, Two-monthly, Weekly (Invoice), and Daily all have real schedule generation and are selectable on the computation form.**
 
 ### [x] 6. Seafarer cutoff-based due date logic — **picker built, shipped, and verified on both CSA and Committee**
 - **Issue as written:** Not yet built, blocked on a cutoff explainer doc from Rovick.
@@ -143,6 +181,10 @@ Every item below carries an **Audit** line — the concrete evidence (file:line,
 - **Audit:** `postings` table schema confirmed via `information_schema.columns`: `id, dcr_id, payment_id, masterlist_id, amortization_schedule_id, amount, posted_by, posted_at` — one undifferentiated `amount` column, no penalty/amortization split field anywhere.
 - **Status: NOT STARTED.**
 
+### [ ] 10. Penalty-balance discount for Collection/Remedial — **newly tracked (was flagged out-of-scope under Feature #1)**
+- **Audit:** Distinct from Feature #1's interest discount — this is a percentage waiver on an **already-accumulated penalty balance** to get a delinquent borrower to settle immediately (*"bayaran niyo ako ngayon, kahit i-discount ko na itong kalahati, 30% o 20%"*). Different rules (% of penalty, not per-installment interest), different owner (Collection/Remedial, not CSA/Committee), different trigger (an overdue penalty, not an early full settlement). Grep confirms no penalty-discount/waive logic in `src/lib/negotiation` or `src/lib/remedial`.
+- **Status: NOT STARTED — needs its own spec (rules, approval path, ledger treatment) before any work.**
+
 ---
 
 ## ⏳ Pending Input from Rovick (Blocking Further Work)
@@ -155,10 +197,28 @@ Every item below carries an **Audit** line — the concrete evidence (file:line,
 
 ## Overall Progress
 
-**Fixes:** 8 / 11 done, 1 blocked (not actionable as written), 1 rescoped (not started), 1 reclassified as duplicate
-**Features to Build:** 2 / 9 done (1 already existed — Auto loan numbering; 1 built+shipped+verified this session — Seafarer due-date picker), 7 not started
-**Total actionable items:** 20
+*Updated 2026-09-01 after a second item-by-item re-audit against the live codebase, migrations, and revision-plan status logs.*
 
----
+**Fixes:** 9 / 11 done (#11 resolved via Feature #1), 1 in progress (#10 — small UI conditional left), 1 rescoped & not started (#7)
+**Features to Build:** 5 / 10 done — Auto loan numbering (#4, pre-existing), Seafarer due-date picker (#6), **Early-settlement + origination discount (#1, new)**, **Move of Payment core (#2, new — addendum pending)**, **Extra payment frequencies (#5, new)**. Not started: Co-Borrower section (#3), Batch penalty trigger (#7), Penalty reversal (#8), Penalty/Amortization ledger split (#9), Penalty-balance discount (#10, newly tracked).
+**Total actionable items:** 21
 
-*Re-audited item-by-item against the live codebase and database on 2026-08-26 — every status above is backed by a direct grep, file read, or SQL query cited inline, not carried over from the original tracker or assumed from the meeting minutes alone. Where evidence contradicted the ticket's own premise (Fixes #7, #10, #11; Features #4, #5, #6), that's called out rather than silently fixed.*
+### What changed since the 2026-08-26 audit
+| Item | Was | Now |
+|---|---|---|
+| Fix #10 Invoice add-on | Blocked (no such loan type) | In progress — Invoice Financing built as `weekly`; add-on is inert for it, only the input's visibility needs a conditional |
+| Fix #11 Discount on due amounts | Duplicate / no feature | Done — Feature #1 enforces the not-yet-due cutoff mechanically |
+| Feature #1 Early-settlement discount | Not started | **Done** — Offset + origination discount, both roles, ledger column, tests, live-data repairs |
+| Feature #2 Move of Payment | Not started | **Done (core), live-verified 2026-09-01** — surcharge-as-real-payment addendum still pending 2 decisions |
+| Feature #5 Extra frequencies | Premise false / from scratch | **Done** — Weekly/Bi-monthly/Quarterly/Two-monthly/Daily all have real schedule logic |
+
+### Still genuinely pending
+- **Fix #7** — print-area scoping, still needs rescoping with Rovick before work starts.
+- **Fix #10** — hide/disable "Addon months" when schedule type is `weekly` (small, isolated change).
+- **Feature #2 addendum** — 2 decisions needed (see item), then surcharge-as-posted-payment + deferred final installment row.
+- **Feature #3** — Co-Borrower capture: still only a hardcoded empty `coBorrowerName` in the PDF context; no form fields, no columns.
+- **Feature #7** — Batch penalty trigger: no multi-select UI in `src/app/collector`.
+- **Feature #8** — Penalty reversal/adjustment: no reversal mechanism exists.
+- **Feature #9** — Penalty vs. Amortization split: `postings` still has one undifferentiated `amount` column (no migration touched it); the ledger's separate `Penalty`/`Discount` columns are display-only.
+- **Feature #10** — Penalty-balance discount for Collection/Remedial: needs a spec.
+- **Pending docs from Rovick** — Seafarer cutoff explainer (no longer blocking), Remedial/restructured computation doc, plus the auto-flagged-remedial-accounts-with-no-officer bug (AN300418, AN300420 as of 2026-08-26).

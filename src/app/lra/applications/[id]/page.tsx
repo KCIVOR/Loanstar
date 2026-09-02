@@ -23,6 +23,11 @@ import {
   Th,
 } from "@/components/ui";
 import { DocumentChecklist } from "@/components/DocumentChecklist";
+import { CoBorrowerSection } from "@/components/applications/CoBorrowerSection";
+import {
+  coBorrowerBannerState,
+  type CoBorrower,
+} from "@/lib/applications/co-borrower";
 import { AutofillOverlay } from "@/components/dev/AutofillOverlay";
 import { fakePdcDetails, fakeRemark } from "@/lib/dev/fake-data";
 import { GeneratedDocPanel } from "@/components/documents/GeneratedDocPanel";
@@ -58,6 +63,7 @@ type PdcComputation = {
   monthlyAmortization: number;
   totalLoan: number;
   totalInterest: number;
+  grossTotalInterest: number;
   terms: number;
   releaseDate: string | null;
   firstPaymentDate: string | null;
@@ -90,14 +96,21 @@ function buildPdcRows(
   computation: PdcComputation,
   pdcDate: string,
 ): Array<{ checkDate: string; amount: number }> {
+  // Gross (pre-discount) basis — mirrors buildExpectedPdcSchedule /
+  // initializeArAccount exactly, so a discounted loan's client-side preview
+  // never disagrees with what the server actually accepts/bills. See
+  // docs/ledger-balance-consistency-fix-implementation-plan.md Phase 1 (F10).
+  const grossTotalLoan = halfUp(computation.principal + computation.grossTotalInterest);
+  const grossMonthlyAmortization = halfUp(grossTotalLoan / computation.terms);
+
   if (computation.paymentFrequency === "semi_monthly") {
     const count = computation.terms * 2;
-    const half = halfUp(computation.monthlyAmortization / 2);
+    const half = halfUp(grossMonthlyAmortization / 2);
     return Array.from({ length: count }, (_, index) => {
       const checkDate = advanceSemiMonthly(pdcDate, index);
       if (index === count - 1) {
         const priorTotal = halfUp(half * (count - 1));
-        const remainder = halfUp(computation.totalLoan - priorTotal);
+        const remainder = halfUp(grossTotalLoan - priorTotal);
         return { checkDate, amount: remainder > 0 ? remainder : half };
       }
       return { checkDate, amount: half };
@@ -130,9 +143,9 @@ function buildPdcRows(
     if (!computation.releaseDate) return [];
     return generateBiMonthlySchedule({
       terms: computation.terms,
-      monthlyAmortization: computation.monthlyAmortization,
+      monthlyAmortization: grossMonthlyAmortization,
       releaseDate: new Date(computation.releaseDate),
-      totalLoan: computation.totalLoan,
+      totalLoan: grossTotalLoan,
     }).map((row) => ({ checkDate: row.dueDate, amount: row.amountDue }));
   }
 
@@ -140,8 +153,8 @@ function buildPdcRows(
     if (!computation.releaseDate) return [];
     return generateQuarterlySchedule({
       terms: computation.terms,
-      totalLoan: computation.totalLoan,
-      totalInterest: computation.totalInterest,
+      totalLoan: grossTotalLoan,
+      totalInterest: computation.grossTotalInterest,
       releaseDate: new Date(computation.releaseDate),
       dueDay: computation.dueDay ?? 10,
     }).map((row) => ({ checkDate: row.dueDate, amount: row.amountDue }));
@@ -151,17 +164,17 @@ function buildPdcRows(
     if (!computation.releaseDate) return [];
     return generateTwoMonthlySchedule({
       terms: computation.terms,
-      totalLoan: computation.totalLoan,
-      totalInterest: computation.totalInterest,
+      totalLoan: grossTotalLoan,
+      totalInterest: computation.grossTotalInterest,
       releaseDate: new Date(computation.releaseDate),
       dueDay: computation.dueDay ?? 10,
     }).map((row) => ({ checkDate: row.dueDate, amount: row.amountDue }));
   }
 
-  // Monthly (Seafarer/SME/MPL) — unchanged, original logic.
+  // Monthly (Seafarer/SME/MPL) — gross basis (see comment above).
   return Array.from({ length: computation.terms }, (_, index) => ({
     checkDate: addScheduleMonths(pdcDate, index),
-    amount: computation.monthlyAmortization,
+    amount: grossMonthlyAmortization,
   }));
 }
 
@@ -172,6 +185,8 @@ type LraWorkspace = {
     status: string;
     statusLabel: string;
     blocker: string | null;
+    coBorrowerRequired: boolean;
+    coBorrowers: CoBorrower[];
     segment: "seafarer" | "sme" | "individual";
     entityType: "individual" | "corporate" | null;
   };
@@ -215,6 +230,7 @@ type LraWorkspace = {
     monthlyAmortization: number;
     totalLoan: number;
     totalInterest: number;
+    grossTotalInterest: number;
     terms: number;
     releaseDate: string | null;
     firstPaymentDate: string | null;
@@ -1045,6 +1061,39 @@ export default function LraApplicationPage() {
         </Card>
       ) : null}
 
+      {/* Co-Borrower feature (Phase 6): advisory only — the "missing" warning
+          never blocks release. */}
+      {(() => {
+        const state = coBorrowerBannerState({
+          coBorrowerRequired: data.application.coBorrowerRequired,
+          coBorrowers: data.application.coBorrowers,
+        });
+        if (state === "missing") {
+          return (
+            <Alert variant="warning" className="mb-6">
+              The approving committee requested a co-borrower for this loan. No
+              co-borrower details were provided. You may still proceed with
+              release.
+            </Alert>
+          );
+        }
+        if (state === "provided") {
+          return (
+            <Card className="mb-6">
+              <h2 className="mb-2 font-display text-lg font-semibold text-navy-900">
+                Co-borrower
+              </h2>
+              <CoBorrowerSection
+                applicationId={data.application.id}
+                coBorrowers={data.application.coBorrowers}
+                editable={false}
+              />
+            </Card>
+          );
+        }
+        return null;
+      })()}
+
       {!rf ? (
         <Card>
           <h2 className="mb-2 font-display text-lg font-semibold text-navy-900">
@@ -1176,8 +1225,15 @@ export default function LraApplicationPage() {
                     type="text"
                     value={
                       isFlatSchedule
-                        ? data.computation?.monthlyAmortization != null
-                          ? `₱${formatMoney(data.computation.monthlyAmortization)}`
+                        ? // Read from the already-built expected schedule (gross basis,
+                          // see buildPdcRows above) rather than the raw net
+                          // monthlyAmortization field — for a discounted loan those two
+                          // differ, and this field must match what the checks below
+                          // actually require. See
+                          // docs/ledger-balance-consistency-fix-implementation-plan.md
+                          // Phase 1 (F10).
+                          expectedPdcRows[0]?.amount != null
+                          ? `₱${formatMoney(expectedPdcRows[0].amount)}`
                           : ""
                         : "Varies per check — see schedule below"
                     }

@@ -23,6 +23,7 @@ function inputs(postings: TrendPostingRow[]): TrendInputs {
         dueDate: "2026-04-10",
         amountDue: 10_000,
         penaltyAmount: 0,
+        discountAmount: 0,
       },
     ],
     postings,
@@ -121,6 +122,7 @@ describe("computeDelinquencyTrend", () => {
             dueDate: "2026-05-10",
             amountDue: 10_000,
             penaltyAmount: 0,
+            discountAmount: 0,
           },
         ],
       },
@@ -134,5 +136,18 @@ describe("computeDelinquencyTrend", () => {
   it("leaves PAR null when there is no book to measure against", () => {
     const group = computeDelinquencyTrend(inputs([]), WINDOWS, new Map());
     assert.deepEqual(valuesOf(group, "delinquency.par30"), [null, null, null, null, null, null]);
+  });
+
+  it("a fully-discounted unpaid installment is not counted as delinquent (fixed 2026-08-31)", () => {
+    const base = inputs([]);
+    const group = computeDelinquencyTrend(
+      {
+        ...base,
+        schedules: [{ ...base.schedules[0]!, discountAmount: 10_000 }],
+      },
+      WINDOWS,
+      OUTSTANDING,
+    );
+    assert.deepEqual(valuesOf(group, "delinquency.overdue"), [0, 0, 0, 0, 0, 0]);
   });
 });

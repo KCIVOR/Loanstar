@@ -48,6 +48,7 @@ function asSchedules(raw: unknown): ScheduleLite[] {
       amount_due: Number(r.amount_due ?? 0),
       status: String(r.status ?? "pending"),
       penalty_amount: Number(r.penalty_amount ?? 0),
+      discount_amount: Number(r.discount_amount ?? 0),
     };
   });
 }
@@ -136,7 +137,8 @@ export async function GET(request: Request) {
           due_date,
           amount_due,
           status,
-          penalty_amount
+          penalty_amount,
+          discount_amount
         )
       `,
       )
@@ -193,9 +195,7 @@ export async function GET(request: Request) {
         agingBucket: String(row.aging_bucket ?? ""),
         firstPaymentDate: (row.first_payment_date as string | null) ?? null,
         nextDueDate: next?.due_date ?? null,
-        nextDueAmount: next
-          ? next.amount_due + next.penalty_amount
-          : null,
+        nextDueAmount: next ? next.netAmountDue : null,
         lastContact: lastContactByMasterlist.get(row.id as string) ?? null,
       };
     });

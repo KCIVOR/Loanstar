@@ -28,6 +28,7 @@ type StubOpts = {
     | "daily";
   totalLoan?: number;
   totalInterest?: number;
+  grossTotalInterest?: number;
   releaseDate?: string | null;
   principal?: number;
   dueDay?: number;
@@ -77,6 +78,26 @@ function makeSavePdcStub(opts: StubOpts) {
     updated_at: "2026-01-01T00:00:00.000Z",
   };
 
+  // Self-consistent by construction (principal + totalInterest = totalLoan,
+  // and totalLoan reconciles with monthlyAmortization * terms when totalLoan
+  // isn't explicitly overridden) — savePdcChecks now derives its gross PDC
+  // basis from principal + grossTotalInterest (mirroring
+  // initializeArAccount, see
+  // docs/ledger-balance-consistency-fix-implementation-plan.md Phase 1),
+  // not from totalLoan/monthlyAmortization directly, so a stub whose
+  // principal/totalInterest/totalLoan/monthlyAmortization don't reconcile no
+  // longer reflects a real computation. gross_total_interest is
+  // intentionally omitted from computationRow (undiscounted fixture) —
+  // mapComputationRow falls back to total_interest, which is what these
+  // opts already control.
+  const resolvedTotalInterest = opts.totalInterest ?? 0;
+  const resolvedTotalLoan =
+    opts.totalLoan ?? halfUp(opts.monthlyAmortization * opts.terms);
+  const resolvedPrincipal =
+    opts.principal !== undefined
+      ? opts.principal
+      : resolvedTotalLoan - resolvedTotalInterest;
+
   const computationRow = {
     id: "comp-1",
     loan_application_id: "app-1",
@@ -93,7 +114,7 @@ function makeSavePdcStub(opts: StubOpts) {
     loan_type_id: null,
     loan_type_name: null,
     other_deductions: {},
-    principal: 100000,
+    principal: resolvedPrincipal,
     processing_fee: 0,
     admin_cost: 0,
     doc_stamp: 0,
@@ -102,8 +123,9 @@ function makeSavePdcStub(opts: StubOpts) {
     other_deductions_total: 0,
     total_deductions: 0,
     net_released: 100000,
-    total_interest: opts.totalInterest ?? 0,
-    total_loan: opts.totalLoan ?? 100000,
+    total_interest: resolvedTotalInterest,
+    gross_total_interest: opts.grossTotalInterest ?? null,
+    total_loan: resolvedTotalLoan,
     release_date: opts.releaseDate === undefined ? null : opts.releaseDate,
     first_payment_date:
       opts.firstPaymentDate === undefined
@@ -113,9 +135,6 @@ function makeSavePdcStub(opts: StubOpts) {
     line_items: [],
     payment_frequency: opts.paymentFrequency ?? "monthly",
   };
-  if (opts.principal !== undefined) {
-    computationRow.principal = opts.principal;
-  }
 
   const supabase = {
     from(table: string) {
@@ -739,5 +758,157 @@ describe("savePdcChecks hard lock (Quarterly / Two-monthly dual-line)", () => {
     assert.equal(inserted.length, 4); // 2 payments × 2 lines
     assert.equal(inserted[0].amount, 1000); // interest
     assert.equal(inserted[1].amount, 19000); // principal
+  });
+});
+
+/**
+ * Regression coverage for F10 (see
+ * docs/ledger-balance-consistency-fix-implementation-plan.md Phase 1): PDC
+ * amounts must be built from the computation's GROSS interest
+ * (principal + gross_total_interest), never the already-net total_interest/
+ * monthly_amortization a discount leaves behind — otherwise a discounted
+ * loan's checks disagree with what initializeArAccount actually bills at
+ * release. Each case below sets gross_total_interest higher than the net
+ * total_interest a discount would have left, and asserts the accepted check
+ * amount reflects the GROSS figure, not the net one — a regression to the
+ * pre-fix behavior would compute the smaller, net-basis amount instead and
+ * these tests would reject the (correct) gross amount.
+ */
+describe("savePdcChecks gross-basis PDC parity (F10)", () => {
+  it("flat monthly cadence uses gross basis, not net total_interest", async () => {
+    // principal 100000, terms 4: gross interest 8000 -> gross total 108000 ->
+    // 27000/mo. A discount left the stored (net) total_interest at only
+    // 5000 -> 105000/26250 would be the pre-fix (wrong) answer.
+    const stub = makeSavePdcStub({
+      terms: 4,
+      monthlyAmortization: 26250, // net-basis value a pre-fix caller would expect
+      paymentFrequency: "monthly",
+      totalInterest: 5000,
+      grossTotalInterest: 8000,
+      principal: 100000,
+      totalLoan: 105000,
+    });
+
+    const checks = makeChecks(4, 27000);
+    const result = await savePdcChecks(
+      stub.supabase,
+      "rf-1",
+      checks,
+      undefined,
+      "actor-1",
+    );
+    assert.equal(result.status, "ready_generate");
+    const inserted = stub.getInsertedChecks() as Array<{ amount: number }>;
+    assert.equal(inserted.length, 4);
+    for (const row of inserted) {
+      assert.equal(row.amount, 27000);
+    }
+
+    // The pre-fix net-basis amount must now be rejected.
+    await assert.rejects(
+      () =>
+        savePdcChecks(
+          stub.supabase,
+          "rf-1",
+          makeChecks(4, 26250),
+          undefined,
+          "actor-1",
+        ),
+      /Check amount must equal the monthly amortization \(₱27000\)/,
+    );
+  });
+
+  it("semi-monthly (Salary) cadence uses gross basis, not net total_interest", async () => {
+    // principal 120000, terms 6: gross interest 12000 -> gross total 132000
+    // -> monthly 22000 -> half 11000. Net (discounted) total_interest 6000
+    // would have given monthly 21000 / half 10500 pre-fix.
+    const stub = makeSavePdcStub({
+      terms: 6,
+      monthlyAmortization: 21000, // net-basis value a pre-fix caller would expect
+      paymentFrequency: "semi_monthly",
+      totalInterest: 6000,
+      grossTotalInterest: 12000,
+      principal: 120000,
+      totalLoan: 126000,
+      firstPaymentDate: "2026-08-31",
+    });
+
+    const half = 11000;
+    const checks = Array.from({ length: 12 }, (_, i) => ({
+      checkNumber: String(3001 + i),
+      amount: i === 11 ? halfUp(132000 - halfUp(half * 11)) : half,
+      checkDate: advanceSemiMonthly("2026-08-31", i),
+      bankName: "Test Bank",
+    }));
+
+    const result = await savePdcChecks(
+      stub.supabase,
+      "rf-1",
+      checks,
+      undefined,
+      "actor-1",
+    );
+    assert.equal(result.status, "ready_generate");
+    const inserted = stub.getInsertedChecks() as Array<{ amount: number }>;
+    assert.equal(inserted.length, 12);
+    assert.equal(inserted[0].amount, 11000);
+  });
+
+  it("quarterly cadence uses gross basis, not net total_interest", async () => {
+    // Gross totalInterest 9000 (vs. net-discounted totalInterest 5000 the
+    // computation actually stores) must drive the interest/principal split.
+    const RELEASE_DATE = "2026-09-01";
+    const grossTotalLoan = 100000 + 9000; // principal + gross interest
+    const expected = generateQuarterlySchedule({
+      terms: 6,
+      totalLoan: grossTotalLoan,
+      totalInterest: 9000,
+      releaseDate: new Date(RELEASE_DATE),
+      dueDay: 10,
+    });
+
+    const stub = makeSavePdcStub({
+      terms: 6,
+      monthlyAmortization: 0,
+      paymentFrequency: "quarterly",
+      releaseDate: RELEASE_DATE,
+      totalInterest: 5000, // net, discounted — must NOT be what PDC uses
+      grossTotalInterest: 9000,
+      principal: 100000,
+      totalLoan: 105000, // net total_loan on the computation row
+      dueDay: 10,
+    });
+
+    const checks = expected.map((row, i) => ({
+      checkNumber: String(4001 + i),
+      amount: row.amountDue,
+      checkDate: row.dueDate,
+      bankName: "Test Bank",
+    }));
+
+    const result = await savePdcChecks(stub.supabase, "rf-1", checks, undefined, "actor-1");
+    assert.equal(result.status, "ready_generate");
+    const inserted = stub.getInsertedChecks() as Array<{ amount: number }>;
+    assert.equal(inserted.length, 4); // 2 quarters × 2 lines
+    assert.equal(inserted[0].amount, expected[0].amountDue); // gross interest, 4500
+    assert.equal(inserted[1].amount, expected[1].amountDue); // gross principal
+
+    // The net-basis (discounted) amounts must now be rejected.
+    const netExpected = generateQuarterlySchedule({
+      terms: 6,
+      totalLoan: 105000,
+      totalInterest: 5000,
+      releaseDate: new Date(RELEASE_DATE),
+      dueDay: 10,
+    });
+    const netChecks = netExpected.map((row, i) => ({
+      checkNumber: String(4001 + i),
+      amount: row.amountDue,
+      checkDate: row.dueDate,
+      bankName: "Test Bank",
+    }));
+    await assert.rejects(() =>
+      savePdcChecks(stub.supabase, "rf-1", netChecks, undefined, "actor-1"),
+    );
   });
 });

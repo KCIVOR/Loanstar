@@ -10,6 +10,7 @@ import {
 } from "@/lib/ar/masterlist";
 import { getRoundingWriteoffThreshold } from "@/lib/ar/posting";
 import { PaidOffEligibilityError } from "@/lib/ar/paid-off";
+import { AMORTIZATION_SCHEDULE_LEDGER_COLUMNS } from "@/lib/ledger/build-account-ledger-rows";
 import { requireModulePermission } from "@/lib/permissions/server";
 import { createClient, createServiceClient } from "@/lib/supabase/server";
 
@@ -47,7 +48,7 @@ async function fetchPdcChecks(scope: {
 
   const { data } = await admin
     .from("pdc_checks")
-    .select("sort_order, check_number")
+    .select("sort_order, check_number, status")
     .eq("release_file_id", releaseFileId)
     .order("sort_order", { ascending: true });
   return data ?? [];
@@ -66,7 +67,7 @@ export async function GET(_request: Request, { params }: RouteParams) {
         *,
         portfolios ( id, name ),
         assignments ( * ),
-        amortization_schedules ( * )
+        amortization_schedules ( ${AMORTIZATION_SCHEDULE_LEDGER_COLUMNS}, amount_paid )
       `,
       )
       .eq("id", id)
@@ -121,7 +122,7 @@ export async function GET(_request: Request, { params }: RouteParams) {
     const { data: postings } = await supabase
       .from("postings")
       .select(
-        "id, amortization_schedule_id, amount, payments ( payment_date, reference_no, channel, status )",
+        "id, amortization_schedule_id, amount, payments ( payment_date, reference_no, channel, status, move_of_payment_batch_id )",
       )
       .eq("masterlist_id", id)
       .order("posted_at", { ascending: true });

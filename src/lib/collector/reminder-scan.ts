@@ -2,6 +2,8 @@ export type ReminderScheduleRow = {
   installmentNo: number;
   dueDate: string;
   amountDue: number;
+  /** Origination or early-settlement discount on this installment, if any. */
+  discountAmount: number;
   status: string;
 };
 

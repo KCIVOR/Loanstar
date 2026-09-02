@@ -117,4 +117,31 @@ describe("buildDeskLedgerRows", () => {
     assert.equal(totals?.credit, 14122.95);
     assert.equal(totals?.balance, 14122.95);
   });
+
+  it("carries discountAmount through to the built row's target/discount (2026-08-31 — Collector/Remedial parity with AR)", () => {
+    const rows = buildDeskLedgerRows({
+      totalLoan: 28245.9,
+      schedules: [
+        {
+          id: "s1",
+          installmentNo: 1,
+          dueDate: "2026-10-10",
+          amountDue: 14122.95,
+          penaltyAmount: 0,
+          discountAmount: 1000,
+          status: "pending",
+        },
+        schedules[1]!,
+      ],
+      postings: [],
+      pdcChecks: [],
+    });
+
+    const installment = rows.find(
+      (row) => row.kind === "installment" && row.scheduleId === "s1",
+    );
+    assert.ok(installment, "expected installment s1's row");
+    assert.equal(installment.target, 13122.95); // net of the discount
+    assert.equal(installment.discount, 1000);
+  });
 });

@@ -15,6 +15,10 @@ const actionSchema = z.object({
   action: z.enum(["approve", "deny", "revisit", "hold"]),
   comment: z.string().optional(),
   revisitRoute: z.enum(["csa", "cig"]).optional(),
+  // Co-Borrower feature (Phase 2): only used with action "approve" — attaches
+  // an advisory co-borrower requirement to the approved loan. Rejected for
+  // seafarer applications inside executeFinalAction.
+  requireCoBorrower: z.boolean().optional(),
 });
 
 export async function POST(request: Request, { params }: RouteParams) {
@@ -34,6 +38,7 @@ export async function POST(request: Request, { params }: RouteParams) {
     const result = await executeFinalAction(supabase, id, user.id, body.action, {
       comment: body.comment,
       revisitRoute: body.revisitRoute,
+      requireCoBorrower: body.requireCoBorrower,
     });
 
     // Phase 4: denial email fires on Deny (not on CIG's courtesy-call confirm).

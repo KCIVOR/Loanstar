@@ -4,6 +4,7 @@ import { z } from "zod";
 import { writeAuditEvent } from "@/lib/audit/writer";
 import { handleApiError, jsonOk } from "@/lib/api/handler";
 import { DOCUMENT_BUCKET } from "@/lib/constants";
+import { AMORTIZATION_SCHEDULE_LEDGER_COLUMNS } from "@/lib/ledger/build-account-ledger-rows";
 import {
   assertPaymentProofPathOwnedByBorrower,
   isAllowedPaymentProofMime,
@@ -102,7 +103,7 @@ export async function GET(_request: Request, ctx: { params: Promise<{ id: string
         closed_at,
         created_at,
         updated_at,
-        amortization_schedules ( * )
+        amortization_schedules ( ${AMORTIZATION_SCHEDULE_LEDGER_COLUMNS} )
       `,
       )
       .eq("loan_application_id", id)
@@ -124,7 +125,7 @@ export async function GET(_request: Request, ctx: { params: Promise<{ id: string
     const { data: postings } = await supabase
       .from("postings")
       .select(
-        "id, amortization_schedule_id, amount, payments ( payment_date, reference_no, channel, status )",
+        "id, amortization_schedule_id, amount, payments ( payment_date, reference_no, channel, status, move_of_payment_batch_id )",
       )
       .eq("masterlist_id", ctxData.masterlistId)
       .order("posted_at", { ascending: true });
@@ -138,7 +139,7 @@ export async function GET(_request: Request, ctx: { params: Promise<{ id: string
     const { data: pdcChecks } = releaseFile
       ? await supabase
           .from("pdc_checks")
-          .select("sort_order, check_number")
+          .select("sort_order, check_number, status")
           .eq("release_file_id", releaseFile.id as string)
           .order("sort_order", { ascending: true })
       : { data: [] };

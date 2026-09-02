@@ -37,6 +37,7 @@ export const FIELD_GROUPS: FieldGroup[] = [
     fields: [
       { key: "borrowerName", label: "Borrower name", sample: "Jonathan Hipolito Del Poso" },
       { key: "coBorrowerName", label: "Co-borrower name", sample: "" },
+      { key: "coBorrowerAddress", label: "Co-borrower address", sample: "" },
       { key: "borrowerNo", label: "Borrower no.", sample: "BN302754" },
       { key: "address", label: "Address", sample: "544 J. Buizon Street Brgy. Sto. Cristo, Baliwag, Bulacan 3006" },
       { key: "manningAgency", label: "Manning agency (SME: company name)", sample: "Marlow Navigation Philippines Inc." },

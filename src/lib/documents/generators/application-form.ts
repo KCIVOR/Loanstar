@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
+import { normalizeCoBorrowers } from "@/lib/applications/co-borrower";
 import { mapBorrowerRow, type BorrowerRow } from "@/lib/borrowers/types";
 import { getActiveComputation } from "@/lib/csa/computation";
 import { renderAndStore, type RenderedDocumentResult } from "@/lib/documents/render-store";
@@ -28,7 +29,9 @@ export async function generateApplicationForm(
 
   const { data: app, error } = await supabase
     .from("loan_applications")
-    .select("application_no, created_at, segment, entity_type, borrowers (*)")
+    .select(
+      "application_no, created_at, segment, entity_type, co_borrowers, borrowers (*)",
+    )
     .eq("id", applicationId)
     .single();
   if (error || !app) throw new Error("Application not found");
@@ -55,6 +58,7 @@ export async function generateApplicationForm(
     applicationCreatedAt: app.created_at as string | null,
     profile: borrower,
     computation,
+    coBorrowers: normalizeCoBorrowers(app.co_borrowers),
   });
 
   const result = await renderAndStore(supabase, {

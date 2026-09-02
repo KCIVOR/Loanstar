@@ -7,6 +7,7 @@ import { assertCsaCanEdit } from "@/lib/csa/application";
 import {
   getActiveComputation,
   persistComputation,
+  validateCollateralPaymentSchedule,
   validateFrequencyTerms,
   validateOriginationDiscounts,
   validateSeafarerDueDay,
@@ -360,6 +361,19 @@ export async function POST(request: Request, { params }: RouteParams) {
         : "monthly";
     const paymentSchedule = body.paymentSchedule ?? applicationPaymentSchedule;
 
+    const collateralType =
+      application.collateral_type === "car_refinancing" ||
+      application.collateral_type === "real_estate"
+        ? application.collateral_type
+        : "none";
+    const collateralScheduleError = validateCollateralPaymentSchedule(
+      collateralType,
+      paymentSchedule,
+    );
+    if (collateralScheduleError) {
+      return NextResponse.json({ error: collateralScheduleError }, { status: 400 });
+    }
+
     // validateOriginationDiscounts/validateFrequencyTerms operate on the
     // 7-value computations.payment_frequency vocabulary, not the 8-value
     // payment_schedule — translate the same way persistComputation does
@@ -396,11 +410,7 @@ export async function POST(request: Request, { params }: RouteParams) {
     const saved = await persistComputation(supabase, {
       loanApplicationId: id,
       segment,
-      collateralType:
-        application.collateral_type === "car_refinancing" ||
-        application.collateral_type === "real_estate"
-          ? application.collateral_type
-          : "none",
+      collateralType,
       loanTypeId: loanType.id,
       loanTypeName: loanType.name,
       inputMode: body.inputMode,

@@ -42,6 +42,7 @@ function asSchedules(raw: unknown): ScheduleLite[] {
       amount_due: Number(r.amount_due ?? 0),
       status: String(r.status ?? "pending"),
       penalty_amount: Number(r.penalty_amount ?? 0),
+      discount_amount: Number(r.discount_amount ?? 0),
     };
   });
 }
@@ -119,7 +120,8 @@ export async function GET(request: Request) {
           amount_due,
           amount_paid,
           status,
-          penalty_amount
+          penalty_amount,
+          discount_amount
         ),
         remedial_turnovers (
           id,
@@ -244,9 +246,7 @@ export async function GET(request: Request) {
         daysPastDue: dpd,
         severity,
         nextDueDate: next?.due_date ?? null,
-        nextDueAmount: next
-          ? next.amount_due + next.penalty_amount
-          : null,
+        nextDueAmount: next ? next.netAmountDue : null,
         turnedOverAt:
           latest?.confirmed_at ??
           latest?.created_at ??

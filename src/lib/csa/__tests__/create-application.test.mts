@@ -183,16 +183,16 @@ describe("createApplicationSchema paymentSchedule (payment-schedule unification)
     assert.equal(result.success, false);
   });
 
-  it("accepts sme with a collateral type and a non-monthly paymentSchedule together (orthogonal facts)", () => {
+  it("accepts sme with a collateral type and monthly paymentSchedule together", () => {
     const parsed = createApplicationSchema.parse({
       ...base,
       segment: "sme",
       entityType: "corporate",
       collateralType: "car_refinancing",
-      paymentSchedule: "quarterly",
+      paymentSchedule: "monthly",
     });
     assert.equal(parsed.collateralType, "car_refinancing");
-    assert.equal(parsed.paymentSchedule, "quarterly");
+    assert.equal(parsed.paymentSchedule, "monthly");
   });
 
   it("does not require paymentSchedule for seafarer", () => {
@@ -201,5 +201,48 @@ describe("createApplicationSchema paymentSchedule (payment-schedule unification)
       segment: "seafarer",
     });
     assert.equal(parsed.paymentSchedule, "monthly");
+  });
+});
+
+describe("createApplicationSchema collateral locks paymentSchedule to monthly (2026-08-30)", () => {
+  it("rejects sme + car_refinancing collateral + a non-monthly paymentSchedule", () => {
+    const result = createApplicationSchema.safeParse({
+      ...base,
+      segment: "sme",
+      entityType: "corporate",
+      collateralType: "car_refinancing",
+      paymentSchedule: "quarterly",
+    });
+    assert.equal(result.success, false);
+  });
+
+  it("rejects individual + real_estate collateral + a non-monthly paymentSchedule", () => {
+    const result = createApplicationSchema.safeParse({
+      ...base,
+      segment: "individual",
+      collateralType: "real_estate",
+      paymentSchedule: "salary",
+    });
+    assert.equal(result.success, false);
+  });
+
+  it("accepts individual + real_estate collateral + monthly paymentSchedule", () => {
+    const parsed = createApplicationSchema.parse({
+      ...base,
+      segment: "individual",
+      collateralType: "real_estate",
+      paymentSchedule: "monthly",
+    });
+    assert.equal(parsed.paymentSchedule, "monthly");
+  });
+
+  it("still allows a clean (no-collateral) sme or individual loan any of the 8 schedules", () => {
+    const parsed = createApplicationSchema.parse({
+      ...base,
+      segment: "individual",
+      collateralType: "none",
+      paymentSchedule: "quarterly",
+    });
+    assert.equal(parsed.paymentSchedule, "quarterly");
   });
 });

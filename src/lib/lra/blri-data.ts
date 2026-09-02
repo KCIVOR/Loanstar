@@ -1,7 +1,8 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { getActiveComputation } from "@/lib/csa/computation";
-import { computeFirstPaymentDate } from "@/lib/computation/release-date";
+import { addCalendarMonths, computeFirstPaymentDate } from "@/lib/computation/release-date";
+import { halfUp } from "@/lib/computation/money";
 import type { BorrowerRow } from "@/lib/borrowers/types";
 import { mapBorrowerRow } from "@/lib/borrowers/types";
 
@@ -106,16 +107,28 @@ export function buildBlriData(input: {
       bankName: row.bankName,
     }));
   } else {
+    // Gross (pre-discount) monthly amortization — mirrors the same basis
+    // `initializeArAccount` (ar/masterlist.ts) and `savePdcChecks`
+    // (lra/release-service.ts) use, so this pre-PDC-encoding preview never
+    // shows a net-of-discount amount that later disagrees with the real
+    // billed row. See docs/ledger-balance-consistency-fix-implementation-plan.md
+    // Phase 1 (F10).
+    const grossTotalInterest = input.computation.grossTotalInterest;
+    const grossTotalLoan = halfUp(input.computation.principal + grossTotalInterest);
+    const grossMonthlyAmortization = halfUp(grossTotalLoan / input.computation.terms);
+
     pdcSchedule = [];
-    let cursor = new Date(firstPayment);
     for (let i = 0; i < input.computation.terms; i += 1) {
+      // addCalendarMonths clamps to the target month's real last day —
+      // the old cursor-based loop overflowed past month-end (e.g. the 30th
+      // rolling into March instead of clamping to Feb 28). See
+      // docs/date-schedule-overflow-bug-fix-plan.md.
       pdcSchedule.push({
         checkNumber: null,
-        checkDate: formatDate(cursor),
-        amount: input.computation.monthlyAmortization,
+        checkDate: formatDate(addCalendarMonths(firstPayment, i)),
+        amount: grossMonthlyAmortization,
         bankName: "",
       });
-      cursor = new Date(cursor.getFullYear(), cursor.getMonth() + 1, cursor.getDate());
     }
   }
 

@@ -123,6 +123,10 @@ export async function GET(_request: Request, { params }: RouteParams) {
         statusLabel: formatStatusLabel(application.status),
         statusHistory: application.status_history,
         blocker: application.blocker,
+        coBorrowerRequired: application.co_borrower_required === true,
+        coBorrowers: Array.isArray(application.co_borrowers)
+          ? (application.co_borrowers as Array<{ fullName: string; address: string }>)
+          : [],
         segment:
           application.segment === "sme" || application.segment === "individual"
             ? application.segment
@@ -132,6 +136,11 @@ export async function GET(_request: Request, { params }: RouteParams) {
           application.entity_type === "corporate"
             ? application.entity_type
             : null,
+        collateralType:
+          application.collateral_type === "car_refinancing" ||
+          application.collateral_type === "real_estate"
+            ? application.collateral_type
+            : "none",
         paymentSchedule:
           application.payment_schedule === "mpl" ||
           application.payment_schedule === "salary" ||

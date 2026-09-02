@@ -6,6 +6,7 @@ import { writeAuditEvent } from "@/lib/audit/writer";
 import {
   getActiveComputation,
   persistComputation,
+  validateCollateralPaymentSchedule,
   validateFrequencyTerms,
   validateOriginationDiscounts,
   validateSeafarerDueDay,
@@ -439,6 +440,12 @@ async function persistOverrideComputation(
       ? "salary"
       : (existingComp?.payment_frequency as OverrideInput["paymentSchedule"] | undefined)) ??
     (appRow?.payment_schedule as OverrideInput["paymentSchedule"] | undefined);
+
+  const collateralScheduleError = validateCollateralPaymentSchedule(
+    collateralType,
+    resolvedPaymentSchedule,
+  );
+  if (collateralScheduleError) throw new Error(collateralScheduleError);
 
   // validateOriginationDiscounts/validateFrequencyTerms operate on the
   // 7-value computations.payment_frequency vocabulary — translate the same

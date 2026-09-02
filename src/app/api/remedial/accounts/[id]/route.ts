@@ -1,6 +1,7 @@
 import { handleApiError, jsonOk } from "@/lib/api/handler";
 import { fetchAccountPostings } from "@/lib/collection/account-postings";
 import { nextOpenInstallment, type ScheduleLite } from "@/lib/collector/desk";
+import { AMORTIZATION_SCHEDULE_LEDGER_COLUMNS } from "@/lib/ledger/build-account-ledger-rows";
 import {
   ForbiddenError,
   requireModulePermission,
@@ -24,6 +25,7 @@ function asSchedules(raw: unknown): ScheduleLite[] {
       amount_due: Number(r.amount_due ?? 0),
       status: String(r.status ?? "pending"),
       penalty_amount: Number(r.penalty_amount ?? 0),
+      discount_amount: Number(r.discount_amount ?? 0),
       amount_paid: Number(r.amount_paid ?? 0),
     } as ScheduleLite & { amount_paid?: number };
   });
@@ -47,7 +49,7 @@ async function fetchPdcChecks(scope: {
 
   const { data } = await admin
     .from("pdc_checks")
-    .select("sort_order, check_number")
+    .select("sort_order, check_number, status")
     .eq("release_file_id", releaseFileId)
     .order("sort_order", { ascending: true });
   return data ?? [];
@@ -70,14 +72,7 @@ export async function GET(_request: Request, { params }: RouteParams) {
           remedial_assigned_at
         ),
         amortization_schedules (
-          id,
-          installment_no,
-          due_date,
-          amount_due,
-          amount_paid,
-          status,
-          penalty_amount,
-          paid_at
+          ${AMORTIZATION_SCHEDULE_LEDGER_COLUMNS}, amount_paid
         ),
         remedial_turnovers (
           id,
@@ -226,7 +221,7 @@ export async function GET(_request: Request, { params }: RouteParams) {
         daysPastDue: dpd,
         severity,
         nextDueDate: next?.due_date ?? null,
-        nextDueAmount: next ? next.amount_due + next.penalty_amount : null,
+        nextDueAmount: next ? next.netAmountDue : null,
         turnedOverAt:
           latest?.confirmed_at ??
           latest?.created_at ??
@@ -242,8 +237,18 @@ export async function GET(_request: Request, { params }: RouteParams) {
           amountDue: Number(row.amount_due ?? 0),
           amountPaid: Number(row.amount_paid ?? 0),
           penaltyAmount: Number(row.penalty_amount ?? 0),
+          discountAmount: Number(row.discount_amount ?? 0),
           status: String(row.status ?? "pending"),
           paidAt: (row.paid_at as string | null) ?? null,
+          movedAt: (row.moved_at as string | null) ?? null,
+          moveSurchargeAmount:
+            row.move_surcharge_amount != null
+              ? Number(row.move_surcharge_amount)
+              : null,
+          moveOfPaymentBatchId:
+            (row.move_of_payment_batch_id as string | null) ?? null,
+          deferredFromMoveOfPaymentBatchId:
+            (row.deferred_from_move_of_payment_batch_id as string | null) ?? null,
         }))
         .sort((a, b) => a.installmentNo - b.installmentNo),
       payments: paymentsWithUploaderNames,

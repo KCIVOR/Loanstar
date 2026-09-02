@@ -58,12 +58,19 @@ export function simulateAgingStep(input: {
     // row on the account, independent of whether there's an overdue
     // installment at all, so it's computed before that early return below.
     discountsCleared: [] as string[],
+    // The account's total/balance were set assuming these would be honored —
+    // a reverted, unpaid discount means the borrower owes this much more
+    // after all (fixed 2026-08-31, mirrors posting.ts/the SQL parity twin).
+    revertedDiscountTotal: 0,
   };
 
   for (const s of input.schedules) {
     if (s.status === "paid" || s.status === "rolled") continue;
     if ((s.discountAmount ?? 0) > 0 && daysPastDue(s.dueDate, asOf) >= 0) {
       result.discountsCleared.push(s.id);
+      result.revertedDiscountTotal = halfUp(
+        result.revertedDiscountTotal + (s.discountAmount ?? 0),
+      );
     }
   }
 
@@ -73,8 +80,14 @@ export function simulateAgingStep(input: {
 
   let finalPenalty = overdue.penaltyAmount;
   // Base unpaid balance only — accrued penalty is deliberately excluded so a
-  // repeat run recomputes the same figure and no-ops (see posting.ts).
-  const outstanding = overdue.amountDue - overdue.amountPaid;
+  // repeat run recomputes the same figure and no-ops (see posting.ts). Net
+  // of discount — a still-discounted overdue installment (reversion and
+  // penalty both firing in the same pass) is penalized on what's really
+  // still owed, not the gross amount_due (fixed 2026-08-31).
+  const outstanding = Math.max(
+    0,
+    overdue.amountDue - (overdue.discountAmount ?? 0) - overdue.amountPaid,
+  );
   const penalty = calculatePenaltyAmount(outstanding, rate);
   if (penalty > overdue.penaltyAmount) {
     result.penaltyWritten = {
@@ -92,7 +105,13 @@ export function simulateAgingStep(input: {
       .sort((a, b) => a.installmentNo - b.installmentNo)[0];
     if (next) {
       const rollAmount = halfUp(
-        overdue.amountDue - overdue.amountPaid + finalPenalty,
+        Math.max(
+          0,
+          overdue.amountDue -
+            (overdue.discountAmount ?? 0) -
+            overdue.amountPaid +
+            finalPenalty,
+        ),
       );
       result.rollover = {
         fromId: overdue.id,
@@ -394,5 +413,130 @@ describe("origination-discount reversion (Phase 3 parity fixtures)", () => {
     // The SQL's own WHERE clause (`discount_amount > 0`) makes every run after
     // the first a no-op — this proves the JS mirror agrees.
     assert.equal(clearedCount, 1);
+  });
+});
+
+describe("penalty and rollover are computed net of an active discount (fixed 2026-08-31)", () => {
+  const base = {
+    id: "i1",
+    installmentNo: 1,
+    dueDate: "2026-06-01",
+    status: "pending",
+    amountDue: 10000,
+    amountPaid: 0,
+    penaltyAmount: 0,
+    rolledAt: null as string | null,
+  };
+  const next = {
+    id: "i2",
+    installmentNo: 2,
+    dueDate: "2026-07-01",
+    status: "pending",
+    amountDue: 10000,
+    amountPaid: 0,
+    penaltyAmount: 0,
+    rolledAt: null as string | null,
+  };
+
+  it("charges penalty on the net (discounted) balance, not the gross amount_due", () => {
+    // 10,000 due, 4,000 still-active discount → real outstanding 6,000.
+    // At 5%, that's a 300 penalty, not 500.
+    const out = simulateAgingStep({
+      schedules: [
+        { ...base, dueDate: "2026-07-16", discountAmount: 4000 },
+        { ...next, dueDate: "2026-08-16" },
+      ],
+      asOf: "2026-07-17T12:00:00.000Z",
+      penaltyRate: 0.05,
+    });
+    assert.equal(out.penaltyWritten?.penaltyAmount, 300);
+  });
+
+  it("a fully-discounted overdue installment accrues no penalty at all", () => {
+    const out = simulateAgingStep({
+      schedules: [
+        { ...base, dueDate: "2026-07-16", discountAmount: 10000 },
+        { ...next, dueDate: "2026-08-16" },
+      ],
+      asOf: "2026-07-17T12:00:00.000Z",
+      penaltyRate: 0.05,
+    });
+    assert.equal(out.penaltyWritten, null);
+  });
+
+  it("rolls forward the net balance, not the gross amount_due", () => {
+    // 10,000 due, 4,000 discount, penalty ends up 300 (5% of net 6,000) →
+    // roll amount should be 6,000 + 300 = 6,300, not 10,000 + penalty.
+    const out = simulateAgingStep({
+      schedules: [
+        { ...base, dueDate: "2026-06-17", discountAmount: 4000 },
+        next,
+      ],
+      asOf: "2026-07-17T12:00:00.000Z",
+      penaltyRate: 0.05,
+    });
+    assert.ok(out.rollover);
+    assert.equal(out.rollover!.rollAmount, 6300);
+  });
+});
+
+describe("reverted discount carries onto the account balance (fixed 2026-08-31)", () => {
+  const base = {
+    id: "i1",
+    installmentNo: 1,
+    dueDate: "2026-06-01",
+    status: "pending",
+    amountDue: 10000,
+    amountPaid: 0,
+    penaltyAmount: 0,
+    rolledAt: null as string | null,
+  };
+  const next = {
+    id: "i2",
+    installmentNo: 2,
+    dueDate: "2026-07-01",
+    status: "pending",
+    amountDue: 10000,
+    amountPaid: 0,
+    penaltyAmount: 0,
+    rolledAt: null as string | null,
+  };
+
+  it("a not-yet-due discount contributes nothing to revertedDiscountTotal", () => {
+    const out = simulateAgingStep({
+      schedules: [
+        { ...base, dueDate: "2026-08-01", discountAmount: 500 },
+        { ...next, dueDate: "2026-09-01" },
+      ],
+      asOf: "2026-07-17T12:00:00.000Z",
+    });
+    assert.equal(out.revertedDiscountTotal, 0);
+  });
+
+  it("a reverted discount is reported so the caller can add it back to total_loan/outstanding_balance", () => {
+    const out = simulateAgingStep({
+      schedules: [
+        { ...base, dueDate: "2026-07-17", discountAmount: 500 },
+        { ...next, dueDate: "2026-09-01" },
+      ],
+      asOf: "2026-07-17T12:00:00.000Z",
+    });
+    assert.deepEqual(out.discountsCleared, ["i1"]);
+    assert.equal(out.revertedDiscountTotal, 500);
+  });
+
+  it("sums multiple discounts reverting on the same run (AN300432 repro: 3 discounted rows, one already due)", () => {
+    const out = simulateAgingStep({
+      schedules: [
+        { ...base, id: "i1", dueDate: "2026-06-01", discountAmount: 1544.4 },
+        { ...next, id: "i2", dueDate: "2026-07-17", discountAmount: 1544.4 },
+        { ...base, id: "i3", installmentNo: 3, dueDate: "2026-09-01", discountAmount: 1544.4 },
+      ],
+      asOf: "2026-07-17T12:00:00.000Z",
+      penaltyRate: 0.05,
+    });
+    assert.deepEqual(out.discountsCleared.sort(), ["i1", "i2"]);
+    // i3 isn't due yet — only i1 and i2's discounts revert.
+    assert.equal(out.revertedDiscountTotal, 3088.8);
   });
 });

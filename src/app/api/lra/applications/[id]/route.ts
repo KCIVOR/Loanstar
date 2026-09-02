@@ -29,6 +29,9 @@ export async function GET(_request: Request, { params }: RouteParams) {
         application_no,
         status,
         blocker,
+        co_borrower_required,
+        co_borrowers,
+        co_borrower_completed_at,
         segment,
         entity_type,
         borrowers ( id, borrower_no, first_name, last_name, email, business_info )
@@ -120,6 +123,11 @@ export async function GET(_request: Request, { params }: RouteParams) {
         status: app.status,
         statusLabel: formatStatusLabel(app.status),
         blocker: app.blocker,
+        coBorrowerRequired: app.co_borrower_required === true,
+        coBorrowers: Array.isArray(app.co_borrowers)
+          ? (app.co_borrowers as Array<{ fullName: string; address: string }>)
+          : [],
+        coBorrowerCompletedAt: (app.co_borrower_completed_at as string | null) ?? null,
         segment:
           app.segment === "sme" || app.segment === "individual"
             ? app.segment
@@ -141,6 +149,7 @@ export async function GET(_request: Request, { params }: RouteParams) {
             monthlyAmortization: computation.monthlyAmortization,
             totalLoan: computation.totalLoan,
             totalInterest: computation.totalInterest,
+            grossTotalInterest: computation.grossTotalInterest,
             terms: computation.terms,
             releaseDate: computation.releaseDate,
             firstPaymentDate: computation.firstPaymentDate,

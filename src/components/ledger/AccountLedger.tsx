@@ -10,10 +10,24 @@ import {
   formatLedgerTextCell,
 } from "@/lib/ledger/format";
 
+/** Lets a caller (e.g. Collector's Move of Payment) turn eligible
+ * "installment" rows into a radio-selectable list, with a Surcharge column
+ * appended — instead of duplicating the ledger as a separate picker table.
+ * Ignored entirely when omitted, so every other AccountLedger consumer
+ * renders exactly as before. */
+type LedgerSelection = {
+  /** Due dates (installment rows) that can be picked. */
+  eligibleDueDates: Set<string>;
+  selectedDueDate: string | null;
+  surchargeByDueDate: Map<string, number>;
+  onSelect: (dueDate: string) => void;
+};
+
 type AccountLedgerProps = {
   rows: AccountLedgerRow[];
   className?: string;
   caption?: string;
+  selection?: LedgerSelection;
 };
 
 function moneyCell(value: number | null) {
@@ -28,6 +42,11 @@ function statusVariant(
   if (status === "partial") return "warning";
   if (status === "overdue") return "danger";
   if (status === "pending") return "navy";
+  // Move of Payment (see
+  // docs/revision-plans/feature-move-of-payment-implementation-plan.md).
+  if (status === "moved") return "warning";
+  // Fixes Plan Phase 4 — a collected Move of Payment surcharge line.
+  if (status === "surcharge") return "navy";
   return "neutral";
 }
 
@@ -73,6 +92,7 @@ export function AccountLedger({
   rows,
   className = "",
   caption,
+  selection,
 }: AccountLedgerProps) {
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
 
@@ -95,6 +115,7 @@ export function AccountLedger({
       <Table className="is-compact is-ledger">
         <thead>
           <tr>
+            {selection ? <Th></Th> : null}
             <Th>Check No.</Th>
             <Th>Due Date</Th>
             <Th num>Target</Th>
@@ -106,6 +127,7 @@ export function AccountLedger({
             <Th num>Credit</Th>
             <Th num>Balance</Th>
             <Th>Status</Th>
+            {selection ? <Th num>Surcharge</Th> : null}
           </tr>
         </thead>
         <tbody>
@@ -113,8 +135,36 @@ export function AccountLedger({
             if (item.type === "row") {
               const row = item.row;
               const isTotals = row.kind === "totals";
+              const eligible =
+                selection != null &&
+                row.kind === "installment" &&
+                row.dueDate != null &&
+                selection.eligibleDueDates.has(row.dueDate);
+              const checked = eligible && row.dueDate === selection?.selectedDueDate;
               return (
-                <tr key={row.key} className={isTotals ? "tfoot-row" : undefined}>
+                <tr
+                  key={row.key}
+                  className={cn(
+                    isTotals && "tfoot-row",
+                    eligible && "cursor-pointer",
+                    checked && "is-selected",
+                  )}
+                  onClick={
+                    eligible ? () => selection!.onSelect(row.dueDate!) : undefined
+                  }
+                >
+                  {selection ? (
+                    <Td>
+                      {eligible ? (
+                        <input
+                          type="radio"
+                          name="ledger-move-of-payment"
+                          checked={checked}
+                          onChange={() => selection.onSelect(row.dueDate!)}
+                        />
+                      ) : null}
+                    </Td>
+                  ) : null}
                   <Td className="mono">
                     {isTotals
                       ? "Report Total"
@@ -152,6 +202,15 @@ export function AccountLedger({
                       "—"
                     )}
                   </Td>
+                  {selection ? (
+                    <Td num className="mono">
+                      {eligible
+                        ? moneyCell(
+                            selection.surchargeByDueDate.get(row.dueDate!) ?? null,
+                          )
+                        : "—"}
+                    </Td>
+                  ) : null}
                 </tr>
               );
             }
@@ -171,6 +230,7 @@ export function AccountLedger({
                   onClick={() => toggle(item.scheduleId)}
                   aria-expanded={isOpen}
                 >
+                  {selection ? <Td></Td> : null}
                   <Td className="mono">{formatLedgerTextCell(first.checkNo)}</Td>
                   <Td className="mono">{formatLedgerDateCell(first.dueDate)}</Td>
                   <Td num className="mono">
@@ -207,10 +267,12 @@ export function AccountLedger({
                       "—"
                     )}
                   </Td>
+                  {selection ? <Td num className="mono">—</Td> : null}
                 </tr>
                 {isOpen
                   ? item.rows.map((r) => (
                       <tr key={r.key} className="bg-surface-2/50">
+                        {selection ? <Td></Td> : null}
                         <Td className="mono text-ink-400">{""}</Td>
                         <Td className="mono text-ink-400">{""}</Td>
                         <Td num className="mono text-ink-400">
@@ -238,6 +300,7 @@ export function AccountLedger({
                           {moneyCell(r.balance)}
                         </Td>
                         <Td>—</Td>
+                        {selection ? <Td num className="mono">—</Td> : null}
                       </tr>
                     ))
                   : null}

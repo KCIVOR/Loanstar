@@ -1,4 +1,5 @@
 import {
+  addCalendarMonths,
   advanceSemiMonthly,
   computeFirstPaymentDate,
 } from "../computation/release-date";
@@ -136,8 +137,7 @@ export function generateAmortizationSchedule(input: {
   const installments: AmortizationInstallment[] = [];
 
   for (let i = 0; i < input.terms; i += 1) {
-    const due = new Date(firstPayment);
-    due.setMonth(due.getMonth() + i);
+    const due = addCalendarMonths(firstPayment, i);
     let amountDue = monthly;
     if (i === input.terms - 1 && input.totalLoan != null) {
       const prior = halfUp(monthly * (input.terms - 1));
@@ -257,9 +257,12 @@ function generateInterestPrincipalSplitSchedule(input: {
 
   for (let i = 1; i <= numPayments; i += 1) {
     const monthOffset = i * input.frequencyMonths;
-    const dueDate = new Date(release);
-    dueDate.setMonth(dueDate.getMonth() + monthOffset);
-    dueDate.setDate(dueDay);
+    // Single atomic construction — dueDay is baked in from the start, so
+    // the release date's own day-of-month (which can be 29-31) never gets
+    // a chance to overflow the target month before dueDay is applied. The
+    // old setMonth-then-setDate sequence could silently skip a whole month
+    // this way; see docs/date-schedule-overflow-bug-fix-plan.md.
+    const dueDate = addCalendarMonths(release, monthOffset, dueDay);
 
     const dueDateStr = formatDateLocal(dueDate);
 

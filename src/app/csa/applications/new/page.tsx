@@ -61,6 +61,11 @@ function CsaNewApplicationForm() {
 
   const collateralEligible = segment === "sme" || segment === "individual";
   const paymentScheduleEligible = segment === "sme" || segment === "individual";
+  /** Auto/Real Estate collateral locks the schedule to Regular (Monthly) —
+   * confirmed against the real Excel calculator and the paper application
+   * form (2026-08-30): collateral and schedule are never independent
+   * choices there, a collateral loan is always monthly cadence. */
+  const paymentScheduleLocked = collateralType !== "none";
 
   function handleSegmentChange(next: LoanSegment) {
     setSegment(next);
@@ -70,6 +75,7 @@ function CsaNewApplicationForm() {
 
   function handleCollateralTypeChange(next: CollateralType) {
     setCollateralType(next);
+    if (next !== "none") setPaymentSchedule("monthly");
   }
 
   async function handleEmailBlur() {
@@ -248,20 +254,32 @@ function CsaNewApplicationForm() {
           ) : null}
           {paymentScheduleEligible ? (
             <div className="sm:col-span-2">
-              <Label htmlFor="paymentSchedule">Loan schedule</Label>
+              <Label htmlFor="paymentSchedule">
+                Loan schedule
+                {paymentScheduleLocked ? (
+                  <span className="text-ink-400 ml-1 text-xs">
+                    (locked to Regular Monthly — Auto/Real Estate loans don't use other schedules)
+                  </span>
+                ) : null}
+              </Label>
               <Select
                 id="paymentSchedule"
                 value={paymentSchedule}
+                disabled={paymentScheduleLocked}
                 onChange={(e) => setPaymentSchedule(e.target.value as PaymentSchedule)}
               >
                 <option value="monthly">Regular (Monthly)</option>
-                <option value="mpl">MPL (Multi-Purpose Loan)</option>
-                <option value="salary">Salary (semi-monthly)</option>
-                <option value="weekly">Invoice Financing (Weekly)</option>
-                <option value="bi_monthly">Bi-monthly (every 15 days)</option>
-                <option value="quarterly">Quarterly</option>
-                <option value="two_monthly">Two-monthly</option>
-                <option value="daily">Daily</option>
+                {!paymentScheduleLocked ? (
+                  <>
+                    <option value="mpl">MPL (Multi-Purpose Loan)</option>
+                    <option value="salary">Salary (semi-monthly)</option>
+                    <option value="weekly">Invoice Financing (Weekly)</option>
+                    <option value="bi_monthly">Bi-monthly (every 15 days)</option>
+                    <option value="quarterly">Quarterly</option>
+                    <option value="two_monthly">Two-monthly</option>
+                    <option value="daily">Daily</option>
+                  </>
+                ) : null}
               </Select>
             </div>
           ) : null}

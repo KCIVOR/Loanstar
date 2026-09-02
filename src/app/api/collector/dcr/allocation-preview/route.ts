@@ -35,7 +35,7 @@ export async function GET(request: Request) {
 
     const { data: payment, error: paymentError } = await supabase
       .from("payments")
-      .select("id, amount, masterlist_id")
+      .select("id, amount, masterlist_id, move_of_payment_batch_id")
       .eq("id", paymentId)
       .single();
 
@@ -43,10 +43,16 @@ export async function GET(request: Request) {
       throw new Error(paymentError?.message ?? "Payment not found");
     }
 
+    // Fixes Plan Phase 3 (Issue 5) — a Move of Payment surcharge must not
+    // pay down any installment. Default it to a single fully-unapplied line
+    // so the pop-up opens with nothing pre-checked. The Collector can still
+    // override in the modal.
+    const isSurcharge = Boolean(payment.move_of_payment_batch_id);
+
     const { data: scheduleRows, error: scheduleError } = await supabase
       .from("amortization_schedules")
       .select(
-        "id, installment_no, due_date, amount_due, penalty_amount, amount_paid, status",
+        "id, installment_no, due_date, amount_due, penalty_amount, discount_amount, amount_paid, status",
       )
       .eq("masterlist_id", payment.masterlist_id)
       .in("status", ["pending", "partial", "overdue"])
@@ -60,16 +66,16 @@ export async function GET(request: Request) {
       dueDate: row.due_date as string,
       amountDue: Number(row.amount_due),
       penaltyAmount: Number(row.penalty_amount ?? 0),
+      discountAmount: Number(row.discount_amount ?? 0),
       amountPaid: Number(row.amount_paid),
       status: row.status as "pending" | "partial" | "overdue",
     }));
 
-    const allocation = computeAutoAllocation(
-      Number(payment.amount),
-      installments,
-    );
+    const allocation = isSurcharge
+      ? [{ amortizationScheduleId: null, amount: Number(payment.amount) }]
+      : computeAutoAllocation(Number(payment.amount), installments);
 
-    return jsonOk({ installments, allocation });
+    return jsonOk({ installments, allocation, isSurcharge });
   } catch (error) {
     return handleApiError(error);
   }

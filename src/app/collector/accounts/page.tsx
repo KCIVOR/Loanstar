@@ -311,6 +311,12 @@ export default function CollectorAccountsPage() {
         >
           Record payment
         </Link>
+        <Link
+          href={`/collector/accounts/${acc.id}/move-of-payment`}
+          className="btn btn-secondary btn-sm"
+        >
+          Move of payment
+        </Link>
       </div>
     );
   }

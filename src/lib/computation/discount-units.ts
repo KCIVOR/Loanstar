@@ -1,10 +1,12 @@
 import {
+  generateAmortizationSchedule,
   generateBiMonthlySchedule,
   generateQuarterlySchedule,
   generateTwoMonthlySchedule,
 } from "../ar/schedule";
 import { computeInvoiceLoan } from "./invoice";
 import { halfUp } from "./money";
+import { addCalendarMonths, formatDateLocal } from "./release-date";
 
 export type ScheduleType =
   | "monthly"
@@ -19,9 +21,12 @@ export type ScheduleType =
 
 export type DiscountUnit = {
   /** What CSA picks and what `origination_discounts[].installmentNo` means
-   * for this loan — "Month N" for most frequencies, but "Quarter N" /
-   * "Payment N" for Quarterly/Two-monthly, since those don't have `terms`
-   * real due dates. */
+   * for this loan — "Month N" for Monthly/MPL/Seafarer, "Week N" for
+   * Invoice, "Quarter N" for Quarterly, "Payment N" for Two-monthly/
+   * Bi-Monthly/Salary. Quarterly/Two-monthly have fewer units than `terms`
+   * (grouped by real due date); Salary/Bi-Monthly have `terms * 2` and
+   * Invoice has `terms * 4` (one per real payment, confirmed 2026-08-31 —
+   * CSA discounts a specific payment, never a bundle of several). */
   unitNo: number;
   label: string;
   dueDate: string | null;
@@ -39,7 +44,10 @@ export type DiscountUnit = {
  * How many discount units a loan of this frequency/terms has — money-
  * independent, safe to call before a computation exists (e.g. validating a
  * request body). Quarterly/Two-monthly have far fewer real due dates than
- * `terms` (a 12-month Quarterly loan has 4, not 12); every other frequency's
+ * `terms` (a 12-month Quarterly loan has 4, not 12); Salary/Bi-Monthly have
+ * `terms * 2` and Invoice has `terms * 4` (real payments per month —
+ * confirmed 2026-08-31 the client discounts per real payment, never a
+ * bundle of several, for every schedule type); every other frequency's
  * unit count equals `terms`; Daily has none — it's a single, already-fixed
  * payment, nothing left to discount.
  */
@@ -47,21 +55,40 @@ export function maxDiscountUnits(paymentFrequency: ScheduleType, terms: number):
   if (paymentFrequency === "daily") return 0;
   if (paymentFrequency === "quarterly") return Math.floor(terms / 3);
   if (paymentFrequency === "two_monthly") return Math.floor(terms / 2);
+  if (paymentFrequency === "bi_monthly" || paymentFrequency === "semi_monthly") {
+    return terms * 2;
+  }
+  // Invoice: one unit per real weekly payment — 4 weeks per month, always
+  // (confirmed 2026-08-31 — every schedule type discounts per real payment,
+  // not per calendar bundle; Invoice was the one remaining exception,
+  // grouping 4 real weeks into one "Month" choice).
+  if (paymentFrequency === "weekly") return terms * 4;
   return terms;
 }
 
 function unitLabel(paymentFrequency: ScheduleType, unitNo: number): string {
   if (paymentFrequency === "quarterly") return `Quarter ${unitNo}`;
-  if (paymentFrequency === "two_monthly") return `Payment ${unitNo}`;
+  if (
+    paymentFrequency === "two_monthly" ||
+    paymentFrequency === "bi_monthly" ||
+    paymentFrequency === "semi_monthly"
+  ) {
+    return `Payment ${unitNo}`;
+  }
+  if (paymentFrequency === "weekly") return `Week ${unitNo}`;
   return `Month ${unitNo}`;
 }
 
+/** Monthly (SME/MPL/Seafarer) only — one real row per month, one unit per
+ * row. Salary/Bi-Monthly used to share this with a 2-rows-per-unit mode;
+ * confirmed 2026-08-31 the client wants per-real-payment discount
+ * selection, so they now get their own real-schedule-based units below
+ * instead (matching how Quarterly/Two-monthly/Invoice already work). */
 function flatMonthlyUnits(input: {
   paymentFrequency: ScheduleType;
   terms: number;
   totalInterest: number;
   firstPaymentDate?: string | Date | null;
-  rowsPerMonth: 1 | 2;
 }): DiscountUnit[] {
   const interestPerMonth = halfUp(input.totalInterest / input.terms);
   const anchor = input.firstPaymentDate
@@ -73,18 +100,14 @@ function flatMonthlyUnits(input: {
     const unitNo = i + 1;
     let dueDate: string | null = null;
     if (anchor) {
-      const d = new Date(anchor);
-      d.setMonth(d.getMonth() + i);
-      dueDate = d.toISOString().slice(0, 10);
+      dueDate = formatDateLocal(addCalendarMonths(anchor, i));
     }
-    const installmentNos =
-      input.rowsPerMonth === 2 ? [2 * i + 1, 2 * i + 2] : [unitNo];
     return {
       unitNo,
       label: unitLabel(input.paymentFrequency, unitNo),
       dueDate,
       interestAmount: interestPerMonth,
-      installmentNos,
+      installmentNos: [unitNo],
     };
   });
 }
@@ -119,6 +142,10 @@ export function buildDiscountUnits(input: {
   if (input.paymentFrequency === "daily") return [];
 
   if (input.paymentFrequency === "weekly") {
+    // One unit per real weekly payment (confirmed 2026-08-31 — CSA
+    // discounts a specific payment, not a whole calendar month; Invoice was
+    // the last schedule type still bundling multiple real payments — 4
+    // weeks — into a single "Month" choice).
     if (!input.releaseDate) return [];
     const result = computeInvoiceLoan({
       principal: input.principal,
@@ -126,19 +153,13 @@ export function buildDiscountUnits(input: {
       releaseDate:
         input.releaseDate instanceof Date ? input.releaseDate : new Date(input.releaseDate),
     });
-    const units: DiscountUnit[] = [];
-    for (let month = 1; month <= terms; month += 1) {
-      const weeks = result.weeklySchedule.filter((w) => w.month === month);
-      if (weeks.length === 0) continue;
-      units.push({
-        unitNo: month,
-        label: `Month ${month}`,
-        dueDate: weeks[0].dueDate,
-        interestAmount: halfUp(weeks.reduce((sum, w) => sum + w.amountDue, 0)),
-        installmentNos: weeks.map((w) => w.weekNo),
-      });
-    }
-    return units;
+    return result.weeklySchedule.map((week) => ({
+      unitNo: week.weekNo,
+      label: `Week ${week.weekNo}`,
+      dueDate: week.dueDate,
+      interestAmount: week.amountDue,
+      installmentNos: [week.weekNo],
+    }));
   }
 
   if (input.paymentFrequency === "quarterly" || input.paymentFrequency === "two_monthly") {
@@ -177,15 +198,56 @@ export function buildDiscountUnits(input: {
     return units;
   }
 
-  if (input.paymentFrequency === "bi_monthly" || input.paymentFrequency === "semi_monthly") {
-    // 2 real rows per calendar month, flat interest split evenly across
-    // `terms` months — same total-interest-over-term model as a regular
-    // monthly loan (neither product has Invoice's escalating-rate
-    // structure, so a flat per-month share is accurate, not an
-    // approximation).
-    return flatMonthlyUnits({ ...input, rowsPerMonth: 2 });
+  if (input.paymentFrequency === "bi_monthly") {
+    // One unit per real payment (confirmed 2026-08-31 — CSA discounts a
+    // specific payment, not a whole calendar month) — reuses the exact same
+    // generator PDC/AR use, same pattern as Quarterly/Two-monthly above.
+    if (!input.releaseDate) return [];
+    const releaseDate =
+      input.releaseDate instanceof Date ? input.releaseDate : new Date(input.releaseDate);
+    const monthlyAmortization = halfUp(input.totalLoan / terms);
+    const rows = generateBiMonthlySchedule({
+      terms,
+      monthlyAmortization,
+      releaseDate,
+      totalLoan: input.totalLoan,
+    });
+    const interestPerRow = halfUp(input.totalInterest / rows.length);
+    return rows.map((row) => ({
+      unitNo: row.installmentNo,
+      label: unitLabel("bi_monthly", row.installmentNo),
+      dueDate: row.dueDate,
+      interestAmount: interestPerRow,
+      installmentNos: [row.installmentNo],
+    }));
+  }
+
+  if (input.paymentFrequency === "semi_monthly") {
+    // One unit per real payment, same reasoning as Bi-Monthly above. Needs
+    // a real firstPaymentDate — Salary's date rule (advanceSemiMonthly)
+    // only lives inside generateAmortizationSchedule, not a standalone
+    // generator, so it's reused directly rather than duplicated here.
+    if (!input.firstPaymentDate) return [];
+    const monthlyAmortization = halfUp(input.totalLoan / terms);
+    const rows = generateAmortizationSchedule({
+      terms,
+      monthlyAmortization,
+      releaseDate: input.releaseDate ?? input.firstPaymentDate,
+      addonMonths: 0,
+      firstPaymentDate: input.firstPaymentDate,
+      totalLoan: input.totalLoan,
+      paymentFrequency: "semi_monthly",
+    });
+    const interestPerRow = halfUp(input.totalInterest / rows.length);
+    return rows.map((row) => ({
+      unitNo: row.installmentNo,
+      label: unitLabel("semi_monthly", row.installmentNo),
+      dueDate: row.dueDate,
+      interestAmount: interestPerRow,
+      installmentNos: [row.installmentNo],
+    }));
   }
 
   // Monthly (SME/MPL/Seafarer, the default) — 1 real row per month.
-  return flatMonthlyUnits({ ...input, rowsPerMonth: 1 });
+  return flatMonthlyUnits(input);
 }

@@ -91,6 +91,31 @@ export function computeSalaryFirstPaymentDate(
 }
 
 /**
+ * Advances `anchor` by `months` calendar months, clamping the day-of-month
+ * to the target month's real last day — same technique
+ * `computeSmeFirstPaymentDate` already uses correctly
+ * (`Math.min(day, lastDay)`), extended to every installment after the
+ * first one. Pass `day` to force a specific day-of-month (still clamped)
+ * instead of reusing `anchor`'s own day — this is what closes the
+ * Quarterly/Two-Monthly bug, where the anchor's own day must never be
+ * allowed to overflow the target month before the real due-day gets
+ * applied. See docs/date-schedule-overflow-bug-fix-plan.md.
+ *
+ * Without this, `date.setMonth(date.getMonth() + n)` silently overflows
+ * into the next month whenever the day doesn't fit (e.g. the 30th rolling
+ * into February lands on March 2, not Feb 28) — confirmed live 2026-08-30,
+ * this is the fix.
+ */
+export function addCalendarMonths(anchor: Date, months: number, day?: number): Date {
+  const targetMonth = anchor.getMonth() + months;
+  const targetYear = anchor.getFullYear() + Math.floor(targetMonth / 12);
+  const normalizedMonth = ((targetMonth % 12) + 12) % 12;
+  const wantedDay = day ?? anchor.getDate();
+  const lastDayOfTargetMonth = new Date(targetYear, normalizedMonth + 1, 0).getDate();
+  return new Date(targetYear, normalizedMonth, Math.min(wantedDay, lastDayOfTargetMonth));
+}
+
+/**
  * Advances a semi-monthly (Salary) "YYYY-MM-DD" anchor date by `index` steps
  * through the alternating 15th / end-of-month sequence — e.g. from an
  * end-of-month anchor: same month's end (index 0) → next month's 15th (1) →
@@ -131,15 +156,15 @@ export function advanceSemiMonthly(anchorDate: string, index: number): string {
  * LRA page (building the on-screen draft) and `savePdcChecks` (validating
  * what gets submitted), so the two can never disagree with each other.
  *
- * Deliberately reproduces `Date.setMonth`'s plain overflow behavior exactly
- * as-is (e.g. Jan 31 + 1 month rolls into March, not clamped to Feb 28) —
- * this is a straight extraction of existing behavior, not a correctness
- * fix. Changing that behavior is a separate decision.
+ * Clamps to the target month's real last day via `addCalendarMonths` — e.g.
+ * Jan 31 + 1 month lands on Feb 28, not a March 1/2/3 overflow. Confirmed
+ * live 2026-08-30 that the old raw `Date.setMonth` overflow was a real bug
+ * reaching real PDC checks, not intentional; see
+ * docs/date-schedule-overflow-bug-fix-plan.md.
  */
 export function addScheduleMonths(anchorDate: string, index: number): string {
   const date = new Date(anchorDate);
-  date.setMonth(date.getMonth() + index);
-  return date.toISOString().slice(0, 10);
+  return formatDateLocal(addCalendarMonths(date, index));
 }
 
 /**

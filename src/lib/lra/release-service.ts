@@ -215,6 +215,27 @@ export async function getReleaseFile(
 }
 
 /**
+ * Gross (pre-discount) basis for PDC amounts — must exactly mirror
+ * `initializeArAccount`'s identical computation in ar/masterlist.ts. Every
+ * PDC-amount generator below feeds this same gross basis into the exact
+ * same schedule functions `initializeArAccount` calls at release, so a
+ * check encoded here can never disagree with the row it will actually
+ * settle. See docs/ledger-balance-consistency-fix-implementation-plan.md
+ * Phase 1 (F10) — before this fix these generators read
+ * computation.totalLoan/totalInterest/monthlyAmortization directly, which
+ * are already net-of-discount, silently diluting the discount across every
+ * PDC check instead of concentrating it on the CSA-selected installments.
+ */
+function grossPdcBasis(
+  computation: NonNullable<Awaited<ReturnType<typeof getActiveComputation>>>,
+): { grossTotalInterest: number; grossTotalLoan: number; grossMonthlyAmortization: number } {
+  const grossTotalInterest = computation.grossTotalInterest;
+  const grossTotalLoan = halfUp(computation.principal + grossTotalInterest);
+  const grossMonthlyAmortization = halfUp(grossTotalLoan / computation.terms);
+  return { grossTotalInterest, grossTotalLoan, grossMonthlyAmortization };
+}
+
+/**
  * Builds the expected {amount, date} PDC check schedule for the 5 schedule
  * types added after the original monthly/semi-monthly-only PDC logic
  * (Invoice/Bi-Monthly/Quarterly/Two-Monthly/Daily). Reuses the exact same
@@ -231,7 +252,10 @@ function buildExpectedPdcSchedule(
   if (computation.paymentFrequency === "daily") {
     // Single manually-dated payment — doesn't anchor off releaseDate at all,
     // just the CSA-entered firstPaymentDate (already validated above this
-    // call) and the already-computed principal+interest total.
+    // call) and the already-computed principal+interest total. Daily has
+    // zero discount units (see masterlist.ts), so gross vs net is moot here
+    // — matches initializeArAccount, which also reads computation.totalLoan
+    // (net) for Daily specifically.
     return [{ amount: computation.totalLoan, date: computation.firstPaymentDate! }];
   }
 
@@ -244,6 +268,9 @@ function buildExpectedPdcSchedule(
   const releaseDate = new Date(computation.releaseDate);
 
   if (computation.paymentFrequency === "weekly") {
+    // Invoice's own real interest engine — principal/terms only, never reads
+    // totalInterest/totalLoan, so gross vs net doesn't apply here either
+    // (matches initializeArAccount exactly).
     const result = computeInvoiceLoan({
       principal: computation.principal,
       terms: computation.terms,
@@ -255,20 +282,23 @@ function buildExpectedPdcSchedule(
     }));
   }
 
+  const { grossTotalInterest, grossTotalLoan, grossMonthlyAmortization } =
+    grossPdcBasis(computation);
+
   if (computation.paymentFrequency === "bi_monthly") {
     return generateBiMonthlySchedule({
       terms: computation.terms,
-      monthlyAmortization: computation.monthlyAmortization,
+      monthlyAmortization: grossMonthlyAmortization,
       releaseDate,
-      totalLoan: computation.totalLoan,
+      totalLoan: grossTotalLoan,
     }).map((row) => ({ amount: row.amountDue, date: row.dueDate }));
   }
 
   if (computation.paymentFrequency === "quarterly") {
     return generateQuarterlySchedule({
       terms: computation.terms,
-      totalLoan: computation.totalLoan,
-      totalInterest: computation.totalInterest,
+      totalLoan: grossTotalLoan,
+      totalInterest: grossTotalInterest,
       releaseDate,
       dueDay: computation.dueDay ?? 10,
     }).map((row) => ({ amount: row.amountDue, date: row.dueDate }));
@@ -277,8 +307,8 @@ function buildExpectedPdcSchedule(
   // two_monthly — the only remaining case among the 5 new schedule types.
   return generateTwoMonthlySchedule({
     terms: computation.terms,
-    totalLoan: computation.totalLoan,
-    totalInterest: computation.totalInterest,
+    totalLoan: grossTotalLoan,
+    totalInterest: grossTotalInterest,
     releaseDate,
     dueDay: computation.dueDay ?? 10,
   }).map((row) => ({ amount: row.amountDue, date: row.dueDate }));
@@ -362,9 +392,15 @@ export async function savePdcChecks(
     return { ...row, checkNumber, bankName };
   });
 
-  const halfAmortization = halfUp(computation.monthlyAmortization / 2);
+  // Same gross basis as buildExpectedPdcSchedule / initializeArAccount — a
+  // discounted Salary/Seafarer/SME/MPL loan's PDC amounts must match the
+  // real per-row amount generateAmortizationSchedule will produce, not the
+  // net-of-discount computation.monthlyAmortization/totalLoan (F10 fix, see
+  // docs/ledger-balance-consistency-fix-implementation-plan.md Phase 1).
+  const { grossTotalLoan, grossMonthlyAmortization } = grossPdcBasis(computation);
+  const halfAmortization = halfUp(grossMonthlyAmortization / 2);
   const lastSemiMonthlyAmount = halfUp(
-    computation.totalLoan - halfUp(halfAmortization * (expectedCount - 1)),
+    grossTotalLoan - halfUp(halfAmortization * (expectedCount - 1)),
   );
 
   if (expectedSchedule) {
@@ -391,12 +427,11 @@ export async function savePdcChecks(
       }
     });
   } else {
-    // Unchanged monthly-cadence path — exact same check and message as before
-    // this plan (Seafarer/SME/MPL).
+    // Flat monthly cadence (Seafarer/SME/MPL) — now gross-basis (see above).
     for (const row of normalizedChecks) {
-      if (row.amount !== computation.monthlyAmortization) {
+      if (row.amount !== grossMonthlyAmortization) {
         throw new ValidationError(
-          `Check amount must equal the monthly amortization (₱${computation.monthlyAmortization})`,
+          `Check amount must equal the monthly amortization (₱${grossMonthlyAmortization})`,
         );
       }
     }

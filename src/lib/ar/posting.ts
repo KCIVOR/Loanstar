@@ -10,7 +10,7 @@ import {
   type AgingThresholds,
 } from "@/lib/ar/schedule";
 import { isActiveDcrStatus } from "@/lib/collector/desk";
-import { halfUp } from "@/lib/computation/money";
+import { halfUp, netInstallmentDue } from "@/lib/computation/money";
 import { createServiceClient } from "@/lib/supabase/server";
 
 export type OpenInstallment = {
@@ -19,6 +19,8 @@ export type OpenInstallment = {
   amountDue: number;
   penaltyAmount: number;
   amountPaid: number;
+  /** Origination or early-settlement discount on this installment, if any. */
+  discountAmount?: number;
   status: "pending" | "partial" | "overdue";
 };
 
@@ -41,8 +43,12 @@ export function computeAutoAllocation(
   for (const inst of openInstallments) {
     if (remaining <= 0) break;
 
-    const totalDue = halfUp(inst.amountDue + inst.penaltyAmount);
-    const remainingDue = halfUp(totalDue - inst.amountPaid);
+    const remainingDue = netInstallmentDue({
+      amountDue: inst.amountDue,
+      discountAmount: inst.discountAmount,
+      penaltyAmount: inst.penaltyAmount,
+      amountPaid: inst.amountPaid,
+    });
     if (remainingDue <= 0) continue;
 
     const applied = halfUp(Math.min(remaining, remainingDue));
@@ -59,14 +65,17 @@ export function computeAutoAllocation(
   return lines;
 }
 
-async function fetchOpenInstallments(
+/** Exported so `/api/collector/dcr/allocation-preview` can reuse the exact
+ * same fetch instead of hand-rolling a second copy of this query (that
+ * second copy was missing discount_amount before 2026-08-31). */
+export async function fetchOpenInstallments(
   supabase: SupabaseClient,
   masterlistId: string,
 ): Promise<OpenInstallment[]> {
   const { data, error } = await supabase
     .from("amortization_schedules")
     .select(
-      "id, installment_no, amount_due, penalty_amount, amount_paid, status",
+      "id, installment_no, amount_due, penalty_amount, discount_amount, amount_paid, status",
     )
     .eq("masterlist_id", masterlistId)
     .in("status", ["pending", "partial", "overdue"])
@@ -79,9 +88,83 @@ async function fetchOpenInstallments(
     installmentNo: row.installment_no as number,
     amountDue: Number(row.amount_due),
     penaltyAmount: Number(row.penalty_amount ?? 0),
+    discountAmount: Number(row.discount_amount ?? 0),
     amountPaid: Number(row.amount_paid),
     status: row.status as OpenInstallment["status"],
   }));
+}
+
+/**
+ * The account's true outstanding balance, derived fresh from the rows —
+ * never accumulated. Sum of net-still-owed (amount_due − discount_amount +
+ * penalty_amount − amount_paid, floored at 0) across every installment not
+ * already 'paid' or 'rolled'.
+ *
+ * Foundation only — not yet called from any balance-mutating path (that's
+ * Phase 4). See docs/ledger-balance-consistency-fix-implementation-plan.md
+ * Phase 3, including the F7 decision this function encodes: penalty IS
+ * included, because that matches what the row ledger has always shown as
+ * "still owed" — excluding it would mean this derived balance still
+ * disagrees with the ledger the borrower sees. A SQL twin,
+ * `public.recompute_outstanding_balance`, mirrors this exact formula for
+ * callers that can't invoke TypeScript (`post_internal_transfer`).
+ */
+export async function recomputeOutstandingBalance(
+  supabase: SupabaseClient,
+  masterlistId: string,
+): Promise<number> {
+  const { data, error } = await supabase
+    .from("amortization_schedules")
+    .select("amount_due, discount_amount, penalty_amount, amount_paid, status")
+    .eq("masterlist_id", masterlistId)
+    // 'moved' rows are frozen like 'rolled' — a Move of Payment defers the
+    // obligation onto an appended extension row, so counting the moved row
+    // too would double-count one installment (Fixes Plan Phase 1, Issue 1).
+    .not("status", "in", "(paid,rolled,moved)");
+
+  if (error) throw new Error(error.message);
+
+  return halfUp(
+    (data ?? []).reduce(
+      (sum, row) =>
+        sum +
+        netInstallmentDue({
+          amountDue: Number(row.amount_due),
+          discountAmount: row.discount_amount as number | null,
+          penaltyAmount: row.penalty_amount as number | null,
+          amountPaid: row.amount_paid as number | null,
+        }),
+      0,
+    ),
+  );
+}
+
+/**
+ * Whether every installment on this account is already 'paid' or 'rolled' —
+ * the row-level half of "is this account actually done?" (F8, see
+ * docs/ledger-balance-consistency-fix-implementation-plan.md Phase 6).
+ *
+ * A derived balance of ₱0.00 (recomputeOutstandingBalance) is NOT the same
+ * thing: a row can net to ₱0.00 (e.g. penalty exactly offsetting an
+ * over-credit) while still sitting at 'pending'/'partial'/'overdue' — that
+ * row is not actually settled, it just happens to owe nothing right now.
+ * `account_status` must only ever become "paid" when both are true:
+ * newBalance <= 0 AND every row has genuinely reached 'paid'/'rolled'.
+ */
+export async function isAccountFullySettled(
+  supabase: SupabaseClient,
+  masterlistId: string,
+): Promise<boolean> {
+  const { data, error } = await supabase
+    .from("amortization_schedules")
+    .select("id")
+    .eq("masterlist_id", masterlistId)
+    .not("status", "in", "(paid,rolled)")
+    .limit(1);
+
+  if (error) throw new Error(error.message);
+
+  return (data ?? []).length === 0;
 }
 
 async function validateAllocationLines(
@@ -214,7 +297,7 @@ export async function writeOffRoundingDifference(
   const { data: schedule, error: scheduleError } = await supabase
     .from("amortization_schedules")
     .select(
-      "id, masterlist_id, amount_due, penalty_amount, amount_paid, status",
+      "id, masterlist_id, amount_due, penalty_amount, discount_amount, amount_paid, status",
     )
     .eq("id", amortizationScheduleId)
     .maybeSingle();
@@ -234,7 +317,15 @@ export async function writeOffRoundingDifference(
   const amountDue = Number(schedule.amount_due);
   const penaltyAmount = Number(schedule.penalty_amount ?? 0);
   const amountPaid = Number(schedule.amount_paid);
-  const remainingDue = halfUp(amountDue + penaltyAmount - amountPaid);
+  // Net of discount — a discounted installment's real remaining balance is
+  // smaller than gross amount_due (fixed 2026-08-31, see
+  // docs/payment-flow-discount-audit-and-fix-plan.md).
+  const remainingDue = netInstallmentDue({
+    amountDue,
+    discountAmount: schedule.discount_amount,
+    penaltyAmount,
+    amountPaid,
+  });
 
   if (remainingDue <= 0) {
     throw new Error(
@@ -250,7 +341,11 @@ export async function writeOffRoundingDifference(
   }
 
   const now = new Date().toISOString();
-  const totalDue = halfUp(amountDue + penaltyAmount);
+  const totalDue = netInstallmentDue({
+    amountDue,
+    discountAmount: schedule.discount_amount,
+    penaltyAmount,
+  });
 
   const { error: insertError } = await supabase
     .from("rounding_writeoffs")
@@ -276,24 +371,21 @@ export async function writeOffRoundingDifference(
 
   if (scheduleUpdateError) throw new Error(scheduleUpdateError.message);
 
-  const { data: ml, error: mlReadError } = await supabase
-    .from("masterlist")
-    .select("outstanding_balance")
-    .eq("id", masterlistId)
-    .single();
-
-  if (mlReadError) throw new Error(mlReadError.message);
-
-  const newBalance = Math.max(
-    0,
-    halfUp(Number(ml?.outstanding_balance ?? 0) - remainingDue),
-  );
+  // Derived fresh from the rows (Phase 4, see
+  // docs/ledger-balance-consistency-fix-implementation-plan.md) — the row
+  // above is already "paid", so this naturally excludes it.
+  const newBalance = await recomputeOutstandingBalance(supabase, masterlistId);
+  // A ₱0.00 derived balance does NOT by itself mean the account is done —
+  // a row can net to ₱0.00 while still sitting open (F8, see Phase 6 of the
+  // same plan). account_status only becomes "paid" when every row has
+  // genuinely reached 'paid'/'rolled' too.
+  const fullySettled = await isAccountFullySettled(supabase, masterlistId);
 
   const { error: mlUpdateError } = await supabase
     .from("masterlist")
     .update({
       outstanding_balance: newBalance,
-      account_status: newBalance <= 0 ? "paid" : "active",
+      account_status: newBalance <= 0 && fullySettled ? "paid" : "active",
     })
     .eq("id", masterlistId);
 
@@ -358,16 +450,22 @@ export async function writeOffAccountRoundingDifference(
 
   if (insertError) throw new Error(insertError.message);
 
-  const newBalance = Math.max(
-    0,
-    halfUp(Number(record.outstanding_balance) - eligibility.amount),
-  );
+  // Derived fresh from the rows (Phase 4, see
+  // docs/ledger-balance-consistency-fix-implementation-plan.md) — eligibility
+  // above already required every row paid/rolled, so this is 0 by construction.
+  const newBalance = await recomputeOutstandingBalance(supabase, masterlistId);
+  // Same row-level check as writeOffRoundingDifference (F8, Phase 6) — a
+  // no-op here in practice, since canWriteOffAccountRounding's eligibility
+  // check above already required every row paid/rolled, but kept for the
+  // same reason every other balance-mutating site now has it: account_status
+  // must never be derived from the balance number alone.
+  const fullySettled = await isAccountFullySettled(supabase, masterlistId);
 
   const { error: mlUpdateError } = await supabase
     .from("masterlist")
     .update({
       outstanding_balance: newBalance,
-      account_status: newBalance <= 0 ? "paid" : "active",
+      account_status: newBalance <= 0 && fullySettled ? "paid" : "active",
     })
     .eq("id", masterlistId);
 
@@ -387,7 +485,7 @@ export async function refreshMasterlistAging(
 ) {
   const { data: masterlistRow, error: mlReadError } = await supabase
     .from("masterlist")
-    .select("segment")
+    .select("segment, total_loan, outstanding_balance, loan_application_id")
     .eq("id", masterlistId)
     .single();
 
@@ -395,6 +493,102 @@ export async function refreshMasterlistAging(
     throw new Error(
       mlReadError?.message ?? `Masterlist ${masterlistId} not found`,
     );
+  }
+
+  // Move of Payment revert (see
+  // docs/revision-plans/feature-move-of-payment-implementation-plan.md
+  // Phase 3) — a clearly separate, standalone block, run BEFORE the
+  // schedules SELECT below so the existing, untouched overdue/penalty logic
+  // (unmodified by this feature) naturally sees any just-reverted row's
+  // fresh status on this same pass, exactly like the requirements doc
+  // describes ("no new penalty logic needed"). Every row sharing a
+  // move_of_payment_batch_id always carries the same
+  // move_of_payment_deadline (set together in applyMoveOfPayment), so
+  // filtering rows directly is equivalent to grouping by batch — reverting
+  // one automatically reverts the whole batch, never half of it (Part 4 #5b
+  // of the plan).
+  const { data: movedRows } = await supabase
+    .from("amortization_schedules")
+    .select("id, move_of_payment_deadline, move_of_payment_batch_id")
+    .eq("masterlist_id", masterlistId)
+    .eq("status", "moved");
+
+  const expiredMoved = (movedRows ?? []).filter(
+    (row) =>
+      row.move_of_payment_deadline &&
+      daysPastDue(row.move_of_payment_deadline as string, asOf) > 0,
+  );
+  const expiredMovedIds = expiredMoved.map((row) => row.id as string);
+  const expiredBatchIds = [
+    ...new Set(
+      expiredMoved
+        .map((row) => row.move_of_payment_batch_id as string | null)
+        .filter((id): id is string => Boolean(id)),
+    ),
+  ];
+
+  if (expiredMovedIds.length > 0) {
+    await supabase
+      .from("amortization_schedules")
+      .update({
+        status: "pending",
+        moved_at: null,
+        moved_to_installment_no: null,
+        move_surcharge_amount: null,
+        move_of_payment_deadline: null,
+        move_of_payment_batch_id: null,
+      })
+      .in("id", expiredMovedIds);
+  }
+
+  // Addendum 2 (Gap 1): a lapsed batch also un-does its schedule extension —
+  // delete the 'pending' installment row(s) it appended at the end of the
+  // schedule (tagged with deferred_from_move_of_payment_batch_id, never
+  // move_of_payment_batch_id). Skip any that already carry a payment
+  // (defensive — the appended row is the new last installment, so an earlier
+  // deadline lapsing before it is paid is the normal case, but never delete
+  // real money). The surcharge payment itself is deliberately left alone —
+  // once AR posts it, it stands as an unapplied credit on the account.
+  if (expiredBatchIds.length > 0) {
+    await supabase
+      .from("amortization_schedules")
+      .delete()
+      .eq("masterlist_id", masterlistId)
+      .eq("amount_paid", 0)
+      .in("deferred_from_move_of_payment_batch_id", expiredBatchIds);
+
+    // Fixes Plan Phase 4b — a lapsed batch also un-does its PDC check
+    // lifecycle: drop any replacement check recorded for the (now-deleted)
+    // extension row, and restore the held/replaced original check(s) to
+    // 'active'. Best-effort — a loan with no release file / no per-installment
+    // checks simply has nothing to update.
+    const { data: releaseFile } = await supabase
+      .from("release_files")
+      .select("id")
+      .eq("loan_application_id", masterlistRow.loan_application_id as string)
+      .maybeSingle();
+    const releaseFileId = releaseFile?.id as string | undefined;
+    if (releaseFileId) {
+      // Restore held/replaced originals FIRST — this clears
+      // replaced_by_check_id so the self-FK no longer points at the
+      // replacement rows the next statement deletes.
+      await supabase
+        .from("pdc_checks")
+        .update({
+          status: "active",
+          move_of_payment_batch_id: null,
+          replaced_by_check_id: null,
+        })
+        .eq("release_file_id", releaseFileId)
+        .in("status", ["held", "replaced"])
+        .in("move_of_payment_batch_id", expiredBatchIds);
+      await supabase
+        .from("pdc_checks")
+        .delete()
+        .eq("release_file_id", releaseFileId)
+        .eq("status", "active")
+        .in("move_of_payment_batch_id", expiredBatchIds);
+    }
   }
 
   const { data: schedules } = await supabase
@@ -410,8 +604,12 @@ export async function refreshMasterlistAging(
 
   // 'rolled' installments are frozen — their own balance was absorbed into
   // the next installment, so they're excluded from being "the overdue one".
+  // 'moved' installments are frozen the same way (Fixes Plan Phase 1,
+  // Issue 8) — a Move of Payment defers the obligation until the deadline;
+  // penalising it before then is the exact opposite of the feature's point,
+  // and leaves the row stuck where the deadline-revert can't find it.
   const overdue = (schedules ?? [])
-    .filter((row) => row.status !== "rolled")
+    .filter((row) => row.status !== "rolled" && row.status !== "moved")
     .filter((row) => daysPastDue(row.due_date as string, asOf) > 0)
     .sort((a, b) =>
       (a.due_date as string).localeCompare(b.due_date as string),
@@ -441,8 +639,16 @@ export async function refreshMasterlistAging(
     // below, which folds balance + penalty into the next installment — that
     // installment's amount_due then carries it, so compounding still happens
     // once per month, exactly as `penalty_rate*` config ("per month") intends.
-    const outstanding =
-      Number(overdue.amount_due) - Number(overdue.amount_paid);
+    // Net of discount — an installment whose discount hasn't reverted yet
+    // at the exact moment penalty/reversion both run in the same pass
+    // (e.g. a large "Simulate delinquency" jump) must be penalized on what's
+    // really still owed, not the gross figure (fixed 2026-08-31, see
+    // docs/payment-flow-discount-audit-and-fix-plan.md).
+    const outstanding = netInstallmentDue({
+      amountDue: Number(overdue.amount_due),
+      discountAmount: overdue.discount_amount,
+      amountPaid: Number(overdue.amount_paid),
+    });
     const penalty = calculatePenaltyAmount(outstanding, penaltyRate);
 
     if (penalty > Number(overdue.penalty_amount ?? 0)) {
@@ -471,17 +677,25 @@ export async function refreshMasterlistAging(
     const dpd = daysPastDue(overdue.due_date as string, asOf);
     if (dpd >= thresholds.t30 && !overdue.rolled_at) {
       const next = (schedules ?? [])
-        .filter((row) => row.id !== overdue.id && row.status !== "rolled")
+        .filter(
+          (row) =>
+            row.id !== overdue.id &&
+            row.status !== "rolled" &&
+            // never roll an overdue balance into a frozen 'moved' row
+            // (Fixes Plan Phase 1, Issue 8).
+            row.status !== "moved",
+        )
         .sort(
           (a, b) => (a.installment_no as number) - (b.installment_no as number),
         )[0];
 
       if (next) {
-        const rollAmount = halfUp(
-          Number(overdue.amount_due) -
-            Number(overdue.amount_paid) +
-            finalPenalty,
-        );
+        const rollAmount = netInstallmentDue({
+          amountDue: Number(overdue.amount_due),
+          discountAmount: overdue.discount_amount,
+          amountPaid: Number(overdue.amount_paid),
+          penaltyAmount: finalPenalty,
+        });
         const now = new Date().toISOString();
 
         await supabase
@@ -518,11 +732,17 @@ export async function refreshMasterlistAging(
   // this is safe under the same repeat-call conditions that caused the
   // penalty bug this function was fixed for (nightly cron, every Collector
   // accounts GET, dev-simulate calls).
-  const expiredDiscountIds = (schedules ?? [])
-    .filter((row) => row.status !== "rolled")
+  const expiredDiscountRows = (schedules ?? [])
+    // don't revert a 'moved' row's discount while it is frozen — it may
+    // still return on the deadline (Fixes Plan Phase 1, Issue 8).
+    .filter((row) => row.status !== "rolled" && row.status !== "moved")
     .filter((row) => Number(row.discount_amount ?? 0) > 0)
-    .filter((row) => daysPastDue(row.due_date as string, asOf) >= 0)
-    .map((row) => row.id as string);
+    .filter((row) => daysPastDue(row.due_date as string, asOf) >= 0);
+
+  const expiredDiscountIds = expiredDiscountRows.map((row) => row.id as string);
+  const revertedDiscountTotal = halfUp(
+    expiredDiscountRows.reduce((sum, row) => sum + Number(row.discount_amount ?? 0), 0),
+  );
 
   if (expiredDiscountIds.length > 0) {
     await supabase
@@ -537,6 +757,28 @@ export async function refreshMasterlistAging(
     aging_bucket: agingBucket,
     remedial_flag: remedialFlag,
   };
+
+  // The account's total/balance were set at release assuming every
+  // origination discount above would be honored. A reverted discount
+  // (Rule 6, above) means the borrower now owes that money after all — carry
+  // it onto both figures the same way a posted payment carries a reduction,
+  // so Outstanding Balance and the ledger's opening debit/Report Total stay
+  // in agreement (confirmed 2026-08-31: they diverged on AN300432 without
+  // this — balance stayed net of a discount that had already reverted).
+  if (revertedDiscountTotal > 0) {
+    masterlistUpdate.total_loan = halfUp(
+      Number(masterlistRow.total_loan ?? 0) + revertedDiscountTotal,
+    );
+    // Derived fresh from the rows (Phase 4, see
+    // docs/ledger-balance-consistency-fix-implementation-plan.md) — the
+    // discount_amount=0 update above already ran, so this naturally reflects
+    // the reversion. total_loan (the originally disclosed obligation) stays
+    // a plain accumulation, out of scope for this derived-balance replacement.
+    masterlistUpdate.outstanding_balance = await recomputeOutstandingBalance(
+      supabase,
+      masterlistId,
+    );
+  }
   if (remedialFlag) {
     masterlistUpdate.account_status = "remedial";
   }
@@ -719,71 +961,27 @@ async function postSingleDcrItem(
     );
   }
 
-  for (const line of allocationLines) {
-    await supabase.from("postings").insert({
-      dcr_id: dcrId,
-      payment_id: payment.id,
-      masterlist_id: payment.masterlist_id,
-      amortization_schedule_id: line.amortizationScheduleId,
+  // The actual writes (posting insert(s), schedule update(s), payment
+  // status, balance recompute+update) run atomically in one Postgres
+  // function — a partial failure here used to leave a durable inconsistent
+  // state, and the idempotency guard above only became true on the LAST of
+  // those four steps, so a retry after a mid-sequence crash re-ran
+  // everything from the top (Phase 5, see
+  // docs/ledger-balance-consistency-fix-implementation-plan.md). The
+  // function re-checks payment status itself (locked via `for update`) as
+  // its first statement, so this call is safe to retry.
+  const { error: rpcError } = await supabase.rpc("post_single_dcr_item", {
+    p_dcr_id: dcrId,
+    p_payment_id: payment.id,
+    p_allocations: allocationLines.map((line) => ({
+      amortizationScheduleId: line.amortizationScheduleId,
       amount: line.amount,
-      posted_by: actorId,
-      posted_at: now,
-    });
+    })),
+    p_actor_id: actorId,
+    p_now: now,
+  });
 
-    if (line.amortizationScheduleId) {
-      const { data: schedule } = await supabase
-        .from("amortization_schedules")
-        .select("id, amount_due, amount_paid, penalty_amount, status")
-        .eq("id", line.amortizationScheduleId)
-        .single();
-
-      if (schedule) {
-        const totalDue =
-          Number(schedule.amount_due) + Number(schedule.penalty_amount ?? 0);
-        const newPaid = Number(schedule.amount_paid) + Number(line.amount);
-        const paid = newPaid >= totalDue;
-
-        await supabase
-          .from("amortization_schedules")
-          .update({
-            amount_paid: newPaid,
-            status: paid ? "paid" : "partial",
-            paid_at: paid ? now : null,
-          })
-          .eq("id", schedule.id);
-      }
-    }
-  }
-
-  await supabase
-    .from("payments")
-    .update({
-      status: "posted",
-      reviewed_by: actorId,
-      reviewed_at: now,
-      flagged_reason: null,
-      flagged_at: null,
-    })
-    .eq("id", payment.id);
-
-  const { data: ml } = await supabase
-    .from("masterlist")
-    .select("outstanding_balance")
-    .eq("id", payment.masterlist_id)
-    .single();
-
-  const newBalance = Math.max(
-    0,
-    halfUp(Number(ml?.outstanding_balance ?? 0) - Number(item.amount)),
-  );
-
-  await supabase
-    .from("masterlist")
-    .update({
-      outstanding_balance: newBalance,
-      account_status: newBalance <= 0 ? "paid" : "active",
-    })
-    .eq("id", payment.masterlist_id);
+  if (rpcError) throw new Error(rpcError.message);
 }
 
 /**

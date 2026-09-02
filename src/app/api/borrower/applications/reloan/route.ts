@@ -8,6 +8,7 @@ import {
   nextApplicationKind,
   resolveBorrowerCreateSegment,
 } from "@/lib/borrowers/reloan";
+import { validateCollateralPaymentSchedule } from "@/lib/csa/computation";
 import { mapBorrowerRow } from "@/lib/borrowers/types";
 import { handleApiError, jsonOk } from "@/lib/api/handler";
 import { ensureDocumentSlots } from "@/lib/documents/checklist";
@@ -193,6 +194,14 @@ export async function POST(request: Request) {
             | "two_monthly"
             | "daily")
         : "monthly";
+
+    const collateralScheduleError = validateCollateralPaymentSchedule(
+      collateralType,
+      paymentSchedule,
+    );
+    if (collateralScheduleError) {
+      return NextResponse.json({ error: collateralScheduleError }, { status: 400 });
+    }
 
     const { data: application, error: applicationError } = await supabase
       .from("loan_applications")

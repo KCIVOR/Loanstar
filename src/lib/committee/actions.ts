@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
+import { assertCoBorrowerRequirementAllowed } from "@/lib/applications/co-borrower";
 import { appendStatusHistory } from "@/lib/applications/status";
 import { writeAuditEvent } from "@/lib/audit/writer";
 import { discloseTerms, witnessSignComputation } from "@/lib/negotiation/service";
@@ -138,7 +139,17 @@ export async function executeFinalAction(
   applicationId: string,
   actorId: string,
   action: FinalAction,
-  options?: { comment?: string; revisitRoute?: "csa" | "cig" },
+  options?: {
+    comment?: string;
+    revisitRoute?: "csa" | "cig";
+    /**
+     * Co-Borrower feature (see docs/revision-plans/feature-co-borrower-section.md,
+     * Phase 2). Only meaningful with action "approve": attaches an advisory
+     * co-borrower requirement to the approved loan. Never blocks release —
+     * it only sets `co_borrower_required` so downstream UI/documents surface it.
+     */
+    requireCoBorrower?: boolean;
+  },
 ): Promise<{ status: string }> {
   const { data: application, error: appError } = await supabase
     .from("loan_applications")
@@ -152,12 +163,51 @@ export async function executeFinalAction(
 
   assertFinalActionPreconditions(application.status, action, options);
 
+  // Co-Borrower feature (Phase 2, see
+  // docs/revision-plans/feature-co-borrower-section.md): validate the option
+  // before any side effect. Seafarer applications never carry a co-borrower
+  // requirement (product decision, 2026-09-01).
+  if (action === "approve" && options?.requireCoBorrower === true) {
+    const allowed = assertCoBorrowerRequirementAllowed(
+      application.segment as string | null,
+    );
+    if (!allowed.ok) {
+      throw new Error(allowed.reason);
+    }
+  }
+
   const votes = await getCommitteeVotes(supabase, applicationId);
   const committeeSize = await getCommitteeSize(
     application.segment as string | null,
   );
   assertAllVotesCast(votes, committeeSize);
   const tally = computeVoteTally(votes, committeeSize);
+
+  // Co-Borrower feature: write the advisory flag now — after the vote check
+  // has passed (so it never lands on an application that then fails to be
+  // approved) but before `appendStatusHistory` moves the row off
+  // 'for_approval'/'committee_hold'. The caller's own RLS grant
+  // (applications_committee_action) only permits a `loan_applications` UPDATE
+  // while status is one of those two, so this must happen pre-transition.
+  // It deliberately does NOT touch `blocker` (that feeds bottleneck/TAT
+  // reports; a missing co-borrower is not a hold), and nothing downstream
+  // gates release on this flag.
+  if (action === "approve" && options?.requireCoBorrower === true) {
+    const { data: coBorrowerRow, error: coBorrowerError } = await supabase
+      .from("loan_applications")
+      .update({ co_borrower_required: true, co_borrower_required_by: actorId })
+      .eq("id", applicationId)
+      .select("id")
+      .maybeSingle();
+    if (coBorrowerError) {
+      throw new Error(coBorrowerError.message);
+    }
+    if (!coBorrowerRow) {
+      throw new Error(
+        "Failed to set co-borrower requirement: no row updated (RLS or missing application)",
+      );
+    }
+  }
 
   const { data: actionRow, error: actionError } = await supabase
     .from("committee_actions")
@@ -257,6 +307,9 @@ export async function executeFinalAction(
       newStatus,
       tally,
       votes,
+      ...(options?.requireCoBorrower === true
+        ? { requireCoBorrower: true }
+        : {}),
     },
   });
 

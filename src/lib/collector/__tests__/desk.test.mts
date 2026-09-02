@@ -52,7 +52,23 @@ describe("nextOpenInstallment", () => {
       due_date: "2026-09-10",
       amount_due: 1000,
       penalty_amount: 50,
+      netAmountDue: 1050, // no discount on this fixture — same as gross + penalty
     });
+  });
+
+  it("netAmountDue subtracts an active discount (fixed 2026-08-31)", () => {
+    const next = nextOpenInstallment([
+      {
+        installment_no: 1,
+        due_date: "2026-09-10",
+        amount_due: 1080,
+        status: "pending",
+        penalty_amount: 0,
+        discount_amount: 1080, // 100% off
+      },
+    ]);
+    assert.equal(next?.amount_due, 1080); // gross, unchanged for callers that need it
+    assert.equal(next?.netAmountDue, 0); // real amount owed
   });
 
   it("returns null when all paid", () => {

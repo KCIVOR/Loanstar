@@ -306,6 +306,10 @@ export async function GET(_request: Request, { params }: RouteParams) {
         status: application.status,
         statusLabel: formatStatusLabel(application.status),
         blocker: application.blocker,
+        coBorrowerRequired: application.co_borrower_required === true,
+        coBorrowers: Array.isArray(application.co_borrowers)
+          ? (application.co_borrowers as Array<{ fullName: string; address: string }>)
+          : [],
         isReloan: application.is_reloan,
         segment:
           application.segment === "sme" || application.segment === "individual"
@@ -417,6 +421,8 @@ export async function GET(_request: Request, { params }: RouteParams) {
             originationDiscounts: computation.originationDiscounts ?? null,
             otherDeductions: computation.otherDeductions ?? null,
             otherDeductionsTotal: computation.otherDeductionsTotal,
+            paymentFrequency: computation.paymentFrequency,
+            withDsAndNotary: computation.withDsAndNotary ?? null,
           }
         : null,
       activeLoans,

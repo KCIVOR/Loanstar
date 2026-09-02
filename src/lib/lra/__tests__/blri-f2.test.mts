@@ -77,6 +77,9 @@ test("F2 BLRI data — Del Poso field values match sample", () => {
       totalDeductions: r.totalDeductions,
       netReleased: r.netReleased,
       totalInterest: r.totalInterest,
+      // Undiscounted computation — gross equals net (see mapComputationRow's
+      // fallback for the same reasoning).
+      grossTotalInterest: r.totalInterest,
       totalLoan: r.totalLoan,
       monthlyAmortization: r.monthlyAmortization,
       releaseDate: "2026-06-10",
@@ -113,4 +116,96 @@ test("F2 BLRI data — Del Poso field values match sample", () => {
   for (const row of blri.pdcSchedule) {
     approxEqual(row.amount, 17_428.20);
   }
+});
+
+test("BLRI fallback PDC schedule clamps to Feb 28 instead of overflowing to March (month-overflow bug fix, 2026-08-30)", () => {
+  // releaseDate day 5 (< 22, no cutoff shift) + addonMonths 1 + dueDay 30
+  // -> firstPayment = Sep 30, 2026. The 6th installment (index 5) used to
+  // overflow to Mar 2, 2027 before this fix.
+  const blri = buildBlriData({
+    applicationNo: "LA-2026-0002",
+    borrower: {
+      id: "b2",
+      borrowerNo: "BR-002",
+      userId: null,
+      email: "test2@example.com",
+      firstName: "Ana",
+      lastName: "Santos",
+      middleName: null,
+      suffix: null,
+      dateOfBirth: null,
+      placeOfBirth: null,
+      citizenship: null,
+      civilStatus: null,
+      gender: null,
+      mobilePhone: null,
+      landline: null,
+      presentAddress: {},
+      permanentAddress: {},
+      manningAgency: {},
+      financial: {},
+      allottee: {},
+      picWork: {},
+      businessInfo: {},
+      dependents: [],
+      references: [],
+      profileData: {},
+      createdAt: "",
+      updatedAt: "",
+    },
+    computation: {
+      id: "c2",
+      loanApplicationId: "a2",
+      version: 1,
+      inputMode: "PRINCIPAL",
+      inputAmount: 110_000,
+      terms: 6,
+      addonMonths: 1,
+      pfRate: 0.1,
+      interestRate: 0.03,
+      securityFeeRate: 0,
+      loanTypeId: null,
+      loanTypeName: "SME",
+      otherDeductions: {},
+      principal: 110_000,
+      processingFee: 0,
+      adminCost: 0,
+      docStamp: 0,
+      notaryFee: 0,
+      securityFee: 0,
+      otherDeductionsTotal: 0,
+      totalDeductions: 0,
+      netReleased: 110_000,
+      totalInterest: 19_800,
+      grossTotalInterest: 19_800,
+      totalLoan: 129_800,
+      monthlyAmortization: 21_633.33,
+      releaseDate: "2026-08-05",
+      firstPaymentDate: "2026-09-30",
+      dueDay: 30,
+      originationDiscounts: null,
+      lineItems: [],
+      coverageRatio: null,
+      coverageWarning: false,
+      adminRate: null,
+      chattelRate: null,
+      chattelFee: null,
+      withDsAndNotary: null,
+      paymentFrequency: "monthly",
+      computedBy: null,
+      signedAt: null,
+      signedBy: null,
+      witnessedBy: null,
+      isActive: true,
+      createdAt: "",
+    },
+  });
+
+  assert.equal(blri.pdcSchedule.length, 6);
+  assert.equal(blri.pdcSchedule[0].checkDate, "09/30/26");
+  assert.equal(blri.pdcSchedule[1].checkDate, "10/30/26");
+  assert.equal(blri.pdcSchedule[2].checkDate, "11/30/26");
+  assert.equal(blri.pdcSchedule[3].checkDate, "12/30/26");
+  assert.equal(blri.pdcSchedule[4].checkDate, "01/30/27");
+  assert.equal(blri.pdcSchedule[5].checkDate, "02/28/27"); // not 03/02/27
 });

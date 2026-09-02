@@ -12,6 +12,7 @@ import {
   formatDateLocal,
 } from "@/lib/computation/release-date";
 import { computeDailyInterestLoan } from "@/lib/computation/daily";
+import { computeInvoiceLoan } from "@/lib/computation/invoice";
 import {
   buildDiscountUnits,
   maxDiscountUnits,
@@ -117,6 +118,29 @@ export function validateSeafarerDueDay(
   return null;
 }
 
+/** Collateral (Auto/REM) and payment schedule are never independent choices
+ * in either the real Excel calculator or the paper application form —
+ * confirmed 2026-08-30 by reading the live workbook's formulas
+ * (`IF(OR(I31="auto",I31="REM"), ...)` gates the same single identifier
+ * everywhere) and the "Type Of Loan" field on the corporate application
+ * form (Business Loan / Auto Loan / REMortgage — one flat choice, never
+ * combined with a separate schedule). A collateral loan is always monthly
+ * cadence. Returns an error message if invalid, `null` if OK (including
+ * every collateral value this rule doesn't apply to). Pure so it's
+ * testable without a Supabase client — same shape as
+ * `validateSeafarerDueDay`. */
+export function validateCollateralPaymentSchedule(
+  collateralType: string | null | undefined,
+  paymentSchedule: string | null | undefined,
+): string | null {
+  const hasCollateral =
+    collateralType === "car_refinancing" || collateralType === "real_estate";
+  if (hasCollateral && paymentSchedule != null && paymentSchedule !== "monthly") {
+    return "Auto and Real Estate loans can only use the Regular (Monthly) schedule";
+  }
+  return null;
+}
+
 /** Quarterly and Two-Monthly are interest-only until a final combined
  * interest+principal payment, which only lands cleanly if `terms` divides
  * evenly by the frequency (3 months for quarterly, 2 for two-monthly) — e.g.
@@ -183,6 +207,43 @@ export function validateOriginationDiscounts(
     }
   }
   return null;
+}
+
+/**
+ * The "gross" totalInterest/totalLoan a schedule type's origination discount
+ * gets subtracted from. For every schedule type except Invoice (Weekly),
+ * this is just the flat principal×terms×rate estimate computeSmeLoan/
+ * computeSfLoan already produced — safe, because discount-units.ts derives
+ * each real payment's interest by slicing up that exact same total, so it
+ * can never disagree.
+ *
+ * Invoice (Weekly) is the one exception: its real per-week interest is an
+ * escalating rate (1% / 2% / 2.5% of principal per month elapsed —
+ * computeInvoiceLoan) that has no relationship to the flat estimate. Using
+ * the flat estimate as the discount baseline let a real per-week discount
+ * exceed it, producing negative stored interest (confirmed 2026-08-31 on
+ * live data — see docs/invoice-weekly-interest-corruption-audit-and-fix-plan.md).
+ * This overrides the baseline with the real total for Weekly so the
+ * subtraction always works off the same number the discount itself was
+ * computed from.
+ *
+ * Pure — safe to call before persisting, same shape as `validateFrequencyTerms`.
+ */
+export function resolveGrossTotals(
+  paymentFrequency: ScheduleType,
+  principal: number,
+  terms: number,
+  flatTotalInterest: number,
+  releaseDate: Date,
+): { totalInterest: number; totalLoan: number } {
+  if (paymentFrequency !== "weekly") {
+    return { totalInterest: flatTotalInterest, totalLoan: halfUp(principal + flatTotalInterest) };
+  }
+  const invoice = computeInvoiceLoan({ principal, terms, releaseDate });
+  return {
+    totalInterest: invoice.totalInterest,
+    totalLoan: halfUp(principal + invoice.totalInterest),
+  };
 }
 
 export function buildLineItems(result: SfComputeResult) {
@@ -256,6 +317,14 @@ export function mapComputationRow(row: Record<string, unknown>) {
     totalDeductions: Number(row.total_deductions),
     netReleased: Number(row.net_released),
     totalInterest: Number(row.total_interest),
+    // Pre-discount baseline for splitting each real payment's interest share
+    // (buildDiscountUnits) — falls back to the net total_interest for rows
+    // persisted before 2026-08-31, which never had a discount applied (an
+    // undiscounted computation's gross and net are identical by definition).
+    grossTotalInterest:
+      row.gross_total_interest != null
+        ? Number(row.gross_total_interest)
+        : Number(row.total_interest),
     totalLoan: Number(row.total_loan),
     monthlyAmortization: Number(row.monthly_amortization),
     releaseDate: row.release_date as string | null,
@@ -450,6 +519,24 @@ export async function persistComputation(
     );
   }
 
+  const grossTotals = resolveGrossTotals(
+    paymentFrequency,
+    result.principal,
+    result.terms,
+    result.totalInterest,
+    releaseDate,
+  );
+  result.totalInterest = grossTotals.totalInterest;
+  result.totalLoan = grossTotals.totalLoan;
+  // Captured before any discount subtraction below — persisted separately
+  // (gross_total_interest) so masterlist.ts can later split each real
+  // payment's interest share off the true baseline instead of the net
+  // total_interest that gets stored below (confirmed 2026-08-31 on
+  // AN300434: reading net as if it were gross understated every discounted
+  // row's discount_amount by roughly the discounted fraction — see
+  // docs/discount-basis-mismatch-audit-and-fix-plan.md).
+  const grossTotalInterest = result.totalInterest;
+
   // Apply origination discounts to the stored totals so that the displayed
   // computation and the amortization schedule built at release both reflect
   // the actual amounts the borrower will pay. Each discount's basis is the
@@ -498,6 +585,18 @@ export async function persistComputation(
     }
     totalDiscountPeso = halfUp(totalDiscountPeso);
     effectiveTotalInterest = halfUp(result.totalInterest - totalDiscountPeso);
+    if (effectiveTotalInterest < 0) {
+      // Should be mathematically impossible once result.totalInterest is the
+      // real per-schedule total (see the Weekly override above) — a discount
+      // unit's interestAmount always comes from the exact same total this is
+      // subtracted from, so a valid 0-100% discount can never exceed it. A
+      // negative result here means some future schedule type introduced the
+      // same real-vs-flat mismatch Weekly had — fail loudly instead of
+      // silently persisting negative interest.
+      throw new Error(
+        `Discount total (₱${totalDiscountPeso}) exceeds gross interest (₱${result.totalInterest}) for this ${paymentFrequency} schedule — refusing to persist negative interest`,
+      );
+    }
     effectiveTotalLoan = halfUp(result.principal + effectiveTotalInterest);
     effectiveMonthlyAmortization = halfUp(effectiveTotalLoan / result.terms);
   }
@@ -535,6 +634,7 @@ export async function persistComputation(
       total_deductions: result.totalDeductions,
       net_released: result.netReleased,
       total_interest: effectiveTotalInterest,
+      gross_total_interest: isDaily ? null : grossTotalInterest,
       total_loan: effectiveTotalLoan,
       monthly_amortization: effectiveMonthlyAmortization,
       release_date: releaseDate.toISOString().slice(0, 10),

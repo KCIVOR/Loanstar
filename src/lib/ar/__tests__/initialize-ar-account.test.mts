@@ -3,6 +3,7 @@ import { describe, it } from "node:test";
 
 import {
   enrollUnprocessedArQueue,
+  initialScheduleRowStatus,
   initializeArAccount,
 } from "../masterlist";
 
@@ -56,6 +57,56 @@ describe("initializeArAccount", () => {
     assert.deepEqual(result, { masterlistId: "ml-1", created: false });
     assert.equal(queueUpdate?.masterlist_id, "ml-1");
     assert.equal(typeof queueUpdate?.processed_at, "string");
+  });
+});
+
+/**
+ * Regression coverage for F1/F3 (see
+ * docs/ledger-balance-consistency-fix-implementation-plan.md Phase 2): a
+ * 100%-discounted installment must be born "paid", not "pending" — the only
+ * two other code paths that ever mark a row "paid" (a cash posting, or a
+ * rounding write-off) never run against a row with nothing left to collect,
+ * so leaving it "pending" traps it there forever and exposes it to the
+ * discount-reversion rule once its due date arrives.
+ */
+describe("initialScheduleRowStatus", () => {
+  it("is born paid when the discount fully covers the amount due", () => {
+    const result = initialScheduleRowStatus({
+      amountDue: 913.0,
+      discountAmount: 913.0,
+      releaseDate: "2026-08-31",
+    });
+    assert.equal(result.status, "paid");
+    assert.equal(result.paidAt, "2026-08-31");
+  });
+
+  it("stays pending when the discount only partially covers the amount due", () => {
+    const result = initialScheduleRowStatus({
+      amountDue: 21738.83,
+      discountAmount: 2835.5,
+      releaseDate: "2026-08-31",
+    });
+    assert.equal(result.status, "pending");
+    assert.equal(result.paidAt, null);
+  });
+
+  it("stays pending on an undiscounted row", () => {
+    const result = initialScheduleRowStatus({
+      amountDue: 21738.83,
+      discountAmount: 0,
+      releaseDate: "2026-08-31",
+    });
+    assert.equal(result.status, "pending");
+    assert.equal(result.paidAt, null);
+  });
+
+  it("is born paid when the discount slightly exceeds the amount due (rounding)", () => {
+    const result = initialScheduleRowStatus({
+      amountDue: 913.0,
+      discountAmount: 913.01,
+      releaseDate: "2026-08-31",
+    });
+    assert.equal(result.status, "paid");
   });
 });
 

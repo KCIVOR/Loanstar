@@ -1,9 +1,13 @@
+import { netInstallmentDue } from "@/lib/computation/money";
+
 export type ScheduleLite = {
   installment_no: number;
   due_date: string;
   amount_due: number;
   status: string;
   penalty_amount?: number | null;
+  /** Origination or early-settlement discount on this installment, if any. */
+  discount_amount?: number | null;
 };
 
 export type NextInstallment = {
@@ -11,6 +15,11 @@ export type NextInstallment = {
   due_date: string;
   amount_due: number;
   penalty_amount: number;
+  /** Net of discount, penalty included — the real amount still owed (fixed
+   * 2026-08-31, see docs/payment-flow-discount-audit-and-fix-plan.md). Kept
+   * alongside the raw amount_due/penalty_amount fields (unchanged) so
+   * existing callers reading those directly are unaffected. */
+  netAmountDue: number;
 };
 
 /** True when aging is past current (needs collector attention). */
@@ -31,11 +40,19 @@ export function nextOpenInstallment(
   const first = open[0];
   if (!first) return null;
 
+  const amountDue = Number(first.amount_due);
+  const penaltyAmount = Number(first.penalty_amount ?? 0);
+
   return {
     installment_no: first.installment_no,
     due_date: first.due_date,
-    amount_due: Number(first.amount_due),
-    penalty_amount: Number(first.penalty_amount ?? 0),
+    amount_due: amountDue,
+    penalty_amount: penaltyAmount,
+    netAmountDue: netInstallmentDue({
+      amountDue,
+      discountAmount: first.discount_amount,
+      penaltyAmount,
+    }),
   };
 }
 

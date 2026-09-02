@@ -64,6 +64,8 @@ type PreviewInstallment = {
   dueDate: string;
   amountDue: number;
   penaltyAmount: number;
+  /** Origination or early-settlement discount on this installment, if any. */
+  discountAmount?: number;
   amountPaid: number;
   status: string;
 };
@@ -109,9 +111,17 @@ function segmentBadge(segment: string | null | undefined) {
   );
 }
 
+/** Net of any active discount — what's really still owed (fixed 2026-08-31,
+ * see docs/payment-flow-discount-audit-and-fix-plan.md). This client-side
+ * copy existed independently of the server's netInstallmentDue() and had
+ * gone stale — used both for the "Amount Due" display and as the fallback
+ * amount when Remedial manually checks a row the auto-allocation skipped. */
 function installmentRemainingDue(inst: PreviewInstallment): number {
-  return halfUp(
-    inst.amountDue + inst.penaltyAmount - inst.amountPaid,
+  return Math.max(
+    0,
+    halfUp(
+      inst.amountDue - (inst.discountAmount ?? 0) + inst.penaltyAmount - inst.amountPaid,
+    ),
   );
 }
 

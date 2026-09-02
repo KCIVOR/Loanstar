@@ -65,6 +65,8 @@ type PreviewInstallment = {
   dueDate: string;
   amountDue: number;
   penaltyAmount: number;
+  /** Origination or early-settlement discount on this installment, if any. */
+  discountAmount?: number;
   amountPaid: number;
   status: string;
 };
@@ -79,6 +81,9 @@ type AllocationModalState = {
   paymentAmount: number;
   borrowerName: string;
   rows: AllocationRow[];
+  /** Fixes Plan Phase 3 — this payment is a Move of Payment surcharge;
+   * defaulted to fully-unapplied so it does not pay down an installment. */
+  isSurcharge: boolean;
 };
 
 const SEGMENT_CHIPS: Array<{ id: SegmentFilter; label: string }> = [
@@ -110,9 +115,17 @@ function segmentBadge(segment: string | null | undefined) {
   );
 }
 
+/** Net of any active discount — what's really still owed (fixed 2026-08-31,
+ * see docs/payment-flow-discount-audit-and-fix-plan.md). This client-side
+ * copy existed independently of the server's netInstallmentDue() and had
+ * gone stale — used both for the "Amount Due" display and as the fallback
+ * amount when a Collector manually checks a row the auto-allocation skipped. */
 function installmentRemainingDue(inst: PreviewInstallment): number {
-  return halfUp(
-    inst.amountDue + inst.penaltyAmount - inst.amountPaid,
+  return Math.max(
+    0,
+    halfUp(
+      inst.amountDue - (inst.discountAmount ?? 0) + inst.penaltyAmount - inst.amountPaid,
+    ),
   );
 }
 
@@ -256,6 +269,7 @@ export default function CollectorDcrPage() {
           amortizationScheduleId: string | null;
           amount: number;
         }[];
+        isSurcharge?: boolean;
       };
 
       const allocBySchedule = new Map(
@@ -278,6 +292,7 @@ export default function CollectorDcrPage() {
         paymentAmount: Number(pay?.amount ?? 0),
         borrowerName: firstJoin(pay?.masterlist)?.borrower_name ?? "—",
         rows,
+        isSurcharge: Boolean(preview.isSurcharge),
       });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed");
@@ -690,6 +705,15 @@ export default function CollectorDcrPage() {
       >
         {allocationModal ? (
           <div className="space-y-5">
+            {allocationModal.isSurcharge ? (
+              <Alert variant="info">
+                This is a <strong>Move of Payment surcharge</strong>. It has been left
+                unallocated so it does not pay down an installment — the borrower still owes the
+                same amount. Only change this if you know it should be applied to a specific
+                installment.
+              </Alert>
+            ) : null}
+
             <div className="grid gap-3 sm:grid-cols-3">
               <div className="rounded-[var(--r-md)] border border-line-soft bg-surface-2 px-4 py-3">
                 <p className="text-xs font-semibold uppercase tracking-wide text-ink-500">

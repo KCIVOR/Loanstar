@@ -10,6 +10,7 @@ import {
   Breadcrumbs,
   Button,
   Card,
+  Checkbox,
   ConfirmDialog,
   FacebookLinkText,
   Label,
@@ -26,6 +27,11 @@ import {
   type ComputationPanelHandle,
 } from "@/components/csa/ComputationPanel";
 import { ApplicantProfileFields } from "@/components/borrowers/ApplicantProfileFields";
+import { CoBorrowerSection } from "@/components/applications/CoBorrowerSection";
+import {
+  isCoBorrowerEditableStatus,
+  type CoBorrower,
+} from "@/lib/applications/co-borrower";
 import { AutofillOverlay } from "@/components/dev/AutofillOverlay";
 import { fakeCommitteeAssessment, fakeRemark } from "@/lib/dev/fake-data";
 import {
@@ -76,6 +82,8 @@ type CommitteeDetail = {
     status: string;
     statusLabel: string;
     blocker: string | null;
+    coBorrowerRequired: boolean;
+    coBorrowers: CoBorrower[];
     isReloan: boolean;
     segment: "seafarer" | "sme" | "individual";
     entityType: "individual" | "corporate" | null;
@@ -410,6 +418,9 @@ export default function CommitteeApplicationPage() {
   const [message, setMessage] = useState<string | null>(null);
   const [revisitComment, setRevisitComment] = useState("");
   const [revisitRoute, setRevisitRoute] = useState<"csa" | "cig">("csa");
+  // Co-Borrower feature (Phase 3): ticked in the Approve confirm dialog to
+  // attach an advisory co-borrower requirement. Non-seafarer only.
+  const [requireCoBorrower, setRequireCoBorrower] = useState(false);
   const [confirmRevisit, setConfirmRevisit] = useState(false);
   const [confirmAction, setConfirmAction] = useState<
     "approve" | "deny" | "hold" | null
@@ -499,13 +510,16 @@ export default function CommitteeApplicationPage() {
     setMessage(null);
     setError(null);
     try {
-      const payload: Record<string, string> = { action };
+      const payload: Record<string, string | boolean> = { action };
       if (action === "revisit") {
         payload.comment = revisitComment;
         payload.revisitRoute = revisitRoute;
       }
       if (action === "approve" || action === "deny" || action === "hold") {
         payload.comment = decisionComment;
+      }
+      if (action === "approve" && requireCoBorrower) {
+        payload.requireCoBorrower = true;
       }
 
       const res = await fetch(
@@ -520,6 +534,7 @@ export default function CommitteeApplicationPage() {
       if (!res.ok) throw new Error(body.error ?? "Action failed");
       setMessage(`Final action recorded: ${action}`);
       setDecisionComment("");
+      setRequireCoBorrower(false);
       await load({ silent: true });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Action failed");
@@ -956,6 +971,26 @@ export default function CommitteeApplicationPage() {
             />
           </div>
         </Modal>
+      ) : null}
+
+      {data.application.coBorrowerRequired &&
+      data.application.segment !== "seafarer" ? (
+        <Card className="mb-6">
+          <h2 className="mb-1 font-display text-lg font-semibold text-navy-900">
+            Co-borrower
+          </h2>
+          <p className="mb-4 text-sm text-ink-500">
+            {data.application.coBorrowers.length === 0
+              ? "A co-borrower was requested for this loan — not yet provided. Advisory only; it does not block release."
+              : "Co-borrower details for this loan."}
+          </p>
+          <CoBorrowerSection
+            applicationId={data.application.id}
+            coBorrowers={data.application.coBorrowers}
+            editable={isCoBorrowerEditableStatus(data.application.status)}
+            onSaved={() => void load({ silent: true })}
+          />
+        </Card>
       ) : null}
 
       <Card className="mb-6">
@@ -2070,6 +2105,7 @@ export default function CommitteeApplicationPage() {
             applicationId={applicationId}
             loanTypeId={data.computation?.loanTypeId ?? null}
             segment={data.application.segment}
+            collateralType={data.application.collateralType}
             editable={computationEditable}
             computation={data.computation}
             rateHistory={data.rateHistory}
@@ -2353,6 +2389,7 @@ export default function CommitteeApplicationPage() {
               onCancel={() => {
                 setConfirmAction(null);
                 setDecisionComment("");
+                setRequireCoBorrower(false);
               }}
               onConfirm={() => {
                 if (!confirmAction) return;
@@ -2422,6 +2459,23 @@ export default function CommitteeApplicationPage() {
                 placeholder="Basis for your decision…"
                 rows={3}
               />
+              {confirmAction === "approve" &&
+              data.application.segment !== "seafarer" ? (
+                <div className="mt-4 border-t border-line-soft pt-4">
+                  {data.application.coBorrowerRequired ? (
+                    <p className="text-sm text-ink-500">
+                      A co-borrower is already required on this application.
+                    </p>
+                  ) : (
+                    <Checkbox
+                      checked={requireCoBorrower}
+                      onChange={setRequireCoBorrower}
+                      label="Require a co-borrower before release"
+                      description="CSA will be asked to add the co-borrower's name and address. Advisory only — it does not block release."
+                    />
+                  )}
+                </div>
+              ) : null}
             </ConfirmDialog>
 
             <form

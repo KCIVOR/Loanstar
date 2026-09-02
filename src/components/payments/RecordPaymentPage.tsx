@@ -39,7 +39,12 @@ type ScheduleRow = {
   dueDate: string;
   amountDue: number;
   penaltyAmount: number;
+  /** Origination or early-settlement discount on this installment, if any. */
+  discountAmount?: number;
   status: string;
+  movedAt?: string | null;
+  moveSurchargeAmount?: number | null;
+  moveOfPaymentBatchId?: string | null;
 };
 
 type PaymentRow = {

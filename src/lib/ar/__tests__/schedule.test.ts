@@ -1,9 +1,46 @@
 import { describe, expect, it } from "vitest";
 import {
+  generateAmortizationSchedule,
   generateBiMonthlySchedule,
   generateQuarterlySchedule,
   generateTwoMonthlySchedule,
 } from "../schedule";
+
+describe("generateAmortizationSchedule — month-overflow bug fix (2026-08-30)", () => {
+  it("clamps to Feb 28 instead of overflowing to March when the anchor day is the 30th", () => {
+    // Regression guard for the live repro: Sep 30 first payment, 6th
+    // installment (index 5) must land on Feb 28, 2027, not March 2.
+    const result = generateAmortizationSchedule({
+      terms: 6,
+      monthlyAmortization: 21_633.33,
+      releaseDate: "2026-08-30",
+      addonMonths: 0,
+      firstPaymentDate: "2026-09-30",
+      totalLoan: 129_800,
+    });
+
+    expect(result).toHaveLength(6);
+    expect(result[0].dueDate).toBe("2026-09-30");
+    expect(result[1].dueDate).toBe("2026-10-30");
+    expect(result[2].dueDate).toBe("2026-11-30");
+    expect(result[3].dueDate).toBe("2026-12-30");
+    expect(result[4].dueDate).toBe("2027-01-30");
+    expect(result[5].dueDate).toBe("2027-02-28"); // not 2027-03-02
+  });
+
+  it("clamps to Feb 29 in a leap year", () => {
+    const result = generateAmortizationSchedule({
+      terms: 6,
+      monthlyAmortization: 10_000,
+      releaseDate: "2027-08-31",
+      addonMonths: 0,
+      firstPaymentDate: "2027-09-30",
+      totalLoan: 60_000,
+    });
+
+    expect(result[5].dueDate).toBe("2028-02-29");
+  });
+});
 
 describe("generateBiMonthlySchedule", () => {
   it("generates 12 installments for 6-month term", () => {
@@ -112,6 +149,22 @@ describe("generateQuarterlySchedule", () => {
       });
     }).toThrow("Quarterly loans require terms divisible by 3");
   });
+
+  it("does not skip a month when the release day overflows the target month (month-skip bug fix, 2026-08-30)", () => {
+    // Regression guard for the live repro: release Aug 31 + 3 months used to
+    // overflow "Nov 31" into Dec 1 before dueDay got applied, landing a full
+    // month late on Dec 10 instead of the correct Nov 10.
+    const result = generateQuarterlySchedule({
+      terms: 6,
+      totalLoan: 129_800,
+      totalInterest: 19_800,
+      releaseDate: new Date(2026, 7, 31), // Aug 31, 2026
+      dueDay: 10,
+    });
+
+    expect(result[0].dueDate).toBe("2026-11-10"); // not 2026-12-10
+    expect(result[2].dueDate).toBe("2027-02-10");
+  });
 });
 
 describe("generateTwoMonthlySchedule", () => {
@@ -181,5 +234,22 @@ describe("generateTwoMonthlySchedule", () => {
         releaseDate: new Date("2026-09-01"),
       });
     }).toThrow("Two-monthly loans require terms divisible by 2");
+  });
+
+  it("does not skip a month when the release day overflows the target month (month-skip bug fix, 2026-08-30)", () => {
+    // Third payment (offset 6 months from an Aug 31 release) used to
+    // overflow "Feb 31" into March 3 before dueDay got applied, landing a
+    // full month late on Mar 10 instead of the correct Feb 10.
+    const result = generateTwoMonthlySchedule({
+      terms: 6,
+      totalLoan: 129_800,
+      totalInterest: 19_800,
+      releaseDate: new Date(2026, 7, 31), // Aug 31, 2026
+      dueDay: 10,
+    });
+
+    expect(result[0].dueDate).toBe("2026-10-10");
+    expect(result[2].dueDate).toBe("2026-12-10");
+    expect(result[4].dueDate).toBe("2027-02-10"); // not 2027-03-10
   });
 });

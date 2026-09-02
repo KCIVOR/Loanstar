@@ -27,6 +27,11 @@ import {
 import { ConnectBorrowerAccountPanel } from "@/components/csa/ConnectBorrowerAccountPanel";
 import { NegotiationPanel } from "@/components/csa/NegotiationPanel";
 import { ApplicantProfileFields } from "@/components/borrowers/ApplicantProfileFields";
+import { CoBorrowerSection } from "@/components/applications/CoBorrowerSection";
+import {
+  isCoBorrowerEditableStatus,
+  type CoBorrower,
+} from "@/lib/applications/co-borrower";
 import { AutofillOverlay } from "@/components/dev/AutofillOverlay";
 import { fakeBorrowerProfile, fakeRemark } from "@/lib/dev/fake-data";
 import { DocumentChecklist } from "@/components/DocumentChecklist";
@@ -65,8 +70,11 @@ type ApplicationWorkspace = {
     status: string;
     statusLabel: string;
     blocker: string | null;
+    coBorrowerRequired: boolean;
+    coBorrowers: CoBorrower[];
     segment: "seafarer" | "sme" | "individual";
     entityType: "individual" | "corporate" | null;
+    collateralType: "none" | "car_refinancing" | "real_estate";
     paymentSchedule:
       | "mpl"
       | "salary"
@@ -972,6 +980,26 @@ export default function CsaApplicationPage() {
           </Modal>
         ) : null}
 
+        {data.application.coBorrowerRequired &&
+        data.application.segment !== "seafarer" ? (
+          <Card>
+            <h2 className="mb-1 font-display text-lg font-semibold text-navy-900">
+              Co-borrower
+            </h2>
+            <p className="mb-4 text-sm text-ink-500">
+              {data.application.coBorrowers.length === 0
+                ? "The approving committee requested a co-borrower for this loan — not yet provided. Add the co-borrower's name and address below. This is advisory and does not block release."
+                : "Co-borrower details requested by the approving committee."}
+            </p>
+            <CoBorrowerSection
+              applicationId={data.application.id}
+              coBorrowers={data.application.coBorrowers}
+              editable={isCoBorrowerEditableStatus(data.application.status)}
+              onSaved={() => void load({ silent: true })}
+            />
+          </Card>
+        ) : null}
+
         <Card>
           <h2 className="mb-1 font-display text-lg font-semibold text-navy-900">
             Data Privacy Act orientation
@@ -1273,6 +1301,7 @@ export default function CsaApplicationPage() {
           applicationId={applicationId}
           loanTypeId={data.details?.loanTypeId ?? null}
           segment={data.application.segment}
+          collateralType={data.application.collateralType}
           rateHistory={data.rateHistory}
           editable={editable}
           computation={data.computation}

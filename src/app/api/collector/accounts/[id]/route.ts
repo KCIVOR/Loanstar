@@ -1,6 +1,8 @@
 import { handleApiError, jsonOk } from "@/lib/api/handler";
 import { fetchAccountPostings } from "@/lib/collection/account-postings";
 import { COLLECTOR_QUEUE_ACCOUNT_STATUS } from "@/lib/collector/queue";
+import { AMORTIZATION_SCHEDULE_LEDGER_COLUMNS } from "@/lib/ledger/build-account-ledger-rows";
+import { listMoveOfPaymentCandidates } from "@/lib/ar/move-of-payment";
 import {
   ForbiddenError,
   requireModulePermission,
@@ -27,7 +29,7 @@ async function fetchPdcChecks(scope: {
 
   const { data } = await admin
     .from("pdc_checks")
-    .select("sort_order, check_number")
+    .select("sort_order, check_number, status")
     .eq("release_file_id", releaseFileId)
     .order("sort_order", { ascending: true });
   return data ?? [];
@@ -57,19 +59,13 @@ export async function GET(_request: Request, { params }: RouteParams) {
         account_status,
         total_loan,
         remedial_flag,
+        move_of_payment_used_at,
         assignments!inner (
           collector_user_id,
           remedial_user_id
         ),
         amortization_schedules (
-          id,
-          installment_no,
-          due_date,
-          amount_due,
-          amount_paid,
-          status,
-          penalty_amount,
-          paid_at
+          ${AMORTIZATION_SCHEDULE_LEDGER_COLUMNS}, amount_paid
         )
       `,
       )
@@ -86,7 +82,7 @@ export async function GET(_request: Request, { params }: RouteParams) {
     const { data: payments, error: paymentError } = await supabase
       .from("payments")
       .select(
-        "id, reference_no, payment_date, amount, status, channel, notes, created_at",
+        "id, reference_no, payment_date, amount, status, channel, notes, created_at, move_of_payment_batch_id",
       )
       .eq("masterlist_id", id)
       .order("payment_date", { ascending: true });
@@ -97,6 +93,17 @@ export async function GET(_request: Request, { params }: RouteParams) {
       loanApplicationId: (data.loan_application_id as string | null) ?? null,
     });
     const postings = await fetchAccountPostings(id);
+    // Move of Payment (Phase 5, see
+    // docs/revision-plans/feature-move-of-payment-implementation-plan.md,
+    // extended with manual installment selection) — read-only eligibility +
+    // per-installment surcharge list, same source of truth applyMoveOfPayment
+    // itself uses, so the picker/preview can never disagree with what
+    // actually happens on submit. Uses the service client, same as
+    // fetchPdcChecks above — Collector's own RLS session has no read access
+    // to `computations` at all (confirmed via pg_policy), so
+    // listMoveOfPaymentCandidates would otherwise fail to find it.
+    const admin = createServiceClient();
+    const moveOfPayment = await listMoveOfPaymentCandidates(admin, id);
     const scheduleRows = (
       Array.isArray(data.amortization_schedules)
         ? data.amortization_schedules
@@ -121,6 +128,10 @@ export async function GET(_request: Request, { params }: RouteParams) {
         outstandingBalance: Number(data.outstanding_balance ?? 0),
         accountStatus: String(data.account_status ?? "active"),
         totalLoan: Number(data.total_loan ?? 0),
+        // Move of Payment (Phase 7, see
+        // docs/revision-plans/feature-move-of-payment-implementation-plan.md)
+        // — read-only surfacing of the already-written column, no new logic.
+        moveOfPaymentUsedAt: (data.move_of_payment_used_at as string | null) ?? null,
       },
       schedules: scheduleRows
         .map((row) => ({
@@ -130,13 +141,24 @@ export async function GET(_request: Request, { params }: RouteParams) {
           amountDue: Number(row.amount_due ?? 0),
           amountPaid: Number(row.amount_paid ?? 0),
           penaltyAmount: Number(row.penalty_amount ?? 0),
+          discountAmount: Number(row.discount_amount ?? 0),
           status: String(row.status ?? "pending"),
           paidAt: (row.paid_at as string | null) ?? null,
+          movedAt: (row.moved_at as string | null) ?? null,
+          moveSurchargeAmount:
+            row.move_surcharge_amount != null
+              ? Number(row.move_surcharge_amount)
+              : null,
+          moveOfPaymentBatchId:
+            (row.move_of_payment_batch_id as string | null) ?? null,
+          deferredFromMoveOfPaymentBatchId:
+            (row.deferred_from_move_of_payment_batch_id as string | null) ?? null,
         }))
         .sort((a, b) => a.installmentNo - b.installmentNo),
       payments: payments ?? [],
       postings,
       pdcChecks,
+      moveOfPayment,
     });
   } catch (error) {
     return handleApiError(error);
