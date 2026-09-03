@@ -462,10 +462,7 @@ export default function CigApplicationPage() {
     }
 
     if (stage === "crewing_manager") {
-      if (!sequence.unlocked.crewing_manager) {
-        setError(cigSequenceLockedHint("crewing_manager"));
-        return;
-      }
+      // Option B: the Crewing manager section is always available — no sequence gate.
       if (verification.cmDepartureDate) {
         patch.cmDepartureDate = verification.cmDepartureDate;
       }
@@ -505,10 +502,7 @@ export default function CigApplicationPage() {
     }
 
     if (stage === "finding") {
-      if (!sequence.unlocked.finding) {
-        setError(cigSequenceLockedHint("finding"));
-        return;
-      }
+      // Option B: the Finding is always available — no sequence gate.
       if (verification.finding) {
         patch.finding = verification.finding;
       }
@@ -526,10 +520,7 @@ export default function CigApplicationPage() {
   }
 
   async function saveCiForm(draft: CiFormDraft) {
-    if (!sequence.unlocked.ci_references) {
-      setError(cigSequenceLockedHint("ci_references"));
-      return;
-    }
+    // Option B: the CI & References Form is always available — no sequence gate.
     await saveVerification({
       picVerification: draft.pic,
       referenceVerifications: draft.references,
@@ -1579,15 +1570,6 @@ export default function CigApplicationPage() {
 
             {segment === "sme" ? (
               <>
-                {editable && checksUnlocked && !ciUnlocked ? (
-                  <Card className="!bg-surface-2/40">
-                    <p className="text-sm text-ink-500">
-                      <b>Next:</b> Field Visit unlocks when all external checks
-                      are recorded.
-                    </p>
-                  </Card>
-                ) : null}
-
                 {ciUnlocked ? (
                   <Card>
                     <div className="flex items-start justify-between gap-3">
@@ -1644,27 +1626,9 @@ export default function CigApplicationPage() {
                     </Button>
                   </Card>
                 ) : null}
-
-                {editable && crewingUnlocked && !findingUnlocked ? (
-                  <Card className="!bg-surface-2/40">
-                    <p className="text-sm text-ink-500">
-                      <b>Next:</b> Finding unlocks after Field Visit is
-                      complete.
-                    </p>
-                  </Card>
-                ) : null}
               </>
             ) : (
               <>
-                {editable && checksUnlocked && !ciUnlocked ? (
-                  <Card className="!bg-surface-2/40">
-                    <p className="text-sm text-ink-500">
-                      <b>Next:</b> CI &amp; References Form unlocks when all
-                      external checks are recorded.
-                    </p>
-                  </Card>
-                ) : null}
-
                 {ciUnlocked ? (
                   <Card>
                     <div className="flex items-start justify-between gap-3">
@@ -1693,15 +1657,6 @@ export default function CigApplicationPage() {
                         ? "Open CI & References Form"
                         : "View CI & References Form"}
                     </Button>
-                  </Card>
-                ) : null}
-
-                {segment === "seafarer" && editable && ciUnlocked && !crewingUnlocked ? (
-                  <Card className="!bg-surface-2/40">
-                    <p className="text-sm text-ink-500">
-                      <b>Next:</b> Crewing manager unlocks when CI &amp;
-                      References is complete.
-                    </p>
                   </Card>
                 ) : null}
 
@@ -1929,15 +1884,6 @@ export default function CigApplicationPage() {
                     ) : null}
                   </Card>
                 ) : null}
-
-                {editable && crewingUnlocked && !findingUnlocked ? (
-                  <Card className="!bg-surface-2/40">
-                    <p className="text-sm text-ink-500">
-                      <b>Next:</b> Finding unlocks after crewing manager is
-                      saved complete.
-                    </p>
-                  </Card>
-                ) : null}
               </>
             )}
 
@@ -2105,10 +2051,6 @@ export default function CigApplicationPage() {
                       })
                     }
                     onSave={(next) => {
-                      if (!sequence.unlocked.ci_references) {
-                        setError(cigSequenceLockedHint("ci_references"));
-                        return;
-                      }
                       setVerification({
                         ...verification,
                         smeReloanVerification: next,
@@ -2131,10 +2073,6 @@ export default function CigApplicationPage() {
                       })
                     }
                     onSave={(next) => {
-                      if (!sequence.unlocked.ci_references) {
-                        setError(cigSequenceLockedHint("ci_references"));
-                        return;
-                      }
                       setVerification({
                         ...verification,
                         fieldVisit: next,

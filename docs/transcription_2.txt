@@ -1,0 +1,482 @@
+Impromptu Google Meet Meeting - September 01
+VIEW RECORDING - 83 mins (No highlights): https://fathom.video/share/_yd8azwSorXhfiSQynBnyvyrfFndpbjJ
+
+---
+
+0:01 - rovick romasanta (ubeeeyk@gmail.com)
+  Okay, accept ko na po siya, ma'am. Sige, sige. Three, two, one. Ay, wala.
+
+0:24 - sheila dela cruz
+  Rovick, pa-accept ako ng Fathom. Okay po. Rovick, can you hear me? Yes po, yes po. Okay, let's start.
+
+1:07 - rovick romasanta (ubeeeyk@gmail.com)
+  Wait lang po, wala pa po si Sarane.
+
+1:14 - sheila dela cruz
+  Tago kanina pa ba siya nandun?-chat ka lang po, wait lang po. Okay. Thank you very Thank you.
+
+11:28 - Conference
+  Thank you. Thank you. Hey! Good afternoon. Good afternoon sir, kumusta po?
+
+13:13 - sheila dela cruz
+  Good afternoon Michelle, nice.
+
+13:18 - Conference
+  Maulan po ba dyan sa inyo? Medyo mainit na. maputing naman.
+
+13:23 - rovick romasanta (ubeeeyk@gmail.com)
+  afternoon sir. Binaha po ba dyan sa Manila? Binaha po kayo dyan?
+
+13:31 - Conference
+  Dito, wala. Wala dito sa office. Ay, o po. Sige.
+
+13:39 - sheila dela cruz
+  Let's start na Rovick. Yes po.
+
+13:42 - rovick romasanta (ubeeeyk@gmail.com)
+  So, open ko lang po yung document. So, ano yun. So, according to this. Present ko na po yung ano yung mga changes po from our last meeting which is yung offset, yung add-on month, SME application, so wait lang po.
+
+14:20 - Conference
+  Kita po ba yung live ko? Kita.
+
+14:25 - rovick romasanta (ubeeeyk@gmail.com)
+  Nasa local ka ha? Local yung naka ano?
+
+14:30 - sheila dela cruz
+  Ay ano po sa local ko na lang po muna yan.
+
+14:34 - rovick romasanta (ubeeeyk@gmail.com)
+  Okay. So start na po ako. So first, yung una pong napag-usapan po natin nung last time diba sa Rene ay yung ano?  Yung sa mali po yung, baliktad po yung terminologies ng ano, offset and then other. So yung ano po is...  Pakita ko na lang po yung mga chinges. Hindi ko na po siya i-run through pa ulit-ulit. Ah, siguro, siguro.  Yan, para yan po. Yan. Yan. So here po, so sa other deduction, so yung offset po is, ano, so yung offset po is, siya na po yung other loan from last time, then yung other loan naman po is, siya na po yung offset.  So create na lang po pala ako ng pinbag. So hindi ko na po idadaan sa, ano, sa borrower account.  Di, naletsyo ka na po sa CSA. So were just about Fathom. three terms. Sabarura account lang po pala ako.  Wait lang po. So kailangan po pala may existing loan tayo. Yeah, so accept that.
+
+17:15 - Conference
+  Yes, pa. Para mag-create ka ng new loan, self-existing.
+
+17:35 - rovick romasanta (ubeeeyk@gmail.com)
+  Wait lang po. So Fathom, rovick romasanta, sheila, and sheila. So just to add lang po, currently kasi nasa local si Rovick, kaya po hindi ganun yung kabilis yung process.
+
+19:26 - sheila dela cruz
+  Pero pag nasa live na naman po siya, mas mabilis na po yan.
+
+19:31 - rovick romasanta (ubeeeyk@gmail.com)
+  Okay. Nakakita ko naman yung sa server tsaka against live. Yes po.
+
+19:41 - sheila dela cruz
+  Hindi ko kumanap yung account e.
+
+19:43 - rovick romasanta (ubeeeyk@gmail.com)
+  Maso nga ako? Refugation number. Ayan nung ka. USB. So ito po, so ito pong account na to is my existing loan.  So fill up pa lang ulit ang mga to. So ito po yung ano sir, yung calculator. Then yung last time po is, so baliktad to.  So ito yung other loan, then offset. So ngayon po, so baliktad na siya. So pagkinlik niyo po siya, so may ano na siya.  So parang full payment na po yung ano. Mabayaran kung ilan po yung... Remaining balance sa account so then also nag-add na rin po ng new feature which is yung mag-add po ng discount for offset so pag nag-select po kayo dito ng loan for example ito yung EN 30426 na may 326 remaining balance then pag kinilip po itong apply early settlement discount lalabas po dito yung payments so which is ano so so sa second month, third month, fourth month kung alin po yung isa sa laki ito so for example po itong third month usually ang big sana yung discount is yung pinakadulong dulo pataas yung idili discount ba so pag nagpibili sa baba pang sumama well punyari dyan line 3 months patience.
+
+22:00 - Conference
+  Month five or month seven, month seven, month six, pa gano'n ba? Papabalik natin yung ano.
+
+22:07 - rovick romasanta (ubeeeyk@gmail.com)
+  Okay po. Sige po.
+
+22:09 - Conference
+  Ano na lang po naman yan. Okay lang naman na ganyan, pero...
+
+22:14 - rovick romasanta (ubeeeyk@gmail.com)
+  Yung ordering po ba? Yes. Tama na yan? Okay nga yan. Sige po. Yan.
+
+22:20 - Conference
+  So pag nag-select po tayo dito ng month, may lalabas po sa left side na field. So nakalagay dito kung ano percentage yung ibibigay na discount.  So yung discount po is mababawas lang sa interest ng loan, hindi po sa principal.
+
+22:36 - rovick romasanta (ubeeeyk@gmail.com)
+  For example po, i-calculate na po muna agad natin para amount, sabi natin, 500,000. And then sixth term. So makikita po natin dito.  So... So ang interest, so total interest is 132, then pag nag-add po tayo ng ano, ay I mean ano po pala yung net release 173, then pag nag-add po tayo ng discount, 50% lang, then apply, then recalculate, so nakalagay po dito so may ano, may yung offset po is may discount na.  So from, baka na to lahat, from ano po yan, from So, 326,1880, sabay naging ano na lang po siya, 300 ano, 326K.
+  ACTION ITEM: Fix offset discount persistence/display; verify discount column in AR/PDC - WATCH: https://fathom.video/share/_yd8azwSorXhfiSQynBnyvyrfFndpbjJ?timestamp=1484.9999  So, nabasan po siya ng, isa na ilang man, isa ilang, wait lang po, nawala, refresh ka lang po. So, baka po ano, hindi po kasi nagyan.  I-anaw na lang po namin ito, balikan po ito. So gano'n naman po yan nag-apply po, baka hindi lang po siya nag-save yung binabalik po yung data para makita po na may naka-apply na 50% dito.  So ibalikan na lang po natin yan mamaya.
+
+25:22 - sheila dela cruz
+  Maybe clarify ko lang, sa part na ito, ibig sabihin, kapag naging successful yung transaction, may lalabas na percentage kung magkano yung in-list?  Yes po. So nakalagay dito na sa offset.
+
+25:37 - rovick romasanta (ubeeeyk@gmail.com)
+  So for example po, itong AN-300, so nandito po siya lalabas. So nakalagay na po dito yung total loan kung magkano na lang po yung babayaran.  For example po, ngan. Then yung first and second month, so din-scoutan ko ng 100%, so yung yung So yung interest po nang for the second and third month, so ma-di-discount po siya for 100%.  So makikita po natin dito, naging 320 na lang po siya. So nakalagay dito. So nakalagay po dito yung breakdown, yung early settlement discount.  So 6480, then yung final amount is 300. So pwede naman po yun i-edit ulit. Ito na po pala.
+
+26:36 - Conference
+  Lumabas na siya, rovick.
+
+26:37 - rovick romasanta (ubeeeyk@gmail.com)
+  Napapansin po kasi may loading pa sa pinakababa mo.
+
+26:42 - sheila dela cruz
+  Ayan. Tanina. Baka po sa internet. So pwede din naman po i-remove yan.
+
+26:50 - rovick romasanta (ubeeeyk@gmail.com)
+  Sabi na natin yan. Yan. So okay na po ito. Then dito naman po sa origination discount.
+
+26:56 - Conference
+  So ang i-sabihin po nito is yung ano yung.
+
+27:00 - rovick romasanta (ubeeeyk@gmail.com)
+  So loan po na current na ina-apply yan, pwede na rin po lagyan ng discount. So for example, ito pong loan na ito, yung 100 ano, itong release ito, itong 500,000 po na loan, so pwede po natin siya yan, ilagyan din po ng discount, so yan, magsa-select lang dyan, then for example, 50, 50 ano, 50 percent, apply, then recalculate, yan.  So nakalagay po dito, so may bawas po na 33k, which is sa current loan po magbabawas. And dito naman po sa loan schedule, so visible din po ito sa ano, sa...  Sa borrower. So nakalagay po dito yung SME. SME po kasi itong application na ito, nakalagay po dito kung regular month, multi-purpose loan, then salary, weekly, or invoice, by monthly, quarterly, to monthly, or daily.  So try po natin yan. So pag monthly po, so i-alisin ko na lang po ito para magamit ko rin as example.  So for example po, terms po yung application, then nag-select ako ng discount, then nakaregular po siya monthly. So ang lalabas po dito na schedule po nung payment is, yan, nakalagay siya, tatlong month siya.  So bro. So, may add-on po pala. Alasin ko po muna itong mag-add-on. So nakalagay po dito, so 10, which is next month, 1, then November, then December.  So ito lang, same lang po ito nang lalabas sa AR, yung pag-create po ng ledger. So ito po yung pinaka-ledger.  And if, ano naman po, multi-purpose loan, so mostly the same lang po siya ng regular. pag, ano natin na-calculate, yan monthly, so mostly the same, then pag ano naman po salary.  So ito naman po, so naayos na rin po ito, yung last time na issue. Select discount. yun, nakalagay po dito na nagme-breakdown na po siya dalawang payment within a month.  So nakalagay dito for 9, 9.15 since na 1 po ngayon. Then 30, 15, 31, 15, 30. So tama naman po yung date since na September 1 po ngayon.  Then next po is sa weekly naman po, sa weekly invoice. So recalculate.
+
+30:51 - Conference
+  So nakalagay na po dito kung ilang week po yung mabayaran from 3 terms.
+
+30:58 - rovick romasanta (ubeeeyk@gmail.com)
+  Nakalagay po dito is... So, sa 8, Tuesday, then 15, 22, then 29, so hanggang ano po yan. So, hanggang November 24, which is weekly three terms.  then next po is naman sa bi-monthly so recalculate so nagbabago rin naman po yung calculation so yung mga interest yan so nakalagay po dito na 1 po ngayon so nakalagay dito 9-16 16 then October 10 16 then 31 and so ito is  So, next naman po iso sa quarterly naman. So, sa quarterly po, na ano, 12 months yung terms.
+
+32:29 - Conference
+  Ano po? Gawin mong 12 months yung terms.
+
+32:33 - rovick romasanta (ubeeeyk@gmail.com)
+  Sige po,-note ko. No, no, no. I-gawin mong 12 months.
+
+32:40 - sheila dela cruz
+  Yung nakaset mo dito na data, ayan, terms. Gawin mo siya ang 12.
+
+32:46 - Conference
+  Ayan. Nakala ko po ano.
+
+32:50 - rovick romasanta (ubeeeyk@gmail.com)
+  It's okay.
+
+32:55 - sheila dela cruz
+  Re-calculate yan. Ayan. By quarter po siya.
+
+33:00 - rovick romasanta (ubeeeyk@gmail.com)
+  For each is 12 months. So quite early. So tama naman po, no? So nakalagay dyan, 12 months. Dinevite na lang yan by 4, no?  Yung saya? Yes po.
+
+33:20 - Conference
+  I mean...
+
+33:22 - rovick romasanta (ubeeeyk@gmail.com)
+  Parang ano po siya, every 3 months. So... I mean the amortization.
+
+33:33 - Conference
+  May na-mix ka doon sa... Kasi yung doon sa quarter B, actually, tama yan. Tama yan na, no? Pero may special arrangement kasi kami doon sa isang aming malaking client na yung per quarter niya, ang binabayaran niya lang is, tawag nito, interest, interest, interest.  Tapos sa dulo yung interest mga principal.
+
+33:58 - rovick romasanta (ubeeeyk@gmail.com)
+  Principal. Na-a, nagtigala mo yan sa DLRI dati na.
+
+34:05 - Conference
+  Ah, nagtigala mo.
+
+34:10 - rovick romasanta (ubeeeyk@gmail.com)
+  Yung ano po ba wait ah, narefresh ko lang po. Well, DLRI… Pero supposed to be, tama na yan dyan sa ano.
+
+34:23 - Conference
+  Pak regular na po yung thirdly, tama siya.
+
+34:26 - sheila dela cruz
+  Ang, ang ano lang po is interest, interest, interest, then ano.
+
+34:30 - rovick romasanta (ubeeeyk@gmail.com)
+  Oo, final.
+
+34:32 - sheila dela cruz
+  Ano po siya, Parang special lang sa client na yun. And then at the end of the day, at the end of yung loan niya, isasettled pa din naman po niya yung...  Principal. Oo, opo. Principal interest.
+
+34:47 - Conference
+  Parang yung pang-apat, interest tapos yung pinakabuong principal. Pero ano lang po siya, minimal lang po siya.
+
+34:56 - sheila dela cruz
+  Specific lang sa mga client niya po. May isa lang client na gano So terms of the client.
+
+35:02 - Conference
+  So what is the request of client, if you have a special arrangement for the client? But the normal quarter-day, the normal Tama po.  But the amount of month since they've long they can request them, can we have an interest, interest, interest muna tapos sa dulo na kami magbayad?  Ang pinaka-prinsipal. Sige po.
+
+35:32 - rovick romasanta (ubeeeyk@gmail.com)
+  So, i-ano na lang po natin yan mamaya. Then, itapusin ko na lang po muna ito. Then, sa two-monthly, So, Taka natin na six terms.  Excuse lam rika.
+
+35:52 - Conference
+  have to take this one.
+
+35:56 - rovick romasanta (ubeeeyk@gmail.com)
+  Wait na. Hello? Yes po. Hello, hello then. you. Sige, Bish, Bill.
+
+36:33 - Conference
+  Yan, same din yan yun. Yes, po.
+
+36:41 - rovick romasanta (ubeeeyk@gmail.com)
+  Parang gano'n din yan doon sa anak.
+
+36:43 - Conference
+  Pinag-aiba lang nila kanina, quarterly, yan naman, to every two months yung due date niya.
+
+36:50 - rovick romasanta (ubeeeyk@gmail.com)
+  Yes, po.
+
+36:50 - Conference
+  So nakalagay dito, ano, November, then January. So yan din yung normal, kama yan, normal computation yan. Tapos yung isa...  On special arrangement, interest, interest, principal, interest ko lang sa daily. I see.
+
+37:06 - rovick romasanta (ubeeeyk@gmail.com)
+  Parang may vibration lang ba siya na.
+
+37:10 - Conference
+  Then sa ano naman po sa daily.
+
+37:13 - rovick romasanta (ubeeeyk@gmail.com)
+  Tara. Magsasatay ng dito, payment date, payment date. So for example, ano, sabihin natin ano, recover one. Then, calculate.
+
+37:38 - Conference
+  Wait lang po.
+
+37:45 - rovick romasanta (ubeeeyk@gmail.com)
+  Tama yan.
+
+37:48 - Conference
+  Harap ngayon, pipili ka ng babayaran ng date. Pagkanda't yung day.
+
+37:58 - rovick romasanta (ubeeeyk@gmail.com)
+  Simulala. Total reduction. Wait lang po, brosad. So baka po ano. So i-balikan na lang po natin ito mamaya. Sa daily po, baka po ano kasi.  So ang ang masayari naman po dyan is... Pusta ko dyan, day yung lalabas, diba? Bibilangin yung day. Yung terms siya magiging parang day na siya.  Yes po. So ang mayayari po ako dyan...
+
+39:02 - Conference
+  So bibilangin lang naman nga yung araw, kung ilang yung araw, tapos saka interesan, yan usually mga short term kasi yan.
+  ACTION ITEM: Implement daily schedule: 1-row amortization, interest from release to due date - WATCH: https://fathom.video/share/_yd8azwSorXhfiSQynBnyvyrfFndpbjJ?timestamp=2346.9999  Yes po.
+
+39:10 - rovick romasanta (ubeeeyk@gmail.com)
+  So i-balikan na lang po natin ito. So baka po kasi yan, hindi po kasi nalabas yung... Ano ba yung expected output dyan, Rovick?  Ang expected output po dyan is, so si SA is magsa-select po ng payment date. So then, based po sa payment date, then sa term, so magdegenerate po siya ng...  ng payment schedule. For example, sabihin natin ano, ngayon siya nag ano, ngayon September 1, yung payment date, then terms po ay ano, mga 3 terms.  Ang mangyayari po dyan, ang magkikreate po ng payment schedule is from 1 hanggang ano po Thursday. I see. I see.  I see. I
+
+40:00 - sheila dela cruz
+  Okay, mali ba, mali.
+
+40:01 - Conference
+  Oo. Pagka yung payment date, yun yung 3, supposed to be, yun yung September 3. Kung sa 3 siya magbabayad, yung sinasabi mong September 3, ang release date niya, yung ngayong araw kung kailan mo siya kinikreate.  So, ibig sabihin, alam mo na kung kailan yung date na magbabayad siya. So, from release to target date na yan, yung release date, yun yung days na pibilangin mo, yun lang yung lalagyan mo na interest.  Parang bumbay style po ba yan?
+
+40:32 - rovick romasanta (ubeeeyk@gmail.com)
+  Parang na, alam mo na kung kailan lalabas yung payment niya.
+
+40:36 - Conference
+  Parang sa, sa anak siya, sa mga sales invoice, na alam mo na yung target date na lalabas yung check-in noong client mo.  So, from that day, bibilangan mo siya ng day hanggang doon sa kung kailan yung date, yun lang yung lalagyan mo ng interest.  So, ang lalabas, hindi siya terms by month, magiging day na ang ano niya, parang tinatarget na yung date. you.  Thank you. Thank Kina-target niya kung ilang day from the release date hanggang doon sa payment date na yan. So parang one-time payment lang doon siya.  So parang kung sa computations or parang ganito, halimbawa, mabilisan lang siya sa isang buwan, parang one term, mag-generate yung interest sa one term.
+
+41:23 - sheila dela cruz
+  Pero yung one term na yun, idedivide mo siya kung ilang days niya babayaran yung utang niya. Yes, parang yung one term is 30 days, di ba?
+
+41:32 - Conference
+  Opo, divide lang natin doon, daily, yun na yung magiging daily niya na kailangan bayaran.
+
+41:38 - sheila dela cruz
+  Yes, up Tapos, tapong mag-it is yun.
+
+41:41 - rovick romasanta (ubeeeyk@gmail.com)
+  Hanggang doon sa target date na yan, payment date.
+
+41:44 - Conference
+  So pag bumaba siya sa ledger mo or bit sa amortization, one time lang siya, isang beses lang siya magbabayad.
+
+41:52 - rovick romasanta (ubeeeyk@gmail.com)
+  Pagbabayad. Mm-hmm. Sige ko. Pero isishow niyo lang po yung daily interest niya.
+
+41:59 - sheila dela cruz
+  Hanggang. Sa final, kung kailan yung date na babayagan niya po? Parang, hindi mo nakilalang siyang ishow, ishow mo lang siya as a whole na.
+
+42:07 - Conference
+  As a whole, one-liner lang talaga siya.
+
+42:11 - rovick romasanta (ubeeeyk@gmail.com)
+  Isang row lang po ba? Ah, isang row lang talaga, one-liner lang. O, hindi po. I-follow up na lang po naman ito.  Okay. Ayan, for now po is... Probe, wait lang. Ikaklara mo, nagigets mo yung gustong mangyari ni sir.
+
+42:28 - sheila dela cruz
+  Clear sa'yo yung requirements. Yes po. So, bali yung sa payment po is magiging ano lang po siya.
+
+42:36 - rovick romasanta (ubeeeyk@gmail.com)
+  One payment, kung baga. Yung payment date yan, yung due date niya. Yung due date po, kung kailan magbabayad. Ah, O, sa'yo.  Ayan.
+
+42:45 - sheila dela cruz
+  Then, sa ano.
+
+42:48 - rovick romasanta (ubeeeyk@gmail.com)
+  Then, continue na po muna tayo sa ano. Sa competition po. So, sa nawak. Ya, sa bin... Ang gagawin po natin is salary na lang, salary, then 3 terms lang, remove na po muna natin itong discount, so okay na, then nakalagay po dito sir sa first payment date na nakalagay, magkasama na po dito yung release date, so yung ngayong araw, then kung kailan yung first payment date, so which is 15, kasi ano po siya, salary, yan, then proceed na po ako sa next ano, so i-skip ko na lang po yung mga ibang para mabilis.  What do you to present, Rovick?
+
+44:54 - sheila dela cruz
+  I'll skip it first so I can go to... So next na tayo dun sa features ba na iprepresent mo or nagpapapili ka pa lang ng data?  I mean, magne-next na po ako.
+
+45:15 - rovick romasanta (ubeeeyk@gmail.com)
+  So next na po is sa committee. So si CSA po is siya lang po yung nagiinitiatize computation. Pero yung mga ginawa niya po ng computation kanina, pwede pa rin po yung override ni committee.  Same as ano lang po siya, katulad po nang dati. So nakalagay dito, so pwede siya mag-ano. So pagitan yung ano, yung loan schedule na nakaset na yung salary from ano, from weekly or ano, kahit ano po dito.  But for now, please mag-stick tayo sa salary. And continue. Pagkatilinan. Pagkatilinan. Vote, approve, LRA, LRA, PSA, yan. So mag-create lang po ako ng PDC.  Yeah, I see. Yeah, I love you on me. So we had to schedule, and have to break. So we have to about briefing, we are talking about the We are talking about?  Thank you, Pa. Thank you. So gano'n na po ako. So nasa AR part na po ako. So wait lang po ako.  So ito na po yung PDC na ledger na na-create. So sims na siya na salary, kung nakalagi dito 15, 30, 15, 31, then may bago na po tayo dito ng column which is a discount.  So mag-show na po ang example na meron na. So mangyayari po dyan, so for example, itong payment na sa December-January 28 and February 28 is nilagyan ko po ng discount.  Sabihin natin na 100% to. Ang mangyayari po dyan. So... So yung discount po is lalabas dito. Then mababawasan siya.  So then after po nun, pag for example di po siya nakapagbayad within due date po ng December, ang mangyayari po dyan is yung discount po is mawawala.  Then babalik po yung original amount nung target. So which is 56,000. Then we have ano naman po dito yung sa move of payment.  So right now po is nasa ano pa lang po siya 85%. So what's your name? Then, pakita ko na lang po yung ano yung process niya ngayon.  Isa na po yun. we made the last class. Wait lang po. Yan. Tua. So, si Carlos Santos. So, dito po sa ano, sa collection sign na.  So, yung last time po dito is wala po itong ano ano. So, loan na na lang, demand, log, then record payment.  Then may bago na po tayo ditong option which is the move-off payment. Pag i-move-move po yung payment po nung user ay nung borrower, click po natin itong move-off payment, so magpupunta po tayo sa move-off payment page.  Then dito si collector po pwede siya mag-select kung anong payment yung i-move. For example, ito pong September 15. Ang mangyayari po dyan, select ko lang yan, so nakahighlight naman po yung ano dyan, yung row.  Yan, then maglalagay ako po dito ng ano ng new deadline for the shifted ano. So sabihin natin na ano, September 15, so we have mama.  September 18, yung due date po nung ano, nung subcharge, then pag kinanan niya po yan, then refresh, so mangyayari po dyan, so mag-a-adjust po siya, so nagkaroon nung last time po hanggang November, ano lang siya, November, ngayon po is meron na siyang ano, December.  Okay. Yan, so December 15, then yung sa September 1 po is, September 15 po is na-adjust, then yung dito po, so nakalagay na dito yung status kung yung loan po ba is ano, yung payment po ba is na-move or hindi, so nakalagay naman dyan po kung move, then nakalagay po dito kung magkano yung babayaran, so right now po is, I'm still working it out po.  So mga 85% po, yan, so ma-adjust po siya, so hindi po siya madadagdag sa pinakang total po nung loan.
+
+55:09 - Conference
+  Ano lang po siya is, mabayaran niya lang po yung interest lang po nung itong month po yung mabayaran.
+
+55:19 - rovick romasanta (ubeeeyk@gmail.com)
+  Then, if di po siya nabayaran, yung lahat po ito is babalik from normal, then magkakaroon na po siya ng penalty.  Okay, tama.
+
+55:31 - Conference
+  Yan. So, bigyan ko na po dito.
+
+55:37 - rovick romasanta (ubeeeyk@gmail.com)
+  Then, next po is ano naman. So, pakita ko na rin po yung iba't ibang ano, na schedule po sa ano, sa loan schedule.  May mga na-create na po ako dito, mga salary, MTL, wait lang po ako. So ito po, so yung kaninang ginawa.  So ito po yung sa AR side. So magigitan niyari ko na na-move. Then magbukas ako ng iba pa. So ito po is ano, salary din to, salary, or salary po yung munaanok may, ito po ano po ito, so tawag yan, ang ano po na ito is,  World of Jupiter. I-chatka ko lang po ito. Collusion number. Collector, PSD. Ang mara rin po dito is siya ay...  Balinga naman po yan. Sa ano na po? Ito po pala ano, invoice.
+
+59:22 - Conference
+  Siya nga invoice, since ano weekly po siya.
+
+59:25 - rovick romasanta (ubeeeyk@gmail.com)
+  Hindi ko na nalala. So, September 7, September 7, 14, 21. So tama naman po ano sa invoice? weekly and then nakalagay po dito yung target then if may discount nakalagay dyan discount discount yung sa ano naman po sa CFR so yung last time po na na CFR yung issue po din is yung pag may cut off  First payment, first payment, yes po, pag may add-on sa pag-a-anong kreto lang ako nagyobar dito. Karaman lang tayo, yung kreo yung discount na pinakita mo sa akin, Vic, sa ano pa lang yun, yung doon sa offsetting, sa offsetting yung discount, kung nagkakalculate ka ng bagong loan.  Yes po, sa offset po yun, ay yung ano po, yung kanina ko pinakita is sa offsetting, ito po yun, yung sa ano naman po ipapakita ko.  So, emang ba... So ang nangyayari doon po kasi nung last time, diba, parang ano, para siyang sa ano, sa, kung kailan niya rin,-release yung ano, doon din mag-start yung payment.  So ngayon po, ang nangyayari po dyan, so meron na ditong panibagong ano, yung katulad po na sa Calculator, panibagong KIN, which is yung due date.  Purpose of Loan. Wait lang po, naglo-loading. Confirm. So una to fill up na lang po natin ito, configuration. So sabihin po natin na ano na, yan.  So nakalagay po dito sa tabi. So makita natin dito. May bagong field. It is 5th, 15th, then 25th. So for example, sa 5th yung sinala ko, mangyayari po dyan, ang magiging first payment dito is 5th, then pag ganoon naman po 15th, naging 15th na po siya.  Okay. Yan. Then 25th, so same lang siya. Then sa add-ons naman po, so for example po, may dalawang months akong add-on, di ba po nung last time, hindi po siya nag-add sa month, yung ano.  So for example po, maglagay ako dito ng 2 months add-on. So right now po is 9th, 15th, 20th, 26th.  So pag naglagay ako ng dalawang add-on naman, yan, magiging ngayon na siya, 11th. So, nagiging ngayon Okay. Then, naglagay na rin po dito ng add-on interest.  So, 2 months. Kagalagay dyan. 2,000. So, yan. if, then sabihin natin na ano. So, pakita ko na lang po na ito.  So, sabihin natin na apply. Yan. So, papakita ko na po sa, ano, iyong pag, ang discount po ay sa, ano, sa, sa, iyong loan po na pinag-apply yan.  So, recalculate. Yan. So, nabuhasa na. So, may nakalagay po dito na, ano, origination discount. So, tatlong, tatlong months, which is, ano, 5,000.  Yan. Then, sim. Sim. So same flow. So hanggang sa LRA, hanggang AR po siya. verify. So baka po ano, so naano yata kanina.  So wait lang po ah. So baka po natamaan lang kanina nung pagka ano po namin, pagka ano ko, sa, sa tawag yan, develop po kanina.
+
+1:07:25 - Conference
+  So nagka ano po dito issue.
+
+1:07:28 - rovick romasanta (ubeeeyk@gmail.com)
+  Wait lang po. Ano yung expected output ba Rovick na gusto mong i-press nyan? I mean, lang po. So same lang po siya ng ano, from SME to ano, from SME to CIFAR, from ano, same lang siya ng ano, SME, from CSA po hanggang ano, AR.  So ipapakita ko lang po sana yung ano, yung breakdown din po nung ano, nung discount. So mag-alap, ipapakita ko na po dito na ano.  So mostly, gano'n na rin naman po siya. kahit kagaya po ng ano, wait lang, magkano'n po ako ng bagong si Fathom, si Fathom, si si Fathom, si Fathom, ipakita ko lang po yung schedule.  So bas, wait lang po. So ang mangyayari lang naman din po doon, so ang mangyayari is sa ano siya mag-start, depende po kung saan po sinetong CSA or committee yung payment kung kailan ano yung due date, for example, September 15 yung sinalek or ano, ang lalabas lang po dito, magiging ano siya, September 15, October 15 na lahat.  Then, Same din pa rin yung e-commercial. Opo.
+
+1:09:43 - Conference
+  Tapos yung doon sa offset kaninang pinakita ko doon sa creation, pag may diniscountan yung offset, okay na rin yan, matamat na rin yung...
+
+1:09:53 - rovick romasanta (ubeeeyk@gmail.com)
+  Yes po. Ang tanong po ngayon, ang tanong po ngayon yung ano, yung sa...
+
+1:10:00 - Conference
+  Sa collection site, yun kasi yung sa offsetting site na discount, yun sa collection site. Meron ka na ba nang ginawa?  Yung alin po?
+
+1:10:11 - rovick romasanta (ubeeeyk@gmail.com)
+  Sa offsetting site po? Sa collection, pagka nag-discount sila sa collection. Wait lang, yun po yung ano, pag si collection po yung mag-apply ng discount.
+
+1:10:38 - Conference
+  Kasi yung kanina, yung offset kasi, ito yung discount na parang pinupolypaid mo siya, diba, yung isang account niya. So technically, kaya mo siya din discount na kasi ipupolypaid mo siya ng early fully paid.  Pero pag hindi siya naglo-loan naman, pero active yung account niya, kay collection, tapos gusto ko nang bayaran lahat yung...  So magbibigay rin yung C-collection ng discount. Parang yung offset kasi is closing of account na one-time payment, parang gano'n isang one-time payment.
+
+1:11:10 - rovick romasanta (ubeeeyk@gmail.com)
+  po.
+
+1:11:13 - Conference
+  So pagdating yan sa DCRR naman.
+
+1:11:16 - rovick romasanta (ubeeeyk@gmail.com)
+  Dito lang, talaga po. Account. Then, pero mostly same lang din naman po siya ng ano-ano ginagawa sa calculator. Si collector po is magsa-select lang kung anong-ano.  Ah, yun. Mag-tenity discount.
+
+1:11:58 - Conference
+  Yeah. Yung
+
+1:12:22 - rovick romasanta (ubeeeyk@gmail.com)
+  Yung sa offset po yun yung pinag-usapan natin noon sa, hindi po yung sa ano, yung sa original loan po.  Yung ano?
+
+1:12:32 - Conference
+  Yung sa offset po yung ano yan, yung natingin na ano, pag-offset.
+
+1:12:37 - rovick romasanta (ubeeeyk@gmail.com)
+  Yung kanina kasi yun sa offset yung lumabas yung discount.
+
+1:12:44 - Conference
+  Kasi yun yung may application si borrower, di ba? Pero kung yung magbabayad si borrower na wala siyang bagong application, as in magbabayad lang talaga siya ng payment niya.  Yung ganun po is ano po, so...
+
+1:13:01 - rovick romasanta (ubeeeyk@gmail.com)
+  Hindi pa po siya na ano, so right now po is sa ano pa lang. Ay hindi pa siya na-integrate sa ano.  Parang same procedure lang din siya, pero... procedure lang po siya. So, ano po kasi dun sa Fathom, same flow lang siya nung ano sa CSA po, so magsa-select lang.  So, ano na na po namin din yun, i-add. Yes po, ma'am. So, na-left out po yata, ma'am. It's okay.  Question lang, sir.
+
+1:13:46 - sheila dela cruz
+  Dun sa sinasabi niyo po, si collector, pwede po siya magbigay ng discount din kapag po maagang nagbayad o kaya good payer.  Tama po ba? Yes, ma'am. Yes, ma'am. Nice.
+
+1:13:58 - Conference
+  Yung upsetting kasi...
+
+1:14:00 - sheila dela cruz
+  Ina-close mo din yung account, so mayroong i-publish ang load, pero kung mayroong kang borrower din na current, pero hindi siya nag-apply ng load, pero magbabayad na siya ng buo, may ano din siya, pwede siya bigyan ng discount.
+
+1:14:13 - Conference
+  So parang same lang ang procedure, kaso nga lang, yung isa kasi nag-apply siya ng bagong load, yung isa, magbabayad lang talaga siya ng full payment, parang gano'n.  Okay.
+
+1:14:23 - sheila dela cruz
+  Pero ito sir, hindi ba sa collector na sila yung nagsiset ng discount? Hindi, may approval pa rin naman kasi yan pagdating dito sa ano.
+
+1:14:33 - Conference
+  So kung sabi, bago niya kasi bibigyan ng discount yan, kasi di ba gumagawa lang doon siya ng DCRR. Okay.  Payment pa rin, mag-approval pa rin, magagaling sa accounting. Pero bago niya bibigyan ng discount yan, may request na siya sa management na itong borrower ko, bibigyan ka ng discount.
+
+1:14:55 - rovick romasanta (ubeeeyk@gmail.com)
+  Okay. I-input niya na lang po kung ano po yung na-approve. Okay. Okay.
+
+1:15:00 - Conference
+  So yun po is parang internal na lang po na ang usapan sa account. Parang hindi na natin galawin yung ibang process niya.  So ang mangyayari, yung discount na yun is parang internal na lang na pa-prepurbahan niya, pa-approbahan doon sa loob.
+
+1:15:17 - sheila dela cruz
+  So parang ito po ha, kasi parang lumalabas po sa goal-based access natin, si Collector is may capabilities din na maglagay ng discount doon sa borrower if ever na nagko-collect na po siya.  Parang additional role-based access lang po kay Collector na i-allowed siya na magkaroon ng ganitong features na pwede siyang magbigay ng discount.
+  ACTION ITEM: Add Collector discount in DCRR (interest/penalty); update AR/PDC; add letter placeholder - WATCH: https://fathom.video/share/_yd8azwSorXhfiSQynBnyvyrfFndpbjJ?timestamp=4543.9999  Tama po? Yes ma'am. Okay po.
+
+1:15:54 - rovick romasanta (ubeeeyk@gmail.com)
+  So yun po naman, dito po yun ilalagay sa DCRR, yung sim po nung scenario ko. So, may bagong field dito.  So, dito ko na lang po ilalagay yun.
+
+1:16:06 - Conference
+  Saka, diba kasi ano yan eh, pwede kasing yung discount niya, kung katulad sa offsetting, yung interest ang dinidiscount, ito yung good payer or maganda ang penalty.  Pero pag may mga penalty kasi, yun, may dinidiscount din doon sa penalty. Hindi din siya yung parang, kasi pag nagcompound-compound, lumalaki na yung penalty.  Hininga na lang na sige, bayaran mo na lang ng ganitong amount tapos sarado na natin yung log mo. So, dinidiscount na yung ibang penalty.  Para ma-close ng account niya. So, sa DCR, rinidiscount na-apply. Yan, sa DCR.
+
+1:16:53 - rovick romasanta (ubeeeyk@gmail.com)
+  So, i-anaw ko na lang po yan. Rovick, take note mo, clear yung requirements?
+
+1:17:03 - sheila dela cruz
+  po, yes po, yes po.
+
+1:17:05 - rovick romasanta (ubeeeyk@gmail.com)
+  So lalagay na na po ng discounting for collector. Wait lang po. Yan ako na po. Okay. So sa alas same, same lang din po na po yung sa calculator ng ano.  Oh, parang pinabawas mo lang siya doon sa ano niya.
+
+1:17:34 - Conference
+  Tapos ilagay mo lang din sa letter yung magkaning na discount. Para recorded ba siya doon sa... Yes po. So umayari po dyan.
+
+1:17:42 - rovick romasanta (ubeeeyk@gmail.com)
+  So sa letter dyan po, so lalabas dito. So patulad po nung ano sa schedule ng payment. Thank you. So lalabas lang po yan dito sana sa discount, sa discount column na payment na to is ano.
+
+1:18:09 - Conference
+  Kasi di ba may penalty targets or lalabas din yan yung magkanong diniscount kadaan para magbangga. Yes. So i-add na lang po namin yan.
+
+1:18:21 - rovick romasanta (ubeeeyk@gmail.com)
+  Na ano lang po. So next po is, next naman po yung sana. So tapos sa kato. Yung sa penalty po, so ongoing pa rin po siya.  So more on po siya 90%. So isasabi ko po siya dun sa move of payment na i-present next. So wait lang.  So. So wait na po, check ko lang po yung document kung may naiwan to po ako.
+
+1:19:12 - sheila dela cruz
+  Rovick, clarify ko lang yung 90% na sinasabi mo, ano yung remaining 10%?
+
+1:19:21 - rovick romasanta (ubeeeyk@gmail.com)
+  Yung remaining 10% po is breakdown po sa penalty. Yung right now po kasi, ang nangyayari po is nagduplicate po yung month.  So yun na lang yung kulang para dun sa penalty na features?
+
+1:19:44 - sheila dela cruz
+  Yung tamang breakdown ng item ng penalty? Okay. So when mo kayang ma-present kay sir yung remaining 10% and then remaining 15%?
+
+1:19:59 - Conference
+  Kasi nung kayo,
+
+1:20:00 - rovick romasanta (ubeeeyk@gmail.com)
+  Canina sabi mo may 85% ka, 90%, so kailan mo siya kayang ma-present with sir? Yung 85 at 90 po?  Oo. By ano po, by Thursday po, or ano. So sir, okay po kayo ng Thursday, ma-present po namin yung remaining.  Okay.
+
+1:20:23 - Conference
+  Sige. Okay po.
+
+1:20:26 - sheila dela cruz
+  Same time pa din po tayo, 1pm po.
+
+1:20:31 - Conference
+  Okay. Okay po, thank you po.
+
+1:20:36 - rovick romasanta (ubeeeyk@gmail.com)
+  So, thank you sir. sa lahat ng, ano, na-present po naman kay sir lahat ng deliverables, pera lang dun sa dalawa.  So sir, meron na lang kaming 2 items.
+
+1:20:49 - sheila dela cruz
+  ah, bali, tatlo. Bali, yung isa po is yung 85%, anong module yun, Rovick?
+
+1:20:56 - rovick romasanta (ubeeeyk@gmail.com)
+  85 yung sa move of payment. Move of payment po. No. No. No.
+
+1:21:00 - sheila dela cruz
+  And then second po, sa penalty, and then yung last po is yung collector, may capabilities po sila na mag-add ng discount po.  Opo, so yun po yung deliverables namin sa Thursday. Okay. Okay po, thank you po.
+
+1:21:20 - Conference
+  Okay na tayo, Rovick? Yes po, yes po.
+
+1:21:24 - sheila dela cruz
+  Sir, do you have any questions po po, clarification or insight po? Hmm, wala naman.
+  ACTION ITEM: Implement special quarterly/bi-monthly schedules: interest-only then principal - WATCH: https://fathom.video/share/_yd8azwSorXhfiSQynBnyvyrfFndpbjJ?timestamp=4892.9999
+
+1:21:31 - Conference
+  Actually, deliver ni Rovick yung gusto kong ano, yung mga ibang nagkulang dahil. Wow. So yun na lang, itamat na lang yung po saan siya papataksa.  Okay po. Yung ano pala big, by monthly tsaka yung quarterly. Di ba meron doon yung i-adjust mo. Pero iwanan mo yung nandyan ha, tapos mag-create ka nung mayroong interest, interest, interest.
+
+1:21:59 - rovick romasanta (ubeeeyk@gmail.com)
+  Thank you. you very much.
+
+1:22:01 - Conference
+  And then I see it for the termology so that it will be do that. Parang may isa pa yung per month or daily.
+
+1:22:14 - rovick romasanta (ubeeeyk@gmail.com)
+  O, sa day. Okay po.
+
+1:22:18 - sheila dela cruz
+  Bally, five po yung deliverables namin by Thursday.
+
+1:22:22 - rovick romasanta (ubeeeyk@gmail.com)
+  So Rovick, kaya yan by Thursday ha?
+
+1:22:29 - sheila dela cruz
+  Please! I mean, sige po, Thursday.
+
+1:22:35 - rovick romasanta (ubeeeyk@gmail.com)
+  Parang silitan si Rovick. I mean, sige po. By Thursday po, so mag-chat na lang po ako ng update. Opo.  Babalikan po namin kayo, Sir Rene, dun sa progress.
+
+1:22:49 - sheila dela cruz
+  Sige, sige, sige. Ah, ay po.
+
+1:22:51 - Conference
+  Lapit na eh, nararamdaman ko na eh. Konting na lang natutapos na tayo. Oh! Thank you, sir. Thank you so much, sir.
+
+1:23:04 - rovick romasanta (ubeeeyk@gmail.com)
+  Thank you, Calvin. Thank you. Thank you, Calvin. Ingat po kayo. Bye-bye, po. Thank you, sir. Thank you, sir. Thank you, ma'am.

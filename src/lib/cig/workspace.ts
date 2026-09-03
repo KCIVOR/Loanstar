@@ -207,7 +207,7 @@ export function cigNextStep(input: {
   if (current === "external_checks") {
     return {
       title: "Record external checks",
-      body: "Pass or fail each third-party check. CI & References unlocks when all checks are recorded.",
+      body: "Pass or fail each third-party check. The CI & References Form is already available to fill in any order, but every check must still be recorded before you can submit.",
     };
   }
 
@@ -220,7 +220,7 @@ export function cigNextStep(input: {
     return {
       title: "Complete CI & References Form",
       body: first
-        ? `${first}. Crewing manager unlocks when this stage is complete.`
+        ? `${first}. The Crewing manager section is also open; every section must be complete before you can submit.`
         : "Open the CI & References Form and finish the required PIC, references, checklist, and rating.",
     };
   }
@@ -230,7 +230,7 @@ export function cigNextStep(input: {
     return {
       title: "Complete crewing manager",
       body: first
-        ? `${first}. Finding unlocks next.`
+        ? `${first}. The Finding can be set at any time; every section must be complete before you can submit.`
         : "Record crewing manager position, contract, departure, and fit-to-work.",
     };
   }

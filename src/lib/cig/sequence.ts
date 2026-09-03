@@ -61,45 +61,12 @@ const BORROWER_REVIEW_KEYS: ReadonlySet<string> = new Set([
   "biNotes",
 ]);
 
-const CI_REFERENCES_KEYS: ReadonlySet<string> = new Set([
-  "picAllotmentAwareness",
-  "picPaymentReliability",
-  "picInterviewNotes",
-  "characterReferencesNotes",
-  "charRefOtherLenders",
-  "picVerification",
-  "referenceVerifications",
-  "verificationChecklist",
-  "picPaymentPreference",
-  "picDemeanor",
-  "picRating",
-  "picRatingReason",
-  "cifVerifiedBy",
-  "cifVerifiedDate",
-  // SME Field Visit occupies the same sequence slot as CI & Refs (6.0.a replace).
-  "fieldVisit",
-  "smeReloanVerification",
-]);
-
-const CREWING_MANAGER_KEYS: ReadonlySet<string> = new Set([
-  "cmDepartureDate",
-  "cmSalary",
-  "cmBasicSalary",
-  "cmPosition",
-  "cmContractStatus",
-  "cmFitToWork",
-  "cmNotes",
-  "cmManagerName",
-  "cmManagerPosition",
-  "cmManagerContact",
-  "cmManningAgencyName",
-  "cmJoiningPort",
-]);
-
-const FINDING_KEYS: ReadonlySet<string> = new Set([
-  "finding",
-  "findingNotes",
-]);
+// NOTE: there is deliberately no CI_REFERENCES_KEYS, CREWING_MANAGER_KEYS, or
+// FINDING_KEYS allowlist any more — the CI & References Form / SME Field Visit,
+// the Crewing manager section, AND the Finding are all always writable (Option B,
+// see feature-cig-ci-form-always-available.md), so no cross-stage guard applies.
+// Only borrower review must precede the external checks, and Submit (`forward`)
+// still enforces full completeness before a file can reach Committee.
 
 const STAGE_LABEL: Record<CigSequenceStage, string> = {
   borrower_review: "Borrower review",
@@ -164,9 +131,15 @@ export function getCigSequenceState(
   const unlocked: Record<CigSequenceStage, boolean> = {
     borrower_review: true,
     external_checks: s1,
-    ci_references: s2,
-    crewing_manager: s3,
-    finding: s4,
+    // Option B (feature-cig-ci-form-always-available.md): the CI & References
+    // Form / SME Field Visit AND the Crewing manager section are always
+    // available — they can be filled in any order. Submit (`forward`) still
+    // requires the full completeness gate (all checks recorded + CI content +
+    // crewing content + finding), so an incomplete file still cannot reach
+    // Committee.
+    ci_references: true,
+    crewing_manager: true,
+    finding: true,
     forward: s5,
   };
 
@@ -206,15 +179,16 @@ export function assertVerificationPatchAllowed(
   patch: SequenceVerificationPatch,
   state: CigSequenceState,
 ): void {
+  // Option B (feature-cig-ci-form-always-available.md): only borrower review is a
+  // sequenced verification write, and it is always unlocked — so in practice
+  // nothing here throws. The CI & References Form / SME Field Visit, the Crewing
+  // manager section, and the Finding are all freely writable in any order;
+  // Submit (`forward`) is the sole completeness gate. This assert is kept as the
+  // structural hook in case a future stage needs re-gating.
   const checks: Array<{
     stage: CigSequenceStage;
     keys: ReadonlySet<string>;
-  }> = [
-    { stage: "borrower_review", keys: BORROWER_REVIEW_KEYS },
-    { stage: "ci_references", keys: CI_REFERENCES_KEYS },
-    { stage: "crewing_manager", keys: CREWING_MANAGER_KEYS },
-    { stage: "finding", keys: FINDING_KEYS },
-  ];
+  }> = [{ stage: "borrower_review", keys: BORROWER_REVIEW_KEYS }];
 
   for (const { stage, keys } of checks) {
     if (!patchTouches(patch, keys)) continue;

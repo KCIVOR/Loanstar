@@ -1,7 +1,9 @@
 import { NextResponse } from "next/server";
 
+import { daysPastDue } from "@/lib/ar/schedule";
 import { handleApiError, jsonOk } from "@/lib/api/handler";
 import { computeAutoAllocation } from "@/lib/ar/posting";
+import { halfUp } from "@/lib/computation/money";
 import {
   ForbiddenError,
   hasModulePermission,
@@ -75,7 +77,69 @@ export async function GET(request: Request) {
       ? [{ amortizationScheduleId: null, amount: Number(payment.amount) }]
       : computeAutoAllocation(Number(payment.amount), installments);
 
-    return jsonOk({ installments, allocation, isSurcharge });
+    // Collector Discount (Phase 2) — eligibility lists for the DCRR
+    // discount UI (Phase 4). Uses the same daysPastDue/computeAgingBucket
+    // boundary as every other overdue check in this codebase
+    // (daysPastDue <= 0 = "current", due-today included) rather than a
+    // freshly invented comparison, so an installment due exactly today is
+    // treated identically here as it is everywhere else.
+    const asOf = new Date();
+    const interestEligibleBase = installments.filter(
+      (inst) => daysPastDue(inst.dueDate, asOf) <= 0,
+    );
+    const penaltyEligible = installments.filter(
+      (inst) =>
+        daysPastDue(inst.dueDate, asOf) > 0 && inst.penaltyAmount > 0,
+    );
+
+    // interestPortion per installment isn't stored anywhere (amountDue is
+    // principal+interest blended) — derive it the same way the existing
+    // Offset-discount `activeLoans` path already does (confirmed by
+    // reading src/app/api/csa/applications/[id]/computation/route.ts
+    // directly): totalInterest ÷ terms, halved again for semi-monthly.
+    // Deliberately reuses plain total_interest, not gross_total_interest —
+    // matching that same precedent exactly, not improving on it here.
+    let interestPerRow = 0;
+    if (interestEligibleBase.length > 0) {
+      const { data: masterlistRow } = await supabase
+        .from("masterlist")
+        .select("computation_id")
+        .eq("id", payment.masterlist_id)
+        .single();
+
+      const computationId = masterlistRow?.computation_id as string | null;
+      if (computationId) {
+        const { data: computationRow } = await supabase
+          .from("computations")
+          .select("total_interest, terms, payment_frequency")
+          .eq("id", computationId)
+          .single();
+
+        if (computationRow) {
+          const terms = Number(computationRow.terms) || 1;
+          const interestPerMonth = halfUp(
+            Number(computationRow.total_interest) / terms,
+          );
+          interestPerRow =
+            computationRow.payment_frequency === "semi_monthly"
+              ? halfUp(interestPerMonth / 2)
+              : interestPerMonth;
+        }
+      }
+    }
+
+    const interestEligible = interestEligibleBase.map((inst) => ({
+      ...inst,
+      interestPortion: interestPerRow,
+    }));
+
+    return jsonOk({
+      installments,
+      allocation,
+      isSurcharge,
+      interestEligible,
+      penaltyEligible,
+    });
   } catch (error) {
     return handleApiError(error);
   }

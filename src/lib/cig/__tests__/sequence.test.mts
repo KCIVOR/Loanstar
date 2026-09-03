@@ -209,40 +209,43 @@ describe("section complete predicates", () => {
 });
 
 describe("getCigSequenceState", () => {
-  it("empty verification, checks incomplete → S1 current; S2–S5 locked", () => {
+  it("empty verification, checks incomplete → S1 current; checks + forward locked", () => {
     const state = getCigSequenceState(emptyVerification(), false);
     assert.equal(state.current, "borrower_review");
     assert.equal(state.unlocked.borrower_review, true);
-    assertLocked(state.unlocked, [
-      "external_checks",
-      "ci_references",
-      "crewing_manager",
-      "finding",
-      "forward",
-    ]);
+    // ci_references, crewing_manager and finding are always unlocked now
+    // (Option B) — only external_checks and forward stay gated.
+    assertLocked(state.unlocked, ["external_checks", "forward"]);
+    assert.equal(state.unlocked.ci_references, true);
+    assert.equal(state.unlocked.crewing_manager, true);
+    assert.equal(state.unlocked.finding, true);
     assert.equal(state.completed.borrower_review, false);
   });
 
-  it("S1 complete only → S2 current; checks writable; CI not", () => {
+  it("S1 complete only → S2 current; checks writable; CI form always writable", () => {
     const state = getCigSequenceState(s1Complete(), false);
     assert.equal(state.current, "external_checks");
     assert.equal(state.completed.borrower_review, true);
     assert.equal(state.unlocked.external_checks, true);
-    assert.equal(state.unlocked.ci_references, false);
+    assert.equal(state.unlocked.ci_references, true);
   });
 
-  it("S1+S2 complete → S3 current", () => {
+  it("S1+S2 complete → S3 current; CI + crewing + finding all writable", () => {
     const state = getCigSequenceState(s1Complete(), true);
     assert.equal(state.current, "ci_references");
     assert.equal(state.unlocked.ci_references, true);
-    assert.equal(state.unlocked.crewing_manager, false);
+    assert.equal(state.unlocked.crewing_manager, true);
+    assert.equal(state.unlocked.finding, true);
+    // forward stays gated on real content completion
+    assert.equal(state.unlocked.forward, false);
   });
 
   it("S1–S3 complete → S4 current", () => {
     const state = getCigSequenceState(s3Complete(), true);
     assert.equal(state.current, "crewing_manager");
     assert.equal(state.unlocked.crewing_manager, true);
-    assert.equal(state.unlocked.finding, false);
+    assert.equal(state.unlocked.finding, true);
+    assert.equal(state.unlocked.forward, false);
   });
 
   it("S1–S4 complete → S5 current", () => {
@@ -305,21 +308,17 @@ describe("getCigSequenceState — Individual segment (no Crewing manager step)",
 });
 
 describe("assertVerificationPatchAllowed", () => {
-  it("rejects finding patch at S1", () => {
+  it("allows finding patch at S1 (Option B — always writable)", () => {
     const state = getCigSequenceState(emptyVerification(), false);
-    assert.throws(
-      () =>
-        assertVerificationPatchAllowed({ finding: "positive" }, state),
-      /finding/i,
+    assert.doesNotThrow(() =>
+      assertVerificationPatchAllowed({ finding: "positive" }, state),
     );
   });
 
-  it("rejects crewing manager patch at S1", () => {
+  it("allows crewing manager fields at S1 (Option B — always writable)", () => {
     const state = getCigSequenceState(emptyVerification(), false);
-    assert.throws(
-      () =>
-        assertVerificationPatchAllowed({ cmPosition: "AB" }, state),
-      /crewing/i,
+    assert.doesNotThrow(() =>
+      assertVerificationPatchAllowed({ cmPosition: "AB" }, state),
     );
   });
 
@@ -339,17 +338,17 @@ describe("assertVerificationPatchAllowed", () => {
     );
   });
 
-  it("rejects CI form fields while S2 incomplete", () => {
+  it("allows CI form fields even while checks are incomplete (Option B — always writable)", () => {
     const state = getCigSequenceState(s1Complete(), false);
-    assert.throws(
-      () =>
-        assertVerificationPatchAllowed(
-          { picVerification: completePic(), picRating: 3 },
-          state,
-        ),
-      (err: unknown) =>
-        err instanceof CigSequenceError &&
-        /CI & References|references/i.test(err.message),
+    assert.doesNotThrow(() =>
+      assertVerificationPatchAllowed(
+        { picVerification: completePic(), picRating: 3 },
+        state,
+      ),
+    );
+    // SME variants share the slot and are equally writable.
+    assert.doesNotThrow(() =>
+      assertVerificationPatchAllowed({ fieldVisit: {} }, state),
     );
   });
 
