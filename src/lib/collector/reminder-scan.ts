@@ -28,10 +28,14 @@ export function pickUpcomingInstallment(
   windowEndStr: string,
 ): ReminderScheduleRow | null {
   const upcoming = schedules
+    // Quarterly/Two-Monthly Special loans have a $0 "principal" placeholder
+    // row alongside every non-final period's real interest row — excluded
+    // here so a reminder is never sent for "your payment of PHP 0.00 is due".
     .filter(
       (s) =>
         s.status !== "paid" &&
         s.status !== "rolled" &&
+        s.amountDue > 0 &&
         s.dueDate >= todayStr &&
         s.dueDate <= windowEndStr,
     )

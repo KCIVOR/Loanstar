@@ -148,7 +148,9 @@ export async function GET(_request: Request, { params }: RouteParams) {
           application.payment_schedule === "bi_monthly" ||
           application.payment_schedule === "quarterly" ||
           application.payment_schedule === "two_monthly" ||
-          application.payment_schedule === "daily"
+          application.payment_schedule === "daily" ||
+          application.payment_schedule === "quarterly_special" ||
+          application.payment_schedule === "two_monthly_special"
             ? application.payment_schedule
             : "monthly",
         isReloan: application.is_reloan,

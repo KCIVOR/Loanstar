@@ -95,6 +95,25 @@ function transferTypeLabel(row: InternalTransferHistoryRow): string {
   return row.months ? `Other Loan (${row.months} mo${row.months > 1 ? "s" : ""})` : "Other Loan";
 }
 
+/** `[4,5,6,7,8,9,10,11,13]` → `"4–11, 13"`. */
+function formatInstallmentRanges(nos: number[]): string {
+  const sorted = [...new Set(nos)].sort((a, b) => a - b);
+  const parts: string[] = [];
+  let start = sorted[0];
+  let prev = sorted[0];
+  for (let i = 1; i <= sorted.length; i++) {
+    const n = sorted[i];
+    if (n === prev + 1) {
+      prev = n;
+      continue;
+    }
+    parts.push(start === prev ? `${start}` : `${start}–${prev}`);
+    start = n;
+    prev = n;
+  }
+  return parts.join(", ");
+}
+
 function transferStatusBadge(status: "posted" | "rejected") {
   if (status === "posted") {
     return (
@@ -1253,6 +1272,7 @@ function InternalTransfersHistoryPanel() {
                 <Th>Target account</Th>
                 <Th>Type</Th>
                 <Th num>Amount</Th>
+                <Th num>Discount</Th>
                 <Th>Status</Th>
                 <Th>Resolved by</Th>
                 <Th>Resolved on</Th>
@@ -1262,7 +1282,7 @@ function InternalTransfersHistoryPanel() {
             <tbody>
               {Array.from({ length: 6 }, (_, i) => (
                 <tr key={i}>
-                  <Td colSpan={8}>
+                  <Td colSpan={9}>
                     <Skeleton variant="line" />
                   </Td>
                 </tr>
@@ -1304,6 +1324,14 @@ function InternalTransfersHistoryPanel() {
                     {formatMoney(row.amount)}
                   </span>
                 </div>
+                {row.discountAmount > 0 ? (
+                  <div className="row">
+                    <span className="k">Discount</span>
+                    <span className="v mono text-amber-600">
+                      {formatMoney(row.discountAmount)}
+                    </span>
+                  </div>
+                ) : null}
                 <div className="row">
                   <span className="k">Resolved by</span>
                   <span className="v">{row.reviewedByName}</span>
@@ -1351,6 +1379,7 @@ function InternalTransfersHistoryPanel() {
                   Amount
                   {sortArrow("amount")}
                 </Th>
+                <Th num>Discount</Th>
                 <Th>Status</Th>
                 <Th>Resolved by</Th>
                 <Th
@@ -1388,6 +1417,23 @@ function InternalTransfersHistoryPanel() {
                   <Td>{transferTypeLabel(row)}</Td>
                   <Td num className="mono text-teal-600">
                     {formatMoney(row.amount)}
+                  </Td>
+                  <Td num className="mono">
+                    {row.discountAmount > 0 ? (
+                      <>
+                        <span className="font-semibold text-amber-600">
+                          {formatMoney(row.discountAmount)}
+                        </span>
+                        {row.discountedInstallmentNos.length > 0 ? (
+                          <div className="text-xs text-ink-400">
+                            inst.{" "}
+                            {formatInstallmentRanges(row.discountedInstallmentNos)}
+                          </div>
+                        ) : null}
+                      </>
+                    ) : (
+                      <span className="text-ink-300">—</span>
+                    )}
                   </Td>
                   <Td>{transferStatusBadge(row.status)}</Td>
                   <Td>{row.reviewedByName}</Td>

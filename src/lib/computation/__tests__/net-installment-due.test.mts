@@ -67,4 +67,69 @@ describe("netInstallmentDue (2026-08-31 — payment-flow discount fix)", () => {
       1000,
     );
   });
+
+  describe("penaltyDiscountAmount (feature-collector-discount-implementation-plan.md, Phase 5)", () => {
+    it("subtracts a penalty waiver from the penalty side only, not amount_due", () => {
+      assert.equal(
+        netInstallmentDue({
+          amountDue: 1000,
+          penaltyAmount: 500,
+          penaltyDiscountAmount: 300,
+        }),
+        1200, // 1000 - 0 + 500 - 300 - 0
+      );
+    });
+
+    it("a full penalty waiver removes the penalty entirely", () => {
+      assert.equal(
+        netInstallmentDue({
+          amountDue: 1000,
+          penaltyAmount: 500,
+          penaltyDiscountAmount: 500,
+        }),
+        1000,
+      );
+    });
+
+    it("interest discount and penalty discount apply independently, in the same call", () => {
+      assert.equal(
+        netInstallmentDue({
+          amountDue: 1000,
+          discountAmount: 200,
+          penaltyAmount: 500,
+          penaltyDiscountAmount: 300,
+        }),
+        1000,
+      );
+    });
+
+    it("floors at 0 even if the penalty discount exceeds amount_due + penalty", () => {
+      assert.equal(
+        netInstallmentDue({
+          amountDue: 100,
+          penaltyAmount: 50,
+          penaltyDiscountAmount: 1000,
+        }),
+        0,
+      );
+    });
+
+    it("omitting penaltyDiscountAmount computes byte-for-byte the same result as before this parameter existed", () => {
+      const withoutParam = netInstallmentDue({
+        amountDue: 2160,
+        discountAmount: 1000,
+        penaltyAmount: 500,
+        amountPaid: 200,
+      });
+      const withNullParam = netInstallmentDue({
+        amountDue: 2160,
+        discountAmount: 1000,
+        penaltyAmount: 500,
+        penaltyDiscountAmount: null,
+        amountPaid: 200,
+      });
+      assert.equal(withoutParam, withNullParam);
+      assert.equal(withoutParam, 1460);
+    });
+  });
 });

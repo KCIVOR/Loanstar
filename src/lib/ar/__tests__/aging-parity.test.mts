@@ -25,6 +25,10 @@ export function simulateAgingStep(input: {
     rolledAt: string | null;
     /** Origination or Offset discount sitting on this row (Phase 0/5). */
     discountAmount?: number;
+    /** Collector-approved penalty waiver (feature-collector-discount-implementation-plan.md,
+     * Phase 5) — kept separate from discountAmount, never merged into the
+     * penalty-accrual calculation itself, only into the rollover figure. */
+    penaltyDiscountAmount?: number;
   }>;
   asOf: string;
   penaltyRate?: number;
@@ -104,13 +108,17 @@ export function simulateAgingStep(input: {
       .filter((s) => s.id !== overdue.id && s.status !== "rolled")
       .sort((a, b) => a.installmentNo - b.installmentNo)[0];
     if (next) {
+      // Net of both the interest-side discount AND any Collector penalty
+      // waiver (feature-collector-discount-implementation-plan.md, Phase 5)
+      // — roll forward what's really still owed, not the gross figure.
       const rollAmount = halfUp(
         Math.max(
           0,
           overdue.amountDue -
             (overdue.discountAmount ?? 0) -
             overdue.amountPaid +
-            finalPenalty,
+            finalPenalty -
+            (overdue.penaltyDiscountAmount ?? 0),
         ),
       );
       result.rollover = {
@@ -477,6 +485,126 @@ describe("penalty and rollover are computed net of an active discount (fixed 202
     });
     assert.ok(out.rollover);
     assert.equal(out.rollover!.rollAmount, 6300);
+  });
+});
+
+describe("30-day rollover nets out a Collector penalty waiver (feature-collector-discount-implementation-plan.md, Phase 5)", () => {
+  const base = {
+    id: "i1",
+    installmentNo: 1,
+    dueDate: "2026-06-01",
+    status: "pending",
+    amountDue: 10000,
+    amountPaid: 0,
+    penaltyAmount: 0,
+    rolledAt: null as string | null,
+  };
+  const next = {
+    id: "i2",
+    installmentNo: 2,
+    dueDate: "2026-07-01",
+    status: "pending",
+    amountDue: 10000,
+    amountPaid: 0,
+    penaltyAmount: 0,
+    rolledAt: null as string | null,
+  };
+
+  it("rolls forward the waived (net) penalty, never the gross figure", () => {
+    // 10,000 due, no interest discount, 500 accrued penalty already on the
+    // row (so accrual is a no-op this run), 300 of it waived by a
+    // Collector. Without the fix this would roll 10,500 (the full gross
+    // penalty resurrected as debt on the next row); with the fix it rolls
+    // 10,200 — the waiver survives the rollover.
+    const alreadyPenalized = {
+      ...base,
+      dueDate: "2026-06-17",
+      status: "overdue",
+      penaltyAmount: 500,
+      penaltyDiscountAmount: 300,
+    };
+    const out = simulateAgingStep({
+      schedules: [alreadyPenalized, next],
+      asOf: "2026-07-17T12:00:00.000Z",
+      penaltyRate: 0.05,
+    });
+    assert.ok(out.rollover);
+    assert.equal(out.rollover!.rollAmount, 10200);
+  });
+
+  it("a full penalty waiver rolls forward with zero penalty contribution", () => {
+    const alreadyPenalized = {
+      ...base,
+      dueDate: "2026-06-17",
+      status: "overdue",
+      penaltyAmount: 500,
+      penaltyDiscountAmount: 500,
+    };
+    const out = simulateAgingStep({
+      schedules: [alreadyPenalized, next],
+      asOf: "2026-07-17T12:00:00.000Z",
+      penaltyRate: 0.05,
+    });
+    assert.ok(out.rollover);
+    // 10,000 balance + 0 net penalty.
+    assert.equal(out.rollover!.rollAmount, 10000);
+  });
+
+  it("interest discount and penalty waiver both net out of the same rollover, independently", () => {
+    // 10,000 due, 4,000 interest discount (net balance 6,000), 500 accrued
+    // penalty with 300 waived (net penalty 200) → roll = 6,000 + 200 = 6,200.
+    const row = {
+      ...base,
+      dueDate: "2026-06-17",
+      status: "overdue",
+      discountAmount: 4000,
+      penaltyAmount: 500,
+      penaltyDiscountAmount: 300,
+    };
+    const out = simulateAgingStep({
+      schedules: [row, next],
+      asOf: "2026-07-17T12:00:00.000Z",
+      penaltyRate: 0.05,
+    });
+    assert.ok(out.rollover);
+    assert.equal(out.rollover!.rollAmount, 6200);
+  });
+
+  it("a penalty waiver does NOT affect the penalty-accrual calculation itself — only the rollover", () => {
+    // Confirms the plan's explicit constraint: the accrual branch's
+    // v_outstanding/outstanding nets only the interest-side discount,
+    // never penaltyDiscountAmount. A fresh 10,000 balance at 1 dpd with a
+    // penalty waiver already sitting on the row (but no penalty accrued
+    // yet) must still compute a fresh 5% = 500 penalty, unaffected by the
+    // waiver figure.
+    const out = simulateAgingStep({
+      schedules: [
+        { ...base, dueDate: "2026-07-16", penaltyDiscountAmount: 9000 },
+        { ...next, dueDate: "2026-08-16" },
+      ],
+      asOf: "2026-07-17T12:00:00.000Z",
+      penaltyRate: 0.05,
+    });
+    assert.ok(out.penaltyWritten);
+    assert.equal(out.penaltyWritten!.penaltyAmount, 500);
+  });
+
+  it("omitting penaltyDiscountAmount computes byte-for-byte the same rollover as before this field existed", () => {
+    const withoutField = simulateAgingStep({
+      schedules: [{ ...base, dueDate: "2026-06-17" }, next],
+      asOf: "2026-07-17T12:00:00.000Z",
+      penaltyRate: 0.05,
+    });
+    const withZeroField = simulateAgingStep({
+      schedules: [
+        { ...base, dueDate: "2026-06-17", penaltyDiscountAmount: 0 },
+        next,
+      ],
+      asOf: "2026-07-17T12:00:00.000Z",
+      penaltyRate: 0.05,
+    });
+    assert.deepEqual(withoutField.rollover, withZeroField.rollover);
+    assert.equal(withoutField.rollover!.rollAmount, 10500);
   });
 });
 

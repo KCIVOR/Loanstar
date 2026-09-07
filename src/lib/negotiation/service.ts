@@ -349,7 +349,9 @@ type OverrideInput = {
     | "bi_monthly"
     | "quarterly"
     | "two_monthly"
-    | "daily";
+    | "daily"
+    | "quarterly_special"
+    | "two_monthly_special";
   /** Same explicit-wins/omission-preserves-existing rule as the fields
    * above. See docs/revision-plans/feature-new-loan-origination-discount.md. */
   originationDiscounts?: OriginationDiscount[];

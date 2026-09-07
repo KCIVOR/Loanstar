@@ -19,12 +19,12 @@ export function Table({
 }
 
 export function Th({
-  children,
+  children = null,
   num = false,
   className = "",
   onClick,
 }: {
-  children: ReactNode;
+  children?: ReactNode;
   variant?: "default" | "navy";
   num?: boolean;
   className?: string;
@@ -41,12 +41,12 @@ export function Th({
 }
 
 export function Td({
-  children,
+  children = null,
   num = false,
   className = "",
   colSpan,
 }: {
-  children: ReactNode;
+  children?: ReactNode;
   variant?: "default" | "navy";
   num?: boolean;
   className?: string;

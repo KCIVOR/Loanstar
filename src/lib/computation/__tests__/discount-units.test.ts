@@ -27,6 +27,12 @@ describe("maxDiscountUnits", () => {
     expect(maxDiscountUnits("two_monthly", 4)).toBe(2);
   });
 
+  it("Quarterly Special / Two-monthly Special: same unit count as their non-special counterparts", () => {
+    expect(maxDiscountUnits("quarterly_special", 12)).toBe(4);
+    expect(maxDiscountUnits("quarterly_special", 6)).toBe(2);
+    expect(maxDiscountUnits("two_monthly_special", 4)).toBe(2);
+  });
+
   it("Daily: zero — nothing to discount", () => {
     expect(maxDiscountUnits("daily", 1)).toBe(0);
   });
@@ -105,6 +111,69 @@ describe("buildDiscountUnits — Quarterly / Two-monthly", () => {
     expect(units).toHaveLength(2); // 4 / 2
     expect(units[0].label).toBe("Payment 1");
     expect(units[0].interestAmount).toBe(1_000);
+  });
+});
+
+describe("buildDiscountUnits — Quarterly Special / Two-monthly Special", () => {
+  it("Quarterly Special: same unit count/interest/dates as regular Quarterly — the $0 principal placeholder rows never become units", () => {
+    const units = buildDiscountUnits({
+      paymentFrequency: "quarterly_special",
+      terms: 6,
+      principal: 55_000,
+      totalInterest: 5_000,
+      totalLoan: 60_000,
+      releaseDate: new Date("2026-09-01"),
+      dueDay: 10,
+    });
+
+    expect(units).toHaveLength(2); // 6 / 3
+    expect(units[0].label).toBe("Quarter 1 (Special)");
+    expect(units[0].interestAmount).toBe(2_500);
+    expect(units[0].installmentNos).toHaveLength(1); // interest row only
+    expect(units[1].label).toBe("Quarter 2 (Special)");
+  });
+
+  it("Two-monthly Special: same unit count/interest/dates as regular Two-monthly", () => {
+    const units = buildDiscountUnits({
+      paymentFrequency: "two_monthly_special",
+      terms: 4,
+      principal: 38_000,
+      totalInterest: 2_000,
+      totalLoan: 40_000,
+      releaseDate: new Date("2026-09-01"),
+      dueDay: 10,
+    });
+
+    expect(units).toHaveLength(2); // 4 / 2
+    expect(units[0].label).toBe("Payment 1 (Special)");
+    expect(units[0].interestAmount).toBe(1_000);
+  });
+
+  it("maxDiscountUnits and buildDiscountUnits agree on unit count for both Special variants", () => {
+    const quarterlySpecialUnits = buildDiscountUnits({
+      paymentFrequency: "quarterly_special",
+      terms: 12,
+      principal: 168_300,
+      totalInterest: 70_686,
+      totalLoan: 238_986,
+      releaseDate: new Date("2026-09-04"),
+      dueDay: 10,
+    });
+    expect(quarterlySpecialUnits).toHaveLength(maxDiscountUnits("quarterly_special", 12));
+
+    const twoMonthlySpecialUnits = buildDiscountUnits({
+      paymentFrequency: "two_monthly_special",
+      terms: 12,
+      principal: 168_300,
+      totalInterest: 70_686,
+      totalLoan: 238_986,
+      releaseDate: new Date("2026-09-04"),
+      dueDay: 10,
+    });
+    expect(twoMonthlySpecialUnits).toHaveLength(maxDiscountUnits("two_monthly_special", 12));
+    // Regression for the live AN300445 numbers: 6 payments, ₱11,781 interest each.
+    expect(twoMonthlySpecialUnits).toHaveLength(6);
+    expect(twoMonthlySpecialUnits[0].interestAmount).toBe(11_781);
   });
 });
 

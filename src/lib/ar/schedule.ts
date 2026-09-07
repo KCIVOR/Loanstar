@@ -48,7 +48,7 @@ export function generateAmortizationSchedule(input: {
    * to produce one. Every other
    * cadences (the default) are completely unchanged by this parameter.
    */
-  paymentFrequency?: "monthly" | "semi_monthly" | "weekly" | "bi_monthly" | "quarterly" | "two_monthly" | "daily";
+  paymentFrequency?: "monthly" | "semi_monthly" | "weekly" | "bi_monthly" | "quarterly" | "two_monthly" | "daily" | "quarterly_special" | "two_monthly_special";
   totalInterest?: number;
 }): AmortizationInstallment[] {
   const firstPayment = input.firstPaymentDate
@@ -95,6 +95,32 @@ export function generateAmortizationSchedule(input: {
       throw new Error("Two-monthly loans require totalLoan and totalInterest");
     }
     return generateTwoMonthlySchedule({
+      terms: input.terms,
+      totalLoan: input.totalLoan,
+      totalInterest: input.totalInterest,
+      releaseDate: input.releaseDate,
+      dueDay: input.dueDay,
+    });
+  }
+
+  if (input.paymentFrequency === "quarterly_special") {
+    if (!input.totalLoan || !input.totalInterest) {
+      throw new Error("Quarterly Special loans require totalLoan and totalInterest");
+    }
+    return generateQuarterlySpecialSchedule({
+      terms: input.terms,
+      totalLoan: input.totalLoan,
+      totalInterest: input.totalInterest,
+      releaseDate: input.releaseDate,
+      dueDay: input.dueDay,
+    });
+  }
+
+  if (input.paymentFrequency === "two_monthly_special") {
+    if (!input.totalLoan || !input.totalInterest) {
+      throw new Error("Two-monthly Special loans require totalLoan and totalInterest");
+    }
+    return generateTwoMonthlySpecialSchedule({
       terms: input.terms,
       totalLoan: input.totalLoan,
       totalInterest: input.totalInterest,
@@ -241,6 +267,7 @@ function generateInterestPrincipalSplitSchedule(input: {
   releaseDate: string | Date;
   dueDay?: number;
   frequencyMonths: 2 | 3;
+  mode?: "even" | "special";
 }): AmortizationInstallment[] {
   const release =
     input.releaseDate instanceof Date ? input.releaseDate : new Date(input.releaseDate);
@@ -273,10 +300,26 @@ function generateInterestPrincipalSplitSchedule(input: {
       lineType: "interest",
     });
 
-    let principalAmount = principalPerPayment;
-    if (i === numPayments) {
-      const priorPrincipal = halfUp(principalPerPayment * (numPayments - 1));
-      principalAmount = halfUp(principal - priorPrincipal);
+    let principalAmount: number;
+    if (input.mode === "special") {
+      if (i === numPayments) {
+        // Interest rows are each halfUp()'d independently, so their sum can
+        // drift a few cents from totalInterest — absorb that here so the
+        // full schedule still sums exactly to totalLoan, same reasoning as
+        // the even path's last-row absorption below (there's no prior
+        // principal to measure against in special mode, so this measures
+        // against interest paid instead).
+        const interestPaidSoFar = halfUp(interestPerPayment * numPayments);
+        principalAmount = halfUp(input.totalLoan - interestPaidSoFar);
+      } else {
+        principalAmount = 0;
+      }
+    } else {
+      principalAmount = principalPerPayment;
+      if (i === numPayments) {
+        const priorPrincipal = halfUp(principalPerPayment * (numPayments - 1));
+        principalAmount = halfUp(principal - priorPrincipal);
+      }
     }
 
     installments.push({
@@ -325,4 +368,30 @@ export function generateTwoMonthlySchedule(input: {
     throw new Error("Two-monthly loans require terms divisible by 2 (e.g. 4, 6, 8, 10, or 12 months)");
   }
   return generateInterestPrincipalSplitSchedule({ ...input, frequencyMonths: 2 });
+}
+
+export function generateQuarterlySpecialSchedule(input: {
+  terms: number;
+  totalLoan: number;
+  totalInterest: number;
+  releaseDate: string | Date;
+  dueDay?: number;
+}): AmortizationInstallment[] {
+  if (input.terms % 3 !== 0) {
+    throw new Error("Quarterly Special loans require terms divisible by 3 (e.g. 6, 9, or 12 months)");
+  }
+  return generateInterestPrincipalSplitSchedule({ ...input, frequencyMonths: 3, mode: "special" });
+}
+
+export function generateTwoMonthlySpecialSchedule(input: {
+  terms: number;
+  totalLoan: number;
+  totalInterest: number;
+  releaseDate: string | Date;
+  dueDay?: number;
+}): AmortizationInstallment[] {
+  if (input.terms % 2 !== 0) {
+    throw new Error("Two-Monthly Special loans require terms divisible by 2 (e.g. 4, 6, 8, 10, or 12 months)");
+  }
+  return generateInterestPrincipalSplitSchedule({ ...input, frequencyMonths: 2, mode: "special" });
 }

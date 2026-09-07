@@ -30,12 +30,33 @@ type TransferRow = {
   transferType: "other_loan" | "offset";
   months: number | null;
   amount: number;
+  discountAmount: number;
+  discountedInstallmentNos: number[];
   createdAt: string;
 };
 
 function transferLabel(row: TransferRow): string {
   if (row.transferType === "other_loan") return "Offset (full payoff)";
   return row.months ? `Other Loan (${row.months} mo${row.months > 1 ? "s" : ""})` : "Other Loan";
+}
+
+/** `[4,5,6,7,8,9,10,11,13]` → `"4–11, 13"`. */
+function formatInstallmentRanges(nos: number[]): string {
+  const sorted = [...new Set(nos)].sort((a, b) => a - b);
+  const parts: string[] = [];
+  let start = sorted[0];
+  let prev = sorted[0];
+  for (let i = 1; i <= sorted.length; i++) {
+    const n = sorted[i];
+    if (n === prev + 1) {
+      prev = n;
+      continue;
+    }
+    parts.push(start === prev ? `${start}` : `${start}–${prev}`);
+    start = n;
+    prev = n;
+  }
+  return parts.join(", ");
 }
 
 export default function ArInternalTransfersPage() {
@@ -167,6 +188,7 @@ export default function ArInternalTransfersPage() {
                 <Th>Target account</Th>
                 <Th>Type</Th>
                 <Th num>Amount</Th>
+                <Th num>Discount</Th>
                 <Th>Requested</Th>
                 <Th className="w-1">{""}</Th>
               </tr>
@@ -174,7 +196,7 @@ export default function ArInternalTransfersPage() {
             <tbody>
               {Array.from({ length: 4 }, (_, i) => (
                 <tr key={i}>
-                  <Td colSpan={6}>
+                  <Td colSpan={7}>
                     <Skeleton variant="line" />
                   </Td>
                 </tr>
@@ -197,6 +219,7 @@ export default function ArInternalTransfersPage() {
                 <Th>Target account</Th>
                 <Th>Type</Th>
                 <Th num>Amount</Th>
+                <Th num>Discount</Th>
                 <Th>Requested</Th>
                 <Th className="w-1">{""}</Th>
               </tr>
@@ -230,6 +253,22 @@ export default function ArInternalTransfersPage() {
                   </Td>
                   <Td num className="mono font-semibold text-teal-600">
                     {formatMoney(row.amount)}
+                  </Td>
+                  <Td num className="mono">
+                    {row.discountAmount > 0 ? (
+                      <>
+                        <span className="font-semibold text-amber-600">
+                          {formatMoney(row.discountAmount)}
+                        </span>
+                        {row.discountedInstallmentNos.length > 0 ? (
+                          <div className="text-xs text-ink-400">
+                            inst. {formatInstallmentRanges(row.discountedInstallmentNos)}
+                          </div>
+                        ) : null}
+                      </>
+                    ) : (
+                      <span className="text-ink-300">—</span>
+                    )}
                   </Td>
                   <Td className="mono">{formatDate(row.createdAt)}</Td>
                   <Td>
@@ -266,7 +305,8 @@ export default function ArInternalTransfersPage() {
         title="Confirm internal transfer?"
         message={
           confirmTarget ? (
-            <>
+            <div className="flex flex-col gap-3">
+              <p>
               Reduce{" "}
               <span className="mono font-bold text-teal-600">
                 {confirmTarget.targetLoanAccountNo ?? "the target account"}
@@ -280,7 +320,47 @@ export default function ArInternalTransfersPage() {
                 {confirmTarget.sourceApplicationNo ?? "the source loan"}
               </span>
               . This cannot be undone.
-            </>
+              </p>
+              {confirmTarget.discountAmount > 0 ? (
+                <p className="text-amber-700">
+                  An early-settlement discount of{" "}
+                  <span className="mono font-bold">
+                    {formatMoney(confirmTarget.discountAmount)}
+                  </span>{" "}
+                  in interest
+                  {confirmTarget.discountedInstallmentNos.length > 0
+                    ? ` on installments ${formatInstallmentRanges(confirmTarget.discountedInstallmentNos)}`
+                    : ""}{" "}
+                  is forgiven as part of this transfer. Cash{" "}
+                  <span className="mono font-bold">
+                    {formatMoney(confirmTarget.amount)}
+                  </span>{" "}
+                  +{" "}
+                  <span className="mono font-bold">
+                    {formatMoney(confirmTarget.discountAmount)}
+                  </span>{" "}
+                  discount ={" "}
+                  <span className="mono font-bold">
+                    {formatMoney(
+                      confirmTarget.amount + confirmTarget.discountAmount,
+                    )}
+                  </span>
+                  {confirmTarget.amount + confirmTarget.discountAmount >=
+                  confirmTarget.targetOutstandingBalance
+                    ? ", settling the account's "
+                    : ", against the account's "}
+                  current balance of{" "}
+                  <span className="mono font-bold">
+                    {formatMoney(confirmTarget.targetOutstandingBalance)}
+                  </span>
+                  {confirmTarget.amount + confirmTarget.discountAmount >=
+                  confirmTarget.targetOutstandingBalance
+                    ? " in full"
+                    : ""}
+                  .
+                </p>
+              ) : null}
+            </div>
           ) : (
             ""
           )

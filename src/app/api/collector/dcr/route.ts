@@ -13,6 +13,7 @@ import {
   hasModulePermission,
   requireAuth,
 } from "@/lib/permissions/server";
+import { validateFieldEdit } from "@/lib/permissions/field-rules";
 import { createClient } from "@/lib/supabase/server";
 
 const createSchema = z.object({ action: z.literal("create") });
@@ -29,6 +30,14 @@ const addItemSchema = z.object({
       }),
     )
     .optional(),
+  // Collector Discount (feature-collector-discount-implementation-plan.md,
+  // Phase 5) — two independent, optional sections, never an either/or (a
+  // single settlement may waive both interest and penalty at once).
+  interestDiscountAmount: z.number().min(0).optional(),
+  interestDiscountedInstallmentNos: z.array(z.number().int().positive()).optional(),
+  penaltyDiscountAmount: z.number().min(0).optional(),
+  penaltyDiscountedInstallmentNos: z.array(z.number().int().positive()).optional(),
+  discountReason: z.string().optional(),
 });
 
 const submitSchema = z.object({
@@ -102,12 +111,46 @@ export async function POST(request: Request) {
 
     const addParsed = addItemSchema.safeParse(body);
     if (addParsed.success) {
+      const {
+        interestDiscountAmount,
+        interestDiscountedInstallmentNos,
+        penaltyDiscountAmount,
+        penaltyDiscountedInstallmentNos,
+        discountReason,
+      } = addParsed.data;
+      const hasDiscount =
+        (interestDiscountAmount ?? 0) > 0 || (penaltyDiscountAmount ?? 0) > 0;
+
+      if (hasDiscount) {
+        // One permission gates both sections — checked once, before
+        // accepting a nonzero amount in either.
+        const result = await validateFieldEdit(
+          "collection",
+          "collector_discount",
+          user.id,
+        );
+        if (!result.allowed) {
+          throw new ForbiddenError(result.reason);
+        }
+      }
+
       await addPaymentToDcr(
         supabase,
         addParsed.data.dcrId,
         addParsed.data.paymentId,
         user.id,
         addParsed.data.allocations,
+        hasDiscount
+          ? {
+              interestDiscountAmount: interestDiscountAmount ?? 0,
+              interestDiscountedInstallmentNos:
+                interestDiscountedInstallmentNos ?? [],
+              penaltyDiscountAmount: penaltyDiscountAmount ?? 0,
+              penaltyDiscountedInstallmentNos:
+                penaltyDiscountedInstallmentNos ?? [],
+              discountReason: discountReason ?? "",
+            }
+          : undefined,
       );
       return jsonOk({ added: true });
     }

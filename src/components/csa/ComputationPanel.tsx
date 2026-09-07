@@ -32,6 +32,7 @@ import {
   Table,
   Td,
   Th,
+  Toast,
 } from "@/components/ui";
 
 type LoanType = {
@@ -189,7 +190,9 @@ type ComputationPanelProps = {
     | "bi_monthly"
     | "quarterly"
     | "two_monthly"
-    | "daily";
+    | "daily"
+    | "quarterly_special"
+    | "two_monthly_special";
 };
 
 /** Imperative handle for the dev Autofill overlay — parent pages own their
@@ -248,7 +251,10 @@ function buildComputationSteps(c: Computation) {
     },
     {
       label: "Total interest",
-      formula: `₱${formatMoney(c.principal)} × (${c.terms} + ${c.addonMonths} addon mo) × ${pct(c.interestRate)}`,
+      formula:
+        c.paymentFrequency === "daily"
+          ? `₱${formatMoney(c.principal)} × (${pct(c.interestRate)} ÷ 30 per day) × actual days to payment date`
+          : `₱${formatMoney(c.principal)} × (${c.terms} + ${c.addonMonths} addon mo) × ${pct(c.interestRate)}`,
       value: c.totalInterest,
     },
     {
@@ -257,8 +263,11 @@ function buildComputationSteps(c: Computation) {
       value: c.totalLoan,
     },
     {
-      label: "Monthly amortization",
-      formula: `Total loan ÷ ${c.terms} months`,
+      label: c.paymentFrequency === "daily" ? "Amount due (one-time)" : "Monthly amortization",
+      formula:
+        c.paymentFrequency === "daily"
+          ? "Principal + Total interest — single payment on the payment date"
+          : `Total loan ÷ ${c.terms} months`,
       value: c.monthlyAmortization,
     },
     ...(c.originationDiscounts && c.originationDiscounts.length > 0
@@ -560,6 +569,8 @@ export const ComputationPanel = forwardRef<ComputationPanelHandle, ComputationPa
     | "quarterly"
     | "two_monthly"
     | "daily"
+    | "quarterly_special"
+    | "two_monthly_special"
   >(paymentScheduleProp);
   // buildDiscountUnits/validateFrequencyTerms operate on the 7-value
   // computations.payment_frequency vocabulary, not the 8-value
@@ -636,8 +647,15 @@ export const ComputationPanel = forwardRef<ComputationPanelHandle, ComputationPa
   );
   const [computing, setComputing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [discountBlockedMessage, setDiscountBlockedMessage] = useState<string | null>(null);
   const [coverageMessage, setCoverageMessage] = useState<string | null>(null);
   const [otherObligationsMessage, setOtherObligationsMessage] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!discountBlockedMessage) return;
+    const timer = setTimeout(() => setDiscountBlockedMessage(null), 5000);
+    return () => clearTimeout(timer);
+  }, [discountBlockedMessage]);
 
   // Both endpoints return `activeLoans` at the top level — CSA's dedicated
   // computation route, Committee's application detail route.
@@ -706,7 +724,9 @@ export const ComputationPanel = forwardRef<ComputationPanelHandle, ComputationPa
       computation.paymentFrequency === "bi_monthly" ||
       computation.paymentFrequency === "quarterly" ||
       computation.paymentFrequency === "two_monthly" ||
-      computation.paymentFrequency === "daily"
+      computation.paymentFrequency === "daily" ||
+      computation.paymentFrequency === "quarterly_special" ||
+      computation.paymentFrequency === "two_monthly_special"
     ) {
       setSelectedScheduleType(
         computation.paymentFrequency === "semi_monthly"
@@ -1007,6 +1027,32 @@ export const ComputationPanel = forwardRef<ComputationPanelHandle, ComputationPa
   ]);
 
   function openOriginationDiscountModal() {
+    if (originationSchedule.length === 0) {
+      if (selectedScheduleType === "daily") {
+        setDiscountBlockedMessage(
+          "Daily Interest loans have a single fixed payment — there's nothing to discount.",
+        );
+      } else if (!terms || Number(terms) < 1) {
+        setDiscountBlockedMessage("Enter the loan terms first to see discount options.");
+      } else if (
+        selectedScheduleType === "quarterly" ||
+        selectedScheduleType === "quarterly_special"
+      ) {
+        setDiscountBlockedMessage(
+          "Quarterly terms must be divisible by 3 (e.g. 6, 9, or 12 months) before you can pick a discount.",
+        );
+      } else if (
+        selectedScheduleType === "two_monthly" ||
+        selectedScheduleType === "two_monthly_special"
+      ) {
+        setDiscountBlockedMessage(
+          "Two-monthly terms must be divisible by 2 (e.g. 4, 6, 8, 10, or 12 months) before you can pick a discount.",
+        );
+      } else {
+        setDiscountBlockedMessage("Enter valid loan terms to see discount options.");
+      }
+      return;
+    }
     setOriginationDiscountModalOpen(true);
   }
 
@@ -1274,11 +1320,18 @@ export const ComputationPanel = forwardRef<ComputationPanelHandle, ComputationPa
       setError("Due date must be 5, 15, or 25 for Seafarer loans");
       return;
     }
-    if (selectedScheduleType === "quarterly" && Number(terms) % 3 !== 0) {
+    if (
+      (selectedScheduleType === "quarterly" || selectedScheduleType === "quarterly_special") &&
+      Number(terms) % 3 !== 0
+    ) {
       setError("Quarterly terms must be divisible by 3 (e.g. 6, 9, or 12 months)");
       return;
     }
-    if (selectedScheduleType === "two_monthly" && Number(terms) % 2 !== 0) {
+    if (
+      (selectedScheduleType === "two_monthly" ||
+        selectedScheduleType === "two_monthly_special") &&
+      Number(terms) % 2 !== 0
+    ) {
       setError("Two-monthly terms must be divisible by 2 (e.g. 4, 6, 8, 10, or 12 months)");
       return;
     }
@@ -1334,8 +1387,12 @@ export const ComputationPanel = forwardRef<ComputationPanelHandle, ComputationPa
           body: JSON.stringify({
             inputMode,
             amount: Number(amount),
-            terms: Number(terms),
-            addonMonths: Number(addonMonths),
+            // Daily Interest ignores terms entirely (single manually-dated
+            // payment). The field is hidden for Daily, so submit a fixed,
+            // DB/API-valid value (CHECK (terms >= 1)) instead of the stale
+            // state default.
+            terms: selectedScheduleType === "daily" ? 1 : Number(terms),
+            addonMonths: selectedScheduleType === "daily" ? 0 : Number(addonMonths),
             loanTypeId: selectedLoanTypeId || loanTypeId,
             ...(isSeafarer ? { dueDay: Number(dueDay) } : {}),
             // Schedule choice defaults to the application's own intake value
@@ -1420,6 +1477,7 @@ export const ComputationPanel = forwardRef<ComputationPanelHandle, ComputationPa
     : [];
 
   const form = (
+    <>
     <form onSubmit={(e) => void handleCompute(e)} className="grid gap-3 sm:grid-cols-2">
       <div className="sm:col-span-2">
         <Label htmlFor="loanType">Loan type</Label>
@@ -1577,7 +1635,9 @@ export const ComputationPanel = forwardRef<ComputationPanelHandle, ComputationPa
                   | "bi_monthly"
                   | "quarterly"
                   | "two_monthly"
-                  | "daily",
+                  | "daily"
+                  | "quarterly_special"
+                  | "two_monthly_special",
               )
             }
           >
@@ -1589,7 +1649,9 @@ export const ComputationPanel = forwardRef<ComputationPanelHandle, ComputationPa
                 <option value="weekly">Weekly (Invoice Financing)</option>
                 <option value="bi_monthly">Bi-monthly (every 15 days)</option>
                 <option value="quarterly">Quarterly</option>
+                <option value="quarterly_special">Quarterly (Special)</option>
                 <option value="two_monthly">Two-monthly</option>
+                <option value="two_monthly_special">Two-monthly (Special)</option>
                 <option value="daily">Daily</option>
               </>
             ) : null}
@@ -1604,9 +1666,19 @@ export const ComputationPanel = forwardRef<ComputationPanelHandle, ComputationPa
               Terms must be divisible by 3 (e.g. 6, 9, 12 months) — interest-only every quarter, principal on the last payment
             </p>
           )}
+          {selectedScheduleType === "quarterly_special" && (
+            <p className="text-xs text-ink-500 mt-1">
+              Terms must be divisible by 3 (e.g. 6, 9, 12 months) — special client arrangement: interest-only every quarter, full principal on the last payment
+            </p>
+          )}
           {selectedScheduleType === "two_monthly" && (
             <p className="text-xs text-ink-500 mt-1">
               Terms must be divisible by 2 (e.g. 4, 6, 8, 10, 12 months) — interest-only every 2 months, principal on the last payment
+            </p>
+          )}
+          {selectedScheduleType === "two_monthly_special" && (
+            <p className="text-xs text-ink-500 mt-1">
+              Terms must be divisible by 2 (e.g. 4, 6, 8, 10, 12 months) — special client arrangement: interest-only every 2 months, full principal on the last payment
             </p>
           )}
           {selectedScheduleType === "daily" && (
@@ -1648,42 +1720,46 @@ export const ComputationPanel = forwardRef<ComputationPanelHandle, ComputationPa
           />
         </div>
       </div>
-      <div>
-        <Label htmlFor="terms" required>
-          Terms
-        </Label>
-        <div className="affix">
-          <Input
-            id="terms"
-            type="number"
-            min="1"
-            required
-            value={terms}
-            onChange={(e) => setTerms(e.target.value)}
-            mono
-            className="lead"
-          />
-          <span className="add">mo</span>
-        </div>
-      </div>
-      <div>
-        <Label htmlFor="addonMonths" required>
-          Addon months
-        </Label>
-        <div className="affix">
-          <Input
-            id="addonMonths"
-            type="number"
-            min={0}
-            required
-            value={addonMonths}
-            onChange={(e) => setAddonMonths(e.target.value)}
-            mono
-            className="lead"
-          />
-          <span className="add">mo</span>
-        </div>
-      </div>
+      {selectedScheduleType !== "daily" && (
+        <>
+          <div>
+            <Label htmlFor="terms" required>
+              Terms
+            </Label>
+            <div className="affix">
+              <Input
+                id="terms"
+                type="number"
+                min="1"
+                required
+                value={terms}
+                onChange={(e) => setTerms(e.target.value)}
+                mono
+                className="lead"
+              />
+              <span className="add">mo</span>
+            </div>
+          </div>
+          <div>
+            <Label htmlFor="addonMonths" required>
+              Addon months
+            </Label>
+            <div className="affix">
+              <Input
+                id="addonMonths"
+                type="number"
+                min={0}
+                required
+                value={addonMonths}
+                onChange={(e) => setAddonMonths(e.target.value)}
+                mono
+                className="lead"
+              />
+              <span className="add">mo</span>
+            </div>
+          </div>
+        </>
+      )}
       {isSeafarer ? (
         <div>
           <Label htmlFor="dueDay" required>
@@ -1747,7 +1823,8 @@ export const ComputationPanel = forwardRef<ComputationPanelHandle, ComputationPa
             type="button"
             variant="ghost"
             size="sm"
-            disabled={originationSchedule.length === 0}
+            aria-disabled={originationSchedule.length === 0}
+            className={originationSchedule.length === 0 ? "opacity-50" : undefined}
             onClick={openOriginationDiscountModal}
           >
             {originationDiscountRows.length > 0 ? "✎ Edit discount" : "+ Select discount…"}
@@ -2378,6 +2455,17 @@ export const ComputationPanel = forwardRef<ComputationPanelHandle, ComputationPa
         </Button>
       </div>
     </form>
+    {discountBlockedMessage ? (
+      <div className="fixed bottom-6 right-6 z-50">
+        <Toast
+          variant="error"
+          title="Can't select a discount yet"
+          message={discountBlockedMessage}
+          onClose={() => setDiscountBlockedMessage(null)}
+        />
+      </div>
+    ) : null}
+    </>
   );
 
   if (computation) {

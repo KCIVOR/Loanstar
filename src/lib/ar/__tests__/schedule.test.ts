@@ -3,7 +3,9 @@ import {
   generateAmortizationSchedule,
   generateBiMonthlySchedule,
   generateQuarterlySchedule,
+  generateQuarterlySpecialSchedule,
   generateTwoMonthlySchedule,
+  generateTwoMonthlySpecialSchedule,
 } from "../schedule";
 
 describe("generateAmortizationSchedule — month-overflow bug fix (2026-08-30)", () => {
@@ -251,5 +253,86 @@ describe("generateTwoMonthlySchedule", () => {
     expect(result[0].dueDate).toBe("2026-10-10");
     expect(result[2].dueDate).toBe("2026-12-10");
     expect(result[4].dueDate).toBe("2027-02-10"); // not 2027-03-10
+  });
+});
+
+describe("generateQuarterlySpecialSchedule", () => {
+  it("puts full principal on the final due date and zero principal on earlier dates", () => {
+    const result = generateQuarterlySpecialSchedule({
+      terms: 12,
+      totalLoan: 120_000,
+      totalInterest: 10_000,
+      releaseDate: new Date("2026-09-01"),
+      dueDay: 10,
+    });
+
+    expect(result).toHaveLength(8); // 4 quarters x 2 lines
+
+    const interestRows = result.filter((row) => row.lineType === "interest");
+    const principalRows = result.filter((row) => row.lineType === "principal");
+
+    expect(interestRows).toHaveLength(4);
+    expect(interestRows.every((row) => row.amountDue === 2_500)).toBe(true);
+
+    expect(principalRows).toHaveLength(4);
+    expect(principalRows[0].amountDue).toBe(0);
+    expect(principalRows[1].amountDue).toBe(0);
+    expect(principalRows[2].amountDue).toBe(0);
+    expect(principalRows[3].amountDue).toBe(110_000);
+
+    const total = result.reduce((sum, row) => sum + row.amountDue, 0);
+    expect(total).toBe(120_000);
+  });
+
+  it("rejects terms not divisible by 3", () => {
+    expect(() => {
+      generateQuarterlySpecialSchedule({
+        terms: 7,
+        totalLoan: 120_000,
+        totalInterest: 10_000,
+        releaseDate: new Date("2026-09-01"),
+      });
+    }).toThrow("Quarterly Special loans require terms divisible by 3");
+  });
+});
+
+describe("generateTwoMonthlySpecialSchedule", () => {
+  it("puts full principal on the final due date and zero principal on earlier dates", () => {
+    const result = generateTwoMonthlySpecialSchedule({
+      terms: 12,
+      totalLoan: 120_000,
+      totalInterest: 10_000,
+      releaseDate: new Date("2026-09-01"),
+      dueDay: 10,
+    });
+
+    expect(result).toHaveLength(12); // 6 payments x 2 lines
+
+    const interestRows = result.filter((row) => row.lineType === "interest");
+    const principalRows = result.filter((row) => row.lineType === "principal");
+
+    expect(interestRows).toHaveLength(6);
+    expect(interestRows.every((row) => row.amountDue === 1666.67)).toBe(true);
+
+    expect(principalRows).toHaveLength(6);
+    expect(principalRows.slice(0, 5).every((row) => row.amountDue === 0)).toBe(true);
+    // 6 x 1666.67 = 10,000.02 (2 cents over totalInterest from per-row
+    // rounding), so the final principal absorbs that drift: 120,000 -
+    // 10,000.02 = 109,999.98 — keeps the whole schedule summing to totalLoan.
+    expect(principalRows[5].amountDue).toBe(109_999.98);
+
+    const total = result.reduce((sum, row) => sum + row.amountDue, 0);
+    expect(total).toBe(120_000);
+  });
+
+  it("rejects terms not divisible by 2", () => {
+    expect(() => {
+      generateTwoMonthlySpecialSchedule({
+        terms: 5,
+        totalLoan: 120_000,
+        totalInterest: 10_000,
+        releaseDate: new Date("2026-09-01"),
+      });
+    }).toThrow("Two-Monthly Special loans require terms divisible by 2");
   });
 });

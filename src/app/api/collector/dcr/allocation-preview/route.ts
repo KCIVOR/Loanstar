@@ -2,8 +2,7 @@ import { NextResponse } from "next/server";
 
 import { daysPastDue } from "@/lib/ar/schedule";
 import { handleApiError, jsonOk } from "@/lib/api/handler";
-import { computeAutoAllocation } from "@/lib/ar/posting";
-import { halfUp } from "@/lib/computation/money";
+import { computeAutoAllocation, deriveInterestPerRow } from "@/lib/ar/posting";
 import {
   ForbiddenError,
   hasModulePermission,
@@ -85,7 +84,12 @@ export async function GET(request: Request) {
     // treated identically here as it is everywhere else.
     const asOf = new Date();
     const interestEligibleBase = installments.filter(
-      (inst) => daysPastDue(inst.dueDate, asOf) <= 0,
+      // Quarterly/Two-Monthly Special loans persist a $0 "principal"
+      // placeholder row alongside every non-final period's real interest
+      // row — excluded here so a collector never picks the non-real row for
+      // an interest discount (which would silently waive nothing, while the
+      // paired real interest row's obligation stays untouched).
+      (inst) => daysPastDue(inst.dueDate, asOf) <= 0 && inst.amountDue > 0,
     );
     const penaltyEligible = installments.filter(
       (inst) =>
@@ -94,39 +98,14 @@ export async function GET(request: Request) {
 
     // interestPortion per installment isn't stored anywhere (amountDue is
     // principal+interest blended) — derive it the same way the existing
-    // Offset-discount `activeLoans` path already does (confirmed by
-    // reading src/app/api/csa/applications/[id]/computation/route.ts
-    // directly): totalInterest ÷ terms, halved again for semi-monthly.
-    // Deliberately reuses plain total_interest, not gross_total_interest —
-    // matching that same precedent exactly, not improving on it here.
-    let interestPerRow = 0;
-    if (interestEligibleBase.length > 0) {
-      const { data: masterlistRow } = await supabase
-        .from("masterlist")
-        .select("computation_id")
-        .eq("id", payment.masterlist_id)
-        .single();
-
-      const computationId = masterlistRow?.computation_id as string | null;
-      if (computationId) {
-        const { data: computationRow } = await supabase
-          .from("computations")
-          .select("total_interest, terms, payment_frequency")
-          .eq("id", computationId)
-          .single();
-
-        if (computationRow) {
-          const terms = Number(computationRow.terms) || 1;
-          const interestPerMonth = halfUp(
-            Number(computationRow.total_interest) / terms,
-          );
-          interestPerRow =
-            computationRow.payment_frequency === "semi_monthly"
-              ? halfUp(interestPerMonth / 2)
-              : interestPerMonth;
-        }
-      }
-    }
+    // Offset-discount `activeLoans` path already does (totalInterest ÷
+    // terms, halved for semi-monthly). Centralized in posting.ts (Phase 5)
+    // so this route and the server-side discount re-validation share one
+    // copy of the formula instead of two.
+    const interestPerRow =
+      interestEligibleBase.length > 0
+        ? await deriveInterestPerRow(supabase, payment.masterlist_id as string)
+        : 0;
 
     const interestEligible = interestEligibleBase.map((inst) => ({
       ...inst,

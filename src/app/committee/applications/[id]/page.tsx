@@ -95,7 +95,9 @@ type CommitteeDetail = {
       | "bi_monthly"
       | "quarterly"
       | "two_monthly"
-      | "daily";
+      | "daily"
+      | "quarterly_special"
+      | "two_monthly_special";
     collateralType: "none" | "car_refinancing" | "real_estate";
     statusHistory: StatusHistoryEntry[] | null;
     canDecide: boolean;

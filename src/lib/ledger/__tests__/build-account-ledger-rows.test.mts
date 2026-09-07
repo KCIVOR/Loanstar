@@ -349,6 +349,131 @@ describe("buildAccountLedgerRows", () => {
   });
 });
 
+describe("buildAccountLedgerRows — hides Quarterly/Two-Monthly Special's $0 placeholder rows", () => {
+  it("hides a genuinely all-zero row but keeps the real row on the same due date", () => {
+    const rows = buildAccountLedgerRows({
+      openingDebit: 120_000,
+      schedules: [
+        {
+          id: "interest-1",
+          dueDate: "2026-12-10",
+          target: 2_500,
+          penalty: 0,
+          installmentNo: 1,
+          status: "pending",
+        },
+        {
+          id: "principal-placeholder-1",
+          dueDate: "2026-12-10",
+          target: 0,
+          penalty: 0,
+          discount: 0,
+          installmentNo: 2,
+          status: "pending",
+        },
+        {
+          id: "interest-final",
+          dueDate: "2027-09-10",
+          target: 2_500,
+          penalty: 0,
+          installmentNo: 3,
+          status: "pending",
+        },
+        {
+          id: "principal-final",
+          dueDate: "2027-09-10",
+          target: 120_000,
+          penalty: 0,
+          installmentNo: 4,
+          status: "pending",
+        },
+      ],
+      payments: [],
+    });
+
+    const scheduleIds = rows
+      .filter((r) => r.kind === "installment")
+      .map((r) => r.scheduleId);
+    assert.deepEqual(scheduleIds, ["interest-1", "interest-final", "principal-final"]);
+    assert.ok(!scheduleIds.includes("principal-placeholder-1"));
+  });
+
+  it("never hides a $0 row that has a real payment posted against it", () => {
+    const rows = buildAccountLedgerRows({
+      openingDebit: 120_000,
+      schedules: [
+        {
+          id: "principal-placeholder-1",
+          dueDate: "2026-12-10",
+          target: 0,
+          penalty: 0,
+          discount: 0,
+          installmentNo: 2,
+          status: "pending",
+        },
+      ],
+      payments: [
+        payment({
+          id: "pay-1",
+          paymentDate: "2026-12-05",
+          amount: 0,
+          scheduleId: "principal-placeholder-1",
+        }),
+      ],
+    });
+
+    const paymentRows = rows.filter((r) => r.scheduleId === "principal-placeholder-1");
+    assert.equal(paymentRows.length, 1);
+    assert.equal(paymentRows[0]?.kind, "payment");
+  });
+
+  it("never hides a row with a nonzero penalty or discount, even if target is $0", () => {
+    const withPenalty = buildAccountLedgerRows({
+      openingDebit: 100,
+      schedules: [
+        { id: "s1", dueDate: "2026-12-10", target: 0, penalty: 50, installmentNo: 1, status: "overdue" },
+      ],
+      payments: [],
+    });
+    assert.equal(withPenalty.filter((r) => r.kind === "installment").length, 1);
+
+    const withDiscount = buildAccountLedgerRows({
+      openingDebit: 100,
+      schedules: [
+        { id: "s2", dueDate: "2026-12-10", target: 0, penalty: 0, discount: 10, installmentNo: 1, status: "pending" },
+      ],
+      payments: [],
+    });
+    assert.equal(withDiscount.filter((r) => r.kind === "installment").length, 1);
+  });
+
+  it("hiding the placeholder row never changes the running balance shown on other rows", () => {
+    const withPlaceholder = buildAccountLedgerRows({
+      openingDebit: 120_000,
+      schedules: [
+        { id: "interest-1", dueDate: "2026-12-10", target: 2_500, penalty: 0, installmentNo: 1, status: "pending" },
+        { id: "principal-placeholder-1", dueDate: "2026-12-10", target: 0, penalty: 0, installmentNo: 2, status: "pending" },
+      ],
+      payments: [
+        payment({ id: "pay-1", paymentDate: "2026-12-10", amount: 2_500, scheduleId: "interest-1" }),
+      ],
+    });
+    const withoutPlaceholder = buildAccountLedgerRows({
+      openingDebit: 120_000,
+      schedules: [
+        { id: "interest-1", dueDate: "2026-12-10", target: 2_500, penalty: 0, installmentNo: 1, status: "pending" },
+      ],
+      payments: [
+        payment({ id: "pay-1", paymentDate: "2026-12-10", amount: 2_500, scheduleId: "interest-1" }),
+      ],
+    });
+    const balanceOf = (rows: ReturnType<typeof buildAccountLedgerRows>) =>
+      rows.find((r) => r.kind === "totals")?.balance;
+    assert.equal(balanceOf(withPlaceholder), balanceOf(withoutPlaceholder));
+    assert.equal(balanceOf(withPlaceholder), 117_500);
+  });
+});
+
 describe("mapScheduleRowForLedger (2026-08-31 — the one shared DB-row-to-ledger-row mapper)", () => {
   it("maps every ledger-relevant field, including discount_amount", () => {
     const row = mapScheduleRowForLedger(
@@ -370,6 +495,10 @@ describe("mapScheduleRowForLedger (2026-08-31 — the one shared DB-row-to-ledge
       target: 33224.4,
       penalty: 50,
       discount: 1544.4,
+      // Collector Discount fields (feature-collector-discount-implementation-plan.md,
+      // Phase 6) — null/0 on a row that predates or never received one.
+      discountSource: null,
+      penaltyDiscount: 0,
       installmentNo: 3,
       checkNo: "605226",
       status: "pending",
@@ -688,11 +817,24 @@ describe("buildAccountLedgerRows — Move of Payment", () => {
 });
 
 describe("checkNumbersByInstallmentNo", () => {
+  // 4 real (non-$0) rows, installment_no 1-4 — the shape every schedule
+  // except Quarterly/Two-Monthly Special has always had, where check count
+  // equals schedule row count 1:1.
+  const fourRealRows = [
+    { installment_no: 1, amount_due: 1000 },
+    { installment_no: 2, amount_due: 1000 },
+    { installment_no: 3, amount_due: 1000 },
+    { installment_no: 4, amount_due: 1000 },
+  ];
+
   it("maps sort_order 0 to installment 1", () => {
-    const map = checkNumbersByInstallmentNo([
-      { sort_order: 0, check_number: "1351" },
-      { sort_order: 1, check_number: "151" },
-    ]);
+    const map = checkNumbersByInstallmentNo(
+      [
+        { sort_order: 0, check_number: "1351" },
+        { sort_order: 1, check_number: "151" },
+      ],
+      fourRealRows,
+    );
 
     assert.equal(map.get(1), "1351");
     assert.equal(map.get(2), "151");
@@ -700,28 +842,79 @@ describe("checkNumbersByInstallmentNo", () => {
   });
 
   it("skips checks with a blank or missing number", () => {
-    const map = checkNumbersByInstallmentNo([
-      { sort_order: 0, check_number: "   " },
-      { sort_order: 1, check_number: null },
-      { sort_order: 2 },
-      { sort_order: 3, check_number: " 777 " },
-    ]);
+    const map = checkNumbersByInstallmentNo(
+      [
+        { sort_order: 0, check_number: "   " },
+        { sort_order: 1, check_number: null },
+        { sort_order: 2 },
+        { sort_order: 3, check_number: " 777 " },
+      ],
+      fourRealRows,
+    );
 
     assert.equal(map.size, 1);
     assert.equal(map.get(4), "777");
   });
 
   it("marks held and replaced checks (Fixes Plan Phase 4b)", () => {
-    const map = checkNumbersByInstallmentNo([
-      { sort_order: 0, check_number: "111", status: "held" },
-      { sort_order: 1, check_number: "222", status: "replaced" },
-      { sort_order: 2, check_number: "333", status: "active" },
-      { sort_order: 3, check_number: "444" }, // no status → active
-    ]);
+    const map = checkNumbersByInstallmentNo(
+      [
+        { sort_order: 0, check_number: "111", status: "held" },
+        { sort_order: 1, check_number: "222", status: "replaced" },
+        { sort_order: 2, check_number: "333", status: "active" },
+        { sort_order: 3, check_number: "444" }, // no status → active
+      ],
+      fourRealRows,
+    );
 
     assert.equal(map.get(1), "111 (held)");
     assert.equal(map.get(2), "222 (replaced)");
     assert.equal(map.get(3), "333");
     assert.equal(map.get(4), "444");
+  });
+
+  /**
+   * Regression for a live bug found via Committee → LRA → AR end-to-end
+   * testing (2026-09-04, Quarterly Special, 9-month term / 3 quarters).
+   * amortization_schedules has 6 rows (installment_no 1-6): interest,
+   * principal($0), interest, principal($0), interest, principal(real, the
+   * final one) — but only 4 real PDC checks exist (3 interest + 1 final
+   * principal), since release-service.ts's buildExpectedPdcSchedule filters
+   * amountDue > 0 before generating checks. The pre-fix "sort_order N ->
+   * installment_no N+1" mapping put check 2 (the real Mar-due interest
+   * check) on installment_no 2 (the $0 Dec-due principal placeholder), check
+   * 3 on installment_no 3 (actually the real Mar-due interest row), and
+   * check 4 (the real final principal check) on installment_no 4 (a $0
+   * placeholder) — every check after the first landed one row early, and the
+   * real final principal row (installment_no 6) never got a check at all.
+   */
+  it("Quarterly Special: skips $0 placeholder rows so real checks land on the real rows, not shifted by one", () => {
+    const quarterlySpecialSchedule = [
+      { installment_no: 1, amount_due: 15_658.5 }, // interest, Q1 (Dec)
+      { installment_no: 2, amount_due: 0 }, // principal placeholder, Q1
+      { installment_no: 3, amount_due: 15_658.5 }, // interest, Q2 (Mar)
+      { installment_no: 4, amount_due: 0 }, // principal placeholder, Q2
+      { installment_no: 5, amount_due: 15_658.5 }, // interest, Q3 (Jun)
+      { installment_no: 6, amount_due: 160_600 }, // final principal, Q3 (Jun) — real
+    ];
+    const checks = [
+      { sort_order: 0, check_number: "607852" }, // Q1 interest
+      { sort_order: 1, check_number: "972365" }, // Q2 interest
+      { sort_order: 2, check_number: "491237" }, // Q3 interest
+      { sort_order: 3, check_number: "638228" }, // final principal
+    ];
+
+    const map = checkNumbersByInstallmentNo(checks, quarterlySpecialSchedule);
+
+    // Pre-fix (naive sort_order+1) mapping would have produced
+    // {1: "607852", 2: "972365", 3: "491237", 4: "638228"}, with 5 and 6
+    // undefined — every check from the 2nd one on landed one real row too
+    // early, and the real final-principal row never got a check at all.
+    assert.equal(map.get(1), "607852"); // Q1 interest — correct either way
+    assert.equal(map.get(2), undefined); // $0 placeholder never gets a check
+    assert.equal(map.get(3), "972365"); // Q2 interest — pre-fix this was "491237" (wrong)
+    assert.equal(map.get(4), undefined); // $0 placeholder never gets a check
+    assert.equal(map.get(5), "491237"); // Q3 interest — pre-fix this was undefined (never assigned)
+    assert.equal(map.get(6), "638228"); // final principal — pre-fix this was undefined (never assigned)
   });
 });

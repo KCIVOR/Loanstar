@@ -6,7 +6,9 @@ import { initializeArAccount, invoiceScheduleToInstallments } from "@/lib/ar/mas
 import {
   generateBiMonthlySchedule,
   generateQuarterlySchedule,
+  generateQuarterlySpecialSchedule,
   generateTwoMonthlySchedule,
+  generateTwoMonthlySpecialSchedule,
 } from "@/lib/ar/schedule";
 import { mapBorrowerRow, type BorrowerRow } from "@/lib/borrowers/types";
 import { computeInvoiceLoan } from "@/lib/computation/invoice";
@@ -304,7 +306,38 @@ function buildExpectedPdcSchedule(
     }).map((row) => ({ amount: row.amountDue, date: row.dueDate }));
   }
 
-  // two_monthly — the only remaining case among the 5 new schedule types.
+  if (computation.paymentFrequency === "quarterly_special") {
+    // Special mode's generator emits a $0 principal row alongside every
+    // non-final period's interest row (kept that way so discount-units.ts's
+    // interest/principal pairing stride stays intact — see
+    // docs/quarterly-bimonthly-special-schedule-implementation-plan.md).
+    // A physical PDC check for ₱0 makes no sense, so those rows are
+    // dropped here — only real, positive-amount rows become expected checks.
+    return generateQuarterlySpecialSchedule({
+      terms: computation.terms,
+      totalLoan: grossTotalLoan,
+      totalInterest: grossTotalInterest,
+      releaseDate,
+      dueDay: computation.dueDay ?? 10,
+    })
+      .filter((row) => row.amountDue > 0)
+      .map((row) => ({ amount: row.amountDue, date: row.dueDate }));
+  }
+
+  if (computation.paymentFrequency === "two_monthly_special") {
+    // Same $0-row filtering as quarterly_special above.
+    return generateTwoMonthlySpecialSchedule({
+      terms: computation.terms,
+      totalLoan: grossTotalLoan,
+      totalInterest: grossTotalInterest,
+      releaseDate,
+      dueDay: computation.dueDay ?? 10,
+    })
+      .filter((row) => row.amountDue > 0)
+      .map((row) => ({ amount: row.amountDue, date: row.dueDate }));
+  }
+
+  // two_monthly — the only remaining case among the schedule types handled here.
   return generateTwoMonthlySchedule({
     terms: computation.terms,
     totalLoan: grossTotalLoan,
@@ -361,7 +394,9 @@ export async function savePdcChecks(
     computation.paymentFrequency === "bi_monthly" ||
     computation.paymentFrequency === "quarterly" ||
     computation.paymentFrequency === "two_monthly" ||
-    computation.paymentFrequency === "daily";
+    computation.paymentFrequency === "daily" ||
+    computation.paymentFrequency === "quarterly_special" ||
+    computation.paymentFrequency === "two_monthly_special";
   const expectedSchedule = isNewScheduleType
     ? buildExpectedPdcSchedule(computation)
     : null;

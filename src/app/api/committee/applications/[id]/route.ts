@@ -145,10 +145,15 @@ export async function GET(_request: Request, { params }: RouteParams) {
       if (masterlistIds.length > 0) {
         const { data: scheduleRows } = await admin
           .from("amortization_schedules")
-          .select("masterlist_id, installment_no, due_date, status")
+          .select("masterlist_id, installment_no, due_date, status, amount_due")
           .in("masterlist_id", masterlistIds)
           .in("status", ["pending", "partial", "overdue"]);
         for (const row of scheduleRows ?? []) {
+          // Quarterly/Two-Monthly Special loans persist a $0 "principal"
+          // placeholder row alongside every non-final period's real interest
+          // row — excluded here so "N months remaining" isn't roughly
+          // doubled and the offset picker never offers a non-real row.
+          if (Number(row.amount_due) <= 0) continue;
           const mid = row.masterlist_id as string;
           remainingByMasterlistId.set(mid, (remainingByMasterlistId.get(mid) ?? 0) + 1);
           const dueDate = row.due_date as string;
@@ -330,7 +335,9 @@ export async function GET(_request: Request, { params }: RouteParams) {
           application.payment_schedule === "bi_monthly" ||
           application.payment_schedule === "quarterly" ||
           application.payment_schedule === "two_monthly" ||
-          application.payment_schedule === "daily"
+          application.payment_schedule === "daily" ||
+          application.payment_schedule === "quarterly_special" ||
+          application.payment_schedule === "two_monthly_special"
             ? application.payment_schedule
             : "monthly",
         statusHistory: application.status_history,

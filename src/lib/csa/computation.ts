@@ -64,6 +64,8 @@ export type PersistComputationInput = {
     | "quarterly"
     | "two_monthly"
     | "daily"
+    | "quarterly_special"
+    | "two_monthly_special"
     | null;
   loanTypeId?: string | null;
   loanTypeName?: string | null;
@@ -153,10 +155,16 @@ export function validateFrequencyTerms(
   paymentFrequency: string | null | undefined,
   terms: number,
 ): string | null {
-  if (paymentFrequency === "quarterly" && terms % 3 !== 0) {
+  if (
+    (paymentFrequency === "quarterly" || paymentFrequency === "quarterly_special") &&
+    terms % 3 !== 0
+  ) {
     return "Quarterly terms must be divisible by 3 (e.g. 6, 9, or 12 months)";
   }
-  if (paymentFrequency === "two_monthly" && terms % 2 !== 0) {
+  if (
+    (paymentFrequency === "two_monthly" || paymentFrequency === "two_monthly_special") &&
+    terms % 2 !== 0
+  ) {
     return "Two-monthly terms must be divisible by 2 (e.g. 4, 6, 8, 10, or 12 months)";
   }
   return null;
@@ -346,7 +354,9 @@ export function mapComputationRow(row: Record<string, unknown>) {
       | "bi_monthly"
       | "quarterly"
       | "two_monthly"
-      | "daily",
+      | "daily"
+      | "quarterly_special"
+      | "two_monthly_special",
     computedBy: row.computed_by as string | null,
     signedAt: row.signed_at as string | null,
     signedBy: row.signed_by as string | null,

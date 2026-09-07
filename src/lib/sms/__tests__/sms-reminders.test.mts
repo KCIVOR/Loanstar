@@ -87,4 +87,24 @@ describe("reminder due-window scan (Phase 12)", () => {
     const picked = pickUpcomingInstallment(discounted, "2026-07-17", "2026-07-24");
     assert.equal(picked?.discountAmount, 1080);
   });
+
+  it("never picks a $0 principal placeholder row (Quarterly/Two-Monthly Special) — a real borrower must never get 'your payment of PHP 0.00 is due'", () => {
+    // Regression for a live bug class (AN300445, 2026-09-04): Special
+    // schedules persist a $0 principal row alongside every non-final
+    // period's real interest row, same due date.
+    const specialRows: ReminderScheduleRow[] = [
+      { installmentNo: 1, dueDate: "2026-07-18", amountDue: 0, discountAmount: 0, status: "due" },
+      { installmentNo: 2, dueDate: "2026-07-20", amountDue: 11781, discountAmount: 0, status: "due" },
+    ];
+    const picked = pickUpcomingInstallment(specialRows, "2026-07-17", "2026-07-24");
+    assert.equal(picked?.installmentNo, 2);
+    assert.equal(picked?.amountDue, 11781);
+  });
+
+  it("returns null when every row in the window is a $0 placeholder", () => {
+    const allZero: ReminderScheduleRow[] = [
+      { installmentNo: 1, dueDate: "2026-07-18", amountDue: 0, discountAmount: 0, status: "due" },
+    ];
+    assert.equal(pickUpcomingInstallment(allZero, "2026-07-17", "2026-07-24"), null);
+  });
 });

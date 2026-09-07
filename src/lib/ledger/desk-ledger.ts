@@ -49,7 +49,13 @@ export function buildDeskLedgerRows({
   postings,
   pdcChecks,
 }: BuildDeskLedgerInput): AccountLedgerRow[] {
-  const checkNoByInstallment = checkNumbersByInstallmentNo(pdcChecks);
+  const checkNoByInstallment = checkNumbersByInstallmentNo(
+    pdcChecks,
+    schedules.map((row) => ({
+      installment_no: row.installmentNo,
+      amount_due: Number(row.amountDue ?? 0),
+    })),
+  );
   const scheduleTotal = schedules.reduce(
     (sum, row) => sum + Number(row.amountDue ?? 0),
     0,

@@ -83,7 +83,9 @@ type ApplicationWorkspace = {
       | "bi_monthly"
       | "quarterly"
       | "two_monthly"
-      | "daily";
+      | "daily"
+      | "quarterly_special"
+      | "two_monthly_special";
     isReloan: boolean;
     createdAt: string;
     updatedAt: string;

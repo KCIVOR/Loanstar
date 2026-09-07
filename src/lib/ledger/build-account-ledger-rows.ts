@@ -5,6 +5,15 @@ export type LedgerSchedule = {
   penalty: number;
   /** Early-settlement or origination discount on this installment, if any. */
   discount?: number;
+  /** Which feature set `discount` — 'origination' | 'offset' | 'collector'
+   * | null (predates this column, meaning origination or offset). Lets the
+   * ledger UI label a Collector discount distinctly (feature-collector-discount-implementation-plan.md,
+   * Phase 6) instead of leaving all three indistinguishable. */
+  discountSource?: string | null;
+  /** A Collector-approved penalty waiver — always its own column, never
+   * merged into `discount` (Rule 6: that one has always meant "reduces the
+   * interest side" everywhere in this codebase). */
+  penaltyDiscount?: number;
   installmentNo?: number;
   /** Physical check encoded during LRA release, paired positionally. */
   checkNo?: string | null;
@@ -37,6 +46,8 @@ export type RawAmortizationScheduleRow = {
   amount_due?: number | string | null;
   penalty_amount?: number | string | null;
   discount_amount?: number | string | null;
+  discount_source?: string | null;
+  penalty_discount_amount?: number | string | null;
   status?: string | null;
   moved_at?: string | null;
   move_surcharge_amount?: number | string | null;
@@ -54,6 +65,8 @@ export function mapScheduleRowForLedger(
     target: Number(row.amount_due ?? 0),
     penalty: Number(row.penalty_amount ?? 0),
     discount: Number(row.discount_amount ?? 0),
+    discountSource: row.discount_source ?? null,
+    penaltyDiscount: Number(row.penalty_discount_amount ?? 0),
     installmentNo: Number(row.installment_no ?? 0),
     checkNo,
     status: String(row.status ?? ""),
@@ -75,7 +88,7 @@ export function mapScheduleRowForLedger(
  * `amount_paid`, used downstream by the payment form) appends it on top of
  * this constant rather than this constant growing route-specific fields. */
 export const AMORTIZATION_SCHEDULE_LEDGER_COLUMNS =
-  "id, installment_no, due_date, amount_due, penalty_amount, discount_amount, status, paid_at, moved_at, move_surcharge_amount, move_of_payment_batch_id, deferred_from_move_of_payment_batch_id";
+  "id, installment_no, due_date, amount_due, penalty_amount, discount_amount, discount_source, penalty_discount_amount, status, paid_at, moved_at, move_surcharge_amount, move_of_payment_batch_id, deferred_from_move_of_payment_batch_id";
 
 export type LedgerPaymentEntry = {
   id: string;
@@ -115,6 +128,7 @@ export type AccountLedgerRow = {
   target: number | null;
   penalty: number | null;
   discount: number | null;
+  discountSource: string | null;
   date: string | null;
   referenceNo: string | null;
   status: string | null;
@@ -145,6 +159,14 @@ function discountOrNull(value: number | undefined): number | null {
  * the discount, matching how `openingDebit`/`balance` already account for it. */
 function netTarget(target: number, discount: number | undefined): number {
   return halfUpMoney(target - (Number(discount) || 0));
+}
+
+/** The installment's penalty net of any Collector-approved waiver — same
+ * convention as netTarget above, for the same reason (feature-collector-discount-implementation-plan.md,
+ * Phase 6): the Penalty column showing the waived, gross figure would
+ * contradict the balance next to it, which already nets the waiver out. */
+function netPenalty(penalty: number, penaltyDiscount: number | undefined): number {
+  return halfUpMoney(penalty - (Number(penaltyDiscount) || 0));
 }
 
 function statusLabel(status: string | null | undefined): string | null {
@@ -213,6 +235,7 @@ export function buildAccountLedgerRows(
       target: null,
       penalty: null,
       discount: null,
+      discountSource: null,
       date: null,
       referenceNo: null,
       status: null,
@@ -239,8 +262,11 @@ export function buildAccountLedgerRows(
       checkNo: schedule?.checkNo?.trim() || null,
       dueDate: schedule?.dueDate ?? null,
       target: schedule ? netTarget(schedule.target, schedule.discount) : null,
-      penalty: schedule ? halfUpMoney(schedule.penalty) : null,
+      penalty: schedule
+        ? netPenalty(schedule.penalty, schedule.penaltyDiscount)
+        : null,
       discount: schedule ? discountOrNull(schedule.discount) : null,
+      discountSource: schedule?.discountSource ?? null,
       date: payment.paymentDate,
       referenceNo: payment.referenceNo?.trim() || null,
       status: statusLabel(schedule?.status),
@@ -263,6 +289,7 @@ export function buildAccountLedgerRows(
       target: null,
       penalty: null,
       discount: null,
+      discountSource: null,
       date: payment.paymentDate || null,
       referenceNo: payment.referenceNo?.trim() || null,
       status: "surcharge",
@@ -326,6 +353,7 @@ export function buildAccountLedgerRows(
           target: null,
           penalty: null,
           discount: null,
+          discountSource: null,
           date: schedule.movedAt ? schedule.movedAt.slice(0, 10) : null,
           referenceNo: null,
           status: "moved",
@@ -340,6 +368,27 @@ export function buildAccountLedgerRows(
     }
 
     if (credits.length === 0) {
+      // Quarterly/Two-Monthly Special loans persist a $0 "principal"
+      // placeholder row alongside every non-final period's real interest
+      // row (see docs/quarterly-bimonthly-special-schedule-implementation-plan.md)
+      // — it never represents real money, so showing it as its own ledger
+      // line is just confusing (e.g. the same due date appears twice with
+      // nothing on the second line). Hidden here, DISPLAY-ONLY: the row
+      // still exists in amortization_schedules — needed for discount-unit
+      // pairing (discount-units.ts), positional PDC check mapping
+      // (checkNumbersByInstallmentNo), and rollover/aging targeting — only
+      // this rendered table skips it. Guarded tightly so a row with any
+      // real activity (a payment, a penalty, a discount, or a Move of
+      // Payment) is never hidden — being inside this `credits.length === 0`
+      // branch already guarantees no payment was ever posted to it.
+      const isEmptySpecialPlaceholder =
+        Number(schedule.target) === 0 &&
+        Number(schedule.penalty || 0) === 0 &&
+        Number(schedule.discount || 0) === 0 &&
+        !schedule.moveOfPaymentBatchId &&
+        !schedule.deferredFromMoveOfPaymentBatchId;
+      if (isEmptySpecialPlaceholder) continue;
+
       // Fixes Plan Phase 4b — the installment appended by a Move of Payment
       // has no post-dated check of its own; flag it until a replacement is
       // recorded (which then maps in positionally like any other check).
@@ -352,8 +401,9 @@ export function buildAccountLedgerRows(
         checkNo: installmentCheckNo,
         dueDate: schedule.dueDate,
         target: netTarget(schedule.target, schedule.discount),
-        penalty: halfUpMoney(schedule.penalty),
+        penalty: netPenalty(schedule.penalty, schedule.penaltyDiscount),
         discount: discountOrNull(schedule.discount),
+        discountSource: schedule.discountSource ?? null,
         date: null,
         referenceNo: null,
         status: statusLabel(schedule.status),
@@ -389,6 +439,7 @@ export function buildAccountLedgerRows(
     target: null,
     penalty: null,
     discount: null,
+    discountSource: null,
     date: null,
     referenceNo: null,
     status: null,
@@ -450,18 +501,46 @@ export type LedgerPdcCheck = {
 
 /**
  * LRA checks have no foreign key to installments — the only defensible link is
- * positional: `sort_order` 0 is installment 1. A check on hold for a Move of
- * Payment keeps its number but is shown with a "(held)" / "(replaced)"
- * marker (Fixes Plan Phase 4b).
+ * positional. A check on hold for a Move of Payment keeps its number but is
+ * shown with a "(held)" / "(replaced)" marker (Fixes Plan Phase 4b).
+ *
+ * The position is "the Nth REAL (amount_due > 0) row in installment_no
+ * order" — NOT "installment_no N" directly. Quarterly/Two-Monthly Special
+ * loans persist a $0 "principal" placeholder row alongside every non-final
+ * period's real interest row (see
+ * docs/quarterly-bimonthly-special-schedule-implementation-plan.md), and
+ * PDC checks are only ever generated for the real rows (release-service.ts's
+ * buildExpectedPdcSchedule filters amountDue > 0). A naive "sort_order N ->
+ * installment_no N+1" mapping assumes checks and schedule rows are the same
+ * list — true for every other schedule, but false the moment a Special
+ * loan's $0 rows are in the mix, silently shifting every check after the
+ * first onto the wrong row (confirmed live via Committee → LRA → AR
+ * end-to-end testing, 2026-09-04: a Quarterly Special loan's real checks
+ * displayed against the wrong due dates in the AR ledger, with the final
+ * principal check never showing up at all).
  */
 export function checkNumbersByInstallmentNo(
   checks: LedgerPdcCheck[],
+  scheduleRows: Array<{ installment_no: number; amount_due: number }>,
 ): Map<number, string> {
   const map = new Map<number, string>();
+  // sort_order is each check's own, stable, originally-intended slot number
+  // (0 = the 1st real row, 1 = the 2nd, ...) — it must be used as a direct
+  // index into realInstallmentNos, not re-derived from a check's position in
+  // some filtered/sorted array. A check with a blank number (still occupying
+  // its slot, just not yet encoded) must not cause a later, valid check to
+  // shift onto an earlier slot than the one it actually belongs to.
+  const realInstallmentNos = scheduleRows
+    .filter((row) => Number(row.amount_due) > 0)
+    .sort((a, b) => a.installment_no - b.installment_no)
+    .map((row) => row.installment_no);
+
   for (const check of checks) {
     const sortOrder = Number(check.sort_order ?? Number.NaN);
     const checkNumber = check.check_number?.trim();
     if (!Number.isFinite(sortOrder) || !checkNumber) continue;
+    const installmentNo = realInstallmentNos[sortOrder];
+    if (installmentNo == null) continue;
     const status = check.status ?? "active";
     const label =
       status === "held"
@@ -469,7 +548,7 @@ export function checkNumbersByInstallmentNo(
         : status === "replaced"
           ? `${checkNumber} (replaced)`
           : checkNumber;
-    map.set(sortOrder + 1, label);
+    map.set(installmentNo, label);
   }
   return map;
 }

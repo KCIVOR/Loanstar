@@ -880,15 +880,17 @@ export function fakeComputationInputs(
     | "bi_monthly"
     | "quarterly"
     | "two_monthly"
-    | "daily",
+    | "daily"
+    | "quarterly_special"
+    | "two_monthly_special",
 ): FakeComputationInputs {
   const amount = num(50, 300) * 1000;
   const terms =
     scheduleType === "weekly"
       ? pick([1, 2, 3])
-      : scheduleType === "quarterly"
+      : scheduleType === "quarterly" || scheduleType === "quarterly_special"
         ? pick([6, 9, 12])
-        : scheduleType === "two_monthly"
+        : scheduleType === "two_monthly" || scheduleType === "two_monthly_special"
           ? pick([4, 6, 8, 10, 12])
           : pick([6, 12, 24]);
 

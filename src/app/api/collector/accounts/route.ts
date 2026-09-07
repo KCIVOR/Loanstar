@@ -1,6 +1,5 @@
 import { resolveDateBounds, type DateRangeValue } from "@/components/history";
 import { handleApiError, jsonOk } from "@/lib/api/handler";
-import { refreshMasterlistAging } from "@/lib/ar/posting";
 import { nextOpenInstallment, type ScheduleLite } from "@/lib/collector/desk";
 import {
   COLLECTOR_QUEUE_ACCOUNT_STATUS,
@@ -19,7 +18,7 @@ import {
   type CollectorQueueSortKey,
 } from "@/lib/collector/queue";
 import { requireModulePermission } from "@/lib/permissions/server";
-import { createClient, createServiceClient } from "@/lib/supabase/server";
+import { createClient } from "@/lib/supabase/server";
 
 const RANGE_PRESETS = new Set(["30d", "90d", "all", "custom"]);
 const SEGMENT_FILTERS = new Set(["all", "seafarer", "sme", "individual"]);
@@ -101,16 +100,6 @@ export async function GET(request: Request) {
     const ids = (assignments ?? []).map((a) => a.masterlist_id as string);
     if (!ids.length) {
       return jsonOk({ rows: [], totalCount: 0, kpi: EMPTY_KPI });
-    }
-
-    // Privileged aging refresh: amortization_schedules/masterlist/penalties
-    // writes require accounting_ar:edit, which the collection role doesn't
-    // have — refreshMasterlistAging must run under the service role or every
-    // write here silently no-ops under RLS. Run it before the select below so
-    // the response reflects the just-refreshed numbers, not stale ones.
-    const admin = createServiceClient();
-    for (const id of ids) {
-      await refreshMasterlistAging(admin, id);
     }
 
     // Fetch the officer's assigned+active superset, then filter/sort/paginate

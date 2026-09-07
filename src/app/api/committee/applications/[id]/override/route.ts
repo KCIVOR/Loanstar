@@ -42,6 +42,8 @@ const overrideSchema = z.object({
       "quarterly",
       "two_monthly",
       "daily",
+      "quarterly_special",
+      "two_monthly_special",
     ])
     .optional(),
   originationDiscounts: z

@@ -116,10 +116,17 @@ export async function fetchLoanRegister(
 }
 
 function daysLateForAccount(
-  schedules: Array<{ due_date: string; status: string }>,
+  schedules: Array<{ due_date: string; status: string; amount_due: number }>,
 ): number {
   const overdue = schedules
-    .filter((row) => row.status !== "rolled" && row.status !== "paid")
+    // Quarterly/Two-Monthly Special loans persist a $0 "principal"
+    // placeholder row alongside every non-final period's real interest
+    // row — excluded here so an account never reports "days late" against
+    // a row with nothing actually owed on it.
+    .filter(
+      (row) =>
+        row.status !== "rolled" && row.status !== "paid" && Number(row.amount_due) > 0,
+    )
     .filter((row) => daysPastDue(row.due_date) > 0)
     .sort((a, b) => a.due_date.localeCompare(b.due_date))[0];
   return overdue ? daysPastDue(overdue.due_date) : 0;
@@ -135,16 +142,23 @@ export async function fetchPastDueRegister(
   const ids = pastDue.map((row) => row.masterlistId);
   const { data: schedules, error } = await supabase
     .from("amortization_schedules")
-    .select("masterlist_id, due_date, status")
+    .select("masterlist_id, due_date, status, amount_due")
     .in("masterlist_id", ids)
     .neq("status", "paid");
   if (error) throw new Error(error.message);
 
-  const byAccount = new Map<string, Array<{ due_date: string; status: string }>>();
+  const byAccount = new Map<
+    string,
+    Array<{ due_date: string; status: string; amount_due: number }>
+  >();
   for (const row of schedules ?? []) {
     const masterlistId = row.masterlist_id as string;
     const list = byAccount.get(masterlistId) ?? [];
-    list.push({ due_date: row.due_date as string, status: row.status as string });
+    list.push({
+      due_date: row.due_date as string,
+      status: row.status as string,
+      amount_due: Number(row.amount_due),
+    });
     byAccount.set(masterlistId, list);
   }
 

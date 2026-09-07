@@ -40,12 +40,20 @@ export function netInstallmentDue(input: {
   amountDue: number;
   discountAmount?: number | null;
   penaltyAmount?: number | null;
+  /** A Collector-approved reduction to the penalty side specifically
+   * (feature-collector-discount-implementation-plan.md, Rule 6) — kept as
+   * its own parameter, never merged into discountAmount, since that one has
+   * always meant "reduces the interest side" everywhere in this codebase.
+   * Defaults to 0/undefined so every existing call site computes
+   * byte-for-byte the same result it did before this parameter existed. */
+  penaltyDiscountAmount?: number | null;
   amountPaid?: number | null;
 }): number {
   const net = halfUp(
     input.amountDue -
       (Number(input.discountAmount) || 0) +
       (Number(input.penaltyAmount) || 0) -
+      (Number(input.penaltyDiscountAmount) || 0) -
       (Number(input.amountPaid) || 0),
   );
   return Math.max(0, net);

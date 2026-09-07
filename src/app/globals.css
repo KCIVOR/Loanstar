@@ -1543,6 +1543,16 @@ table.tbl {
   align-items: center;
   justify-content: center;
   padding: 20px;
+  /* Kept as a defensive fallback only — the real fix is capping .modal's
+     own height below so the box always fits inside the viewport and stays
+     centered. Without that cap, a flex item taller than the viewport gets
+     centered by being pushed equally past BOTH edges, and this overflow
+     can only ever scroll toward the edge scrollTop already sits at (0) —
+     the part pushed above the top is permanently unreachable no matter
+     how this is set. That was the actual bug (a Collector Discount
+     section long enough to exceed the viewport is what first exposed it),
+     not something this property alone can fix. */
+  overflow-y: auto;
   z-index: 50;
 }
 .modal {
@@ -1551,13 +1561,20 @@ table.tbl {
   box-shadow: var(--sh-4);
   width: 100%;
   max-width: 440px;
-  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  /* Caps the box to the viewport (minus breathing room) so it always fits
+     and stays centered by the overlay above; the body below scrolls
+     internally instead of the box growing past the screen. */
+  max-height: calc(100vh - 40px);
+  max-height: calc(100dvh - 40px);
 }
 .modal-h {
   padding: 20px 24px 0;
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
+  flex-shrink: 0;
 }
 .modal-h h4 {
   font-family: var(--font-display);
@@ -1577,6 +1594,13 @@ table.tbl {
   padding: 12px 24px 20px;
   font-size: 14px;
   color: var(--ink-700);
+  /* Allows this element to actually shrink below its content's natural
+     height inside a flex column — without min-height:0, a flex child
+     never shrinks past its content size and the max-height on .modal
+     above would have no effect on this element's own overflow. */
+  overflow-y: auto;
+  flex: 1 1 auto;
+  min-height: 0;
 }
 .modal-f {
   padding: 16px 24px;
@@ -1585,6 +1609,7 @@ table.tbl {
   display: flex;
   justify-content: flex-end;
   gap: 10px;
+  flex-shrink: 0;
 }
 
 .menu {

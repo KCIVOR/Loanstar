@@ -40,6 +40,8 @@ export const createApplicationSchema = z
         "quarterly",
         "two_monthly",
         "daily",
+        "quarterly_special",
+        "two_monthly_special",
       ])
       .default("monthly"),
   })

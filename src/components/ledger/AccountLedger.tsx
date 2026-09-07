@@ -35,6 +35,25 @@ function moneyCell(value: number | null) {
   return formatLedgerMoneyCell(value);
 }
 
+/** Same as moneyCell, but labels a Collector-sourced discount distinctly
+ * from an Origination/Offset one (feature-collector-discount-implementation-plan.md,
+ * Phase 6) — the ledger's one gap where all three used to render
+ * identically. Existing rendering for null/'origination'/'offset' is
+ * unchanged. */
+function discountCell(value: number | null, source: string | null) {
+  if (value == null) return "—";
+  return (
+    <span className="inline-flex items-center gap-1.5">
+      <span>{formatLedgerMoneyCell(value)}</span>
+      {source === "collector" ? (
+        <Badge variant="navy" className="shrink-0">
+          Collector
+        </Badge>
+      ) : null}
+    </span>
+  );
+}
+
 function statusVariant(
   status: string,
 ): "success" | "warning" | "danger" | "neutral" | "navy" {
@@ -178,7 +197,7 @@ export function AccountLedger({
                     {moneyCell(row.penalty)}
                   </Td>
                   <Td num className="mono">
-                    {moneyCell(row.discount)}
+                    {discountCell(row.discount, row.discountSource)}
                   </Td>
                   <Td className="mono">{formatLedgerDateCell(row.date)}</Td>
                   <Td className="mono">
@@ -240,7 +259,7 @@ export function AccountLedger({
                     {moneyCell(first.penalty)}
                   </Td>
                   <Td num className="mono">
-                    {moneyCell(first.discount)}
+                    {discountCell(first.discount, first.discountSource)}
                   </Td>
                   <Td className="mono">
                     <span className="inline-flex items-center gap-1.5 text-teal-600">

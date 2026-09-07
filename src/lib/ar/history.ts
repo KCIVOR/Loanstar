@@ -764,6 +764,8 @@ export type InternalTransferHistoryRow = {
   transferType: "other_loan" | "offset";
   months: number | null;
   amount: number;
+  discountAmount: number;
+  discountedInstallmentNos: number[];
   status: "posted" | "rejected";
   reviewedBy: string | null;
   reviewedByName: string;
@@ -830,7 +832,8 @@ export async function getInternalTransferHistory(
     .select(
       `
       id, source_loan_application_id, target_masterlist_id, transfer_type,
-      months, amount, status, rejection_reason, reviewed_by, reviewed_at, created_at,
+      months, amount, discount_amount, discounted_installment_nos,
+      status, rejection_reason, reviewed_by, reviewed_at, created_at,
       source_application:loan_applications!internal_transfers_source_loan_application_id_fkey ( application_no ),
       source_masterlist:masterlist!internal_transfers_source_masterlist_id_fkey ( loan_account_no ),
       target_masterlist:masterlist!internal_transfers_target_masterlist_id_fkey!inner ( loan_account_no, borrower_name, borrower_no, segment )
@@ -932,6 +935,8 @@ export async function getInternalTransferHistory(
       transferType: row.transfer_type as "other_loan" | "offset",
       months: row.months as number | null,
       amount: Number(row.amount),
+      discountAmount: Number(row.discount_amount ?? 0),
+      discountedInstallmentNos: (row.discounted_installment_nos as number[] | null) ?? [],
       status: row.status as "posted" | "rejected",
       reviewedBy,
       reviewedByName: reviewedBy ? (nameById.get(reviewedBy) ?? reviewedBy) : "—",

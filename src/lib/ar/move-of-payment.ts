@@ -262,7 +262,9 @@ async function loadMoveOfPaymentContext(
       | "bi_monthly"
       | "quarterly"
       | "two_monthly"
-      | "daily",
+      | "daily"
+      | "quarterly_special"
+      | "two_monthly_special",
     terms: computation.terms as number,
     principal,
     totalInterest: grossTotalInterest,
@@ -446,8 +448,10 @@ function nextScheduleExtensionDueDate(
       last.setDate(last.getDate() + 15);
       return formatDateLocal(last);
     case "quarterly":
+    case "quarterly_special":
       return formatDateLocal(addCalendarMonths(last, 3));
     case "two_monthly":
+    case "two_monthly_special":
       return formatDateLocal(addCalendarMonths(last, 2));
     default:
       // "weekly" (Invoice) is already rejected by canApplyMoveOfPayment;

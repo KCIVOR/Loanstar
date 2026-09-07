@@ -37,7 +37,9 @@ import { computeInvoiceLoan } from "@/lib/computation/invoice";
 import {
   generateBiMonthlySchedule,
   generateQuarterlySchedule,
+  generateQuarterlySpecialSchedule,
   generateTwoMonthlySchedule,
+  generateTwoMonthlySpecialSchedule,
 } from "@/lib/ar/schedule";
 import {
   formatStatusLabel,
@@ -76,6 +78,8 @@ type PdcComputation = {
     | "quarterly"
     | "two_monthly"
     | "daily"
+    | "quarterly_special"
+    | "two_monthly_special"
     | null;
 };
 
@@ -171,6 +175,37 @@ function buildPdcRows(
     }).map((row) => ({ checkDate: row.dueDate, amount: row.amountDue }));
   }
 
+  if (computation.paymentFrequency === "quarterly_special") {
+    if (!computation.releaseDate) return [];
+    // Special mode's generator emits a $0 principal row alongside every
+    // non-final period's interest row (see release-service.ts's
+    // buildExpectedPdcSchedule, which this mirrors) — filtered out here too,
+    // so this preview never disagrees with what the server accepts.
+    return generateQuarterlySpecialSchedule({
+      terms: computation.terms,
+      totalLoan: grossTotalLoan,
+      totalInterest: computation.grossTotalInterest,
+      releaseDate: new Date(computation.releaseDate),
+      dueDay: computation.dueDay ?? 10,
+    })
+      .filter((row) => row.amountDue > 0)
+      .map((row) => ({ checkDate: row.dueDate, amount: row.amountDue }));
+  }
+
+  if (computation.paymentFrequency === "two_monthly_special") {
+    if (!computation.releaseDate) return [];
+    // Same $0-row filtering as quarterly_special above.
+    return generateTwoMonthlySpecialSchedule({
+      terms: computation.terms,
+      totalLoan: grossTotalLoan,
+      totalInterest: computation.grossTotalInterest,
+      releaseDate: new Date(computation.releaseDate),
+      dueDay: computation.dueDay ?? 10,
+    })
+      .filter((row) => row.amountDue > 0)
+      .map((row) => ({ checkDate: row.dueDate, amount: row.amountDue }));
+  }
+
   // Monthly (Seafarer/SME/MPL) — gross basis (see comment above).
   return Array.from({ length: computation.terms }, (_, index) => ({
     checkDate: addScheduleMonths(pdcDate, index),
@@ -243,6 +278,8 @@ type LraWorkspace = {
       | "quarterly"
       | "two_monthly"
       | "daily"
+      | "quarterly_special"
+      | "two_monthly_special"
       | null;
   } | null;
   blriPreview: {

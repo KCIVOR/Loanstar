@@ -7,7 +7,9 @@ import { computeInvoiceLoan } from "@/lib/computation/invoice";
 import {
   generateBiMonthlySchedule,
   generateQuarterlySchedule,
+  generateQuarterlySpecialSchedule,
   generateTwoMonthlySchedule,
+  generateTwoMonthlySpecialSchedule,
 } from "@/lib/ar/schedule";
 import { invoiceScheduleToInstallments } from "@/lib/ar/masterlist";
 
@@ -25,7 +27,9 @@ type StubOpts = {
     | "bi_monthly"
     | "quarterly"
     | "two_monthly"
-    | "daily";
+    | "daily"
+    | "quarterly_special"
+    | "two_monthly_special";
   totalLoan?: number;
   totalInterest?: number;
   grossTotalInterest?: number;
@@ -758,6 +762,116 @@ describe("savePdcChecks hard lock (Quarterly / Two-monthly dual-line)", () => {
     assert.equal(inserted.length, 4); // 2 payments × 2 lines
     assert.equal(inserted[0].amount, 1000); // interest
     assert.equal(inserted[1].amount, 19000); // principal
+  });
+});
+
+/**
+ * Regression coverage for a live bug (application AN300445, 2026-09-04):
+ * quarterly_special/two_monthly_special's generator emits a $0 principal
+ * row alongside every non-final period's interest row (kept that way so
+ * discount-units.ts's pairing stride stays intact — see
+ * docs/quarterly-bimonthly-special-schedule-implementation-plan.md). Before
+ * this fix, buildExpectedPdcSchedule mapped those raw rows straight into the
+ * expected-PDC-checks list, so LRA demanded a real staff physically write a
+ * ₱0 postdated check for every non-final period — nonsensical, and it
+ * silently doubled the real check count. The fix filters to amountDue > 0
+ * before building the expected schedule; these tests assert only the real
+ * (interest-only, then final interest+principal) checks are ever expected.
+ */
+describe("savePdcChecks hard lock (Quarterly / Two-monthly SPECIAL — no $0 checks)", () => {
+  it("Quarterly Special: N interest-only checks + 1 final principal check, never a $0 row", async () => {
+    const RELEASE_DATE = "2026-09-04";
+    // Mirrors AN300445's real numbers: principal 168300, terms 12 (÷3 = 4
+    // quarters), gross total interest 70686.
+    const expected = generateQuarterlySpecialSchedule({
+      terms: 12,
+      totalLoan: 238986,
+      totalInterest: 70686,
+      releaseDate: new Date(RELEASE_DATE),
+      dueDay: 10,
+    });
+    // Sanity: the raw generator still contains $0 principal rows for the
+    // first 3 quarters — that's the shape this test's fix has to filter.
+    assert.equal(expected.length, 8); // 4 quarters × 2 lines
+    assert.equal(expected.filter((r) => r.amountDue === 0).length, 3);
+
+    const stub = makeSavePdcStub({
+      terms: 12,
+      monthlyAmortization: 0,
+      paymentFrequency: "quarterly_special",
+      releaseDate: RELEASE_DATE,
+      totalLoan: 238986,
+      totalInterest: 70686,
+      dueDay: 10,
+    });
+
+    const realRows = expected.filter((row) => row.amountDue > 0);
+    const checks = realRows.map((row, i) => ({
+      checkNumber: String(1001 + i),
+      amount: row.amountDue,
+      checkDate: row.dueDate,
+      bankName: "Test Bank",
+    }));
+
+    const result = await savePdcChecks(stub.supabase, "rf-1", checks, undefined, "actor-1");
+    assert.equal(result.status, "ready_generate");
+    const inserted = stub.getInsertedChecks() as Array<{ amount: number }>;
+    assert.equal(inserted.length, 5); // 4 interest checks + 1 final principal check
+    assert.ok(inserted.every((c) => c.amount > 0), "no $0 check should ever be expected");
+    assert.equal(inserted[0].amount, 17671.5); // 70686 / 4
+    assert.equal(inserted[4].amount, 168300); // final principal
+  });
+
+  it("Two-monthly Special: rejects a submission that still includes the raw $0 rows", async () => {
+    const RELEASE_DATE = "2026-09-04";
+    // Exact AN300445 case: principal 168300, terms 12 (÷2 = 6 payments),
+    // gross total interest 70686 -> 11781/payment (the live error's amount).
+    const expected = generateTwoMonthlySpecialSchedule({
+      terms: 12,
+      totalLoan: 238986,
+      totalInterest: 70686,
+      releaseDate: new Date(RELEASE_DATE),
+      dueDay: 10,
+    });
+    assert.equal(expected.length, 12); // 6 payments × 2 lines
+    assert.equal(expected[0].amountDue, 11781); // matches the live error message
+
+    const stub = makeSavePdcStub({
+      terms: 12,
+      monthlyAmortization: 0,
+      paymentFrequency: "two_monthly_special",
+      releaseDate: RELEASE_DATE,
+      totalLoan: 238986,
+      totalInterest: 70686,
+      dueDay: 10,
+    });
+
+    // Submitting all 12 raw rows (the pre-fix expectation) must now be
+    // rejected as the wrong count — 7 is correct (6 interest + 1 principal).
+    const rawChecks = expected.map((row, i) => ({
+      checkNumber: String(1001 + i),
+      amount: row.amountDue,
+      checkDate: row.dueDate,
+      bankName: "Test Bank",
+    }));
+    await assert.rejects(
+      () => savePdcChecks(stub.supabase, "rf-1", rawChecks, undefined, "actor-1"),
+      /Number of checks must equal 7/,
+    );
+
+    // The correct, filtered submission succeeds.
+    const realRows = expected.filter((row) => row.amountDue > 0);
+    const goodChecks = realRows.map((row, i) => ({
+      checkNumber: String(1001 + i),
+      amount: row.amountDue,
+      checkDate: row.dueDate,
+      bankName: "Test Bank",
+    }));
+    const result = await savePdcChecks(stub.supabase, "rf-1", goodChecks, undefined, "actor-1");
+    assert.equal(result.status, "ready_generate");
+    const inserted = stub.getInsertedChecks() as Array<{ amount: number }>;
+    assert.equal(inserted.length, 7); // 6 interest checks + 1 final principal check
+    assert.ok(inserted.every((c) => c.amount > 0), "no $0 check should ever be expected");
   });
 });
 

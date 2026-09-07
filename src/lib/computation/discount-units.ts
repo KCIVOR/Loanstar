@@ -2,7 +2,9 @@ import {
   generateAmortizationSchedule,
   generateBiMonthlySchedule,
   generateQuarterlySchedule,
+  generateQuarterlySpecialSchedule,
   generateTwoMonthlySchedule,
+  generateTwoMonthlySpecialSchedule,
 } from "../ar/schedule";
 import { computeInvoiceLoan } from "./invoice";
 import { halfUp } from "./money";
@@ -16,6 +18,8 @@ export type ScheduleType =
   | "quarterly"
   | "two_monthly"
   | "daily"
+  | "quarterly_special"
+  | "two_monthly_special"
   | null
   | undefined;
 
@@ -53,8 +57,12 @@ export type DiscountUnit = {
  */
 export function maxDiscountUnits(paymentFrequency: ScheduleType, terms: number): number {
   if (paymentFrequency === "daily") return 0;
-  if (paymentFrequency === "quarterly") return Math.floor(terms / 3);
-  if (paymentFrequency === "two_monthly") return Math.floor(terms / 2);
+  if (paymentFrequency === "quarterly" || paymentFrequency === "quarterly_special") {
+    return Math.floor(terms / 3);
+  }
+  if (paymentFrequency === "two_monthly" || paymentFrequency === "two_monthly_special") {
+    return Math.floor(terms / 2);
+  }
   if (paymentFrequency === "bi_monthly" || paymentFrequency === "semi_monthly") {
     return terms * 2;
   }
@@ -68,6 +76,8 @@ export function maxDiscountUnits(paymentFrequency: ScheduleType, terms: number):
 
 function unitLabel(paymentFrequency: ScheduleType, unitNo: number): string {
   if (paymentFrequency === "quarterly") return `Quarter ${unitNo}`;
+  if (paymentFrequency === "quarterly_special") return `Quarter ${unitNo} (Special)`;
+  if (paymentFrequency === "two_monthly_special") return `Payment ${unitNo} (Special)`;
   if (
     paymentFrequency === "two_monthly" ||
     paymentFrequency === "bi_monthly" ||
@@ -162,28 +172,34 @@ export function buildDiscountUnits(input: {
     }));
   }
 
-  if (input.paymentFrequency === "quarterly" || input.paymentFrequency === "two_monthly") {
+  if (
+    input.paymentFrequency === "quarterly" ||
+    input.paymentFrequency === "two_monthly" ||
+    input.paymentFrequency === "quarterly_special" ||
+    input.paymentFrequency === "two_monthly_special"
+  ) {
     if (!input.releaseDate) return [];
     const releaseDate =
       input.releaseDate instanceof Date ? input.releaseDate : new Date(input.releaseDate);
+    const scheduleArgs = {
+      terms,
+      totalLoan: input.totalLoan,
+      totalInterest: input.totalInterest,
+      releaseDate,
+      dueDay: input.dueDay ?? 10,
+    };
     const rows =
       input.paymentFrequency === "quarterly"
-        ? generateQuarterlySchedule({
-            terms,
-            totalLoan: input.totalLoan,
-            totalInterest: input.totalInterest,
-            releaseDate,
-            dueDay: input.dueDay ?? 10,
-          })
-        : generateTwoMonthlySchedule({
-            terms,
-            totalLoan: input.totalLoan,
-            totalInterest: input.totalInterest,
-            releaseDate,
-            dueDay: input.dueDay ?? 10,
-          });
+        ? generateQuarterlySchedule(scheduleArgs)
+        : input.paymentFrequency === "quarterly_special"
+          ? generateQuarterlySpecialSchedule(scheduleArgs)
+          : input.paymentFrequency === "two_monthly_special"
+            ? generateTwoMonthlySpecialSchedule(scheduleArgs)
+            : generateTwoMonthlySchedule(scheduleArgs);
     // Generator always emits (interest, principal) pairs in that order —
-    // see generateInterestPrincipalSplitSchedule in ar/schedule.ts.
+    // see generateInterestPrincipalSplitSchedule in ar/schedule.ts. The
+    // Special variants keep this same pair shape (principal is just 0 on
+    // every row but the last), so the i += 2 stride still lines up.
     const units: DiscountUnit[] = [];
     for (let i = 0, unitNo = 1; i < rows.length; i += 2, unitNo += 1) {
       const interestRow = rows[i];

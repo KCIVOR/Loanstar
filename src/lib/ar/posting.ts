@@ -95,6 +95,46 @@ export async function fetchOpenInstallments(
 }
 
 /**
+ * Interest portion per installment isn't stored anywhere (amount_due is
+ * principal+interest blended) — derive it from the loan's own active
+ * computation, same even-split convention (totalInterest ÷ terms, halved
+ * again for semi-monthly) already used by the Offset discount's
+ * `activeLoans` path in `computation/route.ts`. Centralized here
+ * (feature-collector-discount-implementation-plan.md, Phase 2/5) so the
+ * DCRR allocation-preview route and the server-side discount-amount
+ * re-validation both call the exact same formula rather than each keeping
+ * their own copy — the same lesson `fetchOpenInstallments` above already
+ * exists to teach.
+ */
+export async function deriveInterestPerRow(
+  supabase: SupabaseClient,
+  masterlistId: string,
+): Promise<number> {
+  const { data: masterlistRow } = await supabase
+    .from("masterlist")
+    .select("computation_id")
+    .eq("id", masterlistId)
+    .single();
+
+  const computationId = masterlistRow?.computation_id as string | null;
+  if (!computationId) return 0;
+
+  const { data: computationRow } = await supabase
+    .from("computations")
+    .select("total_interest, terms, payment_frequency")
+    .eq("id", computationId)
+    .single();
+
+  if (!computationRow) return 0;
+
+  const terms = Number(computationRow.terms) || 1;
+  const interestPerMonth = halfUp(Number(computationRow.total_interest) / terms);
+  return computationRow.payment_frequency === "semi_monthly"
+    ? halfUp(interestPerMonth / 2)
+    : interestPerMonth;
+}
+
+/**
  * The account's true outstanding balance, derived fresh from the rows —
  * never accumulated. Sum of net-still-owed (amount_due − discount_amount +
  * penalty_amount − amount_paid, floored at 0) across every installment not
@@ -115,7 +155,9 @@ export async function recomputeOutstandingBalance(
 ): Promise<number> {
   const { data, error } = await supabase
     .from("amortization_schedules")
-    .select("amount_due, discount_amount, penalty_amount, amount_paid, status")
+    .select(
+      "amount_due, discount_amount, penalty_amount, penalty_discount_amount, amount_paid, status",
+    )
     .eq("masterlist_id", masterlistId)
     // 'moved' rows are frozen like 'rolled' — a Move of Payment defers the
     // obligation onto an appended extension row, so counting the moved row
@@ -132,6 +174,13 @@ export async function recomputeOutstandingBalance(
           amountDue: Number(row.amount_due),
           discountAmount: row.discount_amount as number | null,
           penaltyAmount: row.penalty_amount as number | null,
+          // Fifth copy of this formula, found unused ("Foundation only")
+          // while implementing feature-collector-discount-implementation-plan.md,
+          // Phase 5 — fixed for the same reason as the other four, even
+          // though nothing calls this yet: a future caller shouldn't
+          // inherit a stale copy that silently drops a Collector penalty
+          // waiver.
+          penaltyDiscountAmount: row.penalty_discount_amount as number | null,
           amountPaid: row.amount_paid as number | null,
         }),
       0,
@@ -594,7 +643,7 @@ export async function refreshMasterlistAging(
   const { data: schedules } = await supabase
     .from("amortization_schedules")
     .select(
-      "id, installment_no, due_date, status, amount_due, amount_paid, penalty_amount, rolled_at, discount_amount",
+      "id, installment_no, due_date, status, amount_due, amount_paid, penalty_amount, rolled_at, discount_amount, penalty_discount_amount",
     )
     .eq("masterlist_id", masterlistId)
     .neq("status", "paid")
@@ -690,17 +739,42 @@ export async function refreshMasterlistAging(
         )[0];
 
       if (next) {
+        // Net of both the interest-side discount AND any Collector
+        // penalty waiver — roll forward what's really still owed, not
+        // the gross figure (feature-collector-discount-implementation-plan.md,
+        // Phase 5; SQL twin: refresh_one_masterlist_aging).
         const rollAmount = netInstallmentDue({
           amountDue: Number(overdue.amount_due),
           discountAmount: overdue.discount_amount,
           amountPaid: Number(overdue.amount_paid),
           penaltyAmount: finalPenalty,
+          penaltyDiscountAmount: overdue.penalty_discount_amount,
         });
+        // Split rollAmount into its interest and penalty portions instead of
+        // dumping the whole thing into the destination row's amount_due —
+        // otherwise the rolled-forward penalty becomes invisible to the
+        // Collector Discount "penalty discount" picker (which keys off
+        // amount_due, and requires penaltyAmount > 0 (confirmed live
+        // 2026-09-04, AN300449: after a roll, no installment had a nonzero
+        // penalty_amount, even though real penalty money had rolled forward
+        // — the picker's "penalty discount" section had nothing to show).
+        // penaltyPortion is computed independently and interestPortion is
+        // defined as the remainder, so the two always sum to exactly
+        // rollAmount — the destination row's TOTAL net-due is unchanged,
+        // only which column carries which part of it.
+        const penaltyPortion = Math.max(
+          0,
+          halfUp(finalPenalty - (Number(overdue.penalty_discount_amount) || 0)),
+        );
+        const interestPortion = halfUp(rollAmount - penaltyPortion);
         const now = new Date().toISOString();
 
         await supabase
           .from("amortization_schedules")
-          .update({ amount_due: Number(next.amount_due) + rollAmount })
+          .update({
+            amount_due: Number(next.amount_due) + interestPortion,
+            penalty_amount: Number(next.penalty_amount ?? 0) + penaltyPortion,
+          })
           .eq("id", next.id);
 
         await supabase
@@ -709,6 +783,9 @@ export async function refreshMasterlistAging(
             status: "rolled",
             rolled_at: now,
             rolled_into_installment_no: next.installment_no,
+            // Consumed by the roll calculation above — zero it so a
+            // stale figure on a rolled row can't be double-counted later.
+            penalty_discount_amount: 0,
           })
           .eq("id", overdue.id);
 
@@ -1347,12 +1424,93 @@ export async function createDcrDraft(
   return { dcrId: data.id as string };
 }
 
+export type CollectorDiscountInput = {
+  interestDiscountAmount: number;
+  interestDiscountedInstallmentNos: number[];
+  penaltyDiscountAmount: number;
+  penaltyDiscountedInstallmentNos: number[];
+  discountReason: string;
+};
+
+/**
+ * Server-side re-derivation of the true maximum a Collector discount can
+ * be — required, not optional (feature-collector-discount-implementation-plan.md,
+ * Phase 5). Phase 3's percent clamp (0-100%) only constrains a
+ * well-behaved client; `dcr_items` stores a computed peso amount, so a
+ * request that sends an inflated amount directly (bypassing the UI's
+ * percent math entirely) must be caught here, independently, before it
+ * can ever reach the posting RPC — an unbounded discount would let a
+ * trivially small payment satisfy Pass B's closure check and mark a real
+ * debt 'paid'. This is a genuinely new check, not an existing pattern:
+ * the ordinary `amount` field on this same insert has no equivalent
+ * server-side maximum, because an oversized ordinary payment is harmless
+ * (it just becomes an advance line) — an oversized discount is not.
+ */
+async function validateCollectorDiscountInput(
+  supabase: SupabaseClient,
+  masterlistId: string,
+  input: CollectorDiscountInput,
+): Promise<void> {
+  const hasInterest = input.interestDiscountAmount > 0;
+  const hasPenalty = input.penaltyDiscountAmount > 0;
+  if (!hasInterest && !hasPenalty) return;
+
+  if (hasInterest && input.interestDiscountedInstallmentNos.length === 0) {
+    throw new Error(
+      "Interest discount amount was entered without selecting any installments",
+    );
+  }
+  if (hasPenalty && input.penaltyDiscountedInstallmentNos.length === 0) {
+    throw new Error(
+      "Penalty discount amount was entered without selecting any installments",
+    );
+  }
+  if (!input.discountReason || input.discountReason.trim() === "") {
+    throw new Error("A reason is required when a Collector discount is entered");
+  }
+
+  if (hasInterest) {
+    const interestPerRow = await deriveInterestPerRow(supabase, masterlistId);
+    const maxInterest = halfUp(
+      interestPerRow * input.interestDiscountedInstallmentNos.length,
+    );
+    if (input.interestDiscountAmount > maxInterest) {
+      throw new Error(
+        `Interest discount amount ${input.interestDiscountAmount.toFixed(2)} exceeds the real interest available on the selected installments (${maxInterest.toFixed(2)})`,
+      );
+    }
+  }
+
+  if (hasPenalty) {
+    const { data: rows, error } = await supabase
+      .from("amortization_schedules")
+      .select("installment_no, penalty_amount")
+      .eq("masterlist_id", masterlistId)
+      .in("installment_no", input.penaltyDiscountedInstallmentNos);
+
+    if (error) throw new Error(error.message);
+
+    const maxPenalty = halfUp(
+      (rows ?? []).reduce(
+        (sum, row) => sum + Number(row.penalty_amount ?? 0),
+        0,
+      ),
+    );
+    if (input.penaltyDiscountAmount > maxPenalty) {
+      throw new Error(
+        `Penalty discount amount ${input.penaltyDiscountAmount.toFixed(2)} exceeds the real penalty on the selected installments (${maxPenalty.toFixed(2)})`,
+      );
+    }
+  }
+}
+
 export async function addPaymentToDcr(
   supabase: SupabaseClient,
   dcrId: string,
   paymentId: string,
   collectorUserId: string,
   allocations?: AllocationLine[],
+  discountInput?: CollectorDiscountInput,
 ) {
   const { data: dcr } = await supabase
     .from("dcr")
@@ -1410,12 +1568,25 @@ export async function addPaymentToDcr(
     );
   }
 
+  if (discountInput) {
+    await validateCollectorDiscountInput(supabase, masterlistId, discountInput);
+  }
+
   const { data: dcrItem, error } = await supabase
     .from("dcr_items")
     .insert({
       dcr_id: dcrId,
       payment_id: paymentId,
       amount: payment.amount,
+      // Draft-time save only — matches Constraint 4: never applied to any
+      // balance until post_single_dcr_item runs at actual posting time.
+      interest_discount_amount: discountInput?.interestDiscountAmount ?? 0,
+      interest_discounted_installment_nos:
+        discountInput?.interestDiscountedInstallmentNos ?? [],
+      penalty_discount_amount: discountInput?.penaltyDiscountAmount ?? 0,
+      penalty_discounted_installment_nos:
+        discountInput?.penaltyDiscountedInstallmentNos ?? [],
+      discount_reason: discountInput?.discountReason?.trim() || null,
     })
     .select("id")
     .single();

@@ -85,6 +85,54 @@ describe("nextOpenInstallment", () => {
       null,
     );
   });
+
+  it("skips a $0 principal placeholder row (Quarterly/Two-Monthly Special) and returns the real interest row instead", () => {
+    // Regression for a live bug (AN300445, 2026-09-04): Special-schedule
+    // loans persist a $0 "principal" row on the same due date as every
+    // non-final period's real interest row. If the interest row happened to
+    // be paid early while its $0 sibling stayed pending, this used to
+    // surface "next due: ₱0.00" to a collector/borrower.
+    const next = nextOpenInstallment([
+      {
+        installment_no: 1,
+        due_date: "2026-11-10",
+        amount_due: 11781,
+        status: "paid", // interest row already paid early
+        penalty_amount: 0,
+      },
+      {
+        installment_no: 2,
+        due_date: "2026-11-10", // same due date, $0 principal placeholder
+        amount_due: 0,
+        status: "pending",
+        penalty_amount: 0,
+      },
+      {
+        installment_no: 3,
+        due_date: "2027-01-10",
+        amount_due: 11781,
+        status: "pending",
+        penalty_amount: 0,
+      },
+    ]);
+    assert.equal(next?.installment_no, 3);
+    assert.equal(next?.amount_due, 11781);
+  });
+
+  it("returns null when every open row is a $0 placeholder (no real payment left)", () => {
+    assert.equal(
+      nextOpenInstallment([
+        {
+          installment_no: 2,
+          due_date: "2026-11-10",
+          amount_due: 0,
+          status: "pending",
+          penalty_amount: 0,
+        },
+      ]),
+      null,
+    );
+  });
 });
 
 describe("dcrItemTotal", () => {

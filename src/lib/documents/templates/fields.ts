@@ -241,6 +241,20 @@ export const FIELD_GROUPS: FieldGroup[] = [
       { key: "applicationDate", label: "Application date", sample: "06/01/2026" },
     ],
   },
+  {
+    label: "Payment receipt",
+    fields: [
+      { key: "paymentAmount", label: "Payment amount", sample: "8,250.00" },
+      { key: "paymentDate", label: "Payment date", sample: "09/02/2026" },
+      { key: "referenceNo", label: "Payment reference no.", sample: "3546" },
+      { key: "interestDiscountAmount", label: "Interest discount amount", sample: "300.00" },
+      { key: "interestDiscountedInstallments", label: "Interest-discounted installment no.(s)", sample: "4, 5" },
+      { key: "penaltyDiscountAmount", label: "Penalty discount amount", sample: "150.00" },
+      { key: "penaltyDiscountedInstallments", label: "Penalty-discounted installment no.(s)", sample: "1" },
+      { key: "totalDiscountAmount", label: "Total discount amount", sample: "450.00" },
+      { key: "discountReason", label: "Discount approval note", sample: "Approved by Sir Rene, 09/03, per phone call" },
+    ],
+  },
 ];
 
 /** Repeating collections, for `data-repeat` rows. */
@@ -376,6 +390,9 @@ export const FIELD_FLAGS: MergeField[] = [
   { key: "isFinal", label: "Final demand (legal-action clause)", sample: "true" },
   { key: "isSme", label: "SME segment application", sample: "" },
   { key: "isSeafarer", label: "Seafarer segment application", sample: "true" },
+  { key: "hasDiscount", label: "Has a discount (any type)", sample: "true" },
+  { key: "hasInterestDiscount", label: "Has an interest discount", sample: "true" },
+  { key: "hasPenaltyDiscount", label: "Has a penalty discount", sample: "true" },
 ];
 
 /** Build the sample render context from the catalog (drives preview). */

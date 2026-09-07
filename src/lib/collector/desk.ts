@@ -34,7 +34,16 @@ export function nextOpenInstallment(
   schedules: ScheduleLite[],
 ): NextInstallment | null {
   const open = schedules
-    .filter((s) => !["paid", "rolled"].includes(String(s.status).toLowerCase()))
+    // Quarterly/Two-Monthly Special loans persist a $0 "principal" placeholder
+    // row alongside every non-final period's real interest row (see
+    // docs/quarterly-bimonthly-special-schedule-implementation-plan.md) —
+    // excluded here so a collector/borrower never sees "₱0.00 due" as if it
+    // were the real next payment.
+    .filter(
+      (s) =>
+        !["paid", "rolled"].includes(String(s.status).toLowerCase()) &&
+        Number(s.amount_due) > 0,
+    )
     .sort((a, b) => a.due_date.localeCompare(b.due_date));
 
   const first = open[0];

@@ -315,7 +315,13 @@ export function LoanActivePanel({
     (sum, row) => sum + Number(row.amount_due ?? 0),
     0,
   );
-  const checkNoByInstallment = checkNumbersByInstallmentNo(pdcChecks);
+  const checkNoByInstallment = checkNumbersByInstallmentNo(
+    pdcChecks,
+    schedules.map((row) => ({
+      installment_no: Number(row.installment_no),
+      amount_due: Number(row.amount_due),
+    })),
+  );
   const ledgerRows = buildAccountLedgerRows({
     openingDebit: totalLoan > 0 ? totalLoan : scheduleTotal,
     schedules: schedules.map((row) =>

@@ -11,6 +11,13 @@ export type InternalTransferListItem = {
   transferType: "other_loan" | "offset";
   months: number | null;
   amount: number;
+  /**
+   * Early-settlement (Offset / full-payoff) discount forgiven on the target
+   * account when this transfer posts — 0 for ordinary transfers. See
+   * `20260828120000_offset_discount_closure.sql`.
+   */
+  discountAmount: number;
+  discountedInstallmentNos: number[];
   createdAt: string;
 };
 
@@ -23,7 +30,7 @@ export async function listPendingInternalTransfers(
     .select(
       `
       id, source_loan_application_id, target_masterlist_id, transfer_type,
-      months, amount, created_at,
+      months, amount, discount_amount, discounted_installment_nos, created_at,
       source_application:loan_applications!internal_transfers_source_loan_application_id_fkey ( application_no ),
       source_masterlist:masterlist!internal_transfers_source_masterlist_id_fkey ( loan_account_no ),
       target_masterlist:masterlist!internal_transfers_target_masterlist_id_fkey ( loan_account_no, outstanding_balance )
@@ -56,6 +63,8 @@ export async function listPendingInternalTransfers(
       transferType: row.transfer_type as "other_loan" | "offset",
       months: row.months as number | null,
       amount: Number(row.amount),
+      discountAmount: Number(row.discount_amount ?? 0),
+      discountedInstallmentNos: (row.discounted_installment_nos as number[] | null) ?? [],
       createdAt: row.created_at as string,
     };
   });

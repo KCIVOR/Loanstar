@@ -470,18 +470,43 @@ export default function ArMasterlistDetailPage() {
   const netReleased = Number(record.net_released ?? 0);
   const totalLoan = Number(record.total_loan ?? 0);
 
-  const paidCount = schedules.filter(
-    (row) => String(row.status).toLowerCase() === "paid",
-  ).length;
   // 'rolled' installments are settled (their balance moved to the next
   // installment) — exclude them from the denominator so a rollover doesn't
   // permanently cap progress below 100%.
   const rolledCount = schedules.filter(
     (row) => String(row.status).toLowerCase() === "rolled",
   ).length;
+  // `trackedCount` (raw row count) is intentionally kept separate below and
+  // reused as-is for the "Terms X mo" display further down — do not fold
+  // the billable-only filtering into it, that reuse is unrelated to this fix.
   const trackedCount = schedules.length - rolledCount;
+  // Quarterly/Two-Monthly Special loans persist a $0 "principal" placeholder
+  // row alongside every non-final period's real interest row (see
+  // docs/quarterly-bimonthly-special-schedule-implementation-plan.md).
+  // `initialScheduleRowStatus` (masterlist.ts) auto-marks ANY row with
+  // netDue <= 0 "paid" at release — correct for a genuinely 100%-discounted
+  // installment, but it can't distinguish that from a placeholder row that
+  // was always $0 and never a real obligation. That status can't safely be
+  // changed (canMarkPaidOff requires every row to reach "paid", and nothing
+  // is ever collected against a $0 row, so it would never reach "paid" any
+  // other way — see docs/... discussion, confirmed live 2026-09-04). So the
+  // "paid" status itself is left alone; only this progress DISPLAY is scoped
+  // to real (amount_due > 0) rows, so a Special loan doesn't show installments
+  // "paid" that were never real payments to begin with.
+  const billableSchedules = schedules.filter(
+    (row) => Number(row.amount_due) > 0,
+  );
+  const billableRolledCount = billableSchedules.filter(
+    (row) => String(row.status).toLowerCase() === "rolled",
+  ).length;
+  const billableTrackedCount = billableSchedules.length - billableRolledCount;
+  const paidCount = billableSchedules.filter(
+    (row) => String(row.status).toLowerCase() === "paid",
+  ).length;
   const progressPct =
-    trackedCount > 0 ? Math.round((paidCount / trackedCount) * 100) : 0;
+    billableTrackedCount > 0
+      ? Math.round((paidCount / billableTrackedCount) * 100)
+      : 0;
 
   const paidOffEligibility = canMarkPaidOff({
     applicationStatus,
@@ -556,7 +581,13 @@ export default function ArMasterlistDetailPage() {
       status: "posted",
       scheduleId: row.amortization_schedule_id,
     }));
-  const checkNoByInstallment = checkNumbersByInstallmentNo(pdcChecks);
+  const checkNoByInstallment = checkNumbersByInstallmentNo(
+    pdcChecks,
+    schedules.map((row) => ({
+      installment_no: Number(row.installment_no),
+      amount_due: Number(row.amount_due),
+    })),
+  );
   const ledgerRows = buildAccountLedgerRows({
     openingDebit,
     schedules: schedules.map((row) =>
@@ -775,7 +806,7 @@ export default function ArMasterlistDetailPage() {
         <div className="mt-4">
           <div className="mb-1.5 flex justify-between text-xs text-navy-200">
             <span>
-              Installments paid {paidCount}/{trackedCount || terms}
+              Installments paid {paidCount}/{billableTrackedCount || terms}
             </span>
             <span className="mono">{progressPct}%</span>
           </div>
@@ -990,9 +1021,9 @@ export default function ArMasterlistDetailPage() {
           Account ledger
         </h2>
         <p className="mb-3 text-sm text-ink-500">
-          {paidCount} of {trackedCount} installments paid
-          {rolledCount > 0
-            ? ` (${rolledCount} rolled forward, excluded from count)`
+          {paidCount} of {billableTrackedCount} installments paid
+          {billableRolledCount > 0
+            ? ` (${billableRolledCount} rolled forward, excluded from count)`
             : ""}
           . Opening debit from total loan; credits are posted allocations and
           rounding write-offs.

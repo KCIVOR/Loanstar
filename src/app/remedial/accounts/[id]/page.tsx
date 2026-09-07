@@ -156,7 +156,19 @@ export default function RemedialAccountPage() {
     return <Alert>{error ?? "Account not found."}</Alert>;
   }
 
-  const paidCount = schedules.filter((s) => s.status === "paid").length;
+  // Quarterly/Two-Monthly Special loans persist a $0 "principal" placeholder
+  // row alongside every non-final period's real interest row —
+  // `initialScheduleRowStatus` (masterlist.ts) auto-marks any row with
+  // netDue <= 0 "paid" at release, which is correct for a genuinely
+  // 100%-discounted installment but can't distinguish that from a
+  // placeholder row that was always $0 and never a real obligation (that
+  // status can't safely be changed — canMarkPaidOff requires every row to
+  // reach "paid", and nothing is ever collected against a $0 row, so it
+  // would never reach "paid" any other way). So this progress display is
+  // scoped to real (amountDue > 0) rows, matching the same fix in
+  // ar/masterlist/[id]/page.tsx (confirmed live 2026-09-04).
+  const billableSchedules = schedules.filter((s) => s.amountDue > 0);
+  const paidCount = billableSchedules.filter((s) => s.status === "paid").length;
   const employmentLabels = masterlistEmploymentLabels(account.segment);
   const secondary = masterlistSecondaryIdentity({
     manning_agency: account.manningAgency,
@@ -321,7 +333,7 @@ export default function RemedialAccountPage() {
             Installments paid
           </div>
           <div className="mono mt-1 font-semibold text-ink-900">
-            {paidCount}/{schedules.length}
+            {paidCount}/{billableSchedules.length}
           </div>
         </div>
       </div>
