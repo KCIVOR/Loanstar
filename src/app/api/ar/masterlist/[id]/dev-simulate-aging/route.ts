@@ -3,7 +3,6 @@ import { z } from "zod";
 
 import { handleApiError, jsonOk } from "@/lib/api/handler";
 import { writeAuditEvent } from "@/lib/audit/writer";
-import { refreshMasterlistAging } from "@/lib/ar/posting";
 import { daysPastDue } from "@/lib/ar/schedule";
 import { formatDateLocal } from "@/lib/computation/release-date";
 import { requireModulePermission } from "@/lib/permissions/server";
@@ -22,8 +21,9 @@ const schema = z.object({
  * still-open (not paid, not rolled) installment's due_date by a fixed shift
  * so the earliest one lands exactly `daysPastDue` days overdue as of today,
  * preserving the spacing between installments, then runs the same
- * `refreshMasterlistAging` the app uses in production — no parallel/fake
- * penalty logic. This mutates real schedule rows; it is not reversible by
+ * `refresh_one_masterlist_aging` SQL function the nightly cron
+ * (`refresh_all_aging`) uses in production — no parallel/fake penalty logic.
+ * This mutates real schedule rows; it is not reversible by
  * this tool (there is no "undo" — re-run a real release or fix dates by hand
  * if a demo account needs to be reset).
  */
@@ -75,7 +75,32 @@ export async function POST(request: Request, { params }: RouteParams) {
         .eq("id", row.id);
     }
 
-    const result = await refreshMasterlistAging(supabase, id);
+    // Production path: the same SQL function the nightly `refresh_all_aging`
+    // cron calls per account. `p_as_of` defaults to CURRENT_DATE in the DB.
+    // The function returns void, so re-read the two fields the response and
+    // the audit event report.
+    const { error: refreshError } = await supabase.rpc(
+      "refresh_one_masterlist_aging",
+      { p_masterlist_id: id },
+    );
+    if (refreshError) {
+      throw new Error(`Aging refresh failed: ${refreshError.message}`);
+    }
+
+    const { data: mlAfter, error: mlAfterError } = await supabase
+      .from("masterlist")
+      .select("aging_bucket, remedial_flag")
+      .eq("id", id)
+      .single();
+    if (mlAfterError || !mlAfter) {
+      throw new Error(
+        mlAfterError?.message ?? "Masterlist not found after aging refresh",
+      );
+    }
+    const result = {
+      agingBucket: String(mlAfter.aging_bucket ?? ""),
+      remedialFlag: Boolean(mlAfter.remedial_flag),
+    };
 
     await writeAuditEvent({
       actorId: user.id,

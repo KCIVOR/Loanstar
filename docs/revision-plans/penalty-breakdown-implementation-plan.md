@@ -4,6 +4,47 @@ Phase-by-phase, surgical. Built from `penalty-breakdown-requirements.md` (11
 rules) and `penalty-breakdown-audit.md` (what exists / is missing). Every
 question the requirements doc raised is already answered from the transcripts.
 
+---
+
+## Progress log
+
+### Phase 1 — DONE (reduced scope), 2026-09-09
+Only the cheap, safe piece was done: `dev-simulate-aging/route.ts` now calls the
+SQL RPC `refresh_one_masterlist_aging` (then re-reads `aging_bucket` /
+`remedial_flag` for its response) instead of the TS twin. So the dev tool and the
+nightly cron run the **same** code through every later phase.
+**Deferred:** deleting `refreshMasterlistAging` (`src/lib/ar/posting.ts:535`) and
+reworking its two test files. The function is now **orphaned** (no app caller) and
+**stale** relative to the SQL (still single-row flat fee). `aging-parity.test.mts`
++ `refresh-masterlist-aging-move-of-payment.test.mts` still pass but now test dead
+code. Clean this up later; no production impact.
+
+### Phase 2 — DONE, 2026-09-09
+Migration `20260908231312_penalty_monthly_compounding.sql` (both migration
+folders; applied live via MCP).
+- New column `amortization_schedules.penalty_periods_applied smallint NOT NULL
+  DEFAULT 0`.
+- `refresh_one_masterlist_aging` penalty-accrual block replaced: loops **every**
+  open past-due installment; each accrues one fee per whole month overdue,
+  compounding on `amount_due − discount − penalty_discount − paid + running
+  penalty`; one `penalties` row per round (`notes = 'Monthly late fee — month N
+  overdue'`); `penalty_periods_applied` guards same-day re-runs.
+- Move-of-payment revert, aging-bucket calc, discount reversion, masterlist
+  update — preserved verbatim.
+- **Deviation from plan:** the rollover does **not** copy
+  `penalty_periods_applied` to the destination row. The rolled row leaves the
+  overdue set (stops accruing); its compounded penalty is already folded into the
+  destination's `penalty_amount` and keeps compounding there on the destination's
+  own monthly timeline. Simpler and avoids under-charging the destination.
+- **Adoption backfill (in the migration):** every currently past-due open
+  installment seeded with the whole months it is already overdue, so the first
+  post-migration cron run does not retro-charge every elapsed month at once.
+  5 live rows seeded. A deliberate historical recompute, if wanted, is separate.
+- **Live dry-run (BEGIN/ROLLBACK)** on a real 12-installment individual account,
+  rollover disabled via config: installments 3 / 2 / 1 months overdue produced
+  3 / 2 / 1 compounding rounds (₱500 → ₱525 → ₱551.25 on a ₱10k installment);
+  running the refresh twice added nothing. `npm test` 1619/1619.
+
 ### Names verified against the live DB + code (2026-09-09)
 
 | Thing | Verified fact |
