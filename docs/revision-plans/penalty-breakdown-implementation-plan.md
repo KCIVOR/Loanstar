@@ -45,6 +45,34 @@ folders; applied live via MCP).
   3 / 2 / 1 compounding rounds (₱500 → ₱525 → ₱551.25 on a ₱10k installment);
   running the refresh twice added nothing. `npm test` 1619/1619.
 
+### Phase 3 — DONE, 2026-09-09
+Migration `20260908232337_penalty_recompute_on_payment.sql` (both folders;
+applied live via MCP).
+- New audit columns `penalties.reversed_at`, `penalties.reversal_reason`.
+- New function `recompute_account_penalties(p_masterlist_id uuid)`: for each open
+  past-due installment the accrual engine has already touched — if on-time
+  payments (payment_date ≤ due_date) cover its net due → fee target 0 (Rule 4a);
+  else recompute the compounded fee from scratch on the still-unpaid balance for
+  every whole month elapsed (Rule 4b). A reduction books a negative `penalties`
+  row; a full reversal also stamps `reversed_at` / `reversal_reason` on the
+  original `Monthly late fee%` rows. Never deletes from `penalties`.
+- Wired into `post_single_dcr_item` as a single `perform` line, immediately
+  before the existing `recompute_outstanding_balance` tail (so Outstanding
+  Balance reflects the adjusted fees). Everything else in that function verbatim.
+- **No reject/un-post wiring** — there is none in the codebase. `rejectDcr` /
+  `rejectDcrItem` only act on `status = 'submitted'` (pre-posting); once
+  `post_single_dcr_item` runs it is permanent. So the only recompute trigger is
+  the posting path itself.
+- **Live dry-run (BEGIN/ROLLBACK):** on-time full payment on a 3-months-overdue
+  installment → all 3 monthly-fee rows stamped `reversed`, one `−₱1,576.25`
+  compensating row, net fee ₱0. Late partial ₱5,000 on a ₱10,000 / 1-month
+  installment → recompute to ₱250 (5% of the ₱5,000 remainder), one `−₱250` row.
+  `npm test` 1619/1619.
+- **Side effect (improvement):** `sumPenaltyIncome` and `aggregates.totalPenalties`
+  still sum raw `penalties.amount`, so the negative rows now net reversals out of
+  "Penalty income" even before Phase 4 switches that metric to a
+  collected-basis. Acceptable / more correct.
+
 ### Names verified against the live DB + code (2026-09-09)
 
 | Thing | Verified fact |
