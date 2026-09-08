@@ -124,6 +124,35 @@ applied live).
   `penaltyEligible` filter is `daysPastDue > 0 && penaltyAmount > 0` (overdue
   installments). Only the *interest* discount is "not yet due". No change.
 
+### Phase 8 — DONE (partial), 2026-09-09
+- **Shadow tests:** `src/lib/ar/__tests__/penalty-accrual.test.mts` — 16 pure-JS
+  tests mirroring the SQL: Phase 2 compounding (500→525→551.25, idempotency,
+  per-month catch-up, final-installment, waiver base, segment rate), Phase 3
+  recompute (4a zero, paid-row fix, 4b partial recompute + multi-month), Phase 4a
+  penalty-first split (full, waiver netting, partial, on-time zero, no
+  double-count, cap at allocation). `npm test` 1635/1635.
+- **Validation journey:** `docs/revision-plans/penalty-breakdown-validation-journey.md`
+  — plain-language demo script for Phases 2/3/4a/7 (compounding, on-time
+  reversal, partial recompute, penalty-income report, cron resilience).
+- **Not covered by shadow tests** (need DB / are later phases): the 30-day
+  rollover interaction, Phase 5 ledger, Phase 6 invoice rule.
+
+---
+
+## Status summary (2026-09-09)
+
+| Phase | State |
+|---|---|
+| 1 | Partial — dev route on SQL RPC; TS twin orphaned, deletion deferred |
+| 2 | **Done, live** — monthly compounding on every overdue installment |
+| 3 (+fix) | **Done, live** — on-time reversal / late-partial recompute; paid-row fix |
+| 4a | **Done, live** — `postings.penalty_amount`, "Penalty income" = collected |
+| 4b | Deferred — collector-typed override input (with Phase 5 UI) |
+| 5 | Not started — `carried_*` breakdown columns + ledger Report Total fix |
+| 6 | Blocked on client — invoice/auto/REM interest-stop (likely verify-only) |
+| 7 | **Done, live** (item 1) — `refresh_all_aging` error isolation; items 2/3 need no code |
+| 8 | Partial — shadow tests + validation journey done; more coverage rides Phases 5/6 |
+
 ### Names verified against the live DB + code (2026-09-09)
 
 | Thing | Verified fact |
