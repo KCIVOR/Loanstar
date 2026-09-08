@@ -106,6 +106,24 @@ live). Delivers Rule 6 and the data side of Rule 5.
   override input in the DCR allocate modal + `dcr_items.penalty_paid_amount`.
   4a's automatic penalty-first split is the default the override would adjust.
 
+### Phase 7 — DONE (item 1), 2026-09-09
+Migration `20260908234736_refresh_all_aging_error_isolation.sql` (both folders;
+applied live).
+- `refresh_all_aging`: the per-account `PERFORM refresh_one_masterlist_aging(...)`
+  is wrapped in a `BEGIN ... EXCEPTION WHEN OTHERS THEN RAISE WARNING ... END`
+  savepoint, so one bad account (e.g. null/unknown `masterlist.segment`) no
+  longer aborts the whole nightly run. Returns the successful count (type
+  unchanged); a summary WARNING is logged when any account failed.
+- **Live dry-run:** broke one account's `segment`, ran the batch → 44/45
+  refreshed, the broken one skipped. Rolled back.
+- **Item 2 (duplicate-month bug):** not reproducible — `UNIQUE (masterlist_id,
+  installment_no)` makes a true duplicate row impossible; the dev-simulate-aging
+  route already shifts the whole schedule together to avoid date collisions.
+  Needs a concrete repro from the client / Sept-04 recording before any fix.
+- **Item 3 (waive overdue fees):** already correct — `allocation-preview`'s
+  `penaltyEligible` filter is `daysPastDue > 0 && penaltyAmount > 0` (overdue
+  installments). Only the *interest* discount is "not yet due". No change.
+
 ### Names verified against the live DB + code (2026-09-09)
 
 | Thing | Verified fact |
