@@ -60,8 +60,8 @@ export const MONEY_METRIC_DEFS: MetricDef[] = [
     id: "money.penaltyIncome",
     label: "Penalty income",
     description:
-      "Total late-payment penalties assessed during the selected period — a symptom of delinquency as much as it is revenue.",
-    formula: "SUM(penalties.amount) where calculated_at is in the period",
+      "Late-payment fees actually collected during the selected period — the fee portion of posted payments, not fees merely assessed.",
+    formula: "SUM(postings.penalty_amount) where posted_at is in the period",
     unit: "php",
     direction: "neutral",
     theme: "money",
@@ -180,13 +180,17 @@ async function sumPenaltyIncome(
   supabase: SupabaseClient,
   period: Period,
 ): Promise<number> {
+  // Fees *collected*, not fees *assessed*: post_single_dcr_item records the
+  // late-fee portion of each posted allocation on postings.penalty_amount
+  // (penalty-first waterfall). `penalties.amount` is the charge ledger and
+  // belongs to a different question ("how much did we bill in fees").
   const { data, error } = await supabase
-    .from("penalties")
-    .select("amount, calculated_at")
-    .gte("calculated_at", `${period.from}T00:00:00.000Z`)
-    .lte("calculated_at", `${period.to}T23:59:59.999Z`);
+    .from("postings")
+    .select("penalty_amount, posted_at")
+    .gte("posted_at", `${period.from}T00:00:00.000Z`)
+    .lte("posted_at", `${period.to}T23:59:59.999Z`);
   if (error) throw new Error(error.message);
-  return (data ?? []).reduce((s, r) => s + Number(r.amount), 0);
+  return (data ?? []).reduce((s, r) => s + Number(r.penalty_amount ?? 0), 0);
 }
 
 async function sumDueInPeriod(

@@ -73,6 +73,39 @@ applied live via MCP).
   "Penalty income" even before Phase 4 switches that metric to a
   collected-basis. Acceptable / more correct.
 
+### Phase 3 fix — DONE, 2026-09-09
+Migration `20260908234126_penalty_recompute_paid_row_fix.sql`. Two bugs found
+while validating Phase 4a:
+- `recompute_account_penalties` 4b branch drove `penalty_amount` to 0 on any
+  fully-`paid` past-due row (still-unpaid = 0), reading as "fee cancelled" when
+  the fee had been paid *late*. Now: a `paid` row not covered on time is left
+  untouched (`ELSIF v_row.status = 'paid' THEN CONTINUE`).
+- When Rule 4a zeroes a fee and the principal is now covered, the row is
+  re-settled to `paid` (an on-time payment that covered principal but not the
+  phantom fee otherwise stuck at `partial`).
+
+### Phase 4a — DONE, 2026-09-09
+Migration `20260908234200_posting_penalty_portion.sql` (both folders; applied
+live). Delivers Rule 6 and the data side of Rule 5.
+- New column `postings.penalty_amount` (default 0).
+- `post_single_dcr_item`: the per-allocation `insert into postings` moves to
+  *after* the Pass A/B schedule update; `penalty_amount` is a penalty-first
+  split — `least(alloc_amount, max(0, final_penalty − final_waiver − fee already
+  taken by earlier postings on this installment))`. An on-time payment
+  (`payment_date ≤ due_date`) records **0** (Phase 3's Rule 4a zeroes the fee
+  right after). Everything else in the function verbatim.
+- `src/lib/reports/metrics/money.ts` — `sumPenaltyIncome` now
+  `SUM(postings.penalty_amount)` by `posted_at` (fees *collected*), and the
+  metric's `description` / `formula` strings updated. Metric id and label
+  unchanged.
+- **Live dry-run (4 scenarios, BEGIN/ROLLBACK):** late-full ₱10,500 → fee 500;
+  Pass-B waiver 200 on ₱10,300 → fee 300; late partial ₱300 → fee 300 + fee
+  recomputed to 485 on the ₱9,700 remainder; on-time ₱10,000 → fee 0, row
+  `paid`. `npm test` 1619/1619.
+- **Deferred to Phase 4b (with the ledger UI pass):** the collector-typed
+  override input in the DCR allocate modal + `dcr_items.penalty_paid_amount`.
+  4a's automatic penalty-first split is the default the override would adjust.
+
 ### Names verified against the live DB + code (2026-09-09)
 
 | Thing | Verified fact |
