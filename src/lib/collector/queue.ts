@@ -36,6 +36,10 @@ export type CollectorQueueMappedRow = {
   nextDueDate: string | null;
   nextDueAmount: number | null;
   lastContact: CollectorLastContact | null;
+  /** Task 4 — payments recorded on this account but not yet posted by
+   * Accounting. `> 0` → show a "DCR pending" flag. Optional so consumers that
+   * don't set it (older callers, tests) still type-check. */
+  unpostedPaymentCount?: number;
 };
 
 export type CollectorQueueKpis = {

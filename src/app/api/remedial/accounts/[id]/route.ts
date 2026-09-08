@@ -1,4 +1,5 @@
 import { handleApiError, jsonOk } from "@/lib/api/handler";
+import { summarizeUnpostedForAccount } from "@/lib/ar/duplicate-dcr";
 import { fetchAccountPostings } from "@/lib/collection/account-postings";
 import { nextOpenInstallment, type ScheduleLite } from "@/lib/collector/desk";
 import { AMORTIZATION_SCHEDULE_LEDGER_COLUMNS } from "@/lib/ledger/build-account-ledger-rows";
@@ -252,6 +253,16 @@ export async function GET(_request: Request, { params }: RouteParams) {
         }))
         .sort((a, b) => a.installmentNo - b.installmentNo),
       payments: paymentsWithUploaderNames,
+      // Task 4 — recorded-but-unposted payments on this account (heads-up
+      // before recording another). Same shape/semantics as the collector
+      // route. `payments.status` alone is authoritative for "posted".
+      unpostedOnAccount: summarizeUnpostedForAccount(
+        (payments ?? []) as Array<{
+          amount: number | string | null;
+          status: string;
+          reference_no?: string | null;
+        }>,
+      ),
       postings,
       pdcChecks,
     });

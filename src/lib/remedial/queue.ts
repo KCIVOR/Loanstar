@@ -27,6 +27,9 @@ export type RemedialQueueMappedRow = {
   turnedOverAt: string | null;
   turnoverReason: string;
   fromCollectorName: string | null;
+  /** Task 4 — payments recorded on this account but not yet posted. `> 0` →
+   * "DCR pending" flag. Optional so callers that don't set it type-check. */
+  unpostedPaymentCount?: number;
 };
 
 export type RemedialQueueKpis = {

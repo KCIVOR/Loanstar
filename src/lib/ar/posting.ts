@@ -9,6 +9,11 @@ import {
   DEFAULT_AGING_THRESHOLDS,
   type AgingThresholds,
 } from "@/lib/ar/schedule";
+import {
+  findOverAllocatedInstallments,
+  loadDcrAllocationsWithMasterlist,
+  loadPendingAllocationsForAccount,
+} from "@/lib/ar/duplicate-dcr";
 import { isActiveDcrStatus } from "@/lib/collector/desk";
 import { halfUp, netInstallmentDue } from "@/lib/computation/money";
 import { createServiceClient } from "@/lib/supabase/server";
@@ -1357,6 +1362,9 @@ export async function submitDcr(
   supabase: SupabaseClient,
   dcrId: string,
   collectorUserId: string,
+  /** Service-role client for the Task-4 duplicate backstop; injectable for
+   * tests. Defaults to `createServiceClient()`. */
+  serviceClient?: SupabaseClient,
 ) {
   const { data: dcr } = await supabase
     .from("dcr")
@@ -1379,6 +1387,55 @@ export async function submitDcr(
 
   if (!count) {
     throw new Error("Add at least one payment to the DCRR");
+  }
+
+  // Task 4 backstop (amount-aware) — a draft built before another DCRR claimed
+  // one of its installments. For each account this DCRR touches, does its own
+  // total per installment, plus what OTHER unposted DCRRs already hold, exceed
+  // what the installment owes?
+  const dupAdmin = serviceClient ?? createServiceClient();
+  const ownAllocs = await loadDcrAllocationsWithMasterlist(dupAdmin, dcrId);
+  const ownByMasterlist = new Map<string, Record<string, number>>();
+  for (const a of ownAllocs) {
+    if (!a.scheduleId || !a.masterlistId) continue;
+    const m = ownByMasterlist.get(a.masterlistId) ?? {};
+    m[a.scheduleId] = (m[a.scheduleId] ?? 0) + a.amount;
+    ownByMasterlist.set(a.masterlistId, m);
+  }
+  const submitOverAllocated: string[] = [];
+  for (const [mlId, ownByInstallment] of ownByMasterlist) {
+    const pendingRaw = await loadPendingAllocationsForAccount(
+      dupAdmin,
+      mlId,
+      dcrId, // exclude self — this DCRR's own totals are `ownByInstallment`
+    );
+    const pendingByInstallment: Record<string, number> = {};
+    for (const [sid, v] of Object.entries(pendingRaw)) {
+      pendingByInstallment[sid] = v.amount;
+    }
+    const openForDue = await fetchOpenInstallments(dupAdmin, mlId);
+    const remainingDue: Record<string, number> = {};
+    for (const inst of openForDue) {
+      remainingDue[inst.id] = netInstallmentDue({
+        amountDue: inst.amountDue,
+        discountAmount: inst.discountAmount,
+        penaltyAmount: inst.penaltyAmount,
+        amountPaid: inst.amountPaid,
+      });
+    }
+    submitOverAllocated.push(
+      ...findOverAllocatedInstallments({
+        candidate: ownByInstallment,
+        pending: pendingByInstallment,
+        remainingDue,
+      }),
+    );
+  }
+  if (submitOverAllocated.length > 0) {
+    throw new Error(
+      "This DCRR would over-fill an installment that another unposted DCRR " +
+        "already covers. Resolve that before submitting.",
+    );
   }
 
   const now = new Date().toISOString();
@@ -1511,6 +1568,9 @@ export async function addPaymentToDcr(
   collectorUserId: string,
   allocations?: AllocationLine[],
   discountInput?: CollectorDiscountInput,
+  /** Service-role client for the Task-4 duplicate lookup (see below). Defaults
+   * to `createServiceClient()`; injectable so unit tests can stub it. */
+  serviceClient?: SupabaseClient,
 ) {
   const { data: dcr } = await supabase
     .from("dcr")
@@ -1566,6 +1626,55 @@ export async function addPaymentToDcr(
       Number(payment.amount),
       openInstallments,
     );
+  }
+
+  // Task 4 — over-allocation block (amount-aware, Option 1). Adding to a
+  // partly-claimed installment is fine; only a real *over*-fill is refused —
+  // where this payment's allocation + everything already pending on OTHER
+  // unposted DCRRs for this account would exceed what the installment still
+  // owes. This matches the "₱X free" hint the Allocate modal shows. Service-
+  // role lookup (RLS hides other collectors' DCRRs); throws on error.
+  const candidateByInstallment: Record<string, number> = {};
+  for (const line of resolvedAllocations) {
+    if (line.amortizationScheduleId) {
+      candidateByInstallment[line.amortizationScheduleId] =
+        (candidateByInstallment[line.amortizationScheduleId] ?? 0) + line.amount;
+    }
+  }
+  if (Object.keys(candidateByInstallment).length > 0) {
+    const dupAdmin = serviceClient ?? createServiceClient();
+    // No excludeDcrId: this draft's own already-added items count toward the
+    // installment total too, so re-filling the same row twice is caught.
+    const pendingRaw = await loadPendingAllocationsForAccount(
+      dupAdmin,
+      masterlistId,
+    );
+    const pendingByInstallment: Record<string, number> = {};
+    for (const [sid, v] of Object.entries(pendingRaw)) {
+      pendingByInstallment[sid] = v.amount;
+    }
+    const openForDue = await fetchOpenInstallments(supabase, masterlistId);
+    const remainingDue: Record<string, number> = {};
+    for (const inst of openForDue) {
+      remainingDue[inst.id] = netInstallmentDue({
+        amountDue: inst.amountDue,
+        discountAmount: inst.discountAmount,
+        penaltyAmount: inst.penaltyAmount,
+        amountPaid: inst.amountPaid,
+      });
+    }
+    const overAllocated = findOverAllocatedInstallments({
+      candidate: candidateByInstallment,
+      pending: pendingByInstallment,
+      remainingDue,
+    });
+    if (overAllocated.length > 0) {
+      throw new Error(
+        "This payment would over-fill an installment that another unposted " +
+          "DCRR already covers. Post or reject that DCRR first, or reduce the " +
+          "overlapping amount to what is still open on that installment.",
+      );
+    }
   }
 
   if (discountInput) {

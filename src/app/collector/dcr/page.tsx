@@ -77,7 +77,17 @@ type PreviewInstallment = {
 type AllocationRow = PreviewInstallment & {
   checked: boolean;
   amount: number;
+  /** Task 4 — peso amount of this installment already allocated by a pending
+   * item on another unposted DCRR, and how many such DCRRs. */
+  pendingElsewhere: number;
+  pendingDcrCount: number;
 };
+
+/** Remaining that is still free to allocate on this row, after both what's
+ * already posted and what another unposted DCRR has spoken for. */
+function installmentFreeToAllocate(row: AllocationRow): number {
+  return Math.max(0, halfUp(installmentRemainingDue(row) - row.pendingElsewhere));
+}
 
 /** Collector Discount (feature-collector-discount-implementation-plan.md,
  * Phase 4) — an installment not yet due, eligible for an interest waiver.
@@ -357,6 +367,10 @@ export default function CollectorDcrPage() {
         isSurcharge?: boolean;
         interestEligible?: InterestEligibleInstallment[];
         penaltyEligible?: PenaltyEligibleInstallment[];
+        pendingByInstallment?: Record<
+          string,
+          { amount: number; dcrCount: number }
+        >;
       };
 
       const allocBySchedule = new Map(
@@ -364,14 +378,27 @@ export default function CollectorDcrPage() {
           .filter((line) => line.amortizationScheduleId)
           .map((line) => [line.amortizationScheduleId!, line.amount]),
       );
+      const pendingMap = preview.pendingByInstallment ?? {};
 
       const rows: AllocationRow[] = preview.installments.map((inst) => {
         const allocated = allocBySchedule.get(inst.id);
-        return {
+        const pending = pendingMap[inst.id];
+        const pendingElsewhere = pending?.amount ?? 0;
+        const base: AllocationRow = {
           ...inst,
           checked: allocated !== undefined,
           amount: allocated ?? installmentRemainingDue(inst),
+          pendingElsewhere,
+          pendingDcrCount: pending?.dcrCount ?? 0,
         };
+        // If another unposted DCRR already covers everything still owed on
+        // this installment, don't pre-check it — the auto-allocation didn't
+        // know about the pending DCRR. The leftover shows as "advance",
+        // prompting the collector to pick a free row.
+        if (pendingElsewhere > 0 && installmentFreeToAllocate(base) <= 0) {
+          base.checked = false;
+        }
+        return base;
       });
 
       setInterestDiscountSelections(new Map());
@@ -399,6 +426,7 @@ export default function CollectorDcrPage() {
     setInterestDiscountSelections(new Map());
     setPenaltyDiscountSelections(new Map());
     setDiscountReason("");
+    setError(null);
   }
 
   function toggleDiscountInstallment(
@@ -856,6 +884,7 @@ export default function CollectorDcrPage() {
       >
         {allocationModal ? (
           <div className="space-y-5">
+            {error ? <Alert variant="danger">{error}</Alert> : null}
             {allocationModal.isSurcharge ? (
               <Alert variant="info">
                 This is a <strong>Move of Payment surcharge</strong>. It has been left
@@ -926,46 +955,68 @@ export default function CollectorDcrPage() {
                       </tr>
                     </thead>
                     <tbody>
-                      {allocationModal.rows.map((row) => (
-                        <tr key={row.id}>
-                          <Td>
-                            <input
-                              type="checkbox"
-                              checked={row.checked}
-                              onChange={(event) =>
-                                updateAllocationRow(row.id, {
-                                  checked: event.target.checked,
-                                })
-                              }
-                              aria-label={`Apply to installment ${row.installmentNo}`}
-                            />
-                          </Td>
-                          <Td className="mono">{row.installmentNo}</Td>
-                          <Td className="mono">{formatDate(row.dueDate)}</Td>
-                          <Td num className="mono">
-                            {formatMoney(installmentRemainingDue(row))}
-                          </Td>
-                          <Td num>
-                            <div className="affix ml-auto w-36">
-                              <span className="add">PHP</span>
-                              <Input
-                                type="number"
-                                min={0}
-                                step="0.01"
-                                className="text-right"
-                                mono
-                                value={row.amount}
-                                disabled={!row.checked}
+                      {allocationModal.rows.map((row) => {
+                        const free = installmentFreeToAllocate(row);
+                        const fullyClaimed =
+                          row.pendingElsewhere > 0 && free <= 0;
+                        return (
+                          <tr
+                            key={row.id}
+                            className={fullyClaimed ? "opacity-55" : undefined}
+                          >
+                            <Td>
+                              <input
+                                type="checkbox"
+                                checked={row.checked}
+                                disabled={fullyClaimed}
                                 onChange={(event) =>
                                   updateAllocationRow(row.id, {
-                                    amount: Number(event.target.value),
+                                    checked: event.target.checked,
                                   })
                                 }
+                                aria-label={`Apply to installment ${row.installmentNo}`}
                               />
-                            </div>
-                          </Td>
-                        </tr>
-                      ))}
+                            </Td>
+                            <Td className="mono">{row.installmentNo}</Td>
+                            <Td className="mono">{formatDate(row.dueDate)}</Td>
+                            <Td num className="mono">
+                              {formatMoney(installmentRemainingDue(row))}
+                              {row.pendingElsewhere > 0 ? (
+                                <span className="mt-0.5 block text-xs font-normal text-amber-600">
+                                  ₱{formatMoney(row.pendingElsewhere)} on{" "}
+                                  {row.pendingDcrCount || 1} unposted DCRR
+                                  {(row.pendingDcrCount || 1) > 1 ? "s" : ""}
+                                  {fullyClaimed
+                                    ? " — fully covered"
+                                    : ` · ₱${formatMoney(free)} free`}
+                                </span>
+                              ) : null}
+                            </Td>
+                            <Td num>
+                              <div className="affix ml-auto w-36">
+                                <span className="add">PHP</span>
+                                <Input
+                                  type="number"
+                                  min={0}
+                                  max={
+                                    row.pendingElsewhere > 0 ? free : undefined
+                                  }
+                                  step="0.01"
+                                  className="text-right"
+                                  mono
+                                  value={row.amount}
+                                  disabled={!row.checked || fullyClaimed}
+                                  onChange={(event) =>
+                                    updateAllocationRow(row.id, {
+                                      amount: Number(event.target.value),
+                                    })
+                                  }
+                                />
+                              </div>
+                            </Td>
+                          </tr>
+                        );
+                      })}
                     </tbody>
                   </Table>
                 </div>
@@ -1037,7 +1088,7 @@ export default function CollectorDcrPage() {
                                       min={0}
                                       max={100}
                                       step="1"
-                                      className="text-right"
+                                      className="text-right lead"
                                       mono
                                       value={
                                         interestDiscountSelections.get(
@@ -1122,7 +1173,7 @@ export default function CollectorDcrPage() {
                                       min={0}
                                       max={100}
                                       step="1"
-                                      className="text-right"
+                                      className="text-right lead"
                                       mono
                                       value={
                                         penaltyDiscountSelections.get(

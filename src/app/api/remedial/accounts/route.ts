@@ -145,6 +145,22 @@ export async function GET(request: Request) {
 
     if (error) throw new Error(error.message);
 
+    // Task 4 — recorded-but-unposted payment count per account (one grouped
+    // query, not N+1). `payments.status` alone is authoritative for "posted".
+    const remedialActiveIds = (data ?? []).map((row) => row.id as string);
+    const unpostedByMasterlist = new Map<string, number>();
+    if (remedialActiveIds.length) {
+      const { data: pendingPayments } = await supabase
+        .from("payments")
+        .select("masterlist_id")
+        .in("masterlist_id", remedialActiveIds)
+        .in("status", ["pending_verification", "confirmed"]);
+      for (const row of pendingPayments ?? []) {
+        const mid = row.masterlist_id as string;
+        unpostedByMasterlist.set(mid, (unpostedByMasterlist.get(mid) ?? 0) + 1);
+      }
+    }
+
     const collectorIds = new Set<string>();
     for (const row of data ?? []) {
       const turnovers = Array.isArray(row.remedial_turnovers)
@@ -257,6 +273,8 @@ export async function GET(request: Request) {
         fromCollectorName: latest?.from_collector_id
           ? (nameById.get(latest.from_collector_id) ?? "Collector")
           : null,
+        unpostedPaymentCount:
+          unpostedByMasterlist.get(row.id as string) ?? 0,
       };
     });
 

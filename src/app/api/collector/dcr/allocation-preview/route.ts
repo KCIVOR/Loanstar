@@ -2,13 +2,14 @@ import { NextResponse } from "next/server";
 
 import { daysPastDue } from "@/lib/ar/schedule";
 import { handleApiError, jsonOk } from "@/lib/api/handler";
+import { loadPendingAllocationsForAccount } from "@/lib/ar/duplicate-dcr";
 import { computeAutoAllocation, deriveInterestPerRow } from "@/lib/ar/posting";
 import {
   ForbiddenError,
   hasModulePermission,
   requireAuth,
 } from "@/lib/permissions/server";
-import { createClient } from "@/lib/supabase/server";
+import { createClient, createServiceClient } from "@/lib/supabase/server";
 
 export async function GET(request: Request) {
   try {
@@ -76,6 +77,15 @@ export async function GET(request: Request) {
       ? [{ amortizationScheduleId: null, amount: Number(payment.amount) }]
       : computeAutoAllocation(Number(payment.amount), installments);
 
+    // Task 4 — how much of each installment is already spoken for by a
+    // `pending` item on another unposted DCRR for this account, so the modal
+    // can grey out / annotate those rows. Service-role (a prior assignee's
+    // DCRR is invisible to this session's RLS) and throws on error.
+    const pendingByInstallment = await loadPendingAllocationsForAccount(
+      createServiceClient(),
+      payment.masterlist_id as string,
+    );
+
     // Collector Discount (Phase 2) — eligibility lists for the DCRR
     // discount UI (Phase 4). Uses the same daysPastDue/computeAgingBucket
     // boundary as every other overdue check in this codebase
@@ -118,6 +128,7 @@ export async function GET(request: Request) {
       isSurcharge,
       interestEligible,
       penaltyEligible,
+      pendingByInstallment,
     });
   } catch (error) {
     return handleApiError(error);

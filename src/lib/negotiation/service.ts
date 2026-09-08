@@ -358,6 +358,9 @@ type OverrideInput = {
   /** Daily Interest only — CSA/Committee-entered manual payment date. Same
    * explicit-wins/omission-preserves-existing rule as the fields above. */
   paymentDate?: string;
+  /** Daily Interest only — planned release date, the interest accrual anchor.
+   * Same explicit-wins/omission-preserves-existing rule as the fields above. */
+  releaseDate?: string;
 };
 
 /** Shared by both committee override paths: resolve the loan type, persist a new computation snapshot, and clear any prior signature since the amount changed. */
@@ -370,7 +373,7 @@ async function persistOverrideComputation(
   const { data: existingComp } = await supabase
     .from("computations")
     .select(
-      "loan_type_id, pf_rate, interest_rate, security_fee_rate, terms, addon_months, input_mode, other_deductions, admin_rate, chattel_rate, with_ds_and_notary, due_day, origination_discounts, payment_frequency, first_payment_date",
+      "loan_type_id, pf_rate, interest_rate, security_fee_rate, terms, addon_months, input_mode, other_deductions, admin_rate, chattel_rate, with_ds_and_notary, due_day, origination_discounts, payment_frequency, first_payment_date, release_date",
     )
     .eq("loan_application_id", applicationId)
     .eq("is_active", true)
@@ -475,8 +478,20 @@ async function persistOverrideComputation(
 
   const resolvedPaymentDate =
     input.paymentDate ?? (existingComp?.first_payment_date as string | null) ?? undefined;
+  // Daily interest accrual anchor — explicit override wins, else the value the
+  // active computation already carried. Never falls back to "now".
+  const resolvedReleaseDate =
+    input.releaseDate ?? (existingComp?.release_date as string | null) ?? undefined;
   if (resolvedPaymentSchedule === "daily" && !resolvedPaymentDate) {
     throw new Error("Payment date is required for Daily Interest loans");
+  }
+  if (resolvedPaymentSchedule === "daily") {
+    if (!resolvedReleaseDate || !/^\d{4}-\d{2}-\d{2}$/.test(resolvedReleaseDate)) {
+      throw new Error("A valid release date is required for Daily Interest loans");
+    }
+    if (resolvedPaymentDate && resolvedReleaseDate >= resolvedPaymentDate) {
+      throw new Error("Daily Interest release date must be before the payment date");
+    }
   }
 
   const saved = await persistComputation(supabase, {
@@ -524,6 +539,12 @@ async function persistOverrideComputation(
     dueDay: resolvedDueDay,
     paymentSchedule: resolvedPaymentSchedule,
     manualPaymentDate: resolvedPaymentDate,
+    // Only Daily uses an explicit release date (its interest accrual anchor).
+    // For every other schedule type persistComputation must keep its own
+    // "release_date = today" behaviour on a recompute — so do NOT forward this
+    // unless the loan is daily.
+    releaseDate:
+      resolvedPaymentSchedule === "daily" ? resolvedReleaseDate : undefined,
     originationDiscounts: resolvedOriginationDiscounts,
     securityFeeRate:
       segment === "sme"

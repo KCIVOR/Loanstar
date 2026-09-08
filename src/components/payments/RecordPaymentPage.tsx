@@ -62,6 +62,13 @@ type AccountPayload = {
   payments: PaymentRow[];
   postings?: DeskLedgerPosting[];
   pdcChecks?: LedgerPdcCheck[];
+  /** Task 4 — recorded-but-unposted payments on this account (informational
+   * heads-up before recording another). Absent on desks not yet wired. */
+  unpostedOnAccount?: {
+    count: number;
+    totalAmount: number;
+    references: string[];
+  };
 };
 
 async function requestAccount(apiPath: string): Promise<AccountPayload> {
@@ -127,8 +134,12 @@ export function RecordPaymentPage({
     });
   }, [data]);
 
-  async function handleRecorded() {
-    setMessage("Payment recorded and ready for the DCR workflow.");
+  async function handleRecorded(result?: { warning?: string }) {
+    setMessage(
+      result?.warning
+        ? `Payment recorded and ready for the DCR workflow. ${result.warning}`
+        : "Payment recorded and ready for the DCR workflow.",
+    );
     try {
       setData(await requestAccount(apiPath));
     } catch (err) {
@@ -216,6 +227,22 @@ export function RecordPaymentPage({
           <AccountLedger rows={ledgerRows} />
         )}
       </section>
+
+      {data.unpostedOnAccount && data.unpostedOnAccount.count > 0 ? (
+        <Alert variant="warning" className="mb-5">
+          This account already has {data.unpostedOnAccount.count} payment
+          {data.unpostedOnAccount.count === 1 ? "" : "s"} totalling ₱
+          {formatMoney(data.unpostedOnAccount.totalAmount)} recorded and waiting
+          for Accounting to post. Recording another may double-count — review the
+          pending payments below before continuing.
+          {data.unpostedOnAccount.references.length > 0 ? (
+            <span className="mt-1 block text-xs text-ink-500">
+              Pending ref{data.unpostedOnAccount.references.length === 1 ? "" : "s"}:{" "}
+              {data.unpostedOnAccount.references.join(", ")}
+            </span>
+          ) : null}
+        </Alert>
+      ) : null}
 
       <RecordPaymentForm
         masterlistId={masterlistId}

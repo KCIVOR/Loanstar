@@ -11,7 +11,7 @@ import {
   computeSmeFirstPaymentDate,
   formatDateLocal,
 } from "@/lib/computation/release-date";
-import { computeDailyInterestLoan } from "@/lib/computation/daily";
+import { computeDailyInterestLoan, parseLocalDate } from "@/lib/computation/daily";
 import { computeInvoiceLoan } from "@/lib/computation/invoice";
 import {
   buildDiscountUnits,
@@ -506,7 +506,9 @@ export async function persistComputation(
   // the old 22nd-cutoff rule. Daily Interest is a single manually-dated
   // payment, not derived at all.
   const firstPayment = isDaily
-    ? new Date(input.manualPaymentDate!)
+    ? // Local Y-M-D parse (not `new Date(str)` UTC-midnight) so the stored
+      // first_payment_date matches the day the engine below counts to.
+      parseLocalDate(input.manualPaymentDate!)
     : input.paymentSchedule === "salary"
       ? computeSalaryFirstPaymentDate(releaseDate, result.addonMonths)
       : segment === "sme" || segment === "individual"
@@ -563,13 +565,20 @@ export async function persistComputation(
 
   if (isDaily) {
     // Daily Interest replaces the standard monthly-amortization totals
-    // entirely — interest accrues per actual day elapsed to the manually
-    // entered payment date, not per calendar month, and the loan is a
-    // single payment (principal + interest), not an amortized schedule.
+    // entirely — interest = principal × monthlyRate ÷ (days in the release
+    // month) × (paymentDate − releaseDate), a single payment, matching the
+    // SME calculator (docs/Calculator SME.xlsm). Both dates are parsed as
+    // local calendar dates (see `firstPayment` above and the local parse of
+    // `input.releaseDate` here) so the day the encoder typed is the day that
+    // gets counted and divided — `new Date("YYYY-MM-DD")` is UTC midnight and
+    // would drift a day (and possibly a month) on a behind-UTC host. The
+    // line-470 `releaseDate` is left as-is for the non-daily paths.
     const daily = computeDailyInterestLoan({
       principal: result.principal,
       monthlyRate: input.interestRate,
-      releaseDate,
+      releaseDate: input.releaseDate
+        ? parseLocalDate(input.releaseDate)
+        : releaseDate,
       paymentDate: firstPayment,
     });
     effectiveTotalInterest = daily.interest;

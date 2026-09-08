@@ -1165,11 +1165,26 @@ export async function recordRelease(
   // role since the computation is already signed by this point, and CSA's
   // own RLS cannot update a signed row (see persistComputation's identical
   // deactivate-prior-actives comment).
+  //
+  // EXCEPTION — Daily Interest: the CSA-entered release date is the accrual
+  // basis the borrower signed (interest = principal × rate ÷ days-in-release-
+  // month × (paymentDate − releaseDate), matching the SME calculator).
+  // Overwriting it here would silently change the signed figure's basis
+  // without recomputing it, so daily loans keep the entered date. A released
+  // daily loan therefore reports under its planned month, not the actual
+  // disbursement day (accepted — see task-03-daily-interest-FINAL-plan.md).
   const admin = createServiceClient();
-  await admin
+  const { data: compRow } = await admin
     .from("computations")
-    .update({ release_date: new Date().toISOString().slice(0, 10) })
-    .eq("id", file.computationId);
+    .select("payment_frequency")
+    .eq("id", file.computationId)
+    .maybeSingle();
+  if (compRow?.payment_frequency !== "daily") {
+    await admin
+      .from("computations")
+      .update({ release_date: new Date().toISOString().slice(0, 10) })
+      .eq("id", file.computationId);
+  }
 
   await syncApplicationBlocker(supabase, file.loanApplicationId, "released", {
     actorId,

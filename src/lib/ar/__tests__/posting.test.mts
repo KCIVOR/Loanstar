@@ -8,11 +8,46 @@ import {
   isAccountFullySettled,
   reconcileAndPostDcr,
   recomputeOutstandingBalance,
+  submitDcr,
   writeOffAccountRoundingDifference,
   writeOffRoundingDifference,
   type AllocationLine,
   type OpenInstallment,
 } from "../posting";
+
+/** In-memory PostgREST stub for the Task-4 duplicate loaders — same shape as
+ * the one in duplicate-dcr.test.mts. */
+function makeLoaderStub(
+  tables: Record<string, Array<Record<string, unknown>>>,
+) {
+  function builder(rows: Array<Record<string, unknown>>) {
+    let filtered = rows;
+    const b = {
+      select: () => b,
+      eq: (col: string, val: unknown) => {
+        filtered = filtered.filter((r) => r[col] === val);
+        return b;
+      },
+      neq: (col: string, val: unknown) => {
+        filtered = filtered.filter((r) => r[col] !== val);
+        return b;
+      },
+      in: (col: string, vals: unknown[]) => {
+        filtered = filtered.filter((r) => vals.includes(r[col]));
+        return b;
+      },
+      not: (col: string, _op: string, val: unknown) => {
+        filtered = filtered.filter((r) => r[col] !== val);
+        return b;
+      },
+      order: () => b,
+      then: (resolve: (v: unknown) => void) =>
+        resolve({ data: filtered, error: null }),
+    };
+    return b;
+  }
+  return { from: (t: string) => builder(tables[t] ?? []) } as never;
+}
 
 function inst(
   overrides: Partial<OpenInstallment> & Pick<OpenInstallment, "id" | "installmentNo">,
@@ -402,6 +437,38 @@ describe("addPaymentToDcr", () => {
     };
   }
 
+  /**
+   * Service-role stub for the Task-4 amount-aware duplicate lookup (Option 1).
+   * `pendingBySchedule` = peso already allocated per installment by a `pending`
+   * item on ANOTHER unposted DCRR for this account; the loaders
+   * (`loadPendingAllocationsForAccount`) read it back through `makeLoaderStub`.
+   * Empty → nothing pending elsewhere.
+   */
+  function makeDupServiceStub(
+    pendingBySchedule: Record<string, number> = {},
+    masterlistId = "ml-1",
+  ) {
+    return makeLoaderStub({
+      payments: [{ id: "opay-1", masterlist_id: masterlistId }],
+      dcr_items: [
+        {
+          id: "oitem-1",
+          dcr_id: "other-dcr",
+          payment_id: "opay-1",
+          status: "pending",
+        },
+      ],
+      dcr: [{ id: "other-dcr", status: "submitted" }],
+      dcr_item_allocations: Object.entries(pendingBySchedule).map(
+        ([sid, amount]) => ({
+          amortization_schedule_id: sid,
+          amount,
+          dcr_item_id: "oitem-1",
+        }),
+      ),
+    });
+  }
+
   it("rejects a Collector-supplied allocation whose total does not match", async () => {
     const { supabase } = makeAddStub({ paymentAmount: 1000 });
     await assert.rejects(
@@ -485,13 +552,227 @@ describe("addPaymentToDcr", () => {
       ],
     });
 
-    await addPaymentToDcr(supabase, "dcr-1", "pay-1", "collector-1");
+    await addPaymentToDcr(
+      supabase,
+      "dcr-1",
+      "pay-1",
+      "collector-1",
+      undefined,
+      undefined,
+      makeDupServiceStub(),
+    );
 
     const expected = computeAutoAllocation(2500, [
       inst({ id: "s1", installmentNo: 1, amountDue: 1000 }),
       inst({ id: "s2", installmentNo: 2, amountDue: 1500 }),
     ]);
     assert.deepEqual(getInsertedAllocations(), expected);
+  });
+
+  it("Task 4 — blocks when the new allocation would OVER-fill an installment another unposted DCRR already covers", async () => {
+    const { supabase } = makeAddStub({
+      paymentAmount: 1000,
+      schedules: [
+        {
+          id: "s1",
+          masterlist_id: "ml-1",
+          status: "pending",
+          installment_no: 1,
+          amount_due: 1000,
+          penalty_amount: 0,
+          amount_paid: 0,
+        },
+      ],
+    });
+    await assert.rejects(
+      () =>
+        addPaymentToDcr(
+          supabase,
+          "dcr-1",
+          "pay-1",
+          "collector-1",
+          [{ amortizationScheduleId: "s1", amount: 1000 }],
+          undefined,
+          // s1 owes 1000 and another unposted DCRR already holds the full 1000
+          makeDupServiceStub({ s1: 1000 }),
+        ),
+      /over-fill an installment that another\s+unposted DCRR/,
+    );
+  });
+
+  it("Task 4 — allows a partial fill up to the amount still free on a partly-claimed installment", async () => {
+    const { supabase, getInsertedAllocations } = makeAddStub({
+      paymentAmount: 3668,
+      schedules: [
+        {
+          id: "s1",
+          masterlist_id: "ml-1",
+          status: "pending",
+          installment_no: 1,
+          amount_due: 18900,
+          penalty_amount: 0,
+          amount_paid: 0,
+        },
+      ],
+    });
+    await addPaymentToDcr(
+      supabase,
+      "dcr-1",
+      "pay-1",
+      "collector-1",
+      [{ amortizationScheduleId: "s1", amount: 3668 }],
+      undefined,
+      // 15232 already pending elsewhere + 3668 new = 18900 = exactly the due
+      makeDupServiceStub({ s1: 15232 }),
+    );
+    assert.deepEqual(getInsertedAllocations(), [
+      { amortizationScheduleId: "s1", amount: 3668 },
+    ]);
+  });
+
+  it("Task 4 — allows when nothing is pending elsewhere on the installment", async () => {
+    const { supabase, getInsertedAllocations } = makeAddStub({
+      paymentAmount: 1000,
+      schedules: [
+        {
+          id: "s1",
+          masterlist_id: "ml-1",
+          status: "pending",
+          installment_no: 1,
+          amount_due: 1000,
+          penalty_amount: 0,
+          amount_paid: 0,
+        },
+      ],
+    });
+    await addPaymentToDcr(
+      supabase,
+      "dcr-1",
+      "pay-1",
+      "collector-1",
+      [{ amortizationScheduleId: "s1", amount: 1000 }],
+      undefined,
+      makeDupServiceStub({}), // lookup returns nothing → no conflict
+    );
+    assert.deepEqual(getInsertedAllocations(), [
+      { amortizationScheduleId: "s1", amount: 1000 },
+    ]);
+  });
+});
+
+describe("submitDcr — Task 4 duplicate backstop", () => {
+  function submitOwnerStub() {
+    return {
+      from(table: string) {
+        if (table === "dcr") {
+          return {
+            select: () => ({
+              eq: () => ({
+                single: async () => ({
+                  data: {
+                    id: "dcr-1",
+                    status: "draft",
+                    collector_user_id: "collector-1",
+                  },
+                  error: null,
+                }),
+              }),
+            }),
+            update: () => ({ eq: async () => ({ error: null }) }),
+          };
+        }
+        if (table === "dcr_items") {
+          return {
+            select: () => ({
+              eq: async () => ({ count: 1, data: [], error: null }),
+            }),
+          };
+        }
+        if (table === "payments") {
+          return {
+            update: () => ({ eq: () => ({ eq: async () => ({ error: null }) }) }),
+          };
+        }
+        throw new Error(`unexpected table ${table}`);
+      },
+    } as never;
+  }
+
+  it("blocks submit when the DCRR would OVER-fill an installment another unposted DCRR already covers", async () => {
+    const service = makeLoaderStub({
+      dcr_items: [
+        { id: "it-own", dcr_id: "dcr-1", payment_id: "pay-own", status: "pending" },
+        { id: "it-other", dcr_id: "dcr-2", payment_id: "pay-other", status: "pending" },
+      ],
+      payments: [
+        { id: "pay-own", masterlist_id: "ml-1" },
+        { id: "pay-other", masterlist_id: "ml-1" },
+      ],
+      dcr_item_allocations: [
+        { amortization_schedule_id: "s1", amount: 1000, dcr_item_id: "it-own" },
+        { amortization_schedule_id: "s1", amount: 1000, dcr_item_id: "it-other" },
+      ],
+      dcr: [
+        { id: "dcr-1", status: "draft" },
+        { id: "dcr-2", status: "draft" },
+      ],
+      amortization_schedules: [
+        {
+          id: "s1",
+          masterlist_id: "ml-1",
+          installment_no: 1,
+          amount_due: 1000,
+          penalty_amount: 0,
+          discount_amount: 0,
+          amount_paid: 0,
+          status: "pending",
+        },
+      ],
+    });
+    await assert.rejects(
+      () => submitDcr(submitOwnerStub(), "dcr-1", "collector-1", service),
+      /over-fill an installment that another unposted DCRR/,
+    );
+  });
+
+  it("submits cleanly when another DCRR shares the installment but the total still fits", async () => {
+    const service = makeLoaderStub({
+      dcr_items: [
+        { id: "it-own", dcr_id: "dcr-1", payment_id: "pay-own", status: "pending" },
+        { id: "it-other", dcr_id: "dcr-2", payment_id: "pay-other", status: "pending" },
+      ],
+      payments: [
+        { id: "pay-own", masterlist_id: "ml-1" },
+        { id: "pay-other", masterlist_id: "ml-1" },
+      ],
+      dcr_item_allocations: [
+        { amortization_schedule_id: "s1", amount: 400, dcr_item_id: "it-own" },
+        { amortization_schedule_id: "s1", amount: 600, dcr_item_id: "it-other" },
+      ],
+      dcr: [
+        { id: "dcr-1", status: "draft" },
+        { id: "dcr-2", status: "draft" },
+      ],
+      amortization_schedules: [
+        {
+          id: "s1",
+          masterlist_id: "ml-1",
+          installment_no: 1,
+          amount_due: 1000,
+          penalty_amount: 0,
+          discount_amount: 0,
+          amount_paid: 0,
+          status: "pending",
+        },
+      ],
+    });
+    const result = await submitDcr(
+      submitOwnerStub(),
+      "dcr-1",
+      "collector-1",
+      service,
+    );
+    assert.equal(result.status, "submitted");
   });
 });
 

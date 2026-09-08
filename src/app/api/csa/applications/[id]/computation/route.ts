@@ -20,7 +20,7 @@ import { assertInterviewRecordedForComputation } from "@/lib/csa/initial-intervi
 import { requireModulePermission } from "@/lib/permissions/server";
 import { createClient, createServiceClient } from "@/lib/supabase/server";
 import { formatDateLocal } from "@/lib/computation/release-date";
-import { halfUp } from "@/lib/computation/money";
+import { interestByInstallment } from "@/lib/computation/offset-interest";
 
 type RouteParams = { params: Promise<{ id: string }> };
 
@@ -177,40 +177,66 @@ export async function GET(_request: Request, { params }: RouteParams) {
         string,
         Array<{ installmentNo: number; dueDate: string }>
       >();
+      // Every schedule row per account (all statuses) — needed to work out the
+      // real interest in each installment below, not just the open ones.
+      const allRowsByMasterlistId = new Map<
+        string,
+        Array<{
+          installmentNo: number;
+          amountDue: number;
+          lineType: string;
+        }>
+      >();
       const today = formatDateLocal(new Date());
       if (masterlistIds.length > 0) {
         const { data: scheduleRows } = await admin
           .from("amortization_schedules")
-          .select("masterlist_id, installment_no, due_date, status, amount_due")
-          .in("masterlist_id", masterlistIds)
-          .in("status", ["pending", "partial", "overdue"]);
+          .select("masterlist_id, installment_no, due_date, status, amount_due, line_type")
+          .in("masterlist_id", masterlistIds);
         for (const row of scheduleRows ?? []) {
+          const mid = row.masterlist_id as string;
+          const amountDue = Number(row.amount_due) || 0;
+          const list = allRowsByMasterlistId.get(mid) ?? [];
+          list.push({
+            installmentNo: row.installment_no as number,
+            amountDue,
+            lineType: (row.line_type as string | null) ?? "standard",
+          });
+          allRowsByMasterlistId.set(mid, list);
+
+          const isOpen = ["pending", "partial", "overdue"].includes(
+            row.status as string,
+          );
           // Quarterly/Two-Monthly Special loans persist a $0 "principal"
           // placeholder row alongside every non-final period's real interest
           // row — excluded here so "N months remaining" isn't roughly
           // doubled and the offset picker never offers a non-real row.
-          if (Number(row.amount_due) <= 0) continue;
-          const mid = row.masterlist_id as string;
+          if (!isOpen || amountDue <= 0) continue;
           remainingByMasterlistId.set(mid, (remainingByMasterlistId.get(mid) ?? 0) + 1);
           const dueDate = row.due_date as string;
           // Rule 2: only future, not-yet-due installments are eligible —
-          // excluded entirely here, not just flagged, so the modal (Phase 5)
+          // excluded entirely here, not just flagged, so the modal
           // can never render an ineligible option in the first place.
           if (dueDate > today) {
-            const list = futureRowsByMasterlistId.get(mid) ?? [];
-            list.push({ installmentNo: row.installment_no as number, dueDate });
-            futureRowsByMasterlistId.set(mid, list);
+            const flist = futureRowsByMasterlistId.get(mid) ?? [];
+            flist.push({ installmentNo: row.installment_no as number, dueDate });
+            futureRowsByMasterlistId.set(mid, flist);
           }
         }
       }
 
-      // Interest portion per installment isn't stored anywhere (amount_due is
-      // principal+interest blended) — derive it from each loan's own active
-      // computation, same even-split convention (totalInterest ÷ terms) used
-      // for origination discounts (Phase 2) and the existing "Add-on
-      // interest" display in ComputationPanel.tsx. Semi-monthly rows are half
-      // a calendar month each, so their interest is halved too — same
-      // reasoning as Phase 2's isSemiMonthly handling.
+      // Per-installment interest. The old code used `total_interest ÷ terms`
+      // and stamped it on every future row — wrong whenever the row count
+      // differs from `terms` (weekly ≈ 4 rows/term, semi-monthly 2, Special 2),
+      // which is exactly how the Sept-04 offset left a balance (see
+      // docs/revision-plans/task-02-offset-full-settlement-plan.md, Phase 2).
+      // Now derived per row from the schedule's own shape:
+      //   - dual-line Special: an `interest` row's own amount IS its interest;
+      //     a `principal` row carries none.
+      //   - interest-only + balloon (weekly/invoice): the small rows literally
+      //     are interest — use each row's own amount; the balloon principal row
+      //     carries at most (amount_due − principal).
+      //   - blended (monthly/semi-monthly): even split across the real rows.
       const computationIds = Array.from(
         new Set(
           (masterlistRows ?? [])
@@ -218,27 +244,30 @@ export async function GET(_request: Request, { params }: RouteParams) {
             .filter((id): id is string => Boolean(id)),
         ),
       );
-      const interestPerRowByComputationId = new Map<string, number>();
+      const computationById = new Map<
+        string,
+        { totalInterest: number; principal: number }
+      >();
       if (computationIds.length > 0) {
         const { data: computationRows } = await admin
           .from("computations")
-          .select("id, total_interest, terms, payment_frequency")
+          .select("id, total_interest, principal")
           .in("id", computationIds);
         for (const row of computationRows ?? []) {
-          const terms = Number(row.terms) || 1;
-          const interestPerMonth = halfUp(Number(row.total_interest) / terms);
-          const isSemiMonthly = row.payment_frequency === "semi_monthly";
-          interestPerRowByComputationId.set(
-            row.id as string,
-            isSemiMonthly ? halfUp(interestPerMonth / 2) : interestPerMonth,
-          );
+          computationById.set(row.id as string, {
+            totalInterest: Number(row.total_interest) || 0,
+            principal: Number(row.principal) || 0,
+          });
         }
       }
 
       activeLoans = (masterlistRows ?? []).map((row) => {
         const mid = row.id as string;
-        const interestPortion =
-          interestPerRowByComputationId.get(row.computation_id as string) ?? 0;
+        const comp = computationById.get(row.computation_id as string);
+        const interestMap = interestByInstallment(
+          allRowsByMasterlistId.get(mid) ?? [],
+          comp,
+        );
         return {
           loanApplicationId: (row.loan_application_id as string | null) ?? "",
           loanAccountNo: (row.loan_account_no as string | null) ?? "Active Account",
@@ -248,7 +277,10 @@ export async function GET(_request: Request, { params }: RouteParams) {
           remainingInstallments: remainingByMasterlistId.get(mid) ?? 0,
           futureInstallments: (futureRowsByMasterlistId.get(mid) ?? [])
             .sort((a, b) => a.installmentNo - b.installmentNo)
-            .map((inst) => ({ ...inst, interestPortion })),
+            .map((inst) => ({
+              ...inst,
+              interestPortion: interestMap.get(inst.installmentNo) ?? 0,
+            })),
         };
       });
     }
@@ -414,6 +446,25 @@ export async function POST(request: Request, { params }: RouteParams) {
         { error: "Payment date is required for Daily Interest loans" },
         { status: 400 },
       );
+    }
+
+    if (paymentSchedule === "daily") {
+      // Daily interest is computed over releaseDate → paymentDate (matching the
+      // SME calculator), so both are required and the release must come first.
+      const isYmd = (s: string | undefined): s is string =>
+        !!s && /^\d{4}-\d{2}-\d{2}$/.test(s) && !Number.isNaN(Date.parse(s));
+      if (!isYmd(body.releaseDate)) {
+        return NextResponse.json(
+          { error: "A valid release date is required for Daily Interest loans" },
+          { status: 400 },
+        );
+      }
+      if (isYmd(body.paymentDate) && body.releaseDate >= body.paymentDate) {
+        return NextResponse.json(
+          { error: "Daily Interest release date must be before the payment date" },
+          { status: 400 },
+        );
+      }
     }
 
     const saved = await persistComputation(supabase, {

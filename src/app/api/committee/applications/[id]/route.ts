@@ -28,7 +28,7 @@ import {
 import { requireModulePermission } from "@/lib/permissions/server";
 import { createClient, createServiceClient } from "@/lib/supabase/server";
 import { formatDateLocal } from "@/lib/computation/release-date";
-import { halfUp } from "@/lib/computation/money";
+import { interestByInstallment } from "@/lib/computation/offset-interest";
 
 type RouteParams = { params: Promise<{ id: string }> };
 
@@ -141,26 +141,43 @@ export async function GET(_request: Request, { params }: RouteParams) {
         string,
         Array<{ installmentNo: number; dueDate: string }>
       >();
+      // Every schedule row per account (all statuses) — needed to work out the
+      // real interest in each installment (Task 2 Phase 2).
+      const allRowsByMasterlistId = new Map<
+        string,
+        Array<{ installmentNo: number; amountDue: number; lineType: string }>
+      >();
       const today = formatDateLocal(new Date());
       if (masterlistIds.length > 0) {
         const { data: scheduleRows } = await admin
           .from("amortization_schedules")
-          .select("masterlist_id, installment_no, due_date, status, amount_due")
-          .in("masterlist_id", masterlistIds)
-          .in("status", ["pending", "partial", "overdue"]);
+          .select("masterlist_id, installment_no, due_date, status, amount_due, line_type")
+          .in("masterlist_id", masterlistIds);
         for (const row of scheduleRows ?? []) {
+          const mid = row.masterlist_id as string;
+          const amountDue = Number(row.amount_due) || 0;
+          const list = allRowsByMasterlistId.get(mid) ?? [];
+          list.push({
+            installmentNo: row.installment_no as number,
+            amountDue,
+            lineType: (row.line_type as string | null) ?? "standard",
+          });
+          allRowsByMasterlistId.set(mid, list);
+
+          const isOpen = ["pending", "partial", "overdue"].includes(
+            row.status as string,
+          );
           // Quarterly/Two-Monthly Special loans persist a $0 "principal"
           // placeholder row alongside every non-final period's real interest
-          // row — excluded here so "N months remaining" isn't roughly
-          // doubled and the offset picker never offers a non-real row.
-          if (Number(row.amount_due) <= 0) continue;
-          const mid = row.masterlist_id as string;
+          // row — excluded so "N months remaining" isn't roughly doubled and
+          // the offset picker never offers a non-real row.
+          if (!isOpen || amountDue <= 0) continue;
           remainingByMasterlistId.set(mid, (remainingByMasterlistId.get(mid) ?? 0) + 1);
           const dueDate = row.due_date as string;
           if (dueDate > today) {
-            const list = futureRowsByMasterlistId.get(mid) ?? [];
-            list.push({ installmentNo: row.installment_no as number, dueDate });
-            futureRowsByMasterlistId.set(mid, list);
+            const flist = futureRowsByMasterlistId.get(mid) ?? [];
+            flist.push({ installmentNo: row.installment_no as number, dueDate });
+            futureRowsByMasterlistId.set(mid, flist);
           }
         }
       }
@@ -172,27 +189,29 @@ export async function GET(_request: Request, { params }: RouteParams) {
             .filter((cid): cid is string => Boolean(cid)),
         ),
       );
-      const interestPerRowByComputationId = new Map<string, number>();
+      const computationById = new Map<
+        string,
+        { totalInterest: number; principal: number }
+      >();
       if (computationIds.length > 0) {
         const { data: computationRows } = await admin
           .from("computations")
-          .select("id, total_interest, terms, payment_frequency")
+          .select("id, total_interest, principal")
           .in("id", computationIds);
         for (const row of computationRows ?? []) {
-          const terms = Number(row.terms) || 1;
-          const interestPerMonth = halfUp(Number(row.total_interest) / terms);
-          const isSemiMonthly = row.payment_frequency === "semi_monthly";
-          interestPerRowByComputationId.set(
-            row.id as string,
-            isSemiMonthly ? halfUp(interestPerMonth / 2) : interestPerMonth,
-          );
+          computationById.set(row.id as string, {
+            totalInterest: Number(row.total_interest) || 0,
+            principal: Number(row.principal) || 0,
+          });
         }
       }
 
       activeLoans = (masterlistRows ?? []).map((row) => {
         const mid = row.id as string;
-        const interestPortion =
-          interestPerRowByComputationId.get(row.computation_id as string) ?? 0;
+        const interestMap = interestByInstallment(
+          allRowsByMasterlistId.get(mid) ?? [],
+          computationById.get(row.computation_id as string),
+        );
         return {
           loanApplicationId: (row.loan_application_id as string | null) ?? "",
           loanAccountNo: (row.loan_account_no as string | null) ?? "Active Account",
@@ -202,7 +221,10 @@ export async function GET(_request: Request, { params }: RouteParams) {
           remainingInstallments: remainingByMasterlistId.get(mid) ?? 0,
           futureInstallments: (futureRowsByMasterlistId.get(mid) ?? [])
             .sort((a, b) => a.installmentNo - b.installmentNo)
-            .map((inst) => ({ ...inst, interestPortion })),
+            .map((inst) => ({
+              ...inst,
+              interestPortion: interestMap.get(inst.installmentNo) ?? 0,
+            })),
         };
       });
     }

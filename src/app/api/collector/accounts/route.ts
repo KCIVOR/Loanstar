@@ -165,6 +165,22 @@ export async function GET(request: Request) {
       }
     }
 
+    // Task 4 — recorded-but-unposted payment count per account, so the queue
+    // can flag "DCR pending" without opening each one. One grouped query (not
+    // N+1); `payments.status` alone is authoritative for "posted".
+    const unpostedByMasterlist = new Map<string, number>();
+    if (activeIds.length) {
+      const { data: pendingPayments } = await supabase
+        .from("payments")
+        .select("masterlist_id")
+        .in("masterlist_id", activeIds)
+        .in("status", ["pending_verification", "confirmed"]);
+      for (const row of pendingPayments ?? []) {
+        const id = row.masterlist_id as string;
+        unpostedByMasterlist.set(id, (unpostedByMasterlist.get(id) ?? 0) + 1);
+      }
+    }
+
     const accounts: CollectorQueueMappedRow[] = (data ?? []).map((row) => {
       const schedules = asSchedules(row.amortization_schedules);
       const next = nextOpenInstallment(schedules);
@@ -186,6 +202,8 @@ export async function GET(request: Request) {
         nextDueDate: next?.due_date ?? null,
         nextDueAmount: next ? next.netAmountDue : null,
         lastContact: lastContactByMasterlist.get(row.id as string) ?? null,
+        unpostedPaymentCount:
+          unpostedByMasterlist.get(row.id as string) ?? 0,
       };
     });
 

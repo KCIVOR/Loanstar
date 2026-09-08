@@ -220,6 +220,25 @@ const INPUT_MODE_LABEL: Record<string, string> = {
   PRINCIPAL: "Principal",
 };
 
+/** Daily Interest "Total interest" formula line — spells out the exact window
+ * and divisor used (matches the SME calculator: principal × rate ÷ days-in-
+ * release-month × days-from-release-to-payment). */
+function dailyInterestFormula(c: Computation): string {
+  const base = `₱${formatMoney(c.principal)} × ${pct(c.interestRate)}/mo`;
+  const rd = c.releaseDate;
+  const pd = c.firstPaymentDate;
+  if (!rd || !pd) return `${base} ÷ days in release month × days to payment`;
+  const [ry, rm, rdd] = rd.split("-").map(Number);
+  const [py, pm, pdd] = pd.split("-").map(Number);
+  const daysInReleaseMonth = new Date(ry, rm, 0).getDate();
+  const dayCount = Math.round(
+    (Date.UTC(py, pm - 1, pdd) - Date.UTC(ry, rm - 1, rdd)) / 86_400_000,
+  );
+  return `${base} ÷ ${daysInReleaseMonth} days in ${rd.slice(0, 7)} × ${dayCount} day${
+    dayCount === 1 ? "" : "s"
+  } (${rd} → ${pd})`;
+}
+
 function buildComputationSteps(c: Computation) {
   const pfBundle = c.processingFee + c.docStamp + c.notaryFee + c.adminCost;
   const principalFormula =
@@ -253,7 +272,7 @@ function buildComputationSteps(c: Computation) {
       label: "Total interest",
       formula:
         c.paymentFrequency === "daily"
-          ? `₱${formatMoney(c.principal)} × (${pct(c.interestRate)} ÷ 30 per day) × actual days to payment date`
+          ? dailyInterestFormula(c)
           : `₱${formatMoney(c.principal)} × (${c.terms} + ${c.addonMonths} addon mo) × ${pct(c.interestRate)}`,
       value: c.totalInterest,
     },
@@ -397,14 +416,16 @@ export function buildDetailedComputationBreakdown(
       title: "Step 4 — Other deductions",
       rows: [
         ...otherLoanRows.map((r, i) => ({
-          label: `Offset${otherLoanRows.length > 1 ? ` #${i + 1}` : ""}`,
-          formula: r.accountNo ? `Deducted against account ${r.accountNo}` : "Manual / external — no linked account",
+          label: `Offset — full settlement${otherLoanRows.length > 1 ? ` #${i + 1}` : ""}`,
+          formula: r.accountNo
+            ? `Closes account ${r.accountNo} (whole balance${(r.discountAmount ?? 0) > 0 ? " less discount" : ""})`
+            : "Manual / external — no linked account",
           value: money(r.amount),
         })),
         ...offsetRows.map((r, i) => ({
-          label: `Other loan${offsetRows.length > 1 ? ` #${i + 1}` : ""}`,
+          label: `Other loan — partial${offsetRows.length > 1 ? ` #${i + 1}` : ""}`,
           formula: r.accountNo
-            ? `${r.months ?? "—"} month(s) applied against ${r.accountNo}`
+            ? `${r.months ?? "—"} month(s) applied against ${r.accountNo} (does not close it)`
             : "Manual other-loan amount",
           value: money(r.amount),
         })),
@@ -590,6 +611,13 @@ export const ComputationPanel = forwardRef<ComputationPanelHandle, ComputationPa
   // Daily Interest only — manual payment date (single payment, not a
   // recurring schedule). Required when the schedule type is "daily".
   const [paymentDate, setPaymentDate] = useState("");
+  // Daily Interest only — the planned release date. Interest is
+  // principal × rate ÷ (days in this month) × (paymentDate − releaseDate),
+  // matching the SME calculator. Defaults to today; the encoder sets the
+  // real disbursement date. Not sent for any other schedule type.
+  const [releaseDate, setReleaseDate] = useState(
+    new Date().toISOString().slice(0, 10),
+  );
   const [selectedLoanTypeId, setSelectedLoanTypeId] = useState(loanTypeId ?? "");
   // sme/individual free-text rates — percent-typed (e.g. "8" for 8%), converted
   // to decimal (0.08) only when building the POST body.
@@ -735,6 +763,9 @@ export const ComputationPanel = forwardRef<ComputationPanelHandle, ComputationPa
       );
       if (computation.paymentFrequency === "daily" && computation.firstPaymentDate) {
         setPaymentDate(computation.firstPaymentDate);
+      }
+      if (computation.paymentFrequency === "daily" && computation.releaseDate) {
+        setReleaseDate(computation.releaseDate);
       }
     }
     const savedDiscountsMap = new Map<number, string>();
@@ -1284,6 +1315,11 @@ export const ComputationPanel = forwardRef<ComputationPanelHandle, ComputationPa
   function applyDiscountModal() {
     if (discountModalRowIndex === null || !discountModalLoan) return;
     const netDiscount = discountModalNet;
+    // Task 2: cash = whole balance − the (now correctly-sized) discount. AR's
+    // post_internal_transfer re-trues this against the live balance, applies
+    // the discount greedily so none is wasted, and blocks if the cash can't
+    // cover it — so an off-by-a-bit estimate here can no longer strand a
+    // balance the way the Sept-04 offset did.
     const finalAmount = Math.max(0, halfUp(discountModalLoan.outstandingBalance - netDiscount));
     const installmentNos = Array.from(discountModalDiscounts.keys()).sort((a, b) => a - b);
     setOtherLoanRows((rows) =>
@@ -1337,6 +1373,19 @@ export const ComputationPanel = forwardRef<ComputationPanelHandle, ComputationPa
     }
     if (selectedScheduleType === "daily" && !paymentDate) {
       setError("Payment date is required for Daily Interest loans");
+      return;
+    }
+    if (selectedScheduleType === "daily" && !releaseDate) {
+      setError("Release date is required for Daily Interest loans");
+      return;
+    }
+    if (
+      selectedScheduleType === "daily" &&
+      releaseDate &&
+      paymentDate &&
+      releaseDate >= paymentDate
+    ) {
+      setError("Daily Interest release date must be before the payment date");
       return;
     }
     setComputing(true);
@@ -1402,7 +1451,9 @@ export const ComputationPanel = forwardRef<ComputationPanelHandle, ComputationPa
             ...(segment === "sme" || segment === "individual"
               ? { paymentSchedule: selectedScheduleType }
               : {}),
-            ...(selectedScheduleType === "daily" ? { paymentDate } : {}),
+            ...(selectedScheduleType === "daily"
+              ? { paymentDate, releaseDate }
+              : {}),
             originationDiscounts: originationDiscountsPayload,
             ...(otherLoansPayload.length > 0 || offsetsPayload.length > 0
               ? {
@@ -1683,9 +1734,25 @@ export const ComputationPanel = forwardRef<ComputationPanelHandle, ComputationPa
           )}
           {selectedScheduleType === "daily" && (
             <p className="text-xs text-ink-500 mt-1">
-              Single payment — interest accrues per actual day to the payment date below
+              Single payment — interest = principal × rate ÷ days in the release
+              month × days from release to payment
             </p>
           )}
+        </div>
+      )}
+      {selectedScheduleType === "daily" && (
+        <div className="sm:col-span-2">
+          <Label htmlFor="releaseDate" required>
+            Release date
+          </Label>
+          <Input
+            id="releaseDate"
+            type="date"
+            required
+            value={releaseDate}
+            max={paymentDate || undefined}
+            onChange={(e) => setReleaseDate(e.target.value)}
+          />
         </div>
       )}
       {selectedScheduleType === "daily" && (
@@ -1698,6 +1765,7 @@ export const ComputationPanel = forwardRef<ComputationPanelHandle, ComputationPa
             type="date"
             required
             value={paymentDate}
+            min={releaseDate || undefined}
             onChange={(e) => setPaymentDate(e.target.value)}
           />
         </div>
@@ -1849,9 +1917,18 @@ export const ComputationPanel = forwardRef<ComputationPanelHandle, ComputationPa
           </div>
 
           <div className="grid gap-4 lg:grid-cols-2">
-            {/* Other Loan Section (labeled "Offset" — full settlement) */}
+            {/* FULL-SETTLEMENT tool. Internal state is `otherLoanRows` and the
+                DB transfer_type is 'other_loan' — both are the REVERSE of this
+                user-facing label. Do not trust the variable name: this is the
+                one that pays the target loan's whole balance and carries the
+                early-settlement discount. The partial tool is below. */}
             <div className="flex flex-col gap-2 rounded-[var(--r-md)] border border-line-soft bg-surface-1 p-3">
-              <Label>Offset{otherLoanRows.length > 1 ? "s" : ""} (full settlement)</Label>
+              <Label>Offset{otherLoanRows.length > 1 ? "s" : ""} — full settlement (closes the loan)</Label>
+              <p className="text-[11px] text-ink-400">
+                Pays the target loan&apos;s entire remaining balance so it closes.
+                Amount auto-fills from the balance. Optional early-settlement
+                discount waives interest on the months you choose.
+              </p>
               <div className="flex flex-col gap-2.5">
                 {otherLoanRows.map((row, index) => {
                   const rowOptions = activeLoans.filter(
@@ -1895,8 +1972,17 @@ export const ComputationPanel = forwardRef<ComputationPanelHandle, ComputationPa
                               Custom / external
                             </span>
                           )}
-                          {hasDiscount ? (
-                            <span className="input mono flex items-center text-xs font-medium text-navy-900">
+                          {hasDiscount || match ? (
+                            // Task 2: a full settlement against a real account
+                            // always pays that account's whole balance — the
+                            // amount is not editable down (a hand-lowered amount
+                            // is one way the Sept-04 offset under-settled). A
+                            // custom / external loan with no linked account
+                            // stays a free entry.
+                            <span
+                              className="input mono flex items-center text-xs font-medium text-navy-900"
+                              title={match ? "Full balance of the linked account" : undefined}
+                            >
                               ₱{formatMoney(Number(row.amount))}
                             </span>
                           ) : (
@@ -1981,16 +2067,27 @@ export const ComputationPanel = forwardRef<ComputationPanelHandle, ComputationPa
               </p>
             </div>
 
-            {/* Offset Amount Section (labeled "Other Loan" — partial payment) */}
+            {/* PARTIAL-PAYMENT tool. Internal state is `offsetEntries` and the
+                DB transfer_type is 'offset' — both are the REVERSE of this
+                user-facing label. This one pays only (monthly amortization ×
+                number of months ticked); it does NOT close the loan and carries
+                no discount. Full settlement is the tool above. */}
             <div className="flex flex-col gap-2 rounded-[var(--r-md)] border border-line-soft bg-surface-1 p-3">
               <div className="flex items-center justify-between gap-2">
-                <Label>Other Loan amount</Label>
+                <Label>Other loan — partial payment (by months)</Label>
                 {activeLoans.length > 0 ? (
                   <Button type="button" variant="ghost" size="sm" onClick={openOffsetModal}>
                     {offsetEntries.length > 0 ? "Edit selection" : "Select loan & months"}
                   </Button>
                 ) : null}
               </div>
+              <p className="text-[11px] text-ink-400">
+                Pays only (monthly amortization × months chosen) toward the other
+                loan — it does <span className="font-medium">not</span> close it
+                and has no discount. To settle a loan in full, use{" "}
+                <span className="font-medium">Offset — full settlement</span> on
+                the left.
+              </p>
 
               {offsetEntries.length > 0 ? (
                 <div className="flex flex-col gap-1">
@@ -2005,7 +2102,7 @@ export const ComputationPanel = forwardRef<ComputationPanelHandle, ComputationPa
                     </div>
                   ))}
                   <div className="flex items-center justify-between px-0.5 pt-0.5 text-xs">
-                    <span className="text-ink-400">Combined other-loan total</span>
+                    <span className="text-ink-400">Combined partial-payment total</span>
                     <span className="mono font-semibold text-navy-900">₱{formatMoney(offsetEntriesTotal)}</span>
                   </div>
                 </div>
@@ -2015,7 +2112,7 @@ export const ComputationPanel = forwardRef<ComputationPanelHandle, ComputationPa
                     <span className="add">₱</span>
                     <Input
                       id="offsetManualAmount"
-                      aria-label="Other Loan amount"
+                      aria-label="Other loan partial-payment amount"
                       type="number"
                       min="0"
                       step="0.01"
@@ -2035,7 +2132,7 @@ export const ComputationPanel = forwardRef<ComputationPanelHandle, ComputationPa
                   <div className="affix mt-1">
                     <span className="add">₱</span>
                     <Input
-                      aria-label="Custom other-loan amount"
+                      aria-label="Custom other-loan partial-payment amount"
                       type="number"
                       min="0"
                       step="0.01"
@@ -2054,7 +2151,7 @@ export const ComputationPanel = forwardRef<ComputationPanelHandle, ComputationPa
 
       <Modal
         open={offsetModalOpen}
-        title="Select loans & months (other loan)"
+        title="Select loans & months — partial payment"
         onClose={() => setOffsetModalOpen(false)}
         footer={
           <>

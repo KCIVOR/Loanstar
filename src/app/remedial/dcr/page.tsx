@@ -73,7 +73,17 @@ type PreviewInstallment = {
 type AllocationRow = PreviewInstallment & {
   checked: boolean;
   amount: number;
+  /** Task 4 — peso amount already allocated by a pending item on another
+   * unposted DCRR, and how many such DCRRs. */
+  pendingElsewhere: number;
+  pendingDcrCount: number;
 };
+
+/** Remaining still free on this row after posted payments AND another
+ * unposted DCRR's claim. */
+function installmentFreeToAllocate(row: AllocationRow): number {
+  return Math.max(0, halfUp(installmentRemainingDue(row) - row.pendingElsewhere));
+}
 
 type AllocationModalState = {
   paymentId: string;
@@ -265,6 +275,10 @@ export default function RemedialDcrPage() {
           amortizationScheduleId: string | null;
           amount: number;
         }[];
+        pendingByInstallment?: Record<
+          string,
+          { amount: number; dcrCount: number }
+        >;
       };
 
       const allocBySchedule = new Map(
@@ -272,14 +286,23 @@ export default function RemedialDcrPage() {
           .filter((line) => line.amortizationScheduleId)
           .map((line) => [line.amortizationScheduleId!, line.amount]),
       );
+      const pendingMap = preview.pendingByInstallment ?? {};
 
       const rows: AllocationRow[] = preview.installments.map((inst) => {
         const allocated = allocBySchedule.get(inst.id);
-        return {
+        const pending = pendingMap[inst.id];
+        const pendingElsewhere = pending?.amount ?? 0;
+        const base: AllocationRow = {
           ...inst,
           checked: allocated !== undefined,
           amount: allocated ?? installmentRemainingDue(inst),
+          pendingElsewhere,
+          pendingDcrCount: pending?.dcrCount ?? 0,
         };
+        if (pendingElsewhere > 0 && installmentFreeToAllocate(base) <= 0) {
+          base.checked = false;
+        }
+        return base;
       });
 
       setAllocationModal({
@@ -753,46 +776,68 @@ export default function RemedialDcrPage() {
                       </tr>
                     </thead>
                     <tbody>
-                      {allocationModal.rows.map((row) => (
-                        <tr key={row.id}>
-                          <Td>
-                            <input
-                              type="checkbox"
-                              checked={row.checked}
-                              onChange={(event) =>
-                                updateAllocationRow(row.id, {
-                                  checked: event.target.checked,
-                                })
-                              }
-                              aria-label={`Apply to installment ${row.installmentNo}`}
-                            />
-                          </Td>
-                          <Td className="mono">{row.installmentNo}</Td>
-                          <Td className="mono">{formatDate(row.dueDate)}</Td>
-                          <Td num className="mono">
-                            {formatMoney(installmentRemainingDue(row))}
-                          </Td>
-                          <Td num>
-                            <div className="affix ml-auto w-36">
-                              <span className="add">PHP</span>
-                              <Input
-                                type="number"
-                                min={0}
-                                step="0.01"
-                                className="text-right"
-                                mono
-                                value={row.amount}
-                                disabled={!row.checked}
+                      {allocationModal.rows.map((row) => {
+                        const free = installmentFreeToAllocate(row);
+                        const fullyClaimed =
+                          row.pendingElsewhere > 0 && free <= 0;
+                        return (
+                          <tr
+                            key={row.id}
+                            className={fullyClaimed ? "opacity-55" : undefined}
+                          >
+                            <Td>
+                              <input
+                                type="checkbox"
+                                checked={row.checked}
+                                disabled={fullyClaimed}
                                 onChange={(event) =>
                                   updateAllocationRow(row.id, {
-                                    amount: Number(event.target.value),
+                                    checked: event.target.checked,
                                   })
                                 }
+                                aria-label={`Apply to installment ${row.installmentNo}`}
                               />
-                            </div>
-                          </Td>
-                        </tr>
-                      ))}
+                            </Td>
+                            <Td className="mono">{row.installmentNo}</Td>
+                            <Td className="mono">{formatDate(row.dueDate)}</Td>
+                            <Td num className="mono">
+                              {formatMoney(installmentRemainingDue(row))}
+                              {row.pendingElsewhere > 0 ? (
+                                <span className="mt-0.5 block text-xs font-normal text-amber-600">
+                                  ₱{formatMoney(row.pendingElsewhere)} on{" "}
+                                  {row.pendingDcrCount || 1} unposted DCRR
+                                  {(row.pendingDcrCount || 1) > 1 ? "s" : ""}
+                                  {fullyClaimed
+                                    ? " — fully covered"
+                                    : ` · ₱${formatMoney(free)} free`}
+                                </span>
+                              ) : null}
+                            </Td>
+                            <Td num>
+                              <div className="affix ml-auto w-36">
+                                <span className="add">PHP</span>
+                                <Input
+                                  type="number"
+                                  min={0}
+                                  max={
+                                    row.pendingElsewhere > 0 ? free : undefined
+                                  }
+                                  step="0.01"
+                                  className="text-right"
+                                  mono
+                                  value={row.amount}
+                                  disabled={!row.checked || fullyClaimed}
+                                  onChange={(event) =>
+                                    updateAllocationRow(row.id, {
+                                      amount: Number(event.target.value),
+                                    })
+                                  }
+                                />
+                              </div>
+                            </Td>
+                          </tr>
+                        );
+                      })}
                     </tbody>
                   </Table>
                 </div>

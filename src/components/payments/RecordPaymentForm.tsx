@@ -32,7 +32,7 @@ export function RecordPaymentForm({
 }: {
   masterlistId: string;
   borrowerId: string;
-  onRecorded: () => void | Promise<void>;
+  onRecorded: (result?: { warning?: string }) => void | Promise<void>;
 }) {
   const [amount, setAmount] = useState("");
   const [paymentDate, setPaymentDate] = useState("");
@@ -128,15 +128,16 @@ export function RecordPaymentForm({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
+      const body = (await response.json().catch(() => null)) as {
+        error?: string;
+        warning?: string;
+      } | null;
       if (!response.ok) {
-        const body = (await response.json().catch(() => null)) as {
-          error?: string;
-        } | null;
         throw new Error(body?.error ?? "Failed to record payment");
       }
 
       reset();
-      await onRecorded();
+      await onRecorded(body?.warning ? { warning: body.warning } : undefined);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to record payment");
     } finally {

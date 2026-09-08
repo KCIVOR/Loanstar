@@ -56,6 +56,8 @@ const overrideSchema = z.object({
     .optional(),
   /** Daily Interest only — manual payment date. */
   paymentDate: z.string().optional(),
+  /** Daily Interest only — planned release date (interest accrual anchor). */
+  releaseDate: z.string().optional(),
   message: z.string().trim().max(2000).optional(),
   otherDeductions: z
     .object({

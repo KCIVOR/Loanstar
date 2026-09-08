@@ -1,4 +1,5 @@
 import { handleApiError, jsonOk } from "@/lib/api/handler";
+import { summarizeUnpostedForAccount } from "@/lib/ar/duplicate-dcr";
 import { fetchAccountPostings } from "@/lib/collection/account-postings";
 import { COLLECTOR_QUEUE_ACCOUNT_STATUS } from "@/lib/collector/queue";
 import { AMORTIZATION_SCHEDULE_LEDGER_COLUMNS } from "@/lib/ledger/build-account-ledger-rows";
@@ -156,6 +157,17 @@ export async function GET(_request: Request, { params }: RouteParams) {
         }))
         .sort((a, b) => a.installmentNo - b.installmentNo),
       payments: payments ?? [],
+      // Task 4 — recorded-but-unposted payments on this account, so the
+      // record-payment screen can warn before a second payment is entered.
+      // Informational only (no block). `payments.status` alone is
+      // authoritative for "posted" (set by the post_single_dcr_item RPC).
+      unpostedOnAccount: summarizeUnpostedForAccount(
+        (payments ?? []) as Array<{
+          amount: number | string | null;
+          status: string;
+          reference_no?: string | null;
+        }>,
+      ),
       postings,
       pdcChecks,
       moveOfPayment,

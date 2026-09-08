@@ -105,7 +105,7 @@ export async function GET(request: Request) {
 
     const paymentIds = (data ?? []).map((p) => p.id as string);
     let locked = new Set<string>();
-    let draftIds = new Set<string>();
+    const draftIds = new Set<string>();
 
     if (paymentIds.length && scope !== "history") {
       const { data: itemRows, error: itemError } = await supabase
@@ -254,6 +254,16 @@ export async function POST(request: Request) {
       }
     }
 
+    // Task 4 — heads-up (NOT a block): how many payments on this account are
+    // already recorded and still waiting for Accounting to post. Counted
+    // BEFORE this insert. `status` alone is authoritative for "posted".
+    const { count: unpostedBefore } = await supabase
+      .from("payments")
+      .select("id", { count: "exact", head: true })
+      .eq("masterlist_id", body.masterlistId)
+      .in("status", ["pending_verification", "confirmed"]);
+    const priorUnposted = unpostedBefore ?? 0;
+
     const now = new Date().toISOString();
     const { data, error } = await supabase
       .from("payments")
@@ -293,10 +303,24 @@ export async function POST(request: Request) {
         status: "confirmed",
         hasNotes: Boolean(body.notes),
         bucket: DOCUMENT_BUCKET,
+        ...(priorUnposted > 0
+          ? { recordedWithUnpostedPending: priorUnposted }
+          : {}),
       },
     });
 
-    return jsonOk({ payment: data });
+    return jsonOk({
+      payment: data,
+      ...(priorUnposted > 0
+        ? {
+            warning: `Recorded. Note: ${priorUnposted} other payment${
+              priorUnposted === 1 ? "" : "s"
+            } on this account ${
+              priorUnposted === 1 ? "is" : "are"
+            } still waiting for Accounting to post.`,
+          }
+        : {}),
+    });
   } catch (error) {
     if (error instanceof z.ZodError) {
       return NextResponse.json({ error: error.message }, { status: 400 });

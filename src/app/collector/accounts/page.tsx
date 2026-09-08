@@ -364,6 +364,21 @@ export default function CollectorAccountsPage() {
     return <span className="text-ink-400">—</span>;
   }
 
+  function renderDcrPending(acc: CollectorQueueMappedRow) {
+    const n = acc.unpostedPaymentCount ?? 0;
+    if (n <= 0) return null;
+    return (
+      <span
+        className="shrink-0"
+        title={`${n} payment(s) recorded, not yet posted by Accounting`}
+      >
+        <Badge variant="warning" className="whitespace-nowrap">
+          DCR pending{n > 1 ? ` ×${n}` : ""}
+        </Badge>
+      </span>
+    );
+  }
+
   return (
     <div>
       <PageHeader
@@ -625,9 +640,12 @@ export default function CollectorAccountsPage() {
                   <span className="gcard-id">
                     {acc.loanAccountNo ?? acc.borrowerNo}
                   </span>
-                  <Badge variant={agingVariant(acc.agingBucket)}>
-                    {acc.agingBucket}
-                  </Badge>
+                  <span className="flex items-center gap-1">
+                    {renderDcrPending(acc)}
+                    <Badge variant={agingVariant(acc.agingBucket)}>
+                      {acc.agingBucket}
+                    </Badge>
+                  </span>
                 </div>
                 <div className="gcard-name">{acc.borrowerName}</div>
                 <div className="gcard-meta">
@@ -703,7 +721,12 @@ export default function CollectorAccountsPage() {
                 <tr key={acc.id}>
                   <Td>{renderBorrowerCell(acc)}</Td>
                   <Td>{segmentBadge(acc.segment)}</Td>
-                  <Td className="mono">{acc.loanAccountNo ?? "—"}</Td>
+                  <Td className="mono">
+                    <span className="flex items-center gap-1 whitespace-nowrap">
+                      {acc.loanAccountNo ?? "—"}
+                      {renderDcrPending(acc)}
+                    </span>
+                  </Td>
                   <Td num className="mono text-teal-600">
                     {formatMoney(acc.outstandingBalance)}
                   </Td>
