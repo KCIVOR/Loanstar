@@ -80,6 +80,32 @@ have failed. Fixed in Phase 5.
 
 ---
 
+## EXECUTION LOG — 2026-09-09 (all phases applied, live on `acopcwlhkovssjnrqygk`)
+
+Branch `develop`, commits `f47f443` → `9bfad06`.
+
+| Phase | Outcome |
+|-------|---------|
+| 0 | Audit + plan committed (`f47f443`). |
+| 1a | 24 rolled rows → **15 AUTO / 9 QUARANTINE** (AN300450 reclassified — Fact 8). 1a.2/1a.3/1a.5 clean. Plan v2.2 (`80d18cd`). |
+| 1b | **Q1 chosen** — leave the 9 quarantined rows as historical `rolled`. |
+| 1c | `20260909025938_unroll_existing_rolled_rows` — 15 rows un-rolled LIFO; `penalty_periods_applied` seeded to whole-months-overdue; 15 rollover penalties reversed; 0 negatives; 9 rows remain (quarantined). |
+| 1d | `20260909030401_reconcile_unrolled_account_balances` — 6 AUTO accounts' `outstanding_balance` set to derived; `stored == derived` confirmed for all 6. |
+| 2 | **`20260909011055_remove_30day_rollover`** — recorded as applied via the MCP during the plan-authoring session **with no local file**, then clobbered back by a re-run of an earlier migration. Re-asserted on the live DB; matching file created in both folders. `refresh_one_masterlist_aging` has no rollover; smoke test: 0 newly-rolled on a 5-overdue-installment account. |
+| 3 | `refreshMasterlistAging` (orphaned TS twin) rollover block + dead `finalPenalty`/`dpd` removed. `aging-parity.test.mts` deleted (stale pure shadow — no Phase 2 compounding, no rollover). +1 test in `penalty-accrual.test.mts`. `npm test` 1617/1617 (`9bfad06`). |
+| 4 | Downstream audit — **no code change needed**; every `'rolled'` reference is an exclusion filter. Now frozen but not broken: `risk.ts` "rolled installments" KPI (stuck at 9) and the ledger "incl. ₱X carried from #N" note. Cleanup candidates. |
+| 5.2 | AN300459 aged 3/2/1 months → #1/#2/#3 all `overdue`, **each Target ₱74,800.00**, penalties **11,790.35 / 7,667.00 / 3,740.00**, periods 3/2/1, **`rolled_at` NULL on all 12 rows**. Matches the client model. |
+| 5.4/5.5 | Full `refresh_all_aging()` sweep, 45 active/remedial accounts: **0 newly-rolled, 0 new rollover penalties, 0 negative money**; `total_rolled` stays 9; AN300421's quarantined rows untouched. |
+| 5.6 | Not needed — all Phase 5 runs were `BEGIN`/`ROLLBACK`. |
+
+Live backup tables (drop after a clean week): `_backup_rolled_rows_20260909`,
+`_backup_rollover_penalties_20260909`, `_backup_masterlist_balances_20260909`.
+
+Recorded migration order on a fresh replay: `…011055` (remove rollover) →
+`…025938` (un-roll) → `…030401` (reconcile). Valid ordering.
+
+---
+
 ## Executive Summary
 
 **Objective:** Remove the automatic 30-day roll-forward that merges overdue installments, so each
