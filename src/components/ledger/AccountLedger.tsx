@@ -35,19 +35,20 @@ function moneyCell(value: number | null) {
   return formatLedgerMoneyCell(value);
 }
 
-/** Target cell with the Penalty-breakdown Phase 5b "carried from #N" note —
- * how much of this installment's Target / Penalty was folded in by a 30-day
- * rollover of an earlier missed installment. Rendered under the amount so the
- * reader can see what makes up an otherwise unexplained lump (Rule 10). */
+/** Target cell with the Penalty-breakdown Phase 5b "carried from #N" note — how
+ * much of THIS installment's Target was folded in by a 30-day rollover of an
+ * earlier missed installment (the carried-in fee sits in the Penalty column and
+ * is not repeated here). Lets the reader see what makes up an otherwise
+ * unexplained lump (Rule 10). */
 function targetCell(row: AccountLedgerRow) {
-  const carried =
-    (row.carriedInterest ?? 0) + (row.carriedPenalty ?? 0);
+  const carriedIntoTarget = row.carriedInterest ?? 0;
   return (
     <>
       {moneyCell(row.target)}
-      {carried > 0 && row.carriedFrom != null ? (
+      {carriedIntoTarget > 0 && row.carriedFrom != null ? (
         <span className="block text-[11px] font-normal text-ink-400">
-          incl. {formatLedgerMoneyCell(carried)} carried from #{row.carriedFrom}
+          incl. {formatLedgerMoneyCell(carriedIntoTarget)} carried from #
+          {row.carriedFrom}
         </span>
       ) : null}
     </>
