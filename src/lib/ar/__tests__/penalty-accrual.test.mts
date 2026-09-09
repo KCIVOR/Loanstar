@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
+import { computeInvoiceLoan } from "../../computation/invoice";
+
 /**
  * Pure JS mirrors of the SQL penalty engine, so the compounding / recompute /
  * fee-split rules have unit coverage without a live database. Each `simulate*`
@@ -240,6 +242,43 @@ describe("Phase 3 — recompute on payment", () => {
     });
     // remainder 6,000 -> m1 300, m2 5% of 6,300 = 315 -> 615
     assert.equal(r.penaltyAmount, 615);
+  });
+});
+
+describe("Phase 6 — Invoice/Auto/REM: interest is bounded at 3 months, then only the fee", () => {
+  // Rule 9 is satisfied structurally, not by a runtime check:
+  //  1. computeInvoiceLoan enumerates the ENTIRE interest schedule at
+  //     origination (weekly rows for the whole term) — nothing accrues
+  //     interest afterwards.
+  //  2. The term is capped at 3 months by the input guard, so an invoice
+  //     loan cannot carry more than 3 months of interest to begin with.
+  //  3. The SQL aging engine (refresh_one_masterlist_aging) only ever adds to
+  //     penalty_amount (Phase 2 monthly compounding) — it never computes fresh
+  //     interest. The 30-day rollover moves EXISTING balance forward, it does
+  //     not generate interest. So once the weekly schedule is exhausted, only
+  //     the monthly fee grows. No code change was needed for Rule 9.
+  const REL = new Date("2026-01-05");
+
+  it("3-month invoice loan: all interest enumerated up front (12 weekly rows, 22% of principal)", () => {
+    const r = computeInvoiceLoan({ principal: 100_000, terms: 3, releaseDate: REL });
+    assert.equal(r.weeklySchedule.length, 12);
+    assert.equal(r.totalInterest, 22_000);
+    // No row past month 3 exists — there is nothing for interest to accrue onto.
+    assert.equal(Math.max(...r.weeklySchedule.map((w) => w.month)), 3);
+  });
+
+  it("the term itself is capped at 3 months — a 4-month invoice loan cannot be created", () => {
+    assert.throws(
+      () => computeInvoiceLoan({ principal: 100_000, terms: 4, releaseDate: REL }),
+      /1, 2, or 3 months/,
+    );
+  });
+
+  it("penaltyAmount is the informational 5%-of-principal figure, not part of the schedule", () => {
+    const r = computeInvoiceLoan({ principal: 100_000, terms: 3, releaseDate: REL });
+    assert.equal(r.penaltyAmount, 5_000);
+    // It is a result field only — never pushed into weeklySchedule.
+    assert.ok(r.weeklySchedule.every((w) => w.amountDue !== r.penaltyAmount || w.month <= 3));
   });
 });
 

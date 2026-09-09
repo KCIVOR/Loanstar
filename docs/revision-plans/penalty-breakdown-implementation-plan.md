@@ -137,6 +137,22 @@ applied live).
 - **Not covered by shadow tests** (need DB / are later phases): the 30-day
   rollover interaction, Phase 6 invoice rule.
 
+### Phase 6 — VERIFIED, no code change, 2026-09-09
+Rule 9 ("interest builds for max 3 months, then only the fee") is already
+satisfied structurally:
+- `computeInvoiceLoan` enumerates the **entire** weekly interest schedule at
+  origination — nothing accrues interest after release.
+- The term is guarded to **1–3 months**, so an invoice loan cannot carry more
+  than 3 months of interest to begin with.
+- `refresh_one_masterlist_aging` only ever adds to `penalty_amount` — it never
+  computes fresh interest; the 30-day rollover moves *existing* balance, it does
+  not generate interest.
+- 3 tests added to `penalty-accrual.test.mts` locking this in.
+- **Confirm at the demo:** whether the generic monthly fee on the overdue
+  principal row is acceptable, or the client wants the specific "5% of
+  principal" figure surfaced. If the latter, it is a small localised addition to
+  the Phase 2 accrual loop.
+
 ### Phase 4b — DONE, 2026-09-09
 Migration `20260909002138_dcr_penalty_paid_split.sql` (both folders; applied live).
 - New `dcr_items.penalty_paid_amount` + `penalty_paid_installment_nos` (additive,
@@ -208,7 +224,7 @@ applied live).
 | 4b | **Done, live** — collector-typed fee-split override in the DCR allocate modal |
 | 5a | **Done** — ledger "Report Total" now nets realized Collector/Offset discounts |
 | 5b | **Done, live** — `carried_*` columns populated by the rollover; ledger builder exposes them; "incl. ₱X from #N" render text deferred to 4b |
-| 6 | Blocked on client — invoice/auto/REM interest-stop (likely verify-only) |
+| 6 | **Verified — no code change** — invoice/auto/REM interest is bounded at 3 months by construction; confirm the generic-fee behaviour with the client at the demo |
 | 7 | **Done, live** (item 1) — `refresh_all_aging` error isolation; items 2/3 need no code |
 | 8 | Partial — shadow tests + validation journey done; more coverage rides Phases 5/6 |
 
