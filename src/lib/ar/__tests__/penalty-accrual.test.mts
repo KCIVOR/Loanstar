@@ -191,6 +191,22 @@ describe("Phase 2 — monthly compounding accrual", () => {
     assert.equal(simulateMonthlyAccrual(baseRow(), 1, 0.15).rounds[0], 1500);
     assert.equal(simulateMonthlyAccrual(baseRow(), 1, 0.05).rounds[0], 500);
   });
+
+  it("no roll-forward: three consecutively-overdue installments each keep their own Target and compound independently (removed 2026-09-09)", () => {
+    // The 30-day roll-forward was removed. On a monthly loan aged so #1/#2/#3
+    // are 3/2/1 months overdue, each row stays 'overdue' at its own Target and
+    // accrues its own months of fee — none is merged/rolled into another.
+    const inst1 = simulateMonthlyAccrual(baseRow(), 3, 0.05); // ₱10k, 3 months
+    const inst2 = simulateMonthlyAccrual(baseRow(), 2, 0.05);
+    const inst3 = simulateMonthlyAccrual(baseRow(), 1, 0.05);
+    assert.deepEqual(
+      [inst1.penaltyAmount, inst2.penaltyAmount, inst3.penaltyAmount],
+      [1576.25, 1025, 500],
+    );
+    // Each still owes its own ₱10,000 principal — no Target was inflated by a
+    // merge. (Target is `amountDue`, which simulateMonthlyAccrual never mutates.)
+    assert.equal(baseRow().amountDue, 10000);
+  });
 });
 
 describe("Phase 3 — recompute on payment", () => {
