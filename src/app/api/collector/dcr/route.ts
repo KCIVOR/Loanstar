@@ -38,6 +38,10 @@ const addItemSchema = z.object({
   penaltyDiscountAmount: z.number().min(0).optional(),
   penaltyDiscountedInstallmentNos: z.array(z.number().int().positive()).optional(),
   discountReason: z.string().optional(),
+  // Penalty breakdown Phase 4b — collector's manual "of this payment, ₱X is
+  // late-fee money" split. Not a discount: no permission gate, no reason.
+  penaltyPaidAmount: z.number().min(0).optional(),
+  penaltyPaidInstallmentNos: z.array(z.number().int().positive()).optional(),
 });
 
 const submitSchema = z.object({
@@ -117,9 +121,14 @@ export async function POST(request: Request) {
         penaltyDiscountAmount,
         penaltyDiscountedInstallmentNos,
         discountReason,
+        penaltyPaidAmount,
+        penaltyPaidInstallmentNos,
       } = addParsed.data;
       const hasDiscount =
         (interestDiscountAmount ?? 0) > 0 || (penaltyDiscountAmount ?? 0) > 0;
+      const hasPenaltyPaid =
+        (penaltyPaidAmount ?? 0) > 0 &&
+        (penaltyPaidInstallmentNos ?? []).length > 0;
 
       if (hasDiscount) {
         // One permission gates both sections — checked once, before
@@ -149,6 +158,13 @@ export async function POST(request: Request) {
               penaltyDiscountedInstallmentNos:
                 penaltyDiscountedInstallmentNos ?? [],
               discountReason: discountReason ?? "",
+            }
+          : undefined,
+        undefined, // serviceClient — use the default
+        hasPenaltyPaid
+          ? {
+              penaltyPaidAmount: penaltyPaidAmount ?? 0,
+              penaltyPaidInstallmentNos: penaltyPaidInstallmentNos ?? [],
             }
           : undefined,
       );

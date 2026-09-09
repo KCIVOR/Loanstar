@@ -186,6 +186,11 @@ export default function CollectorDcrPage() {
   const [penaltyDiscountSelections, setPenaltyDiscountSelections] =
     useState<Map<number, string>>(new Map());
   const [discountReason, setDiscountReason] = useState("");
+  // Penalty breakdown Phase 4b — installment no -> peso string the collector
+  // marks as late-fee money on this payment. Independent of the discount
+  // sections (not a waiver, no permission gate).
+  const [penaltyPaidSelections, setPenaltyPaidSelections] =
+    useState<Map<number, string>>(new Map());
 
   const { permissions } = usePermissions();
   const canDiscount =
@@ -306,6 +311,27 @@ export default function CollectorDcrPage() {
   const hasDiscount = interestDiscountTotal > 0 || penaltyDiscountTotal > 0;
   const discountReasonMissing = hasDiscount && discountReason.trim() === "";
 
+  // Penalty breakdown Phase 4b — which installments the collector tagged, and
+  // the peso total of what they typed. Server splits the total evenly across
+  // the tagged installments and caps each at the fee owed.
+  const penaltyPaidInstallmentNos = useMemo(
+    () =>
+      Array.from(penaltyPaidSelections.entries())
+        .filter(([, v]) => Number(v) > 0)
+        .map(([no]) => no),
+    [penaltyPaidSelections],
+  );
+  const penaltyPaidTotal = useMemo(
+    () =>
+      halfUp(
+        Array.from(penaltyPaidSelections.values()).reduce(
+          (sum, v) => sum + (Number(v) > 0 ? Number(v) : 0),
+          0,
+        ),
+      ),
+    [penaltyPaidSelections],
+  );
+
   async function startDcr() {
     setActing(true);
     setError(null);
@@ -403,6 +429,7 @@ export default function CollectorDcrPage() {
 
       setInterestDiscountSelections(new Map());
       setPenaltyDiscountSelections(new Map());
+      setPenaltyPaidSelections(new Map());
       setDiscountReason("");
 
       setAllocationModal({
@@ -425,8 +452,26 @@ export default function CollectorDcrPage() {
     setAllocationModal(null);
     setInterestDiscountSelections(new Map());
     setPenaltyDiscountSelections(new Map());
+    setPenaltyPaidSelections(new Map());
     setDiscountReason("");
     setError(null);
+  }
+
+  function togglePenaltyPaidInstallment(installmentNo: number, checked: boolean) {
+    setPenaltyPaidSelections((prev) => {
+      const next = new Map(prev);
+      if (checked) next.set(installmentNo, "");
+      else next.delete(installmentNo);
+      return next;
+    });
+  }
+
+  function updatePenaltyPaidAmount(installmentNo: number, amount: string) {
+    setPenaltyPaidSelections((prev) => {
+      const next = new Map(prev);
+      next.set(installmentNo, amount);
+      return next;
+    });
   }
 
   function toggleDiscountInstallment(
@@ -538,6 +583,16 @@ export default function CollectorDcrPage() {
           }
         : {};
 
+    // Phase 4b — collector's manual fee split. Independent of the discount
+    // permission; only sent when they actually tagged something.
+    const penaltyPaidFields =
+      penaltyPaidTotal > 0 && penaltyPaidInstallmentNos.length > 0
+        ? {
+            penaltyPaidAmount: penaltyPaidTotal,
+            penaltyPaidInstallmentNos,
+          }
+        : {};
+
     setActing(true);
     setError(null);
     try {
@@ -550,6 +605,7 @@ export default function CollectorDcrPage() {
           paymentId: allocationModal.paymentId,
           allocations,
           ...discountFields,
+          ...penaltyPaidFields,
         }),
       });
       if (!res.ok) {
@@ -1204,6 +1260,95 @@ export default function CollectorDcrPage() {
                         ₱{formatMoney(penaltyDiscountTotal)}
                       </span>
                     </p>
+                  </div>
+                ) : null}
+
+                {allocationModal.penaltyEligible.length > 0 ? (
+                  <div>
+                    <h4 className="mb-1 text-sm font-semibold text-ink-700">
+                      Late fee paid
+                    </h4>
+                    <p className="mb-2 text-xs text-ink-500">
+                      Of this payment, how much is late-fee money on each
+                      overdue month. Leave blank to let the system split it
+                      automatically (fee first).
+                    </p>
+                    <div className="tbl-wrap max-h-56 overflow-y-auto">
+                      <Table>
+                        <thead>
+                          <tr>
+                            <Th className="w-10"> </Th>
+                            <Th>#</Th>
+                            <Th>Due date</Th>
+                            <Th num>Fee owed</Th>
+                            <Th num>Fee paid</Th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {allocationModal.penaltyEligible.map((inst) => {
+                            const checked = penaltyPaidSelections.has(
+                              inst.installmentNo,
+                            );
+                            return (
+                              <tr key={inst.id}>
+                                <Td>
+                                  <input
+                                    type="checkbox"
+                                    checked={checked}
+                                    onChange={(event) =>
+                                      togglePenaltyPaidInstallment(
+                                        inst.installmentNo,
+                                        event.target.checked,
+                                      )
+                                    }
+                                    aria-label={`Mark late-fee paid on installment ${inst.installmentNo}`}
+                                  />
+                                </Td>
+                                <Td className="mono">{inst.installmentNo}</Td>
+                                <Td className="mono">
+                                  {formatDate(inst.dueDate)}
+                                </Td>
+                                <Td num className="mono">
+                                  {formatMoney(inst.penaltyAmount)}
+                                </Td>
+                                <Td num>
+                                  <div className="affix ml-auto w-28">
+                                    <span className="add">₱</span>
+                                    <Input
+                                      type="number"
+                                      min={0}
+                                      step="0.01"
+                                      className="text-right"
+                                      mono
+                                      value={
+                                        penaltyPaidSelections.get(
+                                          inst.installmentNo,
+                                        ) ?? ""
+                                      }
+                                      disabled={!checked}
+                                      onChange={(event) =>
+                                        updatePenaltyPaidAmount(
+                                          inst.installmentNo,
+                                          event.target.value,
+                                        )
+                                      }
+                                    />
+                                  </div>
+                                </Td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </Table>
+                    </div>
+                    {penaltyPaidTotal > 0 ? (
+                      <p className="mt-2 text-sm">
+                        Late fee paid total:{" "}
+                        <span className="mono font-semibold text-navy-900">
+                          ₱{formatMoney(penaltyPaidTotal)}
+                        </span>
+                      </p>
+                    ) : null}
                   </div>
                 ) : null}
 

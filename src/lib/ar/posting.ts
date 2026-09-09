@@ -1489,6 +1489,16 @@ export type CollectorDiscountInput = {
   discountReason: string;
 };
 
+/** Penalty breakdown Phase 4b — the collector's manual split of a payment into
+ * "this much is late-fee money". NOT a discount/waiver (nothing is forgiven),
+ * so it carries no permission gate and no reason. `post_single_dcr_item` splits
+ * `penaltyPaidAmount` evenly across `penaltyPaidInstallmentNos` and writes it to
+ * `postings.penalty_amount`, capped at the fee actually owed. */
+export type CollectorPenaltyPaidInput = {
+  penaltyPaidAmount: number;
+  penaltyPaidInstallmentNos: number[];
+};
+
 /**
  * Server-side re-derivation of the true maximum a Collector discount can
  * be — required, not optional (feature-collector-discount-implementation-plan.md,
@@ -1571,6 +1581,10 @@ export async function addPaymentToDcr(
   /** Service-role client for the Task-4 duplicate lookup (see below). Defaults
    * to `createServiceClient()`; injectable so unit tests can stub it. */
   serviceClient?: SupabaseClient,
+  /** Penalty breakdown Phase 4b — collector's manual fee split, if any.
+   * Trailing param so every existing positional caller (incl. the Task-4
+   * tests that inject `serviceClient`) is unaffected. */
+  penaltyPaidInput?: CollectorPenaltyPaidInput,
 ) {
   const { data: dcr } = await supabase
     .from("dcr")
@@ -1696,6 +1710,16 @@ export async function addPaymentToDcr(
       penalty_discounted_installment_nos:
         discountInput?.penaltyDiscountedInstallmentNos ?? [],
       discount_reason: discountInput?.discountReason?.trim() || null,
+      // Phase 4b — draft-time save only; applied by post_single_dcr_item at
+      // posting, capped there at the fee actually owed.
+      penalty_paid_amount: Math.max(
+        0,
+        penaltyPaidInput?.penaltyPaidAmount ?? 0,
+      ),
+      penalty_paid_installment_nos:
+        (penaltyPaidInput?.penaltyPaidAmount ?? 0) > 0
+          ? (penaltyPaidInput?.penaltyPaidInstallmentNos ?? [])
+          : [],
     })
     .select("id")
     .single();

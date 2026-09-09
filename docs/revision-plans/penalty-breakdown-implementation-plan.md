@@ -137,6 +137,32 @@ applied live).
 - **Not covered by shadow tests** (need DB / are later phases): the 30-day
   rollover interaction, Phase 6 invoice rule.
 
+### Phase 4b — DONE, 2026-09-09
+Migration `20260909002138_dcr_penalty_paid_split.sql` (both folders; applied live).
+- New `dcr_items.penalty_paid_amount` + `penalty_paid_installment_nos` (additive,
+  defaults) + a `>= 0` check. **No permission gate** — it is categorisation, not
+  a waiver.
+- `post_single_dcr_item` fee-split branch: when the collector named an
+  installment in `penalty_paid_installment_nos`, `postings.penalty_amount` for
+  that row is `least(alloc, least(typed even share, fee owed net of waiver and
+  earlier postings))` — a typo cannot invent fee income or mis-close a row (the
+  Pass A / Pass B thresholds and `amount_paid` are untouched). Un-named
+  installments keep the Phase 4a automatic penalty-first split; on-time payments
+  still record 0.
+- `src/lib/ar/posting.ts` — new `CollectorPenaltyPaidInput` type;
+  `addPaymentToDcr` takes it as a **trailing** param (so the Task-4 tests that
+  inject `serviceClient` positionally are untouched) and writes the two columns.
+- `src/app/api/collector/dcr/route.ts` — zod `penaltyPaidAmount` /
+  `penaltyPaidInstallmentNos`; passed through only when a tagged amount exists.
+- `src/app/collector/dcr/page.tsx` — a "Late fee paid" table in the allocate
+  modal (mirrors the Penalty-discount table, peso input instead of %), its own
+  `penaltyPaidSelections` state + reset, `penaltyPaidTotal` /
+  `penaltyPaidInstallmentNos` memos, added to the `add_item` payload.
+- **Live dry-run:** collector types exactly ₱500 on a ₱500-fee installment →
+  `postings.penalty_amount = 500`; collector types ₱9,999 on a ₱500-fee
+  installment → capped to ₱500. `npm test` 1639; tsc clean; `/collector/dcr`
+  renders.
+
 ### Phase 5a — DONE, 2026-09-09
 `src/lib/ledger/build-account-ledger-rows.ts` — `buildAccountLedgerRows` now
 subtracts the realized **Collector / Offset** discount (`discountSource IN
@@ -179,7 +205,7 @@ applied live).
 | 2 | **Done, live** — monthly compounding on every overdue installment |
 | 3 (+fix) | **Done, live** — on-time reversal / late-partial recompute; paid-row fix |
 | 4a | **Done, live** — `postings.penalty_amount`, "Penalty income" = collected |
-| 4b | Deferred — collector-typed override input (render text rides here too) |
+| 4b | **Done, live** — collector-typed fee-split override in the DCR allocate modal |
 | 5a | **Done** — ledger "Report Total" now nets realized Collector/Offset discounts |
 | 5b | **Done, live** — `carried_*` columns populated by the rollover; ledger builder exposes them; "incl. ₱X from #N" render text deferred to 4b |
 | 6 | Blocked on client — invoice/auto/REM interest-stop (likely verify-only) |
