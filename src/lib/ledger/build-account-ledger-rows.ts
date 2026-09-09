@@ -14,6 +14,13 @@ export type LedgerSchedule = {
    * merged into `discount` (Rule 6: that one has always meant "reduces the
    * interest side" everywhere in this codebase). */
   penaltyDiscount?: number;
+  /** Penalty breakdown Phase 5b — how much of this row's `target` / `penalty`
+   * was folded in by a 30-day rollover of an earlier missed installment
+   * (`carriedFromInstallmentNo`). Already inside `target` / `penalty`; these
+   * are for the "incl. ₱X carried from #N" note only. */
+  carriedInterest?: number;
+  carriedPenalty?: number;
+  carriedFromInstallmentNo?: number | null;
   installmentNo?: number;
   /** Physical check encoded during LRA release, paired positionally. */
   checkNo?: string | null;
@@ -48,6 +55,9 @@ export type RawAmortizationScheduleRow = {
   discount_amount?: number | string | null;
   discount_source?: string | null;
   penalty_discount_amount?: number | string | null;
+  carried_interest_amount?: number | string | null;
+  carried_penalty_amount?: number | string | null;
+  carried_from_installment_no?: number | string | null;
   status?: string | null;
   moved_at?: string | null;
   move_surcharge_amount?: number | string | null;
@@ -67,6 +77,12 @@ export function mapScheduleRowForLedger(
     discount: Number(row.discount_amount ?? 0),
     discountSource: row.discount_source ?? null,
     penaltyDiscount: Number(row.penalty_discount_amount ?? 0),
+    carriedInterest: Number(row.carried_interest_amount ?? 0),
+    carriedPenalty: Number(row.carried_penalty_amount ?? 0),
+    carriedFromInstallmentNo:
+      row.carried_from_installment_no != null
+        ? Number(row.carried_from_installment_no)
+        : null,
     installmentNo: Number(row.installment_no ?? 0),
     checkNo,
     status: String(row.status ?? ""),
@@ -88,7 +104,7 @@ export function mapScheduleRowForLedger(
  * `amount_paid`, used downstream by the payment form) appends it on top of
  * this constant rather than this constant growing route-specific fields. */
 export const AMORTIZATION_SCHEDULE_LEDGER_COLUMNS =
-  "id, installment_no, due_date, amount_due, penalty_amount, discount_amount, discount_source, penalty_discount_amount, status, paid_at, moved_at, move_surcharge_amount, move_of_payment_batch_id, deferred_from_move_of_payment_batch_id";
+  "id, installment_no, due_date, amount_due, penalty_amount, discount_amount, discount_source, penalty_discount_amount, carried_interest_amount, carried_penalty_amount, carried_from_installment_no, status, paid_at, moved_at, move_surcharge_amount, move_of_payment_batch_id, deferred_from_move_of_payment_batch_id";
 
 export type LedgerPaymentEntry = {
   id: string;
@@ -138,7 +154,27 @@ export type AccountLedgerRow = {
   /** Groups "payment" rows that settled the same installment — lets the
    * table collapse repeated partial payments into one row with a breakdown. */
   scheduleId: string | null;
+  /** Penalty breakdown Phase 5b — the rolled-in portion of this installment's
+   * Target / Penalty, and the installment it came from. `carriedFrom` null
+   * when nothing was rolled in. Already included in `target` / `penalty`. */
+  carriedInterest: number | null;
+  carriedPenalty: number | null;
+  carriedFrom: number | null;
 };
+
+const NO_CARRY = { carriedInterest: null, carriedPenalty: null, carriedFrom: null } as const;
+
+function carryFields(schedule: LedgerSchedule | null | undefined) {
+  const ci = Number(schedule?.carriedInterest) || 0;
+  const cp = Number(schedule?.carriedPenalty) || 0;
+  const from = schedule?.carriedFromInstallmentNo ?? null;
+  if (ci <= 0 && cp <= 0) return NO_CARRY;
+  return {
+    carriedInterest: ci > 0 ? halfUpMoney(ci) : null,
+    carriedPenalty: cp > 0 ? halfUpMoney(cp) : null,
+    carriedFrom: from,
+  };
+}
 
 function halfUpMoney(value: number): number {
   return Math.round((value + Number.EPSILON) * 100) / 100;
@@ -243,6 +279,7 @@ export function buildAccountLedgerRows(
       credit: null,
       balance: openingDebit,
       scheduleId: null,
+      ...NO_CARRY,
     },
   ];
 
@@ -274,6 +311,7 @@ export function buildAccountLedgerRows(
       credit,
       balance,
       scheduleId: schedule?.id ?? null,
+      ...carryFields(schedule),
     });
   }
 
@@ -297,6 +335,7 @@ export function buildAccountLedgerRows(
       credit: halfUpMoney(Number(payment.amount) || 0),
       balance,
       scheduleId: null,
+      ...NO_CARRY,
     });
   }
 
@@ -361,6 +400,7 @@ export function buildAccountLedgerRows(
           credit: showMarkerAmounts ? surcharge : null,
           balance,
           scheduleId: null,
+          ...NO_CARRY,
         });
         for (const payment of realSurcharges) pushSurcharge(payment);
       }
@@ -411,6 +451,7 @@ export function buildAccountLedgerRows(
         credit: null,
         balance,
         scheduleId: schedule.id,
+        ...carryFields(schedule),
       });
       continue;
     }
@@ -419,6 +460,31 @@ export function buildAccountLedgerRows(
 
   for (const payment of [...unappliedCredits].sort(byPaymentDateThenId)) {
     pushCredit(payment, null);
+  }
+
+  // Post-release discounts — a Collector-approved waiver or an Offset
+  // settlement — are realized only when the installment closes, and (unlike
+  // origination discounts, which `openingDebit` already nets out) were never
+  // subtracted from the running balance: `balance` only ever moves down by a
+  // posted credit. A fully-settled account that took a Collector/Offset
+  // discount therefore left Report Total sitting at the discount amount
+  // instead of ₱0. Subtract those realized discounts here so the total
+  // reconciles. Origination / null-source discounts are intentionally
+  // excluded (already in openingDebit).
+  let realizedPostReleaseDiscount = 0;
+  for (const schedule of input.schedules) {
+    if (schedule.moveOfPaymentBatchId) continue;
+    if (statusLabel(schedule.status) !== "paid") continue;
+    if (
+      schedule.discountSource === "collector" ||
+      schedule.discountSource === "offset"
+    ) {
+      realizedPostReleaseDiscount += Number(schedule.discount) || 0;
+    }
+  }
+  realizedPostReleaseDiscount = halfUpMoney(realizedPostReleaseDiscount);
+  if (realizedPostReleaseDiscount > 0) {
+    balance = halfUpMoney(Math.max(0, balance - realizedPostReleaseDiscount));
   }
 
   // A surcharge whose move already reverted (deadline lapsed) has no 'moved'
@@ -447,6 +513,7 @@ export function buildAccountLedgerRows(
     credit: creditTotal,
     balance,
     scheduleId: null,
+    ...NO_CARRY,
   });
 
   return rows;

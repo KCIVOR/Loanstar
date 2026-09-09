@@ -135,7 +135,37 @@ applied live).
   — plain-language demo script for Phases 2/3/4a/7 (compounding, on-time
   reversal, partial recompute, penalty-income report, cron resilience).
 - **Not covered by shadow tests** (need DB / are later phases): the 30-day
-  rollover interaction, Phase 5 ledger, Phase 6 invoice rule.
+  rollover interaction, Phase 6 invoice rule.
+
+### Phase 5a — DONE, 2026-09-09
+`src/lib/ledger/build-account-ledger-rows.ts` — `buildAccountLedgerRows` now
+subtracts the realized **Collector / Offset** discount (`discountSource IN
+('collector','offset')` on `status = 'paid'` rows) from the final `balance`, so
+a fully-settled discounted account's **Report Total reads ₱0.00** instead of the
+leftover discount amount. Origination / null-source discounts are excluded
+(`openingDebit` already nets those). 2 new tests; `npm test` 1637.
+
+### Phase 5b — DONE, 2026-09-09
+Migration `20260909001146_carried_amount_breakdown_columns.sql` (both folders;
+applied live).
+- New `amortization_schedules.carried_interest_amount`,
+  `carried_penalty_amount`, `carried_from_installment_no` (additive, defaults).
+- `refresh_one_masterlist_aging` 30-day rollover: the destination-row `UPDATE`
+  gains three assignments — `carried_interest_amount += v_interest_portion`,
+  `carried_penalty_amount += v_penalty_portion`,
+  `carried_from_installment_no = v_overdue.installment_no`. The existing
+  `amount_due` / `penalty_amount` bump is unchanged (downstream balance calcs
+  still rely on it); the new columns are display-only metadata.
+- `build-account-ledger-rows.ts` — `LedgerSchedule` / `RawAmortizationScheduleRow`
+  / `mapScheduleRowForLedger` / `AMORTIZATION_SCHEDULE_LEDGER_COLUMNS` gain the
+  three fields; `AccountLedgerRow` carries `carriedInterest` / `carriedPenalty`
+  / `carriedFrom` on installment and payment rows.
+- **Live dry-run:** installment #1 (₱10k + ₱500 fee) 35 days overdue rolled into
+  #2 → #2 `carried_interest_amount = 10000`, `carried_penalty_amount = 500`,
+  `carried_from_installment_no = 1`, with the `amount_due` / `penalty_amount`
+  bump intact. 4 new ledger tests; `npm test` 1639.
+- **Deferred to Phase 4b:** the actual "incl. ₱X carried from #N" text on the
+  AR / borrower ledger render sites (the data is now there).
 
 ---
 
@@ -147,8 +177,9 @@ applied live).
 | 2 | **Done, live** — monthly compounding on every overdue installment |
 | 3 (+fix) | **Done, live** — on-time reversal / late-partial recompute; paid-row fix |
 | 4a | **Done, live** — `postings.penalty_amount`, "Penalty income" = collected |
-| 4b | Deferred — collector-typed override input (with Phase 5 UI) |
-| 5 | Not started — `carried_*` breakdown columns + ledger Report Total fix |
+| 4b | Deferred — collector-typed override input (render text rides here too) |
+| 5a | **Done** — ledger "Report Total" now nets realized Collector/Offset discounts |
+| 5b | **Done, live** — `carried_*` columns populated by the rollover; ledger builder exposes them; "incl. ₱X from #N" render text deferred to 4b |
 | 6 | Blocked on client — invoice/auto/REM interest-stop (likely verify-only) |
 | 7 | **Done, live** (item 1) — `refresh_all_aging` error isolation; items 2/3 need no code |
 | 8 | Partial — shadow tests + validation journey done; more coverage rides Phases 5/6 |

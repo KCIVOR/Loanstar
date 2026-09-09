@@ -304,6 +304,81 @@ describe("buildAccountLedgerRows", () => {
     assert.equal(credit?.discount, 1080);
   });
 
+  it("Report Total reconciles to 0 after a Collector discount closes the account (2026-09-09)", () => {
+    // Two ₱1,000 installments. #1 paid in full. #2: borrower pays ₱600, a
+    // ₱400 Collector interest discount closes the rest.
+    const rows = buildAccountLedgerRows({
+      openingDebit: 2000,
+      schedules: [
+        { ...schedules[0]!, target: 1000, status: "paid" },
+        {
+          ...schedules[1]!,
+          target: 1000,
+          penalty: 0,
+          discount: 400,
+          discountSource: "collector",
+          status: "paid",
+        },
+      ],
+      payments: [
+        payment({ id: "p1", paymentDate: "2026-02-16", amount: 1000, scheduleId: "s1" }),
+        payment({ id: "p2", paymentDate: "2026-03-16", amount: 600, scheduleId: "s2" }),
+      ],
+    });
+    // Was ₱400 (the discount) before the fix.
+    assert.equal(rows.at(-1)?.balance, 0);
+  });
+
+  it("does NOT double-subtract an origination / null-source discount (already in openingDebit)", () => {
+    const rows = buildAccountLedgerRows({
+      // openingDebit already net of the ₱400 origination discount on s2.
+      openingDebit: 1600,
+      schedules: [
+        { ...schedules[0]!, target: 1000, status: "paid" },
+        { ...schedules[1]!, target: 1000, penalty: 0, discount: 400, discountSource: null, status: "paid" },
+      ],
+      payments: [
+        payment({ id: "p1", paymentDate: "2026-02-16", amount: 1000, scheduleId: "s1" }),
+        payment({ id: "p2", paymentDate: "2026-03-16", amount: 600, scheduleId: "s2" }),
+      ],
+    });
+    assert.equal(rows.at(-1)?.balance, 0);
+  });
+
+  it("surfaces the carried-in breakdown on a rolled-into installment (Phase 5b)", () => {
+    const rows = buildAccountLedgerRows({
+      openingDebit: 30000,
+      schedules: [
+        {
+          ...schedules[1]!,
+          id: "s2",
+          target: 20000, // 10,000 own + 10,000 carried
+          penalty: 500,
+          carriedInterest: 10000,
+          carriedPenalty: 500,
+          carriedFromInstallmentNo: 1,
+          status: "pending",
+        },
+      ],
+      payments: [],
+    });
+    const inst = rows.find((r) => r.kind === "installment");
+    assert.equal(inst?.carriedInterest, 10000);
+    assert.equal(inst?.carriedPenalty, 500);
+    assert.equal(inst?.carriedFrom, 1);
+  });
+
+  it("leaves carried fields null on an ordinary installment", () => {
+    const rows = buildAccountLedgerRows({
+      openingDebit: 2000,
+      schedules: [{ ...schedules[0]!, target: 1000 }],
+      payments: [],
+    });
+    const inst = rows.find((r) => r.kind === "installment");
+    assert.equal(inst?.carriedInterest, null);
+    assert.equal(inst?.carriedFrom, null);
+  });
+
   it("flattens postings into ledger payment entries", () => {
     const entries = ledgerEntriesFromPostings([
       {
@@ -499,6 +574,10 @@ describe("mapScheduleRowForLedger (2026-08-31 — the one shared DB-row-to-ledge
       // Phase 6) — null/0 on a row that predates or never received one.
       discountSource: null,
       penaltyDiscount: 0,
+      // Penalty breakdown Phase 5b — 0/null on a row nothing rolled into.
+      carriedInterest: 0,
+      carriedPenalty: 0,
+      carriedFromInstallmentNo: null,
       installmentNo: 3,
       checkNo: "605226",
       status: "pending",
