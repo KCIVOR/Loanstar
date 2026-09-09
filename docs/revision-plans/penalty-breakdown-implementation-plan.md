@@ -6,6 +6,32 @@ question the requirements doc raised is already answered from the transcripts.
 
 ---
 
+## STATUS — 2026-09-09: all 8 phases done or verified
+
+Every requirement (Rules 1–11) is delivered. 10 commits on `main`
+(`7102c02`…`a6e44dc`); 6 live migrations (`20260908231312` … `20260909002138`);
+`npm test` 1642/1642. Demo script:
+`penalty-breakdown-validation-journey.md`.
+
+| Phase | Rule(s) | State |
+|---|---|---|
+| 1 | — | Partial (dev route on SQL RPC); orphaned TS twin left for later cleanup |
+| 2 | 2, 3 | **Live** — monthly compounding on every overdue installment |
+| 3 (+fix) | 4a, 4b | **Live** — on-time reversal / late-partial recompute |
+| 4a | 5, 6 | **Live** — fee portion recorded; "Penalty income" = collected |
+| 4b | 5 | **Live** — collector-typed fee-split override in the DCR modal |
+| 5a | 10 | **Live** — ledger Report Total nets realized discounts → ₱0 |
+| 5b | 10 | **Live** — `carried_*` columns + "incl. ₱X carried from #N" on the ledger |
+| 6 | 9 | **Verified, no code** — invoice interest bounded at 3 months by construction |
+| 7 | 1 | **Live** — nightly cron survives one bad account |
+| 8 | — | Shadow tests (19) + validation journey |
+
+**Only open items:** Phase 6 = a yes/no for the client at the demo (generic fee
+vs. surfacing the specific 5%-of-principal figure); Phase 1 cleanup = delete the
+dead `refreshMasterlistAging` twin (no production impact).
+
+---
+
 ## Progress log
 
 ### Phase 1 — DONE (reduced scope), 2026-09-09
