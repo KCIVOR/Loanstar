@@ -14,8 +14,25 @@
 | 1.0 | Initial plan |
 | 2.0 | Rewritten after critical audit + live-database fact-finding. Fixes 3 blocking defects in v1.0. See "What Changed in v2.0". |
 | 2.1 | Fixes 2 substantive gaps + 1 minor, found in a second live-DB review. See "What Changed in v2.1". |
+| 2.2 | **Phase 1a executed.** AN300450 (`3638a07f`) reclassified AUTO → QUARANTINE: its rolled row fails reconciliation (recorded roll_amount ≠ recomputed — source state drifted post-roll). New baseline: **15 AUTO / 6 accounts, 9 QUARANTINE / 4 accounts**. New Fact 8; new Phase 1a.5 pre-check; the Phase 1c quarantine set now also excludes reconciliation-failures; Phase 1d drops to 6 accounts. 1a.1/1a.2/1a.3 all passed. |
 
-### What Changed in v2.1 (read this first)
+### What Changed in v2.2 (read this first)
+
+Phase 1a was run live on `acopcwlhkovssjnrqygk`. Results:
+
+| Check | Outcome |
+|-------|---------|
+| 1a.1 classification | 24 rolled rows. **15 AUTO / 9 QUARANTINE** (not 16/8) — AN300450 moved to QUARANTINE. |
+| 1a.2 one rollover penalty per rolled row | ✅ 0 offending rows |
+| 1a.3 no pre-roll waiver | ✅ 0 rows |
+| 1a.4 reconciliation per AUTO account | ✅ 6 of 7 — **AN300450 fails** (recorded 3,303.09 vs recomputed 6,448.89). See Fact 8. |
+
+Changes: AN300450 added to the Phase 1b quarantine table and Fact 1; Fact 8 documents why; Phase 1a
+gains **1a.5** (a reconciliation pre-check so this class is caught in read-only, not mid-migration);
+the Phase 1c `_quarantined_masterlists` set now `UNION`s in any account with a non-reconciling
+rolled row; Phase 1c counts 16→15 / 8→9; Phase 1d drops `3638a07f` (6 accounts, not 7).
+
+### What Changed in v2.1
 
 v2.0 was correct on the mechanics but left three things unhandled. All verified against the live
 DB on 2026-09-09.
@@ -27,13 +44,13 @@ DB on 2026-09-09.
    AN300432 stored 203,979.60 vs derived 237,288.95 (−33,309.35); AN300362 −39,885.49;
    AN300418 −9,603.29; four more between −5k and −17k. v2.0's Phase 5.4 checkbox
    *"outstanding_balance now equals recompute_outstanding_balance"* would have failed on every AUTO
-   account. **v2.1 adds Phase 1d** — an explicit reconcile of the 7 AUTO accounts' stored balance
+   account. **v2.1 adds Phase 1d** — an explicit reconcile of the 6 AUTO accounts' stored balance
    (which also fixes the pre-existing bug). Quarantined accounts are left alone.
 2. **Un-rolled rows would retroactively compound on the next aging run.** Every rolled row has
    `penalty_periods_applied = 0` (they predate Phase 2, and Phase 2's adoption backfill skipped
    `rolled` rows), yet they are 1–3 whole months overdue. Setting them back to `overdue` without
    seeding the counter means the first cron run accrues 1–3 full compounding rounds at once on
-   each of the 16 rows — a sudden penalty jump on live remedial accounts. **v2.1 seeds
+   each of the 15 rows — a sudden penalty jump on live remedial accounts. **v2.1 seeds
    `penalty_periods_applied` to the current whole-months-overdue in the Phase 1c un-roll**, so the
    fee resumes forward-only (same philosophy as Phase 2's adoption backfill). This is a stated
    business choice — if a retroactive catch-up is wanted instead, see the note in Phase 1c.
@@ -72,8 +89,8 @@ matching the client's model as documented in `penalty-rollforward-audit.md`.
 **Scope:**
 - SQL function `refresh_one_masterlist_aging` (remove rollover block)
 - TypeScript twin `refreshMasterlistAging` (keep in sync)
-- Backfill 16 of 24 existing `status='rolled'` rows; quarantine 8
-- Reconcile the 7 AUTO accounts' stored `masterlist.outstanding_balance` (Phase 1d) — currently
+- Backfill 15 of 24 existing `status='rolled'` rows; quarantine 9
+- Reconcile the 6 AUTO accounts' stored `masterlist.outstanding_balance` (Phase 1d) — currently
   understated by the frozen rollover penalties
 - Verification on test account AN300459 plus one live account per affected segment
 
@@ -100,12 +117,13 @@ re-check before execution disagrees with any of them, **stop and re-plan**.
 | AN300361 | `9776dcab-88d0-49b2-954d-416888bd4262` | seafarer | remedial | 2 | overdue, rolled | ✅ Yes |
 | AN300359 | `d383bea5-d1e2-4472-89d8-4e936888677a` | seafarer | active | 1 | overdue | ✅ Yes |
 | AN300360 | `5b3d85b8-4de1-452f-a5fb-beb86148a52c` | seafarer | active | 1 | overdue | ✅ Yes |
-| AN300450 | `3638a07f-f69c-4df5-a9e8-91218c978402` | sme | active | 1 | overdue | ✅ Yes |
-| **AN300421** | `c91f8a2d-2848-45df-9ed5-52b43e589936` | individual | active | 5 | **partial**, rolled | ⛔ Quarantine |
-| **AN300434** | `e74fff24-dea6-4606-b93e-2ed8f6039390` | sme | **paid** | 2 | **paid**, rolled | ⛔ Quarantine |
-| **AN300018** | `e0296c9a-29eb-411c-b948-2f8b8c4f4858` | sme | **paid** | 1 | **paid** | ⛔ Quarantine |
+| **AN300450** | `3638a07f-f69c-4df5-a9e8-91218c978402` | sme | active | 1 | overdue | ⛔ Quarantine — **fails reconciliation** (Fact 8) |
+| **AN300421** | `c91f8a2d-2848-45df-9ed5-52b43e589936` | individual | active | 5 | **partial**, rolled | ⛔ Quarantine — dest partial |
+| **AN300434** | `e74fff24-dea6-4606-b93e-2ed8f6039390` | sme | **paid** | 2 | **paid**, rolled | ⛔ Quarantine — dest paid, closed loan |
+| **AN300018** | `e0296c9a-29eb-411c-b948-2f8b8c4f4858` | sme | **paid** | 1 | **paid** | ⛔ Quarantine — dest paid, closed loan |
 
-**Totals:** 16 rows / 7 accounts auto-unrollable. 8 rows / 3 accounts quarantined.
+**Totals:** **15 rows / 6 accounts auto-unrollable. 9 rows / 4 accounts quarantined.**
+(v2.0/2.1 said 16/8 — AN300450 was reclassified during the Phase 1a live run; see Fact 8.)
 
 ### Fact 2 — `carried_*` columns were never written by the rollover
 
@@ -166,7 +184,7 @@ postings  : id, dcr_id, payment_id, masterlist_id, amortization_schedule_id
 Test-data cleanup must delete `postings` → `dcr_items` (via `payment_id`) → `payments`, in that
 order, to respect foreign keys.
 
-### Fact 6 — the 7 AUTO accounts' stored balance is already understated
+### Fact 6 — the 6 AUTO accounts' stored balance is already understated
 
 `recompute_outstanding_balance(id)` = `SUM(GREATEST(0, half_up(amount_due − discount_amount +
 penalty_amount − penalty_discount_amount − amount_paid)))` where `status NOT IN
@@ -182,22 +200,44 @@ the stored balance:
 | AN300359 | `d383bea5-…` | 175,700.12 | 187,559.82 | −11,859.70 |
 | AN300418 | `9c6f0048-…` | 73,080.00 | 82,683.29 | −9,603.29 |
 | AN300360 | `5b3d85b8-…` | 127,271.77 | 135,862.60 | −8,590.83 |
-| AN300450 | `3638a07f-…` | 108,163.09 | 113,406.09 | −5,243.00 |
 
 The un-roll (Phase 1c) moves debt from destination rows to the un-rolled rows but is roughly
 balance-neutral in `recompute_outstanding_balance` terms. Phase 1d writes the derived value to
-`outstanding_balance` for these 7 accounts, closing both the pre-existing gap and any residual
-rounding from the un-roll. Quarantined accounts (`c91f8a2d`, `e74fff24`, `e0296c9a`) are
-**not** touched — `c91f8a2d` already reconciles (diff 0.00) and the other two are closed at 0.00.
+`outstanding_balance` for these **6** AUTO accounts, closing both the pre-existing gap and any
+residual rounding from the un-roll. The 4 quarantined accounts (`c91f8a2d`, `e74fff24`,
+`e0296c9a`, `3638a07f`) are **not** touched — `c91f8a2d` already reconciles (diff 0.00), two are
+closed at 0.00, and `3638a07f` needs the manual reconciliation from Fact 8. AN300450's own
+−5,243.00 gap stays until that manual review.
 
 ### Fact 7 — every rolled row has `penalty_periods_applied = 0`
 
-Verified across the AUTO cohort: all 16 rolled rows have `penalty_periods_applied = 0`, while
+Verified across the AUTO cohort: all 15 rolled rows have `penalty_periods_applied = 0`, while
 `age(CURRENT_DATE, due_date)` is 1–3 whole months. They predate the Phase 2 migration
 (`20260908231312`), and that migration's adoption backfill filtered out `status='rolled'`. If
 Phase 1c set them to `overdue` without seeding the counter, the next `refresh_one_masterlist_aging`
 run would accrue 1–3 compounding rounds at once on top of each row's frozen `penalty_amount`.
 Phase 1c seeds the counter to the current whole-months-overdue.
+
+### Fact 8 — AN300450 (`3638a07f`) fails reconciliation and is quarantined
+
+Found during the Phase 1a live run. AN300450 has one rolled row (installment #3 → #6, on a
+Special/balloon schedule with `$0` placeholder rows and a fully-discounted interest line):
+
+| Field | Value |
+|-------|-------|
+| recorded `penalties.amount` (roll_amount) | **3,303.09** |
+| recomputed from #3's current fields | **6,448.89** |
+| #3 now | `amount_due` 6,291.60, `amount_paid` 0, `discount_amount` 0, `penalty_amount` 157.29 |
+| rolled_at | 2026-09-04 (old flat-fee logic — the other penalty row is `'Missed payment penalty'`) |
+
+The recorded roll_amount ≈ 3,145.80 interest + 157.29 penalty = half of #3's current
+`amount_due` + the penalty. #3's `amount_due` / `amount_paid` drifted after it rolled, so the
+mechanical un-roll (subtract the reconstructed portions from #6) would mis-state the balance.
+Phase 1c's reconciliation assertion would abort the whole migration on this row. **AN300450 is
+therefore moved to QUARANTINE** — it needs a human look, like the other three.
+
+The other 6 AUTO accounts all reconcile (`abs(recorded − recomputed) ≤ 0.01` for every rolled
+row) — verified live.
 
 ---
 
@@ -227,7 +267,7 @@ Re-verify the facts above and produce the definitive work list. Run this **immed
 1c; if the counts differ from Fact 1, the data changed since planning — stop and re-plan.
 
 ```sql
--- 1a.1 — Classify every rolled row. Expect 16 'AUTO' and 8 'QUARANTINE'.
+-- 1a.1 — Classify every rolled row. Expect 15 'AUTO' and 9 'QUARANTINE'.
 SELECT
   CASE WHEN bool_or(d.status IN ('paid', 'partial')) OVER (PARTITION BY s.masterlist_id)
        THEN 'QUARANTINE' ELSE 'AUTO' END              AS disposition,
@@ -284,7 +324,7 @@ If this returns rows, the reconstruction in Phase 1c cannot recover the original
 `penalty_discount_amount` — stop and reconstruct those rows by hand from the ledger.
 
 ```sql
--- 1a.4 — Record pre-state for the 7 AUTO accounts, for post-backfill comparison.
+-- 1a.4 — Record pre-state for the 6 AUTO accounts (+ AN300450 for reference).
 SELECT masterlist_id, sum(amount_due) AS sum_due, sum(penalty_amount) AS sum_penalty,
        sum(amount_paid) AS sum_paid, count(*) AS rows
 FROM public.amortization_schedules
@@ -296,32 +336,64 @@ WHERE masterlist_id IN (
 GROUP BY masterlist_id ORDER BY masterlist_id;
 ```
 
+```sql
+-- 1a.5 — Reconciliation pre-check (added v2.2). For every non-quarantined rolled row, the
+-- recorded rollover roll_amount must still match the row's current net due, else the source
+-- state drifted after the roll and the mechanical un-roll would mis-state the balance.
+-- Any account listed here is added to the Phase 1c quarantine set (via the UNION). Expect
+-- exactly two rows: 3638a07f (#3) and e74fff24 (#2) — both already quarantined
+-- (e74fff24 by the paid-destination rule). Any OTHER account here is new: stop and re-count.
+SELECT DISTINCT m.loan_account_no, left(s.masterlist_id::text, 8) AS ml8,
+       s.installment_no,
+       round(pe.amount, 2)                                   AS recorded_roll_amount,
+       round(public.half_up(GREATEST(0,
+           COALESCE(s.amount_due, 0) - COALESCE(s.discount_amount, 0)
+         - COALESCE(s.amount_paid, 0) + COALESCE(s.penalty_amount, 0)
+         - COALESCE(s.penalty_discount_amount, 0))), 2)       AS recomputed
+FROM public.amortization_schedules s
+JOIN public.masterlist m ON m.id = s.masterlist_id
+JOIN public.penalties pe
+  ON pe.amortization_schedule_id = s.id
+ AND pe.notes LIKE '30-day rollover:%'
+ AND pe.reversed_at IS NULL
+WHERE s.status = 'rolled'
+  AND abs(pe.amount - public.half_up(GREATEST(0,
+        COALESCE(s.amount_due, 0) - COALESCE(s.discount_amount, 0)
+      - COALESCE(s.amount_paid, 0) + COALESCE(s.penalty_amount, 0)
+      - COALESCE(s.penalty_discount_amount, 0)))) > 0.01;
+```
+
 **Exit criteria for 1a:**
-- [ ] 1a.1 returns exactly 16 `AUTO` and 8 `QUARANTINE` rows, matching Fact 1
+- [ ] 1a.1 returns exactly 15 `AUTO` and 9 `QUARANTINE` rows, matching Fact 1
 - [ ] 1a.2 returns zero rows
 - [ ] 1a.3 returns zero rows
 - [ ] 1a.4 output saved to the execution log for later comparison
+- [ ] 1a.5 returns **exactly two rows** — `3638a07f` #3 and `e74fff24` #2 — both already
+      quarantined. Any *other* account here is a new reconciliation failure: stop, add it to
+      quarantine, re-count.
 
 ### Phase 1b — Quarantine decision (blocking, human input required)
 
-**Do not automate this.** Three accounts have a rollover destination that has since been paid or
-partially paid. Two of them are closed loans with `outstanding_balance = 0.00`.
+**Do not automate this.** Four accounts (9 rolled rows) cannot be auto-un-rolled. Three have a
+rollover destination since paid/partially paid (two are closed loans at `outstanding_balance =
+0.00`); the fourth fails reconciliation.
 
 | Account | Situation | Why it cannot be auto-unrolled |
 |---------|-----------|-------------------------------|
 | AN300018 (`e0296c9a`) | Loan fully paid & closed. Destination installment is `paid`, `penalty_amount = 0.00`. | The un-roll would need to subtract ₱5,045.09 of penalty from a row that holds ₱0.00 — arithmetically impossible. Restoring the source row would resurrect ₱105,946.97 of debt on a settled loan. |
 | AN300434 (`e74fff24`) | Loan fully paid & closed. Destination `paid` with `amount_paid = 65,624.10`. | Subtracting the rolled amount leaves the row over-paid, producing a negative net balance and a phantom credit. |
 | AN300421 (`c91f8a2d`) | Active. Destination is `partial` with `amount_paid = 28,874.99`. | The payment was made against a merged balance. Splitting it back across two installments is an allocation decision (which installment did the borrower intend to pay?), not a mechanical one. |
+| AN300450 (`3638a07f`) | Active. Special/balloon schedule. One rolled row (#3 → #6). | Recorded roll_amount ₱3,303.09 ≠ recomputed ₱6,448.89 — #3's `amount_due`/`amount_paid` drifted after it rolled (Fact 8). The reconstruction cannot be trusted; needs a per-account manual look. |
 
 **Required decision before Phase 1c runs.** Options:
 
-- **Option Q1 — Leave quarantined (recommended).** These 8 rows keep `status='rolled'` as a
+- **Option Q1 — Leave quarantined (recommended).** These 9 rows keep `status='rolled'` as a
   historical artefact. No new rolled rows will ever be created after Phase 2. Ledger and reports
   already render old rolled rows correctly. Zero risk of resurrecting settled debt.
-- **Option Q2 — Manual reconciliation per account.** Finance reviews each of the 3 accounts and
+- **Option Q2 — Manual reconciliation per account.** Finance reviews each of the 4 accounts and
   supplies the intended allocation; engineering writes a bespoke, per-account correction script.
   Higher effort, and for the two closed loans it likely reopens a settled contract — a business
-  and possibly legal decision.
+  and possibly legal decision. AN300450 is the lightest of the four (one row, active account).
 
 **This plan assumes Option Q1.** If Q2 is chosen, it becomes a separate work item with its own
 plan; Phase 1c is unaffected either way.
@@ -330,7 +402,7 @@ plan; Phase 1c is unaffected either way.
 - [ ] Written decision recorded (Q1 or Q2) with the approver's name and date
 - [ ] If Q2: separate plan drafted and approved before Phase 1c
 
-### Phase 1c — Un-roll the 16 AUTO rows
+### Phase 1c — Un-roll the 15 AUTO rows
 
 **Migration file:** `20260909100000_unroll_existing_rolled_rows.sql`
 
@@ -372,7 +444,10 @@ DECLARE
   v_unrolled        int := 0;
   v_quarantined     int := 0;
 BEGIN
-  -- Accounts where at least one rollover destination has been settled. Skipped wholesale.
+  -- Quarantined accounts, skipped wholesale:
+  --  (a) a rollover destination has been settled (paid/partial), OR
+  --  (b) a rolled row's recorded roll_amount no longer reconciles with its
+  --      current fields — its source state drifted after rolling (Fact 8).
   CREATE TEMP TABLE _quarantined_masterlists ON COMMIT DROP AS
   SELECT DISTINCT s.masterlist_id
   FROM public.amortization_schedules s
@@ -380,7 +455,22 @@ BEGIN
     ON d.masterlist_id  = s.masterlist_id
    AND d.installment_no = s.rolled_into_installment_no
   WHERE s.status = 'rolled'
-    AND d.status IN ('paid', 'partial');
+    AND d.status IN ('paid', 'partial')
+  UNION
+  SELECT DISTINCT s.masterlist_id
+  FROM public.amortization_schedules s
+  JOIN public.penalties pe
+    ON pe.amortization_schedule_id = s.id
+   AND pe.notes LIKE '30-day rollover:%'
+   AND pe.reversed_at IS NULL
+  WHERE s.status = 'rolled'
+    AND abs(
+          pe.amount
+          - public.half_up(GREATEST(0,
+              COALESCE(s.amount_due, 0) - COALESCE(s.discount_amount, 0)
+            - COALESCE(s.amount_paid, 0) + COALESCE(s.penalty_amount, 0)
+            - COALESCE(s.penalty_discount_amount, 0)))
+        ) > 0.01;
 
   SELECT count(*) INTO v_quarantined
   FROM public.amortization_schedules s
@@ -528,9 +618,9 @@ BEGIN
 
   RAISE NOTICE 'Un-rolled % row(s). Quarantined % row(s).', v_unrolled, v_quarantined;
 
-  IF v_unrolled <> 16 THEN
+  IF v_unrolled <> 15 THEN
     RAISE EXCEPTION
-      'Un-roll aborted: expected to un-roll exactly 16 rows, actually un-rolled %. '
+      'Un-roll aborted: expected to un-roll exactly 15 rows, actually un-rolled %. '
       'The data differs from the plan baseline — re-run Phase 1a and re-plan.', v_unrolled;
   END IF;
 END $$;
@@ -542,8 +632,8 @@ BEGIN
   SELECT count(*) INTO v_remaining
   FROM public.amortization_schedules WHERE status = 'rolled';
 
-  IF v_remaining <> 8 THEN
-    RAISE EXCEPTION 'Post-condition failed: expected 8 quarantined rolled rows, found %.',
+  IF v_remaining <> 9 THEN
+    RAISE EXCEPTION 'Post-condition failed: expected 9 quarantined rolled rows, found %.',
       v_remaining;
   END IF;
 
@@ -575,14 +665,14 @@ ROLLBACK;
 
 **Dry-run pass criteria — all must hold. Any failure blocks Phase 1c.**
 
-- [ ] `NOTICE`: "Quarantined 8 rolled row(s) across 3 account(s)"
-- [ ] Exactly 16 `NOTICE: Un-rolled installment #…` lines
-- [ ] `NOTICE`: "Un-rolled 16 row(s). Quarantined 8 row(s)."
-- [ ] `NOTICE`: "Post-condition OK: 8 quarantined rolled row(s) remain"
+- [ ] `NOTICE`: "Quarantined 9 rolled row(s) across 4 account(s)"
+- [ ] Exactly 15 `NOTICE: Un-rolled installment #…` lines
+- [ ] `NOTICE`: "Un-rolled 15 row(s). Quarantined 9 row(s)."
+- [ ] `NOTICE`: "Post-condition OK: 9 quarantined rolled row(s) remain"
 - [ ] Zero `EXCEPTION`, zero `WARNING`
-- [ ] In-transaction check: `still_rolled = 0` for the 7 AUTO accounts
+- [ ] In-transaction check: `still_rolled = 0` for the 6 AUTO accounts
 - [ ] Every un-rolled row has `penalty_periods_applied` equal to its whole-months-overdue
-      (`> 0` for all 16 rows, matching `age(CURRENT_DATE, due_date)`)
+      (`> 0` for all 15 rows, matching `age(CURRENT_DATE, due_date)`)
 - [ ] For each AUTO account, `recompute_outstanding_balance` stays within ±₱1.00 of its
       pre-backfill *derived* value (un-rolling moves debt between rows; it does not change the
       total). It will still differ from the *stored* `outstanding_balance` — that is Phase 1d's job.
@@ -590,18 +680,18 @@ ROLLBACK;
 ### Phase 1c post-apply verification
 
 ```sql
--- V1 — Exactly the 8 quarantined rows remain rolled.
+-- V1 — Exactly the 9 quarantined rows remain rolled.
 SELECT count(*) AS rolled_remaining FROM public.amortization_schedules WHERE status = 'rolled';
--- Expect: 8
+-- Expect: 9
 
--- V2 — All remaining rolled rows belong to the 3 quarantined accounts.
+-- V2 — All remaining rolled rows belong to the 4 quarantined accounts.
 SELECT DISTINCT masterlist_id FROM public.amortization_schedules WHERE status = 'rolled';
--- Expect exactly: c91f8a2d…, e74fff24…, e0296c9a…
+-- Expect exactly: c91f8a2d…, e74fff24…, e0296c9a…, 3638a07f…
 
--- V3 — 16 rollover penalties are now marked reversed.
+-- V3 — 15 rollover penalties are now marked reversed.
 SELECT count(*) AS reversed FROM public.penalties
 WHERE notes LIKE '30-day rollover:%' AND reversed_at IS NOT NULL;
--- Expect: 16
+-- Expect: 15
 
 -- V4 — No negative money anywhere.
 SELECT count(*) AS negatives FROM public.amortization_schedules
@@ -623,7 +713,7 @@ WHERE m.id IN (
 only recomputed by the aging function when a discount reverts, so the aging run does **not** fix
 it (this was a wrong assumption in v2.0). The gap is closed by **Phase 1d** below, which is the
 only step that writes `outstanding_balance`. Record both values here; after 1d they must agree
-for all 7 AUTO accounts.
+for all 6 AUTO accounts.
 
 **Constraints for Phase 1:**
 - ❌ Never `DELETE` from `penalties` — reverse via `reversed_at` + `reversal_reason`
@@ -632,22 +722,22 @@ for all 7 AUTO accounts.
   abort instead. (It is fine on `v_penalty_portion` and the `penalty_periods_applied` seed —
   neither can legitimately be negative.)
 - ❌ Never process a quarantined account partially
-- ❌ Phase 1d touches `masterlist.outstanding_balance` for the **7 AUTO accounts only** —
-  never the 3 quarantined accounts
+- ❌ Phase 1d touches `masterlist.outstanding_balance` for the **6 AUTO accounts only** —
+  never the 4 quarantined accounts
 - ✅ Only `status='rolled'` rows in non-quarantined accounts are modified in 1c
 
-### Phase 1d — Reconcile the stored balance (7 AUTO accounts only)
+### Phase 1d — Reconcile the stored balance (6 AUTO accounts only)
 
 **Migration file:** `20260909105000_reconcile_unrolled_account_balances.sql`
 **Runs after** `20260909100000_unroll_existing_rolled_rows.sql`, **before**
 `20260909110000_remove_rollover_from_refresh_aging.sql`.
 
-**Why:** Fact 6. `masterlist.outstanding_balance` for these 7 accounts was already understated by
+**Why:** Fact 6. `masterlist.outstanding_balance` for these 6 accounts was already understated by
 the frozen rollover penalties, and no later step writes it. This migration sets it to the derived
 value. It is a targeted, ID-scoped update — never a table-wide recompute.
 
 ```sql
--- Migration: Reconcile outstanding_balance for the 7 un-rolled AUTO accounts.
+-- Migration: Reconcile outstanding_balance for the 6 un-rolled AUTO accounts.
 -- The stored value was understated by the 30-day rollover's compounding penalties
 -- (refresh_one_masterlist_aging only rewrites outstanding_balance on a discount revert).
 -- Quarantined accounts (c91f8a2d, e74fff24, e0296c9a) are intentionally excluded.
@@ -664,8 +754,8 @@ DECLARE
     '9488b31e-95fa-4fbe-b77c-affedf43af42',
     '9776dcab-88d0-49b2-954d-416888bd4262',
     'd383bea5-d1e2-4472-89d8-4e936888677a',
-    '5b3d85b8-4de1-452f-a5fb-beb86148a52c',
-    '3638a07f-f69c-4df5-a9e8-91218c978402'
+    '5b3d85b8-4de1-452f-a5fb-beb86148a52c'
+    -- 3638a07f (AN300450) intentionally NOT here — quarantined (Fact 8)
   ]::uuid[];
 BEGIN
   -- Guard: none of these must still hold a rolled row (Phase 1c must have run first).
@@ -695,23 +785,23 @@ BEGIN
     RAISE NOTICE 'Reconciled % : % -> % (Δ +%)', v_id, v_before, v_after, (v_after - v_before);
   END LOOP;
 
-  IF v_n <> 7 THEN
-    RAISE EXCEPTION 'Reconcile aborted: expected 7 accounts, updated %.', v_n;
+  IF v_n <> 6 THEN
+    RAISE EXCEPTION 'Reconcile aborted: expected 6 accounts, updated %.', v_n;
   END IF;
 END $$;
 ```
 
 **Dry-run pass criteria:**
-- [ ] 7 `NOTICE: Reconciled …` lines, each Δ positive (or 0.00 for any that already matched)
+- [ ] 6 `NOTICE: Reconciled …` lines, each Δ positive (or 0.00 for any that already matched)
 - [ ] Zero `EXCEPTION`
-- [ ] After apply: `stored = derived` for all 7 AUTO IDs
+- [ ] After apply: `stored = derived` for all 6 AUTO IDs
 - [ ] Quarantined IDs (`c91f8a2d`, `e74fff24`, `e0296c9a`) unchanged
 - [ ] `total_loan` on all 10 accounts unchanged (this migration never touches it)
 
 **Constraints:**
-- ❌ Never `recompute_outstanding_balance` table-wide — only the 7 hard-coded IDs
+- ❌ Never `recompute_outstanding_balance` table-wide — only the 6 hard-coded IDs
 - ❌ Never touch `total_loan`, `account_status`, `aging_bucket`, `remedial_flag`
-- ❌ Never touch the 3 quarantined accounts
+- ❌ Never touch the 4 quarantined accounts
 
 ---
 
@@ -851,7 +941,7 @@ assert the new behaviour and note it in the commit message.
 ## Phase 4 — Downstream Audit
 
 `rolled` is not removed as a status; it simply stops being produced. Every downstream site either
-filters it out or renders it for historical rows, and 8 quarantined rows still exist — so all
+filters it out or renders it for historical rows, and 9 quarantined rows still exist — so all
 existing handling must stay.
 
 ```bash
@@ -864,7 +954,7 @@ Classify each hit:
 | Pattern | Action |
 |---------|--------|
 | `status <> 'rolled'` / `NOT IN ('paid','rolled')` filter | Keep — harmless |
-| Renders carried/rolled rows (ledger) | Keep — 8 quarantined rows still render |
+| Renders carried/rolled rows (ledger) | Keep — 9 quarantined rows still render |
 | Produces a rolled row | Only the two blocks removed in Phases 2–3 |
 
 Known sites confirmed safe: `recompute_outstanding_balance`, `is_account_fully_settled`,
@@ -1205,11 +1295,11 @@ a clean week.
 ## Success Criteria
 
 - [ ] **P0** Audit doc committed
-- [ ] **P1a** Classification returns 16 AUTO / 8 QUARANTINE; assertions 1a.2 and 1a.3 return zero rows
+- [ ] **P1a** Classification returns 15 AUTO / 9 QUARANTINE; assertions 1a.2 and 1a.3 return zero rows
 - [ ] **P1b** Quarantine decision recorded and approved
-- [ ] **P1c** Dry-run passes; applied; 8 rolled rows remain; 16 penalties reversed; no negative money;
+- [ ] **P1c** Dry-run passes; applied; 9 rolled rows remain; 15 penalties reversed; no negative money;
       every un-rolled row's `penalty_periods_applied` = its whole-months-overdue
-- [ ] **P1d** 7 AUTO accounts' `outstanding_balance` set to derived; `stored = derived` after apply;
+- [ ] **P1d** 6 AUTO accounts' `outstanding_balance` set to derived; `stored = derived` after apply;
       quarantined accounts untouched
 - [ ] **P2** Rollover block and 6 dead variables removed; `prosrc` assertion passes; smoke test clean
 - [ ] **P3** `tsc --noEmit` and `eslint` clean; `npm test` green
@@ -1231,7 +1321,7 @@ P1a run classification + assertions      (read-only)
 P1b obtain quarantine decision           (BLOCKING — human)
      take pre-flight backup
 P1c dry-run → verify → apply 20260909100000 → V1–V5 + periods_applied check
-P1d dry-run → verify → apply 20260909105000 → stored == derived for the 7 AUTO accounts
+P1d dry-run → verify → apply 20260909105000 → stored == derived for the 6 AUTO accounts
 P2  dry-run → verify → apply 20260909110000 → smoke + prosrc assertion
 P3  edit posting.ts → tsc → eslint → npm test
 P4  downstream grep + classification
@@ -1275,7 +1365,7 @@ Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>
 ```
 
 ```
-fix(aging): un-roll 16 rolled installments, quarantine 8
+fix(aging): un-roll 15 rolled installments, quarantine 9
 
 Restores rolled rows to overdue and removes the folded amounts from their
 destination installments, unwinding each chain LIFO. Eight rows across
@@ -1293,7 +1383,7 @@ Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>
 ```
 
 ```
-fix(aging): reconcile stored balance for the 7 un-rolled accounts
+fix(aging): reconcile stored balance for the 6 un-rolled accounts
 
 masterlist.outstanding_balance for these accounts was understated by the
 30-day rollover's compounding penalties (refresh_one_masterlist_aging only
