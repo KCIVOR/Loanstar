@@ -164,8 +164,10 @@ applied live).
   #2 → #2 `carried_interest_amount = 10000`, `carried_penalty_amount = 500`,
   `carried_from_installment_no = 1`, with the `amount_due` / `penalty_amount`
   bump intact. 4 new ledger tests; `npm test` 1639.
-- **Deferred to Phase 4b:** the actual "incl. ₱X carried from #N" text on the
-  AR / borrower ledger render sites (the data is now there).
+- **Render text — DONE:** `src/components/ledger/AccountLedger.tsx` (the single
+  shared ledger component — AR, remedial, borrower, collector move-of-payment)
+  now shows `incl. ₱X carried from #N` under the Target amount on any
+  installment a rollover folded into. `npm test` 1639; tsc + eslint clean.
 
 ---
 

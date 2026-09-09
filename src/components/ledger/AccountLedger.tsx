@@ -35,6 +35,25 @@ function moneyCell(value: number | null) {
   return formatLedgerMoneyCell(value);
 }
 
+/** Target cell with the Penalty-breakdown Phase 5b "carried from #N" note —
+ * how much of this installment's Target / Penalty was folded in by a 30-day
+ * rollover of an earlier missed installment. Rendered under the amount so the
+ * reader can see what makes up an otherwise unexplained lump (Rule 10). */
+function targetCell(row: AccountLedgerRow) {
+  const carried =
+    (row.carriedInterest ?? 0) + (row.carriedPenalty ?? 0);
+  return (
+    <>
+      {moneyCell(row.target)}
+      {carried > 0 && row.carriedFrom != null ? (
+        <span className="block text-[11px] font-normal text-ink-400">
+          incl. {formatLedgerMoneyCell(carried)} carried from #{row.carriedFrom}
+        </span>
+      ) : null}
+    </>
+  );
+}
+
 /** Same as moneyCell, but labels a Collector-sourced discount distinctly
  * from an Origination/Offset one (feature-collector-discount-implementation-plan.md,
  * Phase 6) — the ledger's one gap where all three used to render
@@ -191,7 +210,7 @@ export function AccountLedger({
                   </Td>
                   <Td className="mono">{formatLedgerDateCell(row.dueDate)}</Td>
                   <Td num className="mono">
-                    {moneyCell(row.target)}
+                    {targetCell(row)}
                   </Td>
                   <Td num className="mono">
                     {moneyCell(row.penalty)}
@@ -253,7 +272,7 @@ export function AccountLedger({
                   <Td className="mono">{formatLedgerTextCell(first.checkNo)}</Td>
                   <Td className="mono">{formatLedgerDateCell(first.dueDate)}</Td>
                   <Td num className="mono">
-                    {moneyCell(first.target)}
+                    {targetCell(first)}
                   </Td>
                   <Td num className="mono">
                     {moneyCell(first.penalty)}
