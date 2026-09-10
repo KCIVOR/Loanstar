@@ -3,6 +3,7 @@ import { handleApiError, jsonOk } from "@/lib/api/handler";
 import { getActiveComputation } from "@/lib/csa/computation";
 import { createSignedDownloadUrl } from "@/lib/documents/storage";
 import { loadBlriContext } from "@/lib/lra/blri-data";
+import { segmentGroup } from "@/lib/lra/release-documents";
 import { hasEmploymentContractUploaded } from "@/lib/lra/employment-contract";
 import {
   getOrCreateReleaseFile,
@@ -111,6 +112,19 @@ export async function GET(_request: Request, { params }: RouteParams) {
       })),
     );
 
+    // Generate-modal mode only — the modal fetches its (searched / filtered /
+    // paginated) list from `.../document-picker`.
+    const documentPicker = {
+      mode:
+        segmentGroup(
+          app.segment === "sme" || app.segment === "individual"
+            ? app.segment
+            : "seafarer",
+        ) === "seafarer"
+          ? ("curated" as const)
+          : ("catalog" as const),
+    };
+
     const signedReleaseBySlug = await resolveSignedReleaseDocuments(supabase, id);
     const missingSignedReleaseLabels = signedReleaseSlugLabels(
       missingSignedReleaseSlugs(signedReleaseBySlug.keys()),
@@ -141,6 +155,7 @@ export async function GET(_request: Request, { params }: RouteParams) {
       releaseFile: releaseRow,
       pdcChecks: pdcChecks ?? [],
       generatedDocuments: docsWithUrls,
+      documentPicker,
       briefing,
       computation: computation
         ? {

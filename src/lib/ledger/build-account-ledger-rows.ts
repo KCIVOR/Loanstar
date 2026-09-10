@@ -22,6 +22,10 @@ export type LedgerSchedule = {
   carriedPenalty?: number;
   carriedFromInstallmentNo?: number | null;
   installmentNo?: number;
+  /** Total posted to this installment so far (principal + late-fee portions
+   * combined — the schedule row's own `amount_paid`). Used with each credit's
+   * `penaltyPortion` to split "still owed" into principal vs penalty. */
+  amountPaid?: number;
   /** Physical check encoded during LRA release, paired positionally. */
   checkNo?: string | null;
   status?: string | null;
@@ -51,6 +55,7 @@ export type RawAmortizationScheduleRow = {
   installment_no?: number | string | null;
   due_date?: string | null;
   amount_due?: number | string | null;
+  amount_paid?: number | string | null;
   penalty_amount?: number | string | null;
   discount_amount?: number | string | null;
   discount_source?: string | null;
@@ -73,6 +78,7 @@ export function mapScheduleRowForLedger(
     id: String(row.id),
     dueDate: String(row.due_date ?? ""),
     target: Number(row.amount_due ?? 0),
+    amountPaid: Number(row.amount_paid ?? 0),
     penalty: Number(row.penalty_amount ?? 0),
     discount: Number(row.discount_amount ?? 0),
     discountSource: row.discount_source ?? null,
@@ -102,14 +108,20 @@ export function mapScheduleRowForLedger(
  * was missing from 2 of 4 routes because each hand-wrote its own list). A
  * route that needs an extra, non-ledger column (e.g. Collector's
  * `amount_paid`, used downstream by the payment form) appends it on top of
- * this constant rather than this constant growing route-specific fields. */
+ * this constant rather than this constant growing route-specific fields.
+ * `amount_paid` is here because the ledger's per-month "still owed" columns
+ * need it (2026-09-09) — routes no longer append it separately. */
 export const AMORTIZATION_SCHEDULE_LEDGER_COLUMNS =
-  "id, installment_no, due_date, amount_due, penalty_amount, discount_amount, discount_source, penalty_discount_amount, carried_interest_amount, carried_penalty_amount, carried_from_installment_no, status, paid_at, moved_at, move_surcharge_amount, move_of_payment_batch_id, deferred_from_move_of_payment_batch_id";
+  "id, installment_no, due_date, amount_due, amount_paid, penalty_amount, discount_amount, discount_source, penalty_discount_amount, carried_interest_amount, carried_penalty_amount, carried_from_installment_no, status, paid_at, moved_at, move_surcharge_amount, move_of_payment_batch_id, deferred_from_move_of_payment_batch_id";
 
 export type LedgerPaymentEntry = {
   id: string;
   paymentDate: string;
   amount: number;
+  /** How much of `amount` was recorded as late-fee money (postings.penalty_amount).
+   * Lets the ledger split a credit into its principal vs penalty portions for
+   * the per-month "still owed" columns. Defaults to 0. */
+  penaltyPortion?: number;
   referenceNo: string | null;
   channel: string;
   status: string;
@@ -160,9 +172,16 @@ export type AccountLedgerRow = {
   carriedInterest: number | null;
   carriedPenalty: number | null;
   carriedFrom: number | null;
+  /** Per-month "still owed" (2026-09-09): `monthRemaining` = this installment's
+   * principal not yet paid; `penaltyRemaining` = its late fee not yet paid.
+   * Both null on opening / move-of-payment / surcharge rows. On the totals row
+   * they hold the account-wide sums, which add up to `balance`. */
+  monthRemaining: number | null;
+  penaltyRemaining: number | null;
 };
 
 const NO_CARRY = { carriedInterest: null, carriedPenalty: null, carriedFrom: null } as const;
+const NO_REMAIN = { monthRemaining: null, penaltyRemaining: null } as const;
 
 function carryFields(schedule: LedgerSchedule | null | undefined) {
   const ci = Number(schedule?.carriedInterest) || 0;
@@ -280,11 +299,94 @@ export function buildAccountLedgerRows(
       balance: openingDebit,
       scheduleId: null,
       ...NO_CARRY,
+      ...NO_REMAIN,
     },
   ];
 
   let balance = openingDebit;
   let creditTotal = 0;
+
+  // Per-month "still owed" (2026-09-09) — principal and penalty tracked
+  // separately per installment. Seeded to the net Target / net Penalty the
+  // first time a schedule is touched, then decremented as its credits land
+  // (each credit's `penaltyPortion` is the fee slice, the rest is principal).
+  // 'moved' / 'rolled' rows are excluded, same as the balance fold-in above.
+  const principalRemainingBySched = new Map<string, number>();
+  const penaltyRemainingBySched = new Map<string, number>();
+  const remainingTrackedSchedIds = new Set<string>();
+
+  function seedSchedRemaining(schedule: LedgerSchedule) {
+    if (principalRemainingBySched.has(schedule.id)) return;
+    principalRemainingBySched.set(
+      schedule.id,
+      Math.max(0, netTarget(schedule.target, schedule.discount)),
+    );
+    penaltyRemainingBySched.set(
+      schedule.id,
+      Math.max(0, netPenalty(schedule.penalty, schedule.penaltyDiscount)),
+    );
+  }
+
+  function schedRemaining(schedule: LedgerSchedule | null | undefined) {
+    if (!schedule) return NO_REMAIN;
+    const st = statusLabel(schedule.status);
+    if (st === "moved" || st === "rolled") return NO_REMAIN;
+    seedSchedRemaining(schedule);
+    remainingTrackedSchedIds.add(schedule.id);
+    return {
+      monthRemaining: principalRemainingBySched.get(schedule.id) ?? null,
+      penaltyRemaining: penaltyRemainingBySched.get(schedule.id) ?? null,
+    };
+  }
+
+  function applyCreditToRemaining(
+    schedule: LedgerSchedule | null | undefined,
+    payment: LedgerPaymentEntry,
+  ) {
+    if (!schedule) return NO_REMAIN;
+    const st = statusLabel(schedule.status);
+    if (st === "moved" || st === "rolled") return NO_REMAIN;
+    seedSchedRemaining(schedule);
+    remainingTrackedSchedIds.add(schedule.id);
+    const feePortion = halfUpMoney(Number(payment.penaltyPortion) || 0);
+    const amount = halfUpMoney(Number(payment.amount) || 0);
+    const penLeft = halfUpMoney(
+      Math.max(0, (penaltyRemainingBySched.get(schedule.id) ?? 0) - feePortion),
+    );
+    const prinLeft = halfUpMoney(
+      Math.max(
+        0,
+        (principalRemainingBySched.get(schedule.id) ?? 0) -
+          Math.max(0, halfUpMoney(amount - feePortion)),
+      ),
+    );
+    penaltyRemainingBySched.set(schedule.id, penLeft);
+    principalRemainingBySched.set(schedule.id, prinLeft);
+    return { monthRemaining: prinLeft, penaltyRemaining: penLeft };
+  }
+  // Accrued late fees are debits that arise AFTER origination — `openingDebit`
+  // is principal only (it comes from `total_loan`), so a penalty that has been
+  // charged but not yet paid was never in the running balance, while the
+  // credit that pays it flows through `pushCredit` in full. Report Total then
+  // sat below the stored `outstanding_balance` (which counts `penalty_amount`)
+  // by exactly the net unpaid penalty. Fold each installment's net penalty in
+  // once, the first time that installment is emitted, so the ledger reconciles.
+  let penaltyChargedTotal = 0;
+  const penaltyChargedFor = new Set<string>();
+
+  function applyPenaltyCharge(schedule: LedgerSchedule | null | undefined) {
+    if (!schedule || penaltyChargedFor.has(schedule.id)) return;
+    const status = statusLabel(schedule.status);
+    // 'rolled' / 'moved' rows' obligation lives on another row — their penalty
+    // (if any) must not be double-counted here. Matches the status set
+    // `recompute_outstanding_balance` excludes.
+    if (status === "rolled" || status === "moved") return;
+    penaltyChargedFor.add(schedule.id);
+    const pen = netPenalty(Number(schedule.penalty) || 0, schedule.penaltyDiscount);
+    if (pen <= 0) return;
+    penaltyChargedTotal = halfUpMoney(penaltyChargedTotal + pen);
+    balance = halfUpMoney(balance + pen);
+  }
 
   function pushCredit(
     payment: LedgerPaymentEntry,
@@ -312,6 +414,7 @@ export function buildAccountLedgerRows(
       balance,
       scheduleId: schedule?.id ?? null,
       ...carryFields(schedule),
+      ...applyCreditToRemaining(schedule, payment),
     });
   }
 
@@ -336,6 +439,7 @@ export function buildAccountLedgerRows(
       balance,
       scheduleId: null,
       ...NO_CARRY,
+      ...NO_REMAIN,
     });
   }
 
@@ -362,6 +466,10 @@ export function buildAccountLedgerRows(
     const credits = (creditsByScheduleId.get(schedule.id) ?? []).sort(
       byPaymentDateThenId,
     );
+
+    // Fold this installment's accrued late fee into the running balance before
+    // its own credits are applied against it (no-op for 0 / rolled / moved).
+    applyPenaltyCharge(schedule);
 
     if (schedule.moveOfPaymentBatchId) {
       // A row can only reach 'moved' from 'pending'/'partial'/'overdue' — if
@@ -401,6 +509,7 @@ export function buildAccountLedgerRows(
           balance,
           scheduleId: null,
           ...NO_CARRY,
+          ...NO_REMAIN,
         });
         for (const payment of realSurcharges) pushSurcharge(payment);
       }
@@ -452,6 +561,7 @@ export function buildAccountLedgerRows(
         balance,
         scheduleId: schedule.id,
         ...carryFields(schedule),
+        ...schedRemaining(schedule),
       });
       continue;
     }
@@ -497,6 +607,17 @@ export function buildAccountLedgerRows(
     }
   }
 
+  let monthRemainingTotal = 0;
+  let penaltyRemainingTotal = 0;
+  for (const sid of remainingTrackedSchedIds) {
+    monthRemainingTotal = halfUpMoney(
+      monthRemainingTotal + (principalRemainingBySched.get(sid) ?? 0),
+    );
+    penaltyRemainingTotal = halfUpMoney(
+      penaltyRemainingTotal + (penaltyRemainingBySched.get(sid) ?? 0),
+    );
+  }
+
   rows.push({
     kind: "totals",
     key: "totals",
@@ -509,11 +630,18 @@ export function buildAccountLedgerRows(
     date: null,
     referenceNo: null,
     status: null,
-    debit: openingDebit,
+    // Principal (openingDebit) + every late fee charged since. Keeps the
+    // footer's debit − credit = balance identity true now that penalty
+    // charges move the running balance.
+    debit: halfUpMoney(openingDebit + penaltyChargedTotal),
     credit: creditTotal,
     balance,
     scheduleId: null,
     ...NO_CARRY,
+    // Per-month "still owed" summed across installments — for a plain loan
+    // (no origination discount, no unapplied advance) these add up to `balance`.
+    monthRemaining: monthRemainingTotal,
+    penaltyRemaining: penaltyRemainingTotal,
   });
 
   return rows;
@@ -538,6 +666,7 @@ export function ledgerEntriesFromPostings(
   postings: Array<{
     id: string;
     amount: number;
+    penalty_amount?: number | string | null;
     amortization_schedule_id?: string | null;
     payments?: PostingPaymentJoin;
   }>,
@@ -549,6 +678,7 @@ export function ledgerEntriesFromPostings(
       id: posting.id,
       paymentDate: String(payment?.payment_date ?? ""),
       amount: Number(posting.amount ?? 0),
+      penaltyPortion: Number(posting.penalty_amount ?? 0),
       referenceNo: payment?.reference_no ?? null,
       channel: String(payment?.channel ?? "payment"),
       status: String(payment?.status ?? "posted"),

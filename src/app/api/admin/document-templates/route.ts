@@ -7,12 +7,27 @@ import { createTemplate, listTemplates } from "@/lib/documents/templates/service
 import { requireModulePermission } from "@/lib/permissions/server";
 import { createClient } from "@/lib/supabase/server";
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
     await requireModulePermission("system_config", "view");
+    const { searchParams } = new URL(request.url);
+    const limit = Math.min(Number(searchParams.get("limit") ?? 20), 100);
+    const offset = Number(searchParams.get("offset") ?? 0);
+    const searchTerm = searchParams.get("search") ?? "";
+    const categoryFilter = searchParams.get("category") ?? "";
+    const statusFilter = searchParams.get("status") ?? "";
+    const segmentFilter = searchParams.get("segment") ?? "";
+
     const supabase = await createClient();
-    const templates = await listTemplates(supabase);
-    return jsonOk({ templates });
+    const result = await listTemplates(supabase, {
+      limit,
+      offset,
+      searchTerm,
+      categoryFilter,
+      statusFilter,
+      segmentFilter,
+    });
+    return jsonOk(result);
   } catch (error) {
     return handleApiError(error);
   }

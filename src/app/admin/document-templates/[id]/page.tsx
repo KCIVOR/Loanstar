@@ -11,6 +11,7 @@ import {
   Badge,
   Button,
   PageHeader,
+  Select,
   Spinner,
   Table,
   Td,
@@ -18,6 +19,8 @@ import {
 } from "@/components/ui";
 
 type TemplateStatus = "draft" | "published" | "archived";
+
+type GenEligibility = "always" | "optional" | "hidden";
 
 type Version = {
   id: string;
@@ -34,6 +37,8 @@ type Template = {
   name: string;
   description: string | null;
   category: string | null;
+  seafarerGeneration: GenEligibility;
+  smeGeneration: GenEligibility;
 };
 
 const STARTER_BODY =
@@ -56,6 +61,7 @@ export default function TemplateEditorPage() {
   const [message, setMessage] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [publishing, setPublishing] = useState(false);
+  const [savingMeta, setSavingMeta] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -101,6 +107,33 @@ export default function TemplateEditorPage() {
       setError(err instanceof Error ? err.message : "Failed to save draft");
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function updateMeta(patch: {
+    seafarerGeneration?: GenEligibility;
+    smeGeneration?: GenEligibility;
+  }) {
+    setSavingMeta(true);
+    setError(null);
+    setMessage(null);
+    try {
+      const res = await fetch(`/api/admin/document-templates/${templateId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(patch),
+      });
+      if (!res.ok) {
+        const b = (await res.json()) as { error?: string };
+        throw new Error(b.error ?? "Failed to update");
+      }
+      const data = (await res.json()) as { template: Template };
+      setTemplate(data.template);
+      setMessage("Generation settings updated");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to update");
+    } finally {
+      setSavingMeta(false);
     }
   }
 
@@ -174,6 +207,53 @@ export default function TemplateEditorPage() {
           <Badge variant="warning">Unpublished draft v{draft.versionNo}</Badge>
         ) : null}
       </div>
+
+      {template.category === "release" ? (
+        <div className="mb-6 rounded-[var(--r-md)] border border-line-soft bg-surface-2 p-4">
+          <h2 className="mb-1 text-sm font-semibold text-ink-700">
+            Document generation
+          </h2>
+          <p className="mb-3 text-xs text-ink-500">
+            Always = generated automatically. Optional = LRA can pick it in the
+            generate list. Hidden = not offered for this segment. Release path and
+            collateral still decide which vouchers/mortgages actually apply.
+          </p>
+          <div className="flex flex-wrap gap-4">
+            <label className="flex flex-col gap-1 text-sm text-ink-600">
+              Seafarer document generation
+              <Select
+                value={template.seafarerGeneration}
+                disabled={savingMeta}
+                onChange={(e) =>
+                  void updateMeta({
+                    seafarerGeneration: e.target.value as GenEligibility,
+                  })
+                }
+              >
+                <option value="always">Always</option>
+                <option value="optional">Optional</option>
+                <option value="hidden">Hidden</option>
+              </Select>
+            </label>
+            <label className="flex flex-col gap-1 text-sm text-ink-600">
+              SME &amp; Individual document generation
+              <Select
+                value={template.smeGeneration}
+                disabled={savingMeta}
+                onChange={(e) =>
+                  void updateMeta({
+                    smeGeneration: e.target.value as GenEligibility,
+                  })
+                }
+              >
+                <option value="always">Always</option>
+                <option value="optional">Optional</option>
+                <option value="hidden">Hidden</option>
+              </Select>
+            </label>
+          </div>
+        </div>
+      ) : null}
 
       <TemplateEditor
         key={editorInitial.length /* reseed when the loaded body changes */}

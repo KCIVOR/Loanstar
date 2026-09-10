@@ -1479,15 +1479,43 @@ async function validateCollectorDiscountInput(
   if (hasPenalty) {
     const { data: rows, error } = await supabase
       .from("amortization_schedules")
-      .select("installment_no, penalty_amount")
+      .select("id, installment_no, penalty_amount, penalty_discount_amount")
       .eq("masterlist_id", masterlistId)
       .in("installment_no", input.penaltyDiscountedInstallmentNos);
 
     if (error) throw new Error(error.message);
 
+    // Late fee already collected against these rows must not be waivable —
+    // the Penalty column keeps the CHARGED figure after a fee is paid
+    // (penalty-fee-paid-protection, 2026-09-09), so "still waivable" is
+    // charged − already-waived − already-paid.
+    const scheduleIds = (rows ?? []).map((row) => row.id as string);
+    const feePaidByScheduleId = new Map<string, number>();
+    if (scheduleIds.length > 0) {
+      const { data: postingRows, error: postingErr } = await supabase
+        .from("postings")
+        .select("amortization_schedule_id, penalty_amount")
+        .in("amortization_schedule_id", scheduleIds);
+      if (postingErr) throw new Error(postingErr.message);
+      for (const p of postingRows ?? []) {
+        const sid = p.amortization_schedule_id as string;
+        feePaidByScheduleId.set(
+          sid,
+          (feePaidByScheduleId.get(sid) ?? 0) + Number(p.penalty_amount ?? 0),
+        );
+      }
+    }
+
     const maxPenalty = halfUp(
       (rows ?? []).reduce(
-        (sum, row) => sum + Number(row.penalty_amount ?? 0),
+        (sum, row) =>
+          sum +
+          Math.max(
+            0,
+            Number(row.penalty_amount ?? 0) -
+              Number(row.penalty_discount_amount ?? 0) -
+              (feePaidByScheduleId.get(row.id as string) ?? 0),
+          ),
         0,
       ),
     );
@@ -1639,15 +1667,15 @@ export async function addPaymentToDcr(
         discountInput?.penaltyDiscountedInstallmentNos ?? [],
       discount_reason: discountInput?.discountReason?.trim() || null,
       // Phase 4b — draft-time save only; applied by post_single_dcr_item at
-      // posting, capped there at the fee actually owed.
+      // posting, capped there at the fee actually owed. A ₱0 amount with a
+      // non-empty installment list is a real instruction: "leave the fee
+      // outstanding, apply the whole payment to principal".
       penalty_paid_amount: Math.max(
         0,
         penaltyPaidInput?.penaltyPaidAmount ?? 0,
       ),
       penalty_paid_installment_nos:
-        (penaltyPaidInput?.penaltyPaidAmount ?? 0) > 0
-          ? (penaltyPaidInput?.penaltyPaidInstallmentNos ?? [])
-          : [],
+        penaltyPaidInput?.penaltyPaidInstallmentNos ?? [],
     })
     .select("id")
     .single();

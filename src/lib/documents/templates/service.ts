@@ -2,6 +2,9 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 
 export type TemplateStatus = "draft" | "published" | "archived";
 
+/** Per-segment generation eligibility for `category = 'release'` templates. */
+export type DocGenerationEligibility = "always" | "optional" | "hidden";
+
 export type DocumentTemplate = {
   id: string;
   slug: string;
@@ -9,6 +12,8 @@ export type DocumentTemplate = {
   description: string | null;
   category: string | null;
   isActive: boolean;
+  seafarerGeneration: DocGenerationEligibility;
+  smeGeneration: DocGenerationEligibility;
   createdAt: string;
   updatedAt: string;
 };
@@ -32,6 +37,8 @@ type TemplateRow = {
   description: string | null;
   category: string | null;
   is_active: boolean;
+  seafarer_generation: DocGenerationEligibility;
+  sme_generation: DocGenerationEligibility;
   created_at: string;
   updated_at: string;
 };
@@ -56,6 +63,8 @@ function mapTemplate(row: TemplateRow): DocumentTemplate {
     description: row.description,
     category: row.category,
     isActive: row.is_active,
+    seafarerGeneration: row.seafarer_generation,
+    smeGeneration: row.sme_generation,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -76,18 +85,69 @@ function mapVersion(row: VersionRow): DocumentTemplateVersion {
 }
 
 const TEMPLATE_COLS =
-  "id, slug, name, description, category, is_active, created_at, updated_at";
+  "id, slug, name, description, category, is_active, seafarer_generation, sme_generation, created_at, updated_at";
 const VERSION_COLS =
   "id, template_id, version_no, body, merge_fields, status, published_at, created_at, updated_at";
 
 export async function listTemplates(
   supabase: SupabaseClient,
-): Promise<Array<DocumentTemplate & { publishedVersionNo: number | null }>> {
-  const { data: templates, error } = await supabase
+  options?: {
+    limit?: number;
+    offset?: number;
+    searchTerm?: string;
+    categoryFilter?: string;
+    statusFilter?: string;
+    segmentFilter?: string;
+  },
+): Promise<{
+  templates: Array<DocumentTemplate & { publishedVersionNo: number | null }>;
+  total: number;
+  limit: number;
+  offset: number;
+}> {
+  const limit = options?.limit ?? 20;
+  const offset = options?.offset ?? 0;
+  const searchTerm = options?.searchTerm?.trim() ?? "";
+  const categoryFilter = options?.categoryFilter?.trim() ?? "";
+  const statusFilter = options?.statusFilter?.trim() ?? "";
+  const segmentFilter = options?.segmentFilter?.trim() ?? "";
+
+  let query = supabase
     .from("document_templates")
-    .select(TEMPLATE_COLS)
+    .select(TEMPLATE_COLS, { count: "exact" });
+
+  // Apply search filter (search in name, slug, and description)
+  if (searchTerm) {
+    query = query.or(
+      `name.ilike.%${searchTerm}%,slug.ilike.%${searchTerm}%,description.ilike.%${searchTerm}%`,
+    );
+  }
+
+  // Apply category filter
+  if (categoryFilter) {
+    query = query.eq("category", categoryFilter);
+  }
+
+  // Apply status filter
+  if (statusFilter === "active") {
+    query = query.eq("is_active", true);
+  } else if (statusFilter === "inactive") {
+    query = query.eq("is_active", false);
+  }
+
+  // Apply segment filter (show templates available for the segment)
+  if (segmentFilter === "seafarer") {
+    query = query.neq("seafarer_generation", "hidden");
+  } else if (segmentFilter === "sme") {
+    query = query.neq("sme_generation", "hidden");
+  }
+
+  // Apply ordering and pagination
+  const { data: templates, error, count } = await query
     .order("category", { nullsFirst: false })
-    .order("name");
+    .order("name")
+    .range(offset, offset + limit - 1);
+
   if (error) throw new Error(error.message);
 
   const { data: published, error: pubError } = await supabase
@@ -104,10 +164,17 @@ export async function listTemplates(
     publishedByTemplate.set(row.template_id, row.version_no);
   }
 
-  return ((templates ?? []) as TemplateRow[]).map((row) => ({
+  const mappedTemplates = ((templates ?? []) as TemplateRow[]).map((row) => ({
     ...mapTemplate(row),
     publishedVersionNo: publishedByTemplate.get(row.id) ?? null,
   }));
+
+  return {
+    templates: mappedTemplates,
+    total: count ?? 0,
+    limit,
+    offset,
+  };
 }
 
 export async function getTemplateWithVersions(
@@ -187,6 +254,37 @@ export async function createTemplate(
       description: input.description ?? null,
       category: input.category ?? null,
     })
+    .select(TEMPLATE_COLS)
+    .single();
+  if (error) throw new Error(error.message);
+  return mapTemplate(data as TemplateRow);
+}
+
+/**
+ * Update template metadata (not the body). Currently just the per-segment
+ * generation eligibility used by the LRA document picker. `updated_at` is
+ * maintained by the `document_templates_updated_at` trigger.
+ */
+export async function updateTemplateMeta(
+  supabase: SupabaseClient,
+  templateId: string,
+  input: {
+    seafarerGeneration?: DocGenerationEligibility;
+    smeGeneration?: DocGenerationEligibility;
+  },
+): Promise<DocumentTemplate> {
+  const patch: Record<string, DocGenerationEligibility> = {};
+  if (input.seafarerGeneration !== undefined) {
+    patch.seafarer_generation = input.seafarerGeneration;
+  }
+  if (input.smeGeneration !== undefined) {
+    patch.sme_generation = input.smeGeneration;
+  }
+
+  const { data, error } = await supabase
+    .from("document_templates")
+    .update(patch)
+    .eq("id", templateId)
     .select(TEMPLATE_COLS)
     .single();
   if (error) throw new Error(error.message);

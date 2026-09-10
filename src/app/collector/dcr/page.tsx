@@ -106,6 +106,10 @@ type PenaltyEligibleInstallment = {
   installmentNo: number;
   dueDate: string;
   penaltyAmount: number;
+  /** Fee still owed = charged − waived − already paid. The Penalty column
+   * keeps the charged figure once a fee is paid, so this is what the waiver
+   * / "Late fee paid" tables must show and cap against. */
+  feeOwed: number;
 };
 
 type AllocationModalState = {
@@ -302,7 +306,7 @@ export default function CollectorDcrPage() {
     return computeCollectorDiscount(
       allocationModal.penaltyEligible.map((inst) => ({
         installmentNo: inst.installmentNo,
-        amount: inst.penaltyAmount,
+        amount: inst.feeOwed,
       })),
       penaltySelectionMap,
     ).discountAmount;
@@ -311,14 +315,11 @@ export default function CollectorDcrPage() {
   const hasDiscount = interestDiscountTotal > 0 || penaltyDiscountTotal > 0;
   const discountReasonMissing = hasDiscount && discountReason.trim() === "";
 
-  // Penalty breakdown Phase 4b — which installments the collector tagged, and
-  // the peso total of what they typed. Server splits the total evenly across
-  // the tagged installments and caps each at the fee owed.
+  // Penalty breakdown Phase 4b — every installment the collector ticked in the
+  // "Late fee paid" section. A ticked row left at ₱0 is a real instruction
+  // ("all to principal, leave the fee"), so ticked-with-0 counts too.
   const penaltyPaidInstallmentNos = useMemo(
-    () =>
-      Array.from(penaltyPaidSelections.entries())
-        .filter(([, v]) => Number(v) > 0)
-        .map(([no]) => no),
+    () => Array.from(penaltyPaidSelections.keys()),
     [penaltyPaidSelections],
   );
   const penaltyPaidTotal = useMemo(
@@ -584,9 +585,10 @@ export default function CollectorDcrPage() {
         : {};
 
     // Phase 4b — collector's manual fee split. Independent of the discount
-    // permission; only sent when they actually tagged something.
+    // permission; sent whenever an installment is ticked (amount may be ₱0 =
+    // "all to principal, leave the fee outstanding").
     const penaltyPaidFields =
-      penaltyPaidTotal > 0 && penaltyPaidInstallmentNos.length > 0
+      penaltyPaidInstallmentNos.length > 0
         ? {
             penaltyPaidAmount: penaltyPaidTotal,
             penaltyPaidInstallmentNos,
@@ -1220,7 +1222,7 @@ export default function CollectorDcrPage() {
                                   {formatDate(inst.dueDate)}
                                 </Td>
                                 <Td num className="mono">
-                                  {formatMoney(inst.penaltyAmount)}
+                                  {formatMoney(inst.feeOwed)}
                                 </Td>
                                 <Td num>
                                   <div className="affix ml-auto w-24">
@@ -1270,8 +1272,10 @@ export default function CollectorDcrPage() {
                     </h4>
                     <p className="mb-2 text-xs text-ink-500">
                       Of this payment, how much is late-fee money on each
-                      overdue month. Leave blank to let the system split it
-                      automatically (fee first).
+                      overdue month. Tick a month and leave it ₱0 to put the
+                      whole payment toward principal and keep the fee
+                      outstanding. Leave a month unticked to let the system
+                      split automatically (fee first).
                     </p>
                     <div className="tbl-wrap max-h-56 overflow-y-auto">
                       <Table>
@@ -1309,7 +1313,7 @@ export default function CollectorDcrPage() {
                                   {formatDate(inst.dueDate)}
                                 </Td>
                                 <Td num className="mono">
-                                  {formatMoney(inst.penaltyAmount)}
+                                  {formatMoney(inst.feeOwed)}
                                 </Td>
                                 <Td num>
                                   <div className="affix ml-auto w-28">
@@ -1317,9 +1321,11 @@ export default function CollectorDcrPage() {
                                     <Input
                                       type="number"
                                       min={0}
+                                      max={inst.feeOwed}
                                       step="0.01"
                                       className="text-right"
                                       mono
+                                      placeholder="0 = skip fee"
                                       value={
                                         penaltyPaidSelections.get(
                                           inst.installmentNo,

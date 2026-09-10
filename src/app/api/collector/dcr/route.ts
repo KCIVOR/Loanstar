@@ -10,10 +10,10 @@ import {
 } from "@/lib/ar/posting";
 import {
   ForbiddenError,
+  getUserPermissions,
   hasModulePermission,
   requireAuth,
 } from "@/lib/permissions/server";
-import { validateFieldEdit } from "@/lib/permissions/field-rules";
 import { createClient } from "@/lib/supabase/server";
 
 const createSchema = z.object({ action: z.literal("create") });
@@ -126,20 +126,26 @@ export async function POST(request: Request) {
       } = addParsed.data;
       const hasDiscount =
         (interestDiscountAmount ?? 0) > 0 || (penaltyDiscountAmount ?? 0) > 0;
-      const hasPenaltyPaid =
-        (penaltyPaidAmount ?? 0) > 0 &&
-        (penaltyPaidInstallmentNos ?? []).length > 0;
+      // A "Late fee paid" tag counts whenever installments are explicitly
+      // selected — the amount may be ₱0, which means "put the whole payment
+      // toward principal and leave the fee outstanding".
+      const hasPenaltyPaid = (penaltyPaidInstallmentNos ?? []).length > 0;
 
       if (hasDiscount) {
-        // One permission gates both sections — checked once, before
-        // accepting a nonzero amount in either.
-        const result = await validateFieldEdit(
-          "collection",
-          "collector_discount",
-          user.id,
-        );
-        if (!result.allowed) {
-          throw new ForbiddenError(result.reason);
+        // One permission gates both discount sections. Checked against the
+        // caller's OWN module — `collection` for a collector, `remedial` for
+        // a remedial officer — and it must be an EXPLICIT `edit` field rule.
+        // `validateFieldEdit` alone would fail open here (no rule -> 'edit'),
+        // so we read the resolved field-rule set directly instead.
+        const mod = isCollector ? "collection" : "remedial";
+        const perms = await getUserPermissions(user.id);
+        const canDiscount =
+          perms.isSuperAdmin ||
+          perms.fieldRules?.[mod]?.collector_discount === "edit";
+        if (!canDiscount) {
+          throw new ForbiddenError(
+            `Not permitted to apply a discount on module '${mod}'`,
+          );
         }
       }
 

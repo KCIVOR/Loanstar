@@ -66,7 +66,7 @@ export async function GET(_request: Request, { params }: RouteParams) {
           remedial_user_id
         ),
         amortization_schedules (
-          ${AMORTIZATION_SCHEDULE_LEDGER_COLUMNS}, amount_paid
+          ${AMORTIZATION_SCHEDULE_LEDGER_COLUMNS}
         )
       `,
       )
