@@ -242,6 +242,76 @@ export const FIELD_GROUPS: FieldGroup[] = [
     ],
   },
   {
+    label: "Legal instruments — parties & notary",
+    fields: [
+      { key: "lenderAddress", label: "Lender office address", sample: "4th Floor Carson Building, Orense Corner Del Carmen St., Guadalupe Nuevo, Makati City" },
+      { key: "lenderTin", label: "Lender TIN", sample: "008-890-767-000" },
+      { key: "lenderRepresentative", label: "Lender representative", sample: "Kristoffer John C. Dela Cruz" },
+      { key: "lenderRepresentativeTin", label: "Lender representative TIN", sample: "942-356-927-000" },
+      { key: "authorizedSignatory", label: "Lender authorized signatory (cancellations)", sample: "Reden G. Mayor" },
+      { key: "witnessOne", label: "Witness 1", sample: "Jun P. Repaso" },
+      { key: "witnessTwo", label: "Witness 2", sample: "Von Grec T. Terre" },
+      { key: "borrowerRepresentative", label: "Borrower representative (corp/DTI)", sample: "Henki Haurisjah" },
+      { key: "borrowerRepresentativeTitle", label: "Borrower representative title", sample: "President" },
+      { key: "boardResolutionNo", label: "Board Resolution No.", sample: "2026-30" },
+      { key: "corporateSecretary", label: "Corporate Secretary", sample: "Christian Espiritu Barleta" },
+      { key: "borrowerTin", label: "Borrower TIN", sample: "008-249-450-000" },
+      { key: "executionPlace", label: "Place of execution", sample: "Makati City" },
+      { key: "executionDate", label: "Date of execution", sample: "June 11, 2026" },
+      { key: "notaryDocNo", label: "Notary — Doc. No.", sample: "" },
+      { key: "notaryPageNo", label: "Notary — Page No.", sample: "" },
+      { key: "notaryBookNo", label: "Notary — Book No.", sample: "" },
+      { key: "notarySeries", label: "Notary — Series of", sample: "" },
+    ],
+  },
+  {
+    label: "Mortgage cancellation / release",
+    fields: [
+      { key: "priorMortgageAmount", label: "Secured amount (figures)", sample: "1,689,053.68" },
+      { key: "priorMortgageAmountInWords", label: "Secured amount (words)", sample: "One Million Six Hundred Eighty Nine Thousand Fifty Three Pesos & Sixty Eight Cents" },
+      { key: "priorMortgageExecutedOn", label: "Mortgage executed on", sample: "11/26/2023" },
+      { key: "priorMortgageDocNo", label: "Original mortgage — Doc. No.", sample: "90" },
+      { key: "priorMortgagePageNo", label: "Original mortgage — Page No.", sample: "19" },
+      { key: "priorMortgageBookNo", label: "Original mortgage — Book No.", sample: "113" },
+      { key: "priorMortgageSeries", label: "Original mortgage — Series of", sample: "2024" },
+      { key: "priorMortgageNotary", label: "Original mortgage — Notary Public", sample: "Atty. Ruben M. Azañes Jr." },
+      { key: "priorMortgageNotaryPlace", label: "Original mortgage — Notary place", sample: "Quezon City" },
+      { key: "priorMortgageRegistryOfDeeds", label: "Registry of Deeds", sample: "Makati City" },
+      { key: "cancellationPageCount", label: "Instrument page count (words)", sample: "One (1)" },
+    ],
+  },
+  {
+    label: "Voluntary surrender / restructuring",
+    fields: [
+      { key: "surrenderDebtAmount", label: "Debt amount (figures)", sample: "1,689,053.68" },
+      { key: "surrenderDebtAmountInWords", label: "Debt amount (words)", sample: "One Million Six Hundred Eighty Nine Thousand Fifty Three Pesos & Sixty Eight Cents" },
+      { key: "redemptionPeriod", label: "Redemption period", sample: "one (1) month" },
+      { key: "chattelReleaseDate", label: "Chattel loan release date", sample: "06/11/2026" },
+      { key: "totalObligation", label: "Total obligation (figures)", sample: "1,042,909.09" },
+      { key: "totalObligationInWords", label: "Total obligation (words)", sample: "One Million Forty Two Thousand Nine Hundred Nine Pesos & Nine Cents" },
+      { key: "amortStartDate", label: "Amortization start date", sample: "08/11/2026" },
+      { key: "amortMaturityDate", label: "Amortization maturity date", sample: "01/11/2027" },
+      { key: "checkReplacementDate", label: "Check replacement date", sample: "07/15/2026" },
+      { key: "lenderDepositBank", label: "Lender deposit bank", sample: "Banco de Oro / Checking Account" },
+      { key: "lenderDepositAccountName", label: "Lender deposit account name", sample: "Loan Star Lending Group Corp" },
+      { key: "lenderDepositAccountNo", label: "Lender deposit account no.", sample: "002788027155" },
+    ],
+  },
+  {
+    label: "Loan consolidation",
+    fields: [
+      { key: "additionalLoanAmount", label: "Additional loan (figures)", sample: "2,319,431.20" },
+      { key: "additionalLoanAmountInWords", label: "Additional loan (words)", sample: "Two Million Three Hundred Nineteen Thousand Four Hundred Thirty One Pesos & Twenty Cents" },
+      { key: "additionalLoanTermMonths", label: "Additional loan term (words + figure)", sample: "Twelve (12)" },
+      { key: "additionalLoanInterestRate", label: "Additional loan interest rate", sample: "Two percent (2.00%)" },
+      { key: "additionalLoanTotal", label: "Additional loan total incl. interest (figures)", sample: "2,876,094.68" },
+      { key: "additionalLoanTotalInWords", label: "Additional loan total incl. interest (words)", sample: "Two Million Eight Hundred Seventy Six Thousand Ninety Four Pesos & Sixty Eight Cents" },
+      { key: "allLoansTotal", label: "All loans grand total (figures)", sample: "14,864,272.71" },
+      { key: "allLoansTotalInWords", label: "All loans grand total (words)", sample: "Fourteen Million Eight Hundred Sixty Four Thousand Two Hundred Seventy Two Pesos & Seventy One Cents" },
+      { key: "priorLoansCount", label: "Number of prior loans (words + figure)", sample: "six (6)" },
+    ],
+  },
+  {
     label: "Payment receipt",
     fields: [
       { key: "paymentAmount", label: "Payment amount", sample: "8,250.00" },
@@ -380,6 +450,50 @@ export const FIELD_COLLECTIONS: MergeCollection[] = [
       { key: "contactNo", label: "Contact no.", sample: "02-8888-0000" },
     ],
   },
+  {
+    key: "vehicles",
+    label: "Mortgaged / surrendered vehicles",
+    fields: [
+      { key: "makeYearModel", label: "Make / Series / Year Model", sample: "Toyota Vios 2012" },
+      { key: "transmission", label: "Transmission", sample: "Automatic" },
+      { key: "engineNo", label: "Engine No.", sample: "G4NAHU529020" },
+      { key: "chassisNo", label: "Chassis No.", sample: "KMHJ2813BJU622630" },
+      { key: "plateNo", label: "Plate No.", sample: "NCV6053" },
+      { key: "crNo", label: "CR No.", sample: "123654" },
+      { key: "mvFileNo", label: "MV File No.", sample: "1336-00000451921" },
+      { key: "registeredOwner", label: "Registered owner", sample: "Rene Dela Pena" },
+    ],
+  },
+  {
+    key: "properties",
+    label: "Mortgaged / surrendered real properties",
+    fields: [
+      { key: "location", label: "Location", sample: "Bo. of San Luis, Mun. of Antipolo, Prov. of Rizal" },
+      { key: "tctNo", label: "TCT No.", sample: "163-2024000420" },
+      { key: "areaSqm", label: "Area (words + sq m)", sample: "One Hundred Fifty (150.00)" },
+      { key: "technicalDescription", label: "Technical description", sample: "A PARCEL OF LAND (LOT 3, BLOCK 86 …) SITUATED IN THE BO. OF SN. LUIS, MUN. OF ANTIPOLO, PROV. OF RIZAL …" },
+    ],
+  },
+  {
+    key: "priorLoans",
+    label: "Consolidation — prior loans",
+    fields: [
+      { key: "loanNo", label: "Loan number", sample: "LA000015" },
+      { key: "totalAmount", label: "Total amount incl. interest (figures)", sample: "535,461.42" },
+      { key: "totalAmountInWords", label: "Total amount incl. interest (words)", sample: "Five Hundred Thirty Five Thousand Four Hundred Sixty One Pesos & Forty Two Cents" },
+      { key: "releasedOn", label: "Released on", sample: "July 26, 2024" },
+    ],
+  },
+  {
+    key: "replacementChecks",
+    label: "Check replacement — old checks",
+    fields: [
+      { key: "bankBranch", label: "Bank / Branch", sample: "BDO — Makati Ave" },
+      { key: "checkNumber", label: "Check number", sample: "0012345" },
+      { key: "checkDate", label: "Date", sample: "08/11/2026" },
+      { key: "amount", label: "Amount", sample: "173,818.18" },
+    ],
+  },
 ];
 
 /** Conditional flags usable with `data-if` / `data-unless`. */
@@ -393,6 +507,7 @@ export const FIELD_FLAGS: MergeField[] = [
   { key: "hasDiscount", label: "Has a discount (any type)", sample: "true" },
   { key: "hasInterestDiscount", label: "Has an interest discount", sample: "true" },
   { key: "hasPenaltyDiscount", label: "Has a penalty discount", sample: "true" },
+  { key: "isCorpOrDti", label: "Borrower is a corporation / DTI (not an individual)", sample: "" },
 ];
 
 /** Build the sample render context from the catalog (drives preview). */
@@ -464,6 +579,35 @@ export function buildSampleContext(): Record<string, unknown> {
       accountType: "Checking",
       contactNo: "02-8888-0000",
     },
+  ];
+  ctx.vehicles = [
+    {
+      makeYearModel: "Toyota Vios 2012",
+      transmission: "Automatic",
+      engineNo: "1234567894561420",
+      chassisNo: "LKJLKASJDLK13215646",
+      plateNo: "TWO489",
+      crNo: "123654",
+      mvFileNo: "139-000000123456",
+      registeredOwner: "Rene Dela Pena",
+    },
+  ];
+  ctx.properties = [
+    {
+      location: "Bo. of San Luis, Mun. of Antipolo, Prov. of Rizal",
+      tctNo: "163-2024000420",
+      areaSqm: "One Hundred Fifty (150.00)",
+      technicalDescription:
+        "A PARCEL OF LAND (LOT 3, BLOCK 86 OF THE SUBD. PLAN PSD-04-0080071, BEING A PORTION OF BLOCK 25, PSD-04-003999), SITUATED IN THE BO. OF SN. LUIS, MUN. OF ANTIPOLO, PROV. OF RIZAL … CONTAINING AN AREA OF ONE HUNDRED FIFTY (150) SQ. METERS … including all the existing improvements erected thereon.",
+    },
+  ];
+  ctx.priorLoans = [
+    { loanNo: "LA000015", totalAmount: "535,461.42", totalAmountInWords: "Five Hundred Thirty Five Thousand Four Hundred Sixty One Pesos & Forty Two Cents", releasedOn: "July 26, 2024" },
+    { loanNo: "LA000007", totalAmount: "3,232,678.78", totalAmountInWords: "Three Million Two Hundred Thirty Two Thousand Six Hundred Seventy Eight Pesos & Seventy Eight Cents", releasedOn: "August 2, 2024" },
+  ];
+  ctx.replacementChecks = [
+    { bankBranch: "BDO — Makati Ave", checkNumber: "0012345", checkDate: "08/11/2026", amount: "173,818.18" },
+    { bankBranch: "BDO — Makati Ave", checkNumber: "0012346", checkDate: "09/11/2026", amount: "173,818.18" },
   ];
   return ctx;
 }
