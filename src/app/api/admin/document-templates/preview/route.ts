@@ -23,9 +23,7 @@ export async function POST(request: Request) {
     await requireModulePermission("system_config", "view");
     const { body } = previewSchema.parse(await request.json());
 
-    const pdf = await renderTemplateToPdf(body, buildSampleContext(), {
-      useSharedDefaults: true,
-    });
+    const pdf = await renderTemplateToPdf(body, buildSampleContext());
 
     return new NextResponse(new Uint8Array(pdf), {
       status: 200,

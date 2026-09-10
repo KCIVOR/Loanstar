@@ -2,34 +2,12 @@ import htmlToPdfmake from "html-to-pdfmake";
 import { JSDOM } from "jsdom";
 import type { TDocumentDefinitions } from "pdfmake/interfaces";
 
+import { makeDeterministic } from "./deterministic";
 import { getPrinter } from "./fonts";
 
-/**
- * pdfmake emits two non-deterministic fields: the trailer `/ID` (random) and the
- * `/CreationDate`/`/ModDate` timestamps (wall-clock, as `(D:YYYYMMDDHHMMSS…)`
- * objects). Both are normalized here — length-preservingly, so xref byte offsets
- * stay valid — so identical input produces identical bytes. That is what lets the
- * signing content-hash be reproduced and verified later.
- */
-function makeDeterministic(buf: Buffer): Buffer {
-  let s = buf.toString("latin1");
-
-  // 1. Zero the trailer /ID (two equal-length hex strings).
-  const idMatch = s.match(/\/ID\s*\[\s*<([0-9a-fA-F]+)>\s*<([0-9a-fA-F]+)>\s*\]/);
-  if (idMatch) {
-    const [full, id1, id2] = idMatch;
-    s = s.replace(
-      full,
-      full.replace(id1, "0".repeat(id1.length)).replace(id2, "0".repeat(id2.length)),
-    );
-  }
-
-  // 2. Pin every embedded PDF date (D:YYYYMMDDHHMMSS...) to a constant. Replacing
-  //    only the 14 digits keeps the surrounding structure/length intact.
-  s = s.replace(/D:\d{14}/g, "D:20000101000000");
-
-  return Buffer.from(s, "latin1");
-}
+// `makeDeterministic` moved to ./deterministic (shared with the Gotenberg path);
+// behaviour for pdfmake output is byte-identical to the previous inline version.
+export { makeDeterministic } from "./deterministic";
 
 /**
  * Post-process pdfmake content: give every table an explicit equal-width column
