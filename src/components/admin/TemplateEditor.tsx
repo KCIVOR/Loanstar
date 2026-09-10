@@ -13,6 +13,7 @@ import {
   FIELD_FLAGS,
   FIELD_GROUPS,
 } from "@/lib/documents/templates/fields";
+import { VISUAL_EDITOR_CSS } from "@/lib/documents/render/defaultStyles";
 
 type Mode = "visual" | "source";
 
@@ -160,10 +161,7 @@ export function TemplateEditor({
           user-select: all;
         }
         .doc-template-editor .visual-surface { min-height: 460px; }
-        .doc-template-editor .visual-surface :is(table){border-collapse:collapse;width:100%;}
-        .doc-template-editor .visual-surface :is(th,td){border:1px solid #d5d5d5;padding:4px 6px;font-size:13px;text-align:left;}
-        .doc-template-editor .visual-surface :is(h1){font-size:20px;font-weight:600;margin:8px 0;}
-        .doc-template-editor .visual-surface :is(h2){font-size:16px;font-weight:600;margin:8px 0;}
+        ${VISUAL_EDITOR_CSS}
         .doc-template-editor .visual-surface [data-repeat]{outline:1px dashed #9aa5b1;}
       `}</style>
 
