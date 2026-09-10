@@ -18,8 +18,12 @@ export type RenderOptions = {
  * against a data context, producing a deterministic PDF.
  *
  * This is the sole document renderer: every generated document (release docs +
- * the Phase 6 documents) flows through here. The legacy hardcoded
- * `renderDocumentPdf`/`simple-pdf.ts` was retired in Phase 7.
+ * non-release documents) flows through here.
+ *
+ * @param options.useSharedDefaults - Use Visual-editor-aligned styling defaults.
+ *   When true, PDF output matches the editor's Visual tab (full-width tables,
+ *   gray header cells, 29px headings). Default: false for backward compatibility.
+ *   All new documents should use true.
  */
 export async function renderTemplateToPdf(
   templateHtml: string,
