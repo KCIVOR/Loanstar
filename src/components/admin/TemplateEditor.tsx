@@ -77,6 +77,34 @@ export function TemplateEditor({
     }
   }
 
+  const [downloadingDocx, setDownloadingDocx] = useState(false);
+  async function downloadDocx() {
+    setDownloadingDocx(true);
+    setPreviewError(null);
+    try {
+      const res = await fetch("/api/admin/document-templates/docx", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ body: readBody() }),
+      });
+      if (!res.ok) {
+        const msg = (await res.json().catch(() => ({}))) as { error?: string };
+        throw new Error(msg.error ?? "DOCX export failed");
+      }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "template.docx";
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      setPreviewError(err instanceof Error ? err.message : "DOCX export failed");
+    } finally {
+      setDownloadingDocx(false);
+    }
+  }
+
   useEffect(() => {
     return () => {
       if (previewUrl) URL.revokeObjectURL(previewUrl);
@@ -95,6 +123,9 @@ export function TemplateEditor({
           ]}
         />
         <div className="flex items-center gap-2">
+          <Button variant="ghost" onClick={() => void downloadDocx()} loading={downloadingDocx}>
+            Download .docx
+          </Button>
           <Button variant="ghost" onClick={() => void runPreview()} loading={previewing}>
             Preview PDF
           </Button>
