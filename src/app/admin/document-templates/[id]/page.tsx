@@ -175,6 +175,15 @@ export default function TemplateEditorPage() {
         ) : null}
       </div>
 
+      <div className="mb-4">
+        <Alert variant="info">
+          <p>
+            The Visual preview now matches PDF output. What you see is what prints — full-width
+            tables, gray header cells, and proportional headings.
+          </p>
+        </Alert>
+      </div>
+
       <TemplateEditor
         key={editorInitial.length /* reseed when the loaded body changes */}
         initialBody={editorInitial}
