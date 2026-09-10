@@ -242,6 +242,32 @@ export const FIELD_GROUPS: FieldGroup[] = [
     ],
   },
   {
+    label: "Loan Agreement / Disclosure / PN (LSLGC v2)",
+    fields: [
+      { key: "principalAndCentavosInWords", label: "Principal in words (with centavos)", sample: "One Hundred Two Thousand Six Hundred Five Pesos & Five Cents" },
+      { key: "totalLoanAndCentavosInWords", label: "Total loan in words (with centavos)", sample: "One Hundred Twenty One Thousand Nine Hundred Ninety Seven Pesos & Forty One Cents" },
+      { key: "monthlyAmortizationAndCentavosInWords", label: "Monthly amortization in words (with centavos)", sample: "Seventeen Thousand Four Hundred Twenty Eight Pesos & Twenty Cents" },
+      { key: "netLoanAndCentavosInWords", label: "Net released in words (with centavos)", sample: "Ninety Thousand Pesos" },
+      { key: "termsInWords", label: "Term in words (Six (6))", sample: "Seven (7)" },
+      { key: "interestRateInWords", label: "Monthly interest rate in words", sample: "Two and Ten hundredths percent (2.10%)" },
+      { key: "preTerminationRate", label: "Pre-termination rate", sample: "2.10%" },
+      { key: "preTerminationRateInWords", label: "Pre-termination rate in words", sample: "Two and Ten hundredths percent (2.10%)" },
+      { key: "numberOfPdcs", label: "Number of PDCs", sample: "7" },
+      { key: "numberOfPdcsInWords", label: "Number of PDCs in words", sample: "Seven (7)" },
+      { key: "perCheckAmount", label: "Per-check amount", sample: "17,428.20" },
+      { key: "perCheckAmountInWords", label: "Per-check amount in words", sample: "Seventeen Thousand Four Hundred Twenty Eight Pesos & Twenty Cents" },
+      { key: "loanStartDate", label: "Loan schedule start date", sample: "08/10/2026" },
+      { key: "loanMaturityDate", label: "Loan schedule maturity date", sample: "02/10/2027" },
+      { key: "lenderRepresentativeTitle", label: "Lender representative title", sample: "President" },
+      { key: "amountFinanced", label: "Disclosure — amount to be financed", sample: "102,605.05" },
+      { key: "financeChargeInterest", label: "Disclosure — finance charge (interest)", sample: "19,392.36" },
+      { key: "totalInstallmentPayments", label: "Disclosure — total installment payments", sample: "121,997.41" },
+      { key: "installmentCount", label: "Disclosure — number of installments", sample: "7" },
+      { key: "disclosureFromDate", label: "Disclosure — interest period from", sample: "08/10/2026" },
+      { key: "disclosureToDate", label: "Disclosure — interest period to", sample: "02/10/2027" },
+    ],
+  },
+  {
     label: "Legal instruments — parties & notary",
     fields: [
       { key: "lenderAddress", label: "Lender office address", sample: "4th Floor Carson Building, Orense Corner Del Carmen St., Guadalupe Nuevo, Makati City" },
@@ -494,6 +520,16 @@ export const FIELD_COLLECTIONS: MergeCollection[] = [
       { key: "amount", label: "Amount", sample: "173,818.18" },
     ],
   },
+  {
+    key: "invoices",
+    label: "Loan Agreement — financed invoices",
+    fields: [
+      { key: "invoiceNo", label: "Invoice no.", sample: "INV-2026-0042" },
+      { key: "invoiceDate", label: "Invoice date", sample: "01/05/2026" },
+      { key: "invoiceAmount", label: "Invoice amount", sample: "2,244,897.96" },
+      { key: "payor", label: "Payor / account debtor", sample: "DPWH Region IV-A" },
+    ],
+  },
 ];
 
 /** Conditional flags usable with `data-if` / `data-unless`. */
@@ -508,6 +544,14 @@ export const FIELD_FLAGS: MergeField[] = [
   { key: "hasInterestDiscount", label: "Has an interest discount", sample: "true" },
   { key: "hasPenaltyDiscount", label: "Has a penalty discount", sample: "true" },
   { key: "isCorpOrDti", label: "Borrower is a corporation / DTI (not an individual)", sample: "" },
+  { key: "isCorporateBorrower", label: "Borrower is a corporation", sample: "true" },
+  { key: "isDtiBorrower", label: "Borrower is a DTI single proprietor", sample: "" },
+  { key: "isIndividualBorrower", label: "Borrower is an individual", sample: "" },
+  { key: "hasSecurityCheck", label: "Loan carries a signed-undated guaranty check", sample: "true" },
+  { key: "isBiMonthly", label: "Bi-monthly amortization schedule", sample: "" },
+  { key: "isPerDayInterest", label: "Per-day (prorated) interest, one-time payment", sample: "" },
+  { key: "hasInvoiceAnnex", label: "Invoice-financing annex applies", sample: "" },
+  { key: "isNonPdc", label: "Released without PDCs (cash path)", sample: "" },
 ];
 
 /** Build the sample render context from the catalog (drives preview). */
@@ -608,6 +652,9 @@ export function buildSampleContext(): Record<string, unknown> {
   ctx.replacementChecks = [
     { bankBranch: "BDO — Makati Ave", checkNumber: "0012345", checkDate: "08/11/2026", amount: "173,818.18" },
     { bankBranch: "BDO — Makati Ave", checkNumber: "0012346", checkDate: "09/11/2026", amount: "173,818.18" },
+  ];
+  ctx.invoices = [
+    { invoiceNo: "INV-2026-0042", invoiceDate: "01/05/2026", invoiceAmount: "2,244,897.96", payor: "DPWH Region IV-A" },
   ];
   return ctx;
 }

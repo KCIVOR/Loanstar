@@ -5,6 +5,9 @@ import type { BorrowerProfile } from "../../borrowers/types";
 import type { BlriData } from "../blri-data";
 import {
   buildReleaseTemplateContext,
+  countInWords,
+  pctInWords,
+  pesosAndCentavosInWords,
   pesosInWords,
 } from "../template-context";
 
@@ -16,6 +19,29 @@ test("pesosInWords spells whole-peso amounts", () => {
     pesosInWords(102605.05),
     "One Hundred Two Thousand Six Hundred Five Pesos",
   );
+});
+
+test("pesosAndCentavosInWords adds a Cents clause only when non-zero", () => {
+  assert.equal(
+    pesosAndCentavosInWords(115178.57),
+    "One Hundred Fifteen Thousand One Hundred Seventy Eight Pesos & Fifty Seven Cents",
+  );
+  assert.equal(pesosAndCentavosInWords(200000), "Two Hundred Thousand Pesos");
+  assert.equal(pesosAndCentavosInWords(0), "Zero Pesos");
+});
+
+test("countInWords uses the 'Six (6)' house style", () => {
+  assert.equal(countInWords(6), "Six (6)");
+  assert.equal(countInWords(1), "One (1)");
+  assert.equal(countInWords(12), "Twelve (12)");
+  assert.equal(countInWords(null), "");
+});
+
+test("pctInWords spells the monthly rate LSLGC-style", () => {
+  assert.equal(pctInWords(0.025), "Two and Fifty hundredths percent (2.50%)");
+  assert.equal(pctInWords(0.03), "Three percent (3.00%)");
+  assert.equal(pctInWords(0.0325), "Three and Twenty Five hundredths percent (3.25%)");
+  assert.equal(pctInWords(null), "");
 });
 
 const BLRI: BlriData = {
@@ -123,4 +149,44 @@ test("SME context uses business fields and SME loan receivable", () => {
   assert.equal(ctx.businessAddress, "123 Rizal Ave, Quezon City");
   assert.equal(ctx.isSme, true);
   assert.equal(ctx.isSeafarer, false);
+});
+
+test("v2 LSLGC merge keys are present and segment-aware", () => {
+  const seafarer = buildReleaseTemplateContext(BLRI, COMPUTATION, BORROWER, "with_pdc");
+  // house-style in-words keys derived from the BLRI figures
+  assert.equal(
+    seafarer.totalLoanAndCentavosInWords,
+    "One Hundred Twenty One Thousand Nine Hundred Ninety Seven Pesos & Forty One Cents",
+  );
+  assert.equal(seafarer.termsInWords, "Seven (7)");
+  assert.equal(seafarer.numberOfPdcs, "1");
+  assert.equal(seafarer.executionPlace, "Makati City");
+  assert.equal(seafarer.lenderRepresentative, "Kristoffer John C. Dela Cruz");
+  // structural flags: a seafarer loan is neither corporate nor DTI
+  assert.equal(seafarer.isCorporateBorrower, false);
+  assert.equal(seafarer.isDtiBorrower, false);
+  assert.equal(seafarer.hasSecurityCheck, true);
+  assert.deepEqual(seafarer.invoices, []);
+  // uncaptured legal fields stay blank rather than blocking generation
+  assert.equal(seafarer.boardResolutionNo, "");
+  assert.equal(seafarer.notaryDocNo, "");
+
+  const sme = buildReleaseTemplateContext(
+    BLRI,
+    COMPUTATION,
+    {
+      ...BORROWER,
+      businessInfo: {
+        companyName: "Acme Trading Corp.",
+        tin: "123-456-789-000",
+        companyOfficers: [{ name: "Juan Dela Cruz", position: "President" }],
+      },
+    } as unknown as BorrowerProfile,
+    "with_pdc",
+    { segment: "sme" },
+  );
+  assert.equal(sme.isCorporateBorrower, true);
+  assert.equal(sme.borrowerRepresentative, "Juan Dela Cruz");
+  assert.equal(sme.borrowerRepresentativeTitle, "President");
+  assert.equal(sme.borrowerTin, "123-456-789-000");
 });
