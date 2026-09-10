@@ -19,6 +19,10 @@ import { DOCUMENT_BUCKET } from "@/lib/constants";
 import { getActiveComputation } from "@/lib/csa/computation";
 import { ensureDocumentSlots } from "@/lib/documents/checklist";
 import { hashPdf, renderTemplateToPdf } from "@/lib/documents/render";
+import {
+  loadDocRenderConfig,
+  type ResolvedDocRenderConfig,
+} from "@/lib/documents/render/engine-config";
 import { uploadDocumentBytes } from "@/lib/documents/storage";
 import { getPublishedTemplate } from "@/lib/documents/templates/service";
 import { createServiceClient } from "@/lib/supabase/server";
@@ -721,6 +725,7 @@ async function generateOneReleaseDocument(
   contextByPath: Map<ReleasePath, ReturnType<typeof buildReleaseTemplateContext>>,
   releasePaths: ReleasePath[],
   borrowerId: string,
+  renderConfig: ResolvedDocRenderConfig,
 ): Promise<{ slug: string; contentHash: string; regenerated: boolean }> {
   // All release documents render from published templates (the legacy hardcoded
   // renderer was retired in Phase 7). A missing published template is a hard
@@ -751,7 +756,10 @@ async function generateOneReleaseDocument(
     .eq("document_slug", slug)
     .maybeSingle();
 
-  const pdf = await renderTemplateToPdf(published.body, templateContext);
+  const pdf = await renderTemplateToPdf(published.body, templateContext, {
+    engine: renderConfig.engine,
+    connection: renderConfig.connection,
+  });
   const templateVersionId = published.versionId;
 
   const contentHash = hashPdf(pdf);
@@ -831,6 +839,7 @@ export async function generateReleaseDocuments(
   actorId: string,
 ) {
   const ctx = await loadReleaseGenerationContext(supabase, releaseFileId);
+  const renderConfig = await loadDocRenderConfig();
 
   const slugs = autoGenerateSlugs(
     segmentGroup(ctx.segment),
@@ -847,6 +856,7 @@ export async function generateReleaseDocuments(
       ctx.contextByPath,
       ctx.releasePaths,
       ctx.borrowerId,
+      renderConfig,
     );
   }
 
@@ -896,6 +906,7 @@ export async function generateReleaseDocumentBySlug(
     ctx.contextByPath,
     ctx.releasePaths,
     ctx.borrowerId,
+    await loadDocRenderConfig(),
   );
 
   const wasReadyGenerate = ctx.file.status === "ready_generate";

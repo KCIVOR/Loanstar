@@ -38,6 +38,10 @@ const CONFIG_KEYS = [
   "reports_ai_enabled",
   "reports_ai_api_key",
   "reports_ai_model",
+  "doc_render_engine",
+  "gotenberg_url",
+  "gotenberg_basic_auth_user",
+  "gotenberg_basic_auth_pass",
 ] as const;
 
 const SECRET_KEYS = new Set([
@@ -45,6 +49,7 @@ const SECRET_KEYS = new Set([
   "cron_secret",
   "smtp_password",
   "reports_ai_api_key",
+  "gotenberg_basic_auth_pass",
 ]);
 
 function maskSettings(
@@ -111,6 +116,10 @@ const patchConfigSchema = z.object({
   reports_ai_enabled: z.boolean().optional(),
   reports_ai_api_key: z.string().optional(),
   reports_ai_model: z.string().min(1).max(80).optional(),
+  doc_render_engine: z.enum(["pdfmake", "chromium"]).optional(),
+  gotenberg_url: z.string().max(500).optional(),
+  gotenberg_basic_auth_user: z.string().max(200).optional(),
+  gotenberg_basic_auth_pass: z.string().max(400).optional(),
 });
 
 export async function PATCH(request: Request) {
@@ -228,6 +237,27 @@ export async function PATCH(request: Request) {
       updates.push({
         key: "reports_ai_model",
         value: body.reports_ai_model.trim(),
+      });
+    }
+    if (body.doc_render_engine !== undefined) {
+      updates.push({ key: "doc_render_engine", value: body.doc_render_engine });
+    }
+    if (body.gotenberg_url !== undefined) {
+      updates.push({
+        key: "gotenberg_url",
+        value: body.gotenberg_url.trim().replace(/\/+$/, ""),
+      });
+    }
+    if (body.gotenberg_basic_auth_user !== undefined) {
+      updates.push({
+        key: "gotenberg_basic_auth_user",
+        value: body.gotenberg_basic_auth_user.trim(),
+      });
+    }
+    if (shouldApplySecretPatch(body.gotenberg_basic_auth_pass)) {
+      updates.push({
+        key: "gotenberg_basic_auth_pass",
+        value: body.gotenberg_basic_auth_pass!.trim(),
       });
     }
 

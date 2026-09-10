@@ -20,6 +20,9 @@ export type GotenbergAsset = {
   contentType: string;
 };
 
+/** Overrides the historical `GOTENBERG_*` env vars (see `engine-config.ts`). */
+export type GotenbergConnection = { url?: string; user?: string; pass?: string };
+
 export type GotenbergOptions = {
   headerHtml?: string;
   footerHtml?: string;
@@ -27,17 +30,19 @@ export type GotenbergOptions = {
   assets?: GotenbergAsset[];
   /** Document font, attached per-request so determinism is image-independent. */
   fontWoff2?: Uint8Array;
+  /** Service URL + basic-auth creds; falls back to env when a field is absent. */
+  connection?: GotenbergConnection;
 };
 
-function baseUrl(): string {
-  const u = process.env.GOTENBERG_URL;
+function baseUrl(conn?: GotenbergConnection): string {
+  const u = (conn?.url ?? process.env.GOTENBERG_URL ?? "").trim();
   if (!u) throw new RenderEngineError("GOTENBERG_URL is not configured");
   return u.replace(/\/+$/, "");
 }
 
-function authHeaders(): Record<string, string> {
-  const user = process.env.GOTENBERG_BASIC_AUTH_USER;
-  const pass = process.env.GOTENBERG_BASIC_AUTH_PASS;
+function authHeaders(conn?: GotenbergConnection): Record<string, string> {
+  const user = conn?.user ?? process.env.GOTENBERG_BASIC_AUTH_USER;
+  const pass = conn?.pass ?? process.env.GOTENBERG_BASIC_AUTH_PASS;
   if (!user || !pass) return {};
   return {
     authorization: `Basic ${Buffer.from(`${user}:${pass}`).toString("base64")}`,
@@ -110,8 +115,8 @@ export async function htmlToPdfViaGotenberg(
   form.append("generateDocumentOutline", "false");
 
   const res = await fetchWithRetry(
-    `${baseUrl()}/forms/chromium/convert/html`,
-    { method: "POST", headers: authHeaders(), body: form },
+    `${baseUrl(opts.connection)}/forms/chromium/convert/html`,
+    { method: "POST", headers: authHeaders(opts.connection), body: form },
   );
 
   if (!res.ok) {
