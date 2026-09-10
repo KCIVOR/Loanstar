@@ -45,10 +45,9 @@ function chunkToWords(n: number): string {
   return parts.join(" ");
 }
 
-/** Whole-peso amount in words, e.g. 90000 → "Ninety Thousand Pesos". */
-export function pesosInWords(amount: number): string {
-  const whole = Math.floor(Math.abs(amount));
-  if (whole === 0) return "Zero Pesos";
+/** Non-negative integer in words, e.g. 121997 → "One Hundred Twenty One Thousand". */
+function wholeToWords(whole: number): string {
+  if (whole === 0) return "Zero";
   const groups: number[] = [];
   let remaining = whole;
   while (remaining > 0) {
@@ -60,7 +59,50 @@ export function pesosInWords(amount: number): string {
     if (groups[i] === 0) continue;
     words.push(`${chunkToWords(groups[i])}${SCALES[i] ? ` ${SCALES[i]}` : ""}`);
   }
-  return `${words.join(" ")} Pesos`;
+  return words.join(" ");
+}
+
+/** Whole-peso amount in words, e.g. 90000 → "Ninety Thousand Pesos". */
+export function pesosInWords(amount: number): string {
+  const whole = Math.floor(Math.abs(amount));
+  if (whole === 0) return "Zero Pesos";
+  return `${wholeToWords(whole)} Pesos`;
+}
+
+/**
+ * Peso amount in words including centavos, matching the LSLGC legal-document
+ * house style: "One Hundred Fifteen Thousand ... Pesos & Fifty Seven Cents",
+ * or just "... Pesos" when the amount is whole.
+ */
+export function pesosAndCentavosInWords(amount: number): string {
+  const abs = Math.abs(amount);
+  const whole = Math.floor(abs);
+  const cents = Math.round((abs - whole) * 100);
+  const base = `${wholeToWords(whole)} Pesos`;
+  return cents > 0 ? `${base} & ${wholeToWords(cents)} Cents` : base;
+}
+
+/** Small count in the "Six (6)" house style. Returns "" for null/invalid. */
+export function countInWords(n: number | null | undefined): string {
+  if (n == null || !Number.isFinite(n) || n < 0) return "";
+  const int = Math.floor(n);
+  return `${wholeToWords(int)} (${int})`;
+}
+
+/**
+ * Monthly interest rate in the LSLGC house style:
+ * 0.025 → "Two and Fifty hundredths percent (2.50%)", 0.03 → "Three percent (3.00%)".
+ */
+export function pctInWords(rate: number | null | undefined): string {
+  if (rate == null || !Number.isFinite(rate)) return "";
+  const asPercent = rate * 100;
+  const intPart = Math.floor(asPercent);
+  const frac = Math.round((asPercent - intPart) * 100);
+  const figure = `${asPercent.toFixed(2)}%`;
+  const head = wholeToWords(intPart);
+  return frac > 0
+    ? `${head} and ${wholeToWords(frac)} hundredths percent (${figure})`
+    : `${head} percent (${figure})`;
 }
 
 function joinAddress(a: BorrowerProfile["presentAddress"]): string {
@@ -202,6 +244,79 @@ export function buildReleaseTemplateContext(
     bankName: borrower.financial?.bankName ?? "",
     bankAccountNo: borrower.financial?.accountNumber ?? "",
     checkAmount: formatMoney(computation.netReleased),
+
+    // --- LSLGC legal-document merge keys (loan_agreement / disclosure_statement
+    //     / promissory_note v2). Uncaptured fields resolve to "" per this file's
+    //     established convention; helpers above produce the house-style wording. ---
+    principalAndCentavosInWords: pesosAndCentavosInWords(blri.principal),
+    totalLoanAndCentavosInWords: pesosAndCentavosInWords(blri.totalLoan),
+    monthlyAmortizationAndCentavosInWords: pesosAndCentavosInWords(
+      blri.monthlyAmortization,
+    ),
+    netLoanAndCentavosInWords: pesosAndCentavosInWords(computation.netReleased),
+    termsInWords: countInWords(blri.terms),
+    interestRateInWords: pctInWords(computation.interestRate),
+    preTerminationRate: pct(computation.interestRate),
+    preTerminationRateInWords: pctInWords(computation.interestRate),
+
+    numberOfPdcs: String(blri.pdcSchedule.length),
+    numberOfPdcsInWords: countInWords(blri.pdcSchedule.length),
+    perCheckAmount: formatMoney(blri.pdcSchedule[0]?.amount ?? 0),
+    perCheckAmountInWords: pesosAndCentavosInWords(
+      blri.pdcSchedule[0]?.amount ?? 0,
+    ),
+
+    loanStartDate: blri.firstPaymentDate,
+    loanMaturityDate: blri.pdcSchedule.at(-1)?.checkDate ?? "",
+    executionDate: computation.releaseDate ?? "",
+    executionPlace: "Makati City",
+
+    lenderAddress:
+      "4th Floor Carson Building, Orense Corner Del Carmen St., Guadalupe Nuevo, Makati City",
+    lenderTin: "008-890-767-000",
+    lenderRepresentative: "Kristoffer John C. Dela Cruz",
+    lenderRepresentativeTin: "942-356-927-000",
+    lenderRepresentativeTitle: "President",
+    authorizedSignatory: "Reden G. Mayor",
+
+    borrowerRepresentative: isSme
+      ? (borrower.businessInfo?.companyOfficers?.[0]?.name ?? "")
+      : "",
+    borrowerRepresentativeTitle: isSme
+      ? (borrower.businessInfo?.companyOfficers?.[0]?.position ??
+        borrower.businessInfo?.position ??
+        "")
+      : "",
+    boardResolutionNo: "",
+    corporateSecretary: "",
+    borrowerTin: isSme ? (borrower.businessInfo?.tin ?? "") : "",
+
+    notaryDocNo: "",
+    notaryPageNo: "",
+    notaryBookNo: "",
+    notarySeries: "",
+
+    // Amount / date / count slots the Disclosure Statement form fills in.
+    amountFinanced: formatMoney(blri.principal),
+    financeChargeInterest: formatMoney(blri.totalInterest),
+    totalInstallmentPayments: formatMoney(blri.totalLoan),
+    installmentCount: String(blri.terms),
+    disclosureFromDate: blri.firstPaymentDate,
+    disclosureToDate: blri.pdcSchedule.at(-1)?.checkDate ?? "",
+
+    // Loan Agreement structural flags. Default: a Seafarer/Individual loan is a
+    // standard monthly PDC loan; an SME loan is treated as corporate. The
+    // bi-monthly / per-day / invoice product variants and DTI sole-prop are not
+    // inferable from release data yet — they stay false until captured.
+    isCorporateBorrower: isSme,
+    isDtiBorrower: false,
+    isIndividualBorrower: isIndividual,
+    hasSecurityCheck: true,
+    isBiMonthly: false,
+    isPerDayInterest: false,
+    hasInvoiceAnnex: false,
+    isNonPdc: !isCheck,
+    invoices: [] as unknown[],
 
     isCheck,
     isCash: !isCheck,
