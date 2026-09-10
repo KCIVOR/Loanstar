@@ -67,7 +67,7 @@ export async function GET(_request: Request, { params }: RouteParams) {
         *,
         portfolios ( id, name ),
         assignments ( * ),
-        amortization_schedules ( ${AMORTIZATION_SCHEDULE_LEDGER_COLUMNS}, amount_paid )
+        amortization_schedules ( ${AMORTIZATION_SCHEDULE_LEDGER_COLUMNS} )
       `,
       )
       .eq("id", id)
@@ -122,7 +122,7 @@ export async function GET(_request: Request, { params }: RouteParams) {
     const { data: postings } = await supabase
       .from("postings")
       .select(
-        "id, amortization_schedule_id, amount, payments ( payment_date, reference_no, channel, status, move_of_payment_batch_id )",
+        "id, amortization_schedule_id, amount, penalty_amount, payments ( payment_date, reference_no, channel, status, move_of_payment_batch_id )",
       )
       .eq("masterlist_id", id)
       .order("posted_at", { ascending: true });

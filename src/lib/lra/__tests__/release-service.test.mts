@@ -13,7 +13,11 @@ import {
 } from "@/lib/ar/schedule";
 import { invoiceScheduleToInstallments } from "@/lib/ar/masterlist";
 
-import { savePdcChecks } from "../release-service";
+import {
+  canModifyGeneratedDoc,
+  releaseTransitionAfterDelete,
+  savePdcChecks,
+} from "../release-service";
 
 type StubOpts = {
   terms: number;
@@ -1023,6 +1027,62 @@ describe("savePdcChecks gross-basis PDC parity (F10)", () => {
     }));
     await assert.rejects(() =>
       savePdcChecks(stub.supabase, "rf-1", netChecks, undefined, "actor-1"),
+    );
+  });
+});
+
+describe("canModifyGeneratedDoc — regenerate / remove gate", () => {
+  it("allows edits at ready_generate and awaiting_signatures", () => {
+    assert.equal(canModifyGeneratedDoc("ready_generate", false, false), true);
+    assert.equal(canModifyGeneratedDoc("awaiting_signatures", false, false), true);
+  });
+
+  it("blocks once the document is finalized", () => {
+    assert.equal(canModifyGeneratedDoc("awaiting_signatures", true, false), false);
+  });
+
+  it("blocks once the briefing is acknowledged", () => {
+    assert.equal(canModifyGeneratedDoc("awaiting_signatures", false, true), false);
+  });
+
+  it("blocks past the signing stage", () => {
+    for (const s of [
+      "awaiting_path",
+      "pdc_encoding",
+      "awaiting_briefing",
+      "ready_release",
+      "released",
+      "closed",
+    ] as const) {
+      assert.equal(canModifyGeneratedDoc(s, false, false), false);
+    }
+  });
+});
+
+describe("releaseTransitionAfterDelete", () => {
+  it("only acts while awaiting_signatures", () => {
+    assert.equal(releaseTransitionAfterDelete("ready_generate", 0, false), null);
+    assert.equal(releaseTransitionAfterDelete("awaiting_briefing", 0, false), null);
+  });
+
+  it("last document removed rolls back to ready_generate", () => {
+    assert.equal(
+      releaseTransitionAfterDelete("awaiting_signatures", 0, false),
+      "ready_generate",
+    );
+  });
+
+  it("advances to awaiting_briefing when every remaining doc is signed", () => {
+    assert.equal(
+      releaseTransitionAfterDelete("awaiting_signatures", 3, true),
+      "awaiting_briefing",
+    );
+  });
+
+  it("stays put when some remaining docs are unsigned", () => {
+    assert.equal(
+      releaseTransitionAfterDelete("awaiting_signatures", 3, false),
+      null,
     );
   });
 });

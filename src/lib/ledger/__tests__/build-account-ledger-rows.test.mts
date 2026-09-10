@@ -58,9 +58,10 @@ describe("buildAccountLedgerRows", () => {
     assert.equal(rows[0]?.credit, null);
     assert.equal(rows[0]?.balance, 5000);
     assert.equal(rows.at(-1)?.kind, "totals");
-    assert.equal(rows.at(-1)?.debit, 5000);
+    // Report Total debit = principal (5000) + s2's ₱50 accrued late fee.
+    assert.equal(rows.at(-1)?.debit, 5050);
     assert.equal(rows.at(-1)?.credit, 0);
-    assert.equal(rows.at(-1)?.balance, 5000);
+    assert.equal(rows.at(-1)?.balance, 5050);
   });
 
   it("lists unpaid installments with check no, target, penalty and status", () => {
@@ -79,11 +80,13 @@ describe("buildAccountLedgerRows", () => {
     assert.equal(installments[0]?.status, "pending");
     assert.equal(installments[0]?.date, null);
     assert.equal(installments[0]?.credit, null);
-    // Balance carries forward untouched while nothing is collected.
+    // Balance carries forward untouched while nothing is collected — save for
+    // an accrued late fee, which is a debit (s1 has none).
     assert.equal(installments[0]?.balance, 5000);
     assert.equal(installments[1]?.checkNo, "151");
     assert.equal(installments[1]?.penalty, 50);
-    assert.equal(installments[1]?.balance, 5000);
+    // s2's ₱50 late fee folds into the running balance when its row is emitted.
+    assert.equal(installments[1]?.balance, 5050);
   });
 
   it("orders installments by installment number, not input order", () => {
@@ -134,12 +137,14 @@ describe("buildAccountLedgerRows", () => {
     assert.equal(credits[0]?.balance, 4000);
     assert.equal(credits[1]?.checkNo, "151");
     assert.equal(credits[1]?.status, "partial");
-    assert.equal(credits[1]?.balance, 3000);
+    // 5000 − 1000 (s1) + 50 (s2 late fee) − 1000 (s2) = 3050.
+    assert.equal(credits[1]?.balance, 3050);
     assert.equal(credits[1]?.dueDate, "2026-03-15");
     assert.equal(credits[1]?.target, 1000);
     assert.equal(credits[1]?.penalty, 50);
     assert.equal(rows.at(-1)?.credit, 2000);
-    assert.equal(rows.at(-1)?.balance, 3000);
+    assert.equal(rows.at(-1)?.debit, 5050);
+    assert.equal(rows.at(-1)?.balance, 3050);
   });
 
   it("keeps multiple credits on one installment in payment-date order", () => {
@@ -329,6 +334,49 @@ describe("buildAccountLedgerRows", () => {
     assert.equal(rows.at(-1)?.balance, 0);
   });
 
+  it("folds accrued late fees into Report Total so it matches the stored outstanding balance (2026-09-09)", () => {
+    // Mirrors live AN300459: 12 × ₱74,800 principal. #1 paid late in full
+    // (₱74,800 + ₱3,740 fee). #2 overdue, ₱1,683 fee, paid ₱41,140 partial.
+    // Stored outstanding_balance counts penalty_amount, so the ledger must too.
+    const twelve: LedgerSchedule[] = Array.from({ length: 12 }, (_, i) => ({
+      id: `n${i + 1}`,
+      dueDate: `2026-${String(i + 1).padStart(2, "0")}-08`,
+      target: 74_800,
+      penalty: i === 0 ? 3_740 : i === 1 ? 1_683 : 0,
+      installmentNo: i + 1,
+      status: i === 0 ? "paid" : i === 1 ? "overdue" : "pending",
+    }));
+    const rows = buildAccountLedgerRows({
+      openingDebit: 897_600,
+      schedules: twelve,
+      payments: [
+        payment({ id: "p1", paymentDate: "2026-09-09", amount: 78_540, scheduleId: "n1" }),
+        payment({ id: "p2", paymentDate: "2026-09-09", amount: 41_140, scheduleId: "n2" }),
+      ],
+    });
+    const totals = rows.at(-1);
+    assert.equal(totals?.kind, "totals");
+    // 897,600 principal + 3,740 + 1,683 late fees.
+    assert.equal(totals?.debit, 903_023);
+    assert.equal(totals?.credit, 119_680);
+    // debit − credit identity holds, and equals recompute_outstanding_balance.
+    assert.equal(totals?.balance, 783_343);
+  });
+
+  it("a penalty waiver (penaltyDiscount) is netted out of the folded-in late fee", () => {
+    const rows = buildAccountLedgerRows({
+      openingDebit: 2000,
+      schedules: [
+        { ...schedules[0]!, target: 1000, penalty: 0, status: "pending" },
+        { ...schedules[1]!, target: 1000, penalty: 200, penaltyDiscount: 200, status: "overdue" },
+      ],
+      payments: [],
+    });
+    // 200 fee fully waived → nothing folded in.
+    assert.equal(rows.at(-1)?.debit, 2000);
+    assert.equal(rows.at(-1)?.balance, 2000);
+  });
+
   it("does NOT double-subtract an origination / null-source discount (already in openingDebit)", () => {
     const rows = buildAccountLedgerRows({
       // openingDebit already net of the ₱400 origination discount on s2.
@@ -412,6 +460,7 @@ describe("buildAccountLedgerRows", () => {
       id: "post-1",
       paymentDate: "2026-02-10",
       amount: 250,
+      penaltyPortion: 0,
       referenceNo: "REF-1",
       channel: "bank_deposit",
       status: "posted",
@@ -568,6 +617,7 @@ describe("mapScheduleRowForLedger (2026-08-31 — the one shared DB-row-to-ledge
       id: "abc-123",
       dueDate: "2026-09-30",
       target: 33224.4,
+      amountPaid: 0,
       penalty: 50,
       discount: 1544.4,
       // Collector Discount fields (feature-collector-discount-implementation-plan.md,
@@ -995,5 +1045,145 @@ describe("checkNumbersByInstallmentNo", () => {
     assert.equal(map.get(4), undefined); // $0 placeholder never gets a check
     assert.equal(map.get(5), "491237"); // Q3 interest — pre-fix this was undefined (never assigned)
     assert.equal(map.get(6), "638228"); // final principal — pre-fix this was undefined (never assigned)
+  });
+});
+
+describe("buildAccountLedgerRows — per-month remaining columns (This month / Penalty left, 2026-09-09)", () => {
+  const p = (
+    over: Partial<LedgerPaymentEntry> &
+      Pick<LedgerPaymentEntry, "id" | "paymentDate" | "amount">,
+  ): LedgerPaymentEntry => ({
+    referenceNo: null,
+    channel: "bank_deposit",
+    status: "posted",
+    scheduleId: null,
+    penaltyPortion: 0,
+    ...over,
+  });
+
+  it("an unpaid installment shows its full principal and full penalty as still owed", () => {
+    const rows = buildAccountLedgerRows({
+      openingDebit: 5000,
+      schedules: [
+        { id: "s1", dueDate: "2026-02-15", target: 1000, penalty: 0, installmentNo: 1, status: "pending" },
+        { id: "s2", dueDate: "2026-03-15", target: 1000, penalty: 50, installmentNo: 2, status: "overdue" },
+      ],
+      payments: [],
+    });
+    const insts = rows.filter((r) => r.kind === "installment");
+    assert.equal(insts[0]?.monthRemaining, 1000);
+    assert.equal(insts[0]?.penaltyRemaining, 0);
+    assert.equal(insts[1]?.monthRemaining, 1000);
+    assert.equal(insts[1]?.penaltyRemaining, 50);
+  });
+
+  it("a credit splits into principal and penalty portions", () => {
+    const rows = buildAccountLedgerRows({
+      openingDebit: 2000,
+      schedules: [
+        { id: "s1", dueDate: "2026-02-15", target: 1000, penalty: 0, installmentNo: 1, status: "paid", amountPaid: 1000 },
+        { id: "s2", dueDate: "2026-03-15", target: 1000, penalty: 50, installmentNo: 2, status: "partial", amountPaid: 250 },
+      ],
+      payments: [
+        p({ id: "c1", paymentDate: "2026-02-16", amount: 1000, scheduleId: "s1" }),
+        p({ id: "c2", paymentDate: "2026-03-20", amount: 250, scheduleId: "s2", penaltyPortion: 50 }),
+      ],
+    });
+    const paid = rows.filter((r) => r.kind === "payment");
+    assert.equal(paid[0]?.monthRemaining, 0);
+    assert.equal(paid[0]?.penaltyRemaining, 0);
+    // ₱250 paid on s2, ₱50 of it late-fee -> penalty cleared, principal 1000-200=800
+    assert.equal(paid[1]?.monthRemaining, 800);
+    assert.equal(paid[1]?.penaltyRemaining, 0);
+  });
+
+  it("a credit with no penalty portion is all principal — penalty stays owed", () => {
+    const rows = buildAccountLedgerRows({
+      openingDebit: 1000,
+      schedules: [
+        { id: "s2", dueDate: "2026-03-15", target: 1000, penalty: 50, installmentNo: 2, status: "partial", amountPaid: 200 },
+      ],
+      payments: [p({ id: "c1", paymentDate: "2026-03-20", amount: 200, scheduleId: "s2", penaltyPortion: 0 })],
+    });
+    const row = rows.find((r) => r.kind === "payment");
+    assert.equal(row?.monthRemaining, 800);
+    assert.equal(row?.penaltyRemaining, 50);
+  });
+
+  it("principal-first (skip-fee): full monthly paid, ₱0 to the fee -> This month 0, Penalty left = charged", () => {
+    const rows = buildAccountLedgerRows({
+      openingDebit: 181_866.66,
+      schedules: [
+        { id: "n1", dueDate: "2026-04-06", target: 90_933.33, penalty: 25_123.21, installmentNo: 1, status: "partial", amountPaid: 90_933.33 },
+        { id: "n2", dueDate: "2026-05-07", target: 90_933.33, penalty: 0, installmentNo: 2, status: "pending", amountPaid: 0 },
+      ],
+      payments: [
+        p({ id: "c1", paymentDate: "2026-09-12", amount: 90_933.33, scheduleId: "n1", penaltyPortion: 0 }),
+      ],
+    });
+    const paid = rows.find((r) => r.kind === "payment");
+    assert.equal(paid?.monthRemaining, 0); // principal fully covered
+    assert.equal(paid?.penaltyRemaining, 25_123.21); // fee untouched, still owed
+    const totals = rows.at(-1);
+    assert.equal(totals?.monthRemaining, 90_933.33);
+    assert.equal(totals?.penaltyRemaining, 25_123.21);
+    assert.ok(
+      Math.abs(
+        (totals?.monthRemaining ?? 0) +
+          (totals?.penaltyRemaining ?? 0) -
+          (totals?.balance ?? 0),
+      ) < 0.005,
+    );
+  });
+
+  it("totals: This month + Penalty left add up to the whole-loan Balance (plain loan)", () => {
+    const rows = buildAccountLedgerRows({
+      openingDebit: 374_000,
+      schedules: [
+        { id: "n1", dueDate: "2026-07-08", target: 74_800, penalty: 3_740, installmentNo: 1, status: "paid", amountPaid: 78_540 },
+        { id: "n2", dueDate: "2026-08-08", target: 74_800, penalty: 3_740, installmentNo: 2, status: "partial", amountPaid: 50_000 },
+        { id: "n3", dueDate: "2026-09-08", target: 74_800, penalty: 3_740, installmentNo: 3, status: "overdue", amountPaid: 0 },
+        { id: "n4", dueDate: "2026-10-08", target: 74_800, penalty: 0, installmentNo: 4, status: "pending", amountPaid: 0 },
+        { id: "n5", dueDate: "2026-11-08", target: 74_800, penalty: 0, installmentNo: 5, status: "pending", amountPaid: 0 },
+      ],
+      payments: [
+        p({ id: "c1", paymentDate: "2026-07-05", amount: 78_540, scheduleId: "n1", penaltyPortion: 3_740 }),
+        p({ id: "c2", paymentDate: "2026-09-02", amount: 50_000, scheduleId: "n2", penaltyPortion: 0 }),
+      ],
+    });
+    const totals = rows.at(-1);
+    assert.equal(totals?.kind, "totals");
+    assert.equal(totals?.monthRemaining, 249_200); // 0 + 24_800 + 74_800 + 74_800 + 74_800
+    assert.equal(totals?.penaltyRemaining, 7_480); // 0 + 3_740 + 3_740
+    assert.equal(
+      (totals?.monthRemaining ?? 0) + (totals?.penaltyRemaining ?? 0),
+      totals?.balance,
+    );
+  });
+
+  it("opening, move-of-payment and surcharge rows carry no per-month remaining", () => {
+    const rows = buildAccountLedgerRows({
+      openingDebit: 2000,
+      schedules: [
+        {
+          id: "s1",
+          dueDate: "2026-02-15",
+          target: 1000,
+          penalty: 0,
+          installmentNo: 1,
+          status: "moved",
+          movedAt: "2026-02-20T00:00:00Z",
+          moveSurchargeAmount: 150.5,
+          moveOfPaymentBatchId: "batch-1",
+        },
+      ],
+      payments: [],
+    });
+    const opening = rows.find((r) => r.kind === "opening");
+    const moveRow = rows.find((r) => r.kind === "move_of_payment");
+    assert.equal(opening?.monthRemaining, null);
+    assert.equal(opening?.penaltyRemaining, null);
+    assert.equal(moveRow?.monthRemaining, null);
+    assert.equal(moveRow?.penaltyRemaining, null);
   });
 });

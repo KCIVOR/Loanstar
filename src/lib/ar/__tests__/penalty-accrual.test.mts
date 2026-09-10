@@ -31,6 +31,10 @@ type Row = {
   amountPaid: number;
   penaltyAmount: number;
   periodsApplied: number;
+  /** Fee money already collected against this row = SUM(postings.penalty_amount).
+   * Carved out of the principal term so it doesn't shrink the compounding base
+   * (penalty-fee-paid-protection-plan.md Phase 2, 2026-09-09). */
+  feePaid: number;
 };
 
 const baseRow = (over: Partial<Row> = {}): Row => ({
@@ -40,6 +44,7 @@ const baseRow = (over: Partial<Row> = {}): Row => ({
   amountPaid: 0,
   penaltyAmount: 0,
   periodsApplied: 0,
+  feePaid: 0,
   ...over,
 });
 
@@ -64,7 +69,7 @@ function simulateMonthlyAccrual(
       row.amountDue -
         row.discountAmount -
         row.penaltyDiscountAmount -
-        row.amountPaid +
+        Math.max(0, row.amountPaid - row.feePaid) +
         running,
     );
     const add = halfUp(bal * rate);
@@ -78,9 +83,18 @@ function simulateMonthlyAccrual(
 // ── Phase 3 — recompute on payment (with the 20260908234126 paid-row fix) ──
 function simulateRecomputeRow(
   row: Row & { status: "pending" | "partial" | "overdue" | "paid" },
-  opts: { onTimePaid: number; netDue: number; elapsedMonths: number; rate: number },
+  opts: {
+    onTimePaid: number;
+    netDue: number;
+    elapsedMonths: number;
+    rate: number;
+    /** SUM(postings.penalty_amount) for the row — read as its own SELECT in
+     * recompute_account_penalties, parallel to onTimePaid. Defaults to 0. */
+    feePaid?: number;
+  },
 ): { penaltyAmount: number; periodsApplied: number; delta: number; skipped: boolean } {
   const { onTimePaid, netDue, elapsedMonths, rate } = opts;
+  const feePaid = opts.feePaid ?? 0;
   let target: number;
   let targetPeriods: number;
 
@@ -103,7 +117,7 @@ function simulateRecomputeRow(
         row.amountDue -
           row.discountAmount -
           row.penaltyDiscountAmount -
-          row.amountPaid +
+          Math.max(0, row.amountPaid - feePaid) +
           running,
       );
       const add = halfUp(bal * rate);
@@ -111,6 +125,15 @@ function simulateRecomputeRow(
       running += add;
     }
     target = running;
+    // A charged late fee is a balance in its own right: the recompute may
+    // raise it (compounding) but never lower it below what was collected
+    // against it, nor below what is currently charged net of any waiver
+    // (decisions 2026-09-09 / 2026-09-10).
+    target = Math.max(
+      target,
+      feePaid,
+      Math.max(0, row.penaltyAmount - row.penaltyDiscountAmount),
+    );
     targetPeriods = elapsedMonths;
   }
 
@@ -140,6 +163,29 @@ function penaltyFirstSplit(input: {
     Math.max(
       0,
       input.finalPenalty - input.finalWaiver - input.penaltyAlreadyPosted,
+    ),
+  );
+}
+
+// ── Phase 4b — collector-typed override of the fee portion ────────────────
+// Mirrors post_single_dcr_item: for a tagged installment, its even share of
+// the typed total, capped at the allocation and at the fee still owed.
+function phase4bOverride(input: {
+  allocAmount: number;
+  penaltyPaidAmount: number;
+  taggedCount: number;
+  finalPenalty: number;
+  finalWaiver: number;
+  penaltyAlreadyPosted: number;
+}): number {
+  return Math.min(
+    input.allocAmount,
+    Math.min(
+      halfUp(input.penaltyPaidAmount / input.taggedCount),
+      Math.max(
+        0,
+        input.finalPenalty - input.finalWaiver - input.penaltyAlreadyPosted,
+      ),
     ),
   );
 }
@@ -191,6 +237,22 @@ describe("Phase 2 — monthly compounding accrual", () => {
     assert.equal(simulateMonthlyAccrual(baseRow(), 1, 0.15).rounds[0], 1500);
     assert.equal(simulateMonthlyAccrual(baseRow(), 1, 0.05).rounds[0], 500);
   });
+
+  it("no roll-forward: three consecutively-overdue installments each keep their own Target and compound independently (removed 2026-09-09)", () => {
+    // The 30-day roll-forward was removed. On a monthly loan aged so #1/#2/#3
+    // are 3/2/1 months overdue, each row stays 'overdue' at its own Target and
+    // accrues its own months of fee — none is merged/rolled into another.
+    const inst1 = simulateMonthlyAccrual(baseRow(), 3, 0.05); // ₱10k, 3 months
+    const inst2 = simulateMonthlyAccrual(baseRow(), 2, 0.05);
+    const inst3 = simulateMonthlyAccrual(baseRow(), 1, 0.05);
+    assert.deepEqual(
+      [inst1.penaltyAmount, inst2.penaltyAmount, inst3.penaltyAmount],
+      [1576.25, 1025, 500],
+    );
+    // Each still owes its own ₱10,000 principal — no Target was inflated by a
+    // merge. (Target is `amountDue`, which simulateMonthlyAccrual never mutates.)
+    assert.equal(baseRow().amountDue, 10000);
+  });
 });
 
 describe("Phase 3 — recompute on payment", () => {
@@ -219,8 +281,9 @@ describe("Phase 3 — recompute on payment", () => {
     assert.equal(r.penaltyAmount, 500);
   });
 
-  it("Rule 4b: a late partial payment recomputes the fee on the remainder", () => {
-    // paid 5,000 of 10,000, one month elapsed -> 5% of the 5,000 remainder
+  it("a late partial payment does NOT shrink the charged fee (2026-09-10: fee is its own balance)", () => {
+    // paid 5,000 of 10,000, one month elapsed. Recompute on the remainder
+    // gives 5% * 5,000 = 250, but the charged ₱500 is the floor -> stays 500.
     const row = { ...baseRow({ amountPaid: 5000, penaltyAmount: 500, periodsApplied: 1 }), status: "partial" as const };
     const r = simulateRecomputeRow(row, {
       onTimePaid: 0,
@@ -228,8 +291,8 @@ describe("Phase 3 — recompute on payment", () => {
       elapsedMonths: 1,
       rate: 0.05,
     });
-    assert.equal(r.penaltyAmount, 250);
-    assert.equal(r.delta, -250);
+    assert.equal(r.penaltyAmount, 500);
+    assert.equal(r.delta, 0);
   });
 
   it("Rule 4b: a late partial that leaves more elapsed months compounds the remainder", () => {
@@ -242,6 +305,175 @@ describe("Phase 3 — recompute on payment", () => {
     });
     // remainder 6,000 -> m1 300, m2 5% of 6,300 = 315 -> 615
     assert.equal(r.penaltyAmount, 615);
+  });
+});
+
+describe("Phase 3/4 — a paid late fee is protected (penalty-fee-paid-protection, 2026-09-09)", () => {
+  // Scenario mirrors live AN300459 month #4: ₱74,800 due, 1 month late so the
+  // fee charged is 5% = ₱3,740. Borrower pays ₱41,140 (₱37,400 principal + the
+  // ₱3,740 fee); the collector tags ₱3,740 as "Late fee paid" -> it lands in
+  // postings.penalty_amount -> feePaid = 3,740.
+
+  it("recompute does not shrink a fee that has been paid in full", () => {
+    const row = {
+      ...baseRow({ amountDue: 74_800, amountPaid: 41_140, penaltyAmount: 3_740, periodsApplied: 1 }),
+      status: "partial" as const,
+    };
+    const r = simulateRecomputeRow(row, {
+      onTimePaid: 0,
+      netDue: 74_800,
+      elapsedMonths: 1,
+      rate: 0.05,
+      feePaid: 3_740,
+    });
+    // Without the fix this recomputed to 5% * (74,800 - 41,140) = 1,683.
+    assert.equal(r.penaltyAmount, 3_740);
+    assert.equal(r.delta, 0);
+  });
+
+  it("fee money is excluded from the compounding base on recompute", () => {
+    // Same row, only ₱2,000 of the ₱3,740 fee paid -> the recompute base uses
+    // the true remaining principal (74,800 - (41,140 - 2,000) = 35,660). The
+    // charged fee is the floor, so the fee stays at 3,740 (₱1,740 still owed).
+    const row = {
+      ...baseRow({ amountDue: 74_800, amountPaid: 41_140, penaltyAmount: 3_740, periodsApplied: 1 }),
+      status: "partial" as const,
+    };
+    const r = simulateRecomputeRow(row, {
+      onTimePaid: 0,
+      netDue: 74_800,
+      elapsedMonths: 1,
+      rate: 0.05,
+      feePaid: 2_000,
+    });
+    // 5% * 35,660 = 1,783; floored to the charged fee 3,740 (2026-09-10).
+    assert.equal(r.penaltyAmount, 3_740);
+  });
+
+  it("the recompute floors the fee at the charged amount, not what was collected", () => {
+    const row = {
+      ...baseRow({ amountDue: 10_000, amountPaid: 6_000, penaltyAmount: 500, periodsApplied: 1 }),
+      status: "partial" as const,
+    };
+    const r = simulateRecomputeRow(row, {
+      onTimePaid: 0,
+      netDue: 10_000,
+      elapsedMonths: 1,
+      rate: 0.05,
+      feePaid: 400,
+    });
+    // 5% * (10,000 - (6,000 - 400)) = 220; feePaid 400; charged 500 -> floor 500.
+    assert.equal(r.penaltyAmount, 500);
+  });
+
+  it("an on-time payment still zeroes the fee even when feePaid > 0", () => {
+    const row = {
+      ...baseRow({ amountDue: 74_800, amountPaid: 78_540, penaltyAmount: 3_740, periodsApplied: 1 }),
+      status: "partial" as const,
+    };
+    const r = simulateRecomputeRow(row, {
+      onTimePaid: 78_540,
+      netDue: 74_800,
+      elapsedMonths: 1,
+      rate: 0.05,
+      feePaid: 3_740,
+    });
+    assert.equal(r.penaltyAmount, 0);
+  });
+
+  it("next month's accrual compounds on remaining principal + running fee, not the fee-reduced balance", () => {
+    // month #4 after the ₱41,140 payment: penaltyAmount held at 3,740 (Phase 1),
+    // periodsApplied 1, feePaid 3,740. Age one more month.
+    const row = baseRow({
+      amountDue: 74_800,
+      amountPaid: 41_140,
+      penaltyAmount: 3_740,
+      periodsApplied: 1,
+      feePaid: 3_740,
+    });
+    const r = simulateMonthlyAccrual(row, 2, 0.05);
+    // base = 74,800 - max(0, 41,140 - 3,740) + 3,740 = 41,140; add = 2,057.
+    assert.deepEqual(r.rounds, [2_057]);
+    assert.equal(r.penaltyAmount, 5_797);
+  });
+
+  it("without any fee paid, accrual base is unchanged (feePaid defaults to 0)", () => {
+    const r = simulateMonthlyAccrual(baseRow({ amountPaid: 4_000, penaltyAmount: 500, periodsApplied: 1 }), 2, 0.05);
+    // remainder 6,000 -> m2 5% of (6,000 + 500) = 325 -> 825
+    assert.equal(r.penaltyAmount, 825);
+  });
+});
+
+describe("Phase 4 — principal-first: a charged fee stays a balance (2026-09-10)", () => {
+  it("a ₱0 'Late fee paid' tag on an installment sends nothing to the fee", () => {
+    // full monthly paid on a late installment, tagged with ₱0 -> whole
+    // allocation is principal, fee untouched.
+    assert.equal(
+      phase4bOverride({
+        allocAmount: 90_933.33,
+        penaltyPaidAmount: 0,
+        taggedCount: 1,
+        finalPenalty: 25_123.21,
+        finalWaiver: 0,
+        penaltyAlreadyPosted: 0,
+      }),
+      0,
+    );
+  });
+
+  it("recompute keeps the charged fee when principal is covered but the fee is not paid", () => {
+    // pay the full ₱90,933.33 principal, ₱0 to the fee (feePaid 0).
+    const row = {
+      ...baseRow({ amountDue: 90_933.33, amountPaid: 90_933.33, penaltyAmount: 9_320.67, periodsApplied: 2 }),
+      status: "partial" as const,
+    };
+    const r = simulateRecomputeRow(row, {
+      onTimePaid: 0,
+      netDue: 90_933.33,
+      elapsedMonths: 2,
+      rate: 0.05,
+      feePaid: 0,
+    });
+    // recompute base -> 0, so v_target computes to 0; the charged fee is the
+    // floor -> the fee is NOT erased.
+    assert.equal(r.penaltyAmount, 9_320.67);
+  });
+
+  it("a genuine on-time full payment still zeroes the fee (Rule 4a wins over the floor)", () => {
+    const row = {
+      ...baseRow({ amountDue: 90_933.33, amountPaid: 90_933.33, penaltyAmount: 9_320.67, periodsApplied: 2 }),
+      status: "partial" as const,
+    };
+    const r = simulateRecomputeRow(row, {
+      onTimePaid: 90_933.33,
+      netDue: 90_933.33,
+      elapsedMonths: 2,
+      rate: 0.05,
+      feePaid: 0,
+    });
+    assert.equal(r.penaltyAmount, 0);
+  });
+
+  it("an explicit penalty waiver still lowers the fee floor", () => {
+    // charged 9,320.67, waived 4,000 -> floor is the net 5,320.67.
+    const row = {
+      ...baseRow({
+        amountDue: 90_933.33,
+        amountPaid: 90_933.33,
+        penaltyAmount: 9_320.67,
+        penaltyDiscountAmount: 4_000,
+        periodsApplied: 2,
+      }),
+      status: "partial" as const,
+    };
+    const r = simulateRecomputeRow(row, {
+      onTimePaid: 0,
+      netDue: 90_933.33,
+      elapsedMonths: 2,
+      rate: 0.05,
+      feePaid: 0,
+    });
+    assert.equal(r.penaltyAmount, 5_320.67);
   });
 });
 

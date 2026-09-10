@@ -73,7 +73,7 @@ export async function GET(_request: Request, { params }: RouteParams) {
           remedial_assigned_at
         ),
         amortization_schedules (
-          ${AMORTIZATION_SCHEDULE_LEDGER_COLUMNS}, amount_paid
+          ${AMORTIZATION_SCHEDULE_LEDGER_COLUMNS}
         ),
         remedial_turnovers (
           id,

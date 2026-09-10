@@ -21,6 +21,9 @@ const nextConfig: NextConfig = {
     "@foliojs-fork/fontkit",
     "html-to-pdfmake",
     "jsdom",
+    // UMD CJS bundle (jszip + zlib) for the .docx export path — same treatment
+    // as pdfmake so Turbopack doesn't rewrite its internal requires.
+    "html-to-docx",
   ],
   images: {
     remotePatterns: [

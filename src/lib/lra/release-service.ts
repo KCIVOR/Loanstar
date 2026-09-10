@@ -15,6 +15,7 @@ import { computeInvoiceLoan } from "@/lib/computation/invoice";
 import { extractDeductionTargets } from "@/lib/computation/deduction-breakdown";
 import { halfUp } from "@/lib/computation/money";
 import { addScheduleMonths, advanceSemiMonthly } from "@/lib/computation/release-date";
+import { DOCUMENT_BUCKET } from "@/lib/constants";
 import { getActiveComputation } from "@/lib/csa/computation";
 import { ensureDocumentSlots } from "@/lib/documents/checklist";
 import { hashPdf, renderTemplateToPdf } from "@/lib/documents/render";
@@ -26,13 +27,19 @@ import { syncApplicationBlocker, mapReleaseFileRow } from "./blockers";
 import { loadBlriContext } from "./blri-data";
 import { unsignedGeneratedDocumentIds } from "./mark-all-signed";
 import {
-  AUTO_GENERATED_SLUGS,
-  COLLATERAL_GENERATED_SLUGS,
   canRecordRelease,
   releaseStageForPath,
   type ReleasePath,
   type ReleaseFileStatus,
 } from "./constants";
+import {
+  autoGenerateSlugs,
+  PATH_SPECIFIC_SLUGS,
+  releaseDocumentCandidates,
+  segmentGroup,
+  type CollateralType,
+  type ReleaseTemplateRow,
+} from "./release-documents";
 import {
   assertPdcCollectedForClose,
   maybePdcCollectBlocker,
@@ -545,11 +552,70 @@ function releasePathsFromRow(row: Record<string, unknown>): ReleasePath[] {
   ];
 }
 
-export async function generateReleaseDocuments(
+type ReleaseGenerationContext = {
+  file: ReturnType<typeof mapReleaseFileRow>;
+  releasePaths: ReleasePath[];
+  segment: "seafarer" | "sme" | "individual";
+  collateralType: CollateralType;
+  borrowerId: string;
+  catalog: ReleaseTemplateRow[];
+  contextByPath: Map<ReleasePath, ReturnType<typeof buildReleaseTemplateContext>>;
+};
+
+/**
+ * The `category = 'release'` template catalog with per-segment eligibility and
+ * published-version status — the input to `releaseDocumentCandidates` /
+ * `autoGenerateSlugs`. Used by the generation entry points and the LRA
+ * workspace API (document picker).
+ */
+export async function loadReleaseTemplateCatalog(
+  supabase: SupabaseClient,
+): Promise<ReleaseTemplateRow[]> {
+  const { data: templateRows } = await supabase
+    .from("document_templates")
+    .select("id, slug, name, seafarer_generation, sme_generation")
+    .eq("category", "release");
+  const { data: publishedRows } = await supabase
+    .from("document_template_versions")
+    .select("template_id, version_no")
+    .eq("status", "published");
+
+  const publishedByTemplate = new Map<string, number>();
+  for (const r of (publishedRows ?? []) as Array<{
+    template_id: string;
+    version_no: number;
+  }>) {
+    publishedByTemplate.set(r.template_id, r.version_no);
+  }
+
+  return (
+    (templateRows ?? []) as Array<{
+      id: string;
+      slug: string;
+      name: string;
+      seafarer_generation: ReleaseTemplateRow["seafarerGeneration"];
+      sme_generation: ReleaseTemplateRow["smeGeneration"];
+    }>
+  ).map((r) => ({
+    slug: r.slug,
+    name: r.name,
+    publishedVersionNo: publishedByTemplate.get(r.id) ?? null,
+    seafarerGeneration: r.seafarer_generation,
+    smeGeneration: r.sme_generation,
+  }));
+}
+
+/**
+ * Shared setup for both generation entry points: validates the release file,
+ * loads the computation + BLRI + per-path merge context, and the
+ * `category = 'release'` template catalog with its per-segment eligibility and
+ * published-version status. Hard-errors are identical to the pre-refactor
+ * `generateReleaseDocuments`.
+ */
+async function loadReleaseGenerationContext(
   supabase: SupabaseClient,
   releaseFileId: string,
-  actorId: string,
-) {
+): Promise<ReleaseGenerationContext> {
   const { data: row, error: rowError } = await supabase
     .from("release_files")
     .select("*")
@@ -592,21 +658,12 @@ export async function generateReleaseDocuments(
     throw new Error("Borrower not found");
   }
 
-  const collateralType = app.collateral_type as
-    | "none"
-    | "car_refinancing"
-    | "real_estate"
-    | null;
-  const collateralSlugs =
-    collateralType === "car_refinancing" || collateralType === "real_estate"
-      ? COLLATERAL_GENERATED_SLUGS[collateralType]
-      : [];
-  const slugs = [
-    ...new Set([
-      ...releasePaths.flatMap((p) => AUTO_GENERATED_SLUGS[p]),
-      ...collateralSlugs,
-    ]),
-  ];
+  const collateralType = app.collateral_type as CollateralType;
+  const segment = (app.segment === "sme" || app.segment === "individual"
+    ? app.segment
+    : "seafarer") as "seafarer" | "sme" | "individual";
+
+  const catalog = await loadReleaseTemplateCatalog(supabase);
 
   // One merge context per selected path — voucher pairs need path-specific
   // disbursement fields; shared slugs are path-independent.
@@ -626,11 +683,7 @@ export async function generateReleaseDocuments(
     adminCost: computation.adminCost,
     notaryFee: computation.notaryFee,
   };
-  const segmentScope = {
-    segment: (app.segment === "sme" || app.segment === "individual"
-      ? app.segment
-      : "seafarer") as "sme" | "seafarer" | "individual",
-  };
+  const segmentScope = { segment };
   const contextByPath = new Map(
     releasePaths.map((p) => [
       p,
@@ -644,59 +697,100 @@ export async function generateReleaseDocuments(
     ]),
   );
 
-  for (const slug of slugs) {
-    // All release documents render from published templates (the legacy
-    // hardcoded renderer was retired in Phase 7). A missing published template
-    // is a hard error — every release slug is seeded + published.
-    const published = await getPublishedTemplate(supabase, slug);
-    if (!published) {
-      throw new Error(
-        `No published template for release document "${slug}" — cannot generate.`,
-      );
-    }
+  return {
+    file,
+    releasePaths,
+    segment,
+    collateralType,
+    borrowerId: app.borrower_id as string,
+    catalog,
+    contextByPath,
+  };
+}
 
-    const onlyWithPdc =
-      AUTO_GENERATED_SLUGS.with_pdc.includes(slug) &&
-      !AUTO_GENERATED_SLUGS.without_pdc.includes(slug);
-    const onlyWithoutPdc =
-      AUTO_GENERATED_SLUGS.without_pdc.includes(slug) &&
-      !AUTO_GENERATED_SLUGS.with_pdc.includes(slug);
-    const contextPath: ReleasePath = onlyWithPdc
-      ? "with_pdc"
-      : onlyWithoutPdc
-        ? "without_pdc"
-        : releasePaths[0];
-    const templateContext = contextByPath.get(contextPath);
-    if (!templateContext) {
-      throw new Error(`Missing template context for path "${contextPath}"`);
-    }
-
-    const pdf = await renderTemplateToPdf(published.body, templateContext);
-    const templateVersionId = published.versionId;
-
-    const contentHash = hashPdf(pdf);
-    const docId = crypto.randomUUID();
-    const storagePath = `${app.borrower_id}/release/${releaseFileId}/${slug}-${docId}.pdf`;
-
-    await uploadDocumentBytes(supabase, storagePath, pdf, "application/pdf");
-
-    await supabase.from("generated_documents").upsert(
-      {
-        release_file_id: releaseFileId,
-        document_slug: slug,
-        storage_path: storagePath,
-        content_hash: contentHash,
-        template_version_id: templateVersionId,
-        is_finalized: false,
-        signed_at: null,
-        signed_by: null,
-        signature_hash: null,
-        generated_at: new Date().toISOString(),
-      },
-      { onConflict: "release_file_id,document_slug" },
+/**
+ * Render + store one release document. This is the pre-refactor per-slug loop
+ * body, unchanged, plus a `regenerated` flag and a `witnessed_by` reset so a
+ * regenerate clears any prior signature. The `contextPath` decision now reads
+ * `PATH_SPECIFIC_SLUGS` instead of the retired `AUTO_GENERATED_SLUGS`.
+ */
+async function generateOneReleaseDocument(
+  supabase: SupabaseClient,
+  releaseFileId: string,
+  slug: string,
+  contextByPath: Map<ReleasePath, ReturnType<typeof buildReleaseTemplateContext>>,
+  releasePaths: ReleasePath[],
+  borrowerId: string,
+): Promise<{ slug: string; contentHash: string; regenerated: boolean }> {
+  // All release documents render from published templates (the legacy hardcoded
+  // renderer was retired in Phase 7). A missing published template is a hard
+  // error — every release slug is seeded + published.
+  const published = await getPublishedTemplate(supabase, slug);
+  if (!published) {
+    throw new Error(
+      `No published template for release document "${slug}" — cannot generate.`,
     );
   }
 
+  const onlyWithPdc = PATH_SPECIFIC_SLUGS.with_pdc.includes(slug);
+  const onlyWithoutPdc = PATH_SPECIFIC_SLUGS.without_pdc.includes(slug);
+  const contextPath: ReleasePath = onlyWithPdc
+    ? "with_pdc"
+    : onlyWithoutPdc
+      ? "without_pdc"
+      : releasePaths[0];
+  const templateContext = contextByPath.get(contextPath);
+  if (!templateContext) {
+    throw new Error(`Missing template context for path "${contextPath}"`);
+  }
+
+  const { data: existing } = await supabase
+    .from("generated_documents")
+    .select("id")
+    .eq("release_file_id", releaseFileId)
+    .eq("document_slug", slug)
+    .maybeSingle();
+
+  const pdf = await renderTemplateToPdf(published.body, templateContext);
+  const templateVersionId = published.versionId;
+
+  const contentHash = hashPdf(pdf);
+  const docId = crypto.randomUUID();
+  const storagePath = `${borrowerId}/release/${releaseFileId}/${slug}-${docId}.pdf`;
+
+  await uploadDocumentBytes(supabase, storagePath, pdf, "application/pdf");
+
+  await supabase.from("generated_documents").upsert(
+    {
+      release_file_id: releaseFileId,
+      document_slug: slug,
+      storage_path: storagePath,
+      content_hash: contentHash,
+      template_version_id: templateVersionId,
+      is_finalized: false,
+      signed_at: null,
+      signed_by: null,
+      witnessed_by: null,
+      signature_hash: null,
+      generated_at: new Date().toISOString(),
+    },
+    { onConflict: "release_file_id,document_slug" },
+  );
+
+  return { slug, contentHash, regenerated: Boolean(existing) };
+}
+
+/**
+ * Post-generation transition — move the file into signing, seed the briefing
+ * checklist, sync the application blocker. Runs once (on the first generated
+ * document), never on a regenerate of an already-signing file.
+ */
+async function finalizeGenerationTransition(
+  supabase: SupabaseClient,
+  releaseFileId: string,
+  loanApplicationId: string,
+  actorId: string,
+) {
   await supabase
     .from("release_files")
     .update({
@@ -719,12 +813,254 @@ export async function generateReleaseDocuments(
 
   await syncApplicationBlocker(
     supabase,
-    file.loanApplicationId,
+    loanApplicationId,
     "awaiting_signatures",
     { actorId },
   );
+}
+
+/**
+ * "Generate all" — produces every `always`-eligible, publishable, condition-
+ * matched release document for the loan. For a seafarer loan this reproduces
+ * the old `AUTO_GENERATED_SLUGS[path]` (+ collateral) set exactly. Called by the
+ * generate endpoint when no specific `slug` is requested.
+ */
+export async function generateReleaseDocuments(
+  supabase: SupabaseClient,
+  releaseFileId: string,
+  actorId: string,
+) {
+  const ctx = await loadReleaseGenerationContext(supabase, releaseFileId);
+
+  const slugs = autoGenerateSlugs(
+    segmentGroup(ctx.segment),
+    ctx.catalog,
+    ctx.releasePaths,
+    ctx.collateralType,
+  );
+
+  for (const slug of slugs) {
+    await generateOneReleaseDocument(
+      supabase,
+      releaseFileId,
+      slug,
+      ctx.contextByPath,
+      ctx.releasePaths,
+      ctx.borrowerId,
+    );
+  }
+
+  await finalizeGenerationTransition(
+    supabase,
+    releaseFileId,
+    ctx.file.loanApplicationId,
+    actorId,
+  );
 
   return { status: "awaiting_signatures" as const, slugs };
+}
+
+/**
+ * Generate (or regenerate) one release document the LRA officer picked from the
+ * modal. The slug must be a non-hidden, condition-matched, publishable candidate
+ * for this loan. The first generated document moves the file into signing.
+ */
+export async function generateReleaseDocumentBySlug(
+  supabase: SupabaseClient,
+  releaseFileId: string,
+  slug: string,
+  actorId: string,
+): Promise<{
+  slug: string;
+  status: ReleaseFileStatus;
+  regenerated: boolean;
+}> {
+  const ctx = await loadReleaseGenerationContext(supabase, releaseFileId);
+
+  const allowed = releaseDocumentCandidates(
+    segmentGroup(ctx.segment),
+    ctx.catalog,
+    ctx.releasePaths,
+    ctx.collateralType,
+  ).some((c) => c.slug === slug && c.canGenerate);
+  if (!allowed) {
+    throw new ValidationError(
+      `"${slug}" is not an available release document for this loan`,
+    );
+  }
+
+  const { regenerated } = await generateOneReleaseDocument(
+    supabase,
+    releaseFileId,
+    slug,
+    ctx.contextByPath,
+    ctx.releasePaths,
+    ctx.borrowerId,
+  );
+
+  const wasReadyGenerate = ctx.file.status === "ready_generate";
+  if (wasReadyGenerate) {
+    await finalizeGenerationTransition(
+      supabase,
+      releaseFileId,
+      ctx.file.loanApplicationId,
+      actorId,
+    );
+  }
+
+  return {
+    slug,
+    status: wasReadyGenerate ? "awaiting_signatures" : ctx.file.status,
+    regenerated,
+  };
+}
+
+/** Release-file statuses where generated documents may still be added/removed. */
+const GENERATED_DOC_MODIFIABLE_STATUSES: ReleaseFileStatus[] = [
+  "ready_generate",
+  "awaiting_signatures",
+];
+
+/**
+ * Pure guard — may a generated document be regenerated or removed right now?
+ * Blocked once it is finalized (release closed) or the briefing is acknowledged,
+ * or the file has moved past signing.
+ */
+export function canModifyGeneratedDoc(
+  status: ReleaseFileStatus,
+  isFinalized: boolean,
+  briefingAcknowledged: boolean,
+): boolean {
+  if (isFinalized) return false;
+  if (briefingAcknowledged) return false;
+  return GENERATED_DOC_MODIFIABLE_STATUSES.includes(status);
+}
+
+/**
+ * Pure — the release-file status after removing a generated document, or `null`
+ * when it should not change. Mirrors the sign path so the file can't get stuck:
+ * last doc removed rolls back to `ready_generate`; if every remaining doc is
+ * signed it advances to `awaiting_briefing` (what the final sign would have done).
+ */
+export function releaseTransitionAfterDelete(
+  status: ReleaseFileStatus,
+  remainingCount: number,
+  allRemainingSigned: boolean,
+): ReleaseFileStatus | null {
+  if (status !== "awaiting_signatures") return null;
+  if (remainingCount === 0) return "ready_generate";
+  if (allRemainingSigned) return "awaiting_briefing";
+  return null;
+}
+
+/**
+ * Remove one generated document (and its stored PDF), then apply the post-delete
+ * status transition. Refuses once the document is finalized, the briefing is
+ * acknowledged, or the file has moved past signing.
+ */
+export async function removeGeneratedDocument(
+  supabase: SupabaseClient,
+  releaseFileId: string,
+  documentId: string,
+  actorId: string,
+) {
+  const { data: doc, error } = await supabase
+    .from("generated_documents")
+    .select(
+      "id, storage_path, is_finalized, release_files ( id, loan_application_id, status )",
+    )
+    .eq("id", documentId)
+    .single();
+
+  if (error || !doc) {
+    throw new ValidationError("Generated document not found");
+  }
+
+  const rfRaw = doc.release_files;
+  const rf = Array.isArray(rfRaw) ? rfRaw[0] : rfRaw;
+  if (!rf || rf.id !== releaseFileId) {
+    throw new ValidationError("Generated document not found");
+  }
+
+  const { data: briefing } = await supabase
+    .from("briefings")
+    .select("acknowledged_at")
+    .eq("release_file_id", releaseFileId)
+    .maybeSingle();
+
+  if (
+    !canModifyGeneratedDoc(
+      rf.status as ReleaseFileStatus,
+      Boolean(doc.is_finalized),
+      Boolean(briefing?.acknowledged_at),
+    )
+  ) {
+    throw new ValidationError(
+      "This document can no longer be removed at this stage",
+    );
+  }
+
+  // Storage cleanup is best-effort — a stray object must not block the removal.
+  if (doc.storage_path) {
+    try {
+      await supabase.storage
+        .from(DOCUMENT_BUCKET)
+        .remove([doc.storage_path as string]);
+    } catch {
+      // ignore
+    }
+  }
+
+  const { data: deleted, error: delError } = await supabase
+    .from("generated_documents")
+    .delete()
+    .eq("id", documentId)
+    .select("id");
+
+  if (delError) {
+    throw new Error(delError.message);
+  }
+  if (!deleted || deleted.length === 0) {
+    throw new Error(
+      "Delete affected no rows — check the generated_documents DELETE policy",
+    );
+  }
+
+  const { data: remaining } = await supabase
+    .from("generated_documents")
+    .select("id, signed_at")
+    .eq("release_file_id", releaseFileId);
+  const remainingCount = remaining?.length ?? 0;
+  const allRemainingSigned =
+    remainingCount > 0 && (remaining ?? []).every((d) => d.signed_at);
+
+  const next = releaseTransitionAfterDelete(
+    rf.status as ReleaseFileStatus,
+    remainingCount,
+    allRemainingSigned,
+  );
+
+  if (next && next !== rf.status) {
+    await supabase
+      .from("release_files")
+      .update({ status: next, updated_at: new Date().toISOString() })
+      .eq("id", releaseFileId);
+
+    await syncApplicationBlocker(
+      supabase,
+      rf.loan_application_id as string,
+      next,
+      next === "awaiting_briefing"
+        ? { actorId, applicationStatus: "release_briefing" }
+        : { actorId },
+    );
+  }
+
+  return {
+    removed: true as const,
+    status: next ?? (rf.status as ReleaseFileStatus),
+    remainingCount,
+  };
 }
 
 export async function witnessSignGeneratedDocument(

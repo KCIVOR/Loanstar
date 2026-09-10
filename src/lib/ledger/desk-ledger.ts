@@ -11,6 +11,7 @@ export type DeskLedgerSchedule = {
   installmentNo: number;
   dueDate: string;
   amountDue: number;
+  amountPaid?: number;
   penaltyAmount: number;
   /** Origination or early-settlement discount on this installment, if any. */
   discountAmount?: number;
@@ -67,6 +68,7 @@ export function buildDeskLedgerRows({
       id: row.id,
       dueDate: row.dueDate,
       target: Number(row.amountDue ?? 0),
+      amountPaid: Number(row.amountPaid ?? 0),
       penalty: Number(row.penaltyAmount ?? 0),
       discount: Number(row.discountAmount ?? 0),
       installmentNo: row.installmentNo,

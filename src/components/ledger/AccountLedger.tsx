@@ -165,6 +165,8 @@ export function AccountLedger({
             <Th num>Debit</Th>
             <Th num>Credit</Th>
             <Th num>Balance</Th>
+            <Th num>This month</Th>
+            <Th num>Penalty left</Th>
             <Th>Status</Th>
             {selection ? <Th num>Surcharge</Th> : null}
           </tr>
@@ -232,6 +234,12 @@ export function AccountLedger({
                   <Td num className="mono">
                     {moneyCell(row.balance)}
                   </Td>
+                  <Td num className="mono">
+                    {moneyCell(row.monthRemaining)}
+                  </Td>
+                  <Td num className="mono">
+                    {moneyCell(row.penaltyRemaining)}
+                  </Td>
                   <Td>
                     {row.status ? (
                       <Badge variant={statusVariant(row.status)} dot>
@@ -297,6 +305,12 @@ export function AccountLedger({
                   <Td num className="mono">
                     {moneyCell(last.balance)}
                   </Td>
+                  <Td num className="mono">
+                    {moneyCell(last.monthRemaining)}
+                  </Td>
+                  <Td num className="mono">
+                    {moneyCell(last.penaltyRemaining)}
+                  </Td>
                   <Td>
                     {last.status ? (
                       <Badge variant={statusVariant(last.status)} dot>
@@ -337,6 +351,12 @@ export function AccountLedger({
                         </Td>
                         <Td num className="mono">
                           {moneyCell(r.balance)}
+                        </Td>
+                        <Td num className="mono text-ink-600">
+                          {moneyCell(r.monthRemaining)}
+                        </Td>
+                        <Td num className="mono text-ink-600">
+                          {moneyCell(r.penaltyRemaining)}
                         </Td>
                         <Td>—</Td>
                         {selection ? <Td num className="mono">—</Td> : null}

@@ -681,7 +681,6 @@ export async function refreshMasterlistAging(
     supabase,
     masterlistRow.segment as string | null,
   );
-  let finalPenalty = Number(overdue?.penalty_amount ?? 0);
 
   if (overdue && daysPastDue(overdue.due_date as string, asOf) >= 1) {
     // Penalty is charged on the installment's own unpaid balance only — NOT on
@@ -722,87 +721,16 @@ export async function refreshMasterlistAging(
         notes: "Missed payment penalty",
       });
 
-      finalPenalty = penalty;
     }
 
-    // One-time 30-day rollover: fold the whole overdue balance (principal +
-    // accrued penalty) into the next unpaid installment, then freeze this
-    // one. Guarded by rolled_at so it only ever fires once per installment.
-    const dpd = daysPastDue(overdue.due_date as string, asOf);
-    if (dpd >= thresholds.t30 && !overdue.rolled_at) {
-      const next = (schedules ?? [])
-        .filter(
-          (row) =>
-            row.id !== overdue.id &&
-            row.status !== "rolled" &&
-            // never roll an overdue balance into a frozen 'moved' row
-            // (Fixes Plan Phase 1, Issue 8).
-            row.status !== "moved",
-        )
-        .sort(
-          (a, b) => (a.installment_no as number) - (b.installment_no as number),
-        )[0];
-
-      if (next) {
-        // Net of both the interest-side discount AND any Collector
-        // penalty waiver — roll forward what's really still owed, not
-        // the gross figure (feature-collector-discount-implementation-plan.md,
-        // Phase 5; SQL twin: refresh_one_masterlist_aging).
-        const rollAmount = netInstallmentDue({
-          amountDue: Number(overdue.amount_due),
-          discountAmount: overdue.discount_amount,
-          amountPaid: Number(overdue.amount_paid),
-          penaltyAmount: finalPenalty,
-          penaltyDiscountAmount: overdue.penalty_discount_amount,
-        });
-        // Split rollAmount into its interest and penalty portions instead of
-        // dumping the whole thing into the destination row's amount_due —
-        // otherwise the rolled-forward penalty becomes invisible to the
-        // Collector Discount "penalty discount" picker (which keys off
-        // amount_due, and requires penaltyAmount > 0 (confirmed live
-        // 2026-09-04, AN300449: after a roll, no installment had a nonzero
-        // penalty_amount, even though real penalty money had rolled forward
-        // — the picker's "penalty discount" section had nothing to show).
-        // penaltyPortion is computed independently and interestPortion is
-        // defined as the remainder, so the two always sum to exactly
-        // rollAmount — the destination row's TOTAL net-due is unchanged,
-        // only which column carries which part of it.
-        const penaltyPortion = Math.max(
-          0,
-          halfUp(finalPenalty - (Number(overdue.penalty_discount_amount) || 0)),
-        );
-        const interestPortion = halfUp(rollAmount - penaltyPortion);
-        const now = new Date().toISOString();
-
-        await supabase
-          .from("amortization_schedules")
-          .update({
-            amount_due: Number(next.amount_due) + interestPortion,
-            penalty_amount: Number(next.penalty_amount ?? 0) + penaltyPortion,
-          })
-          .eq("id", next.id);
-
-        await supabase
-          .from("amortization_schedules")
-          .update({
-            status: "rolled",
-            rolled_at: now,
-            rolled_into_installment_no: next.installment_no,
-            // Consumed by the roll calculation above — zero it so a
-            // stale figure on a rolled row can't be double-counted later.
-            penalty_discount_amount: 0,
-          })
-          .eq("id", overdue.id);
-
-        await supabase.from("penalties").insert({
-          masterlist_id: masterlistId,
-          amortization_schedule_id: overdue.id,
-          amount: rollAmount,
-          rate_applied: penaltyRate,
-          notes: `30-day rollover: ${rollAmount.toFixed(2)} rolled into installment #${next.installment_no}`,
-        });
-      }
-    }
+    // The 30-day roll-forward was removed 2026-09-09 (no client transcript
+    // supports merging overdue installments — see
+    // docs/revision-plans/penalty-remove-rollforward-plan.md). Each overdue
+    // installment now keeps its own Target and compounds its own penalty; the
+    // SQL twin `refresh_one_masterlist_aging` is the production path and no
+    // longer rolls. This orphaned TS copy (only `dev-simulate-aging` reached
+    // it, and that route now calls the SQL RPC) is kept only so the two twins
+    // don't drift further.
   }
 
   // Origination-discount reversion (feature-new-loan-origination-discount.md,
@@ -1551,15 +1479,43 @@ async function validateCollectorDiscountInput(
   if (hasPenalty) {
     const { data: rows, error } = await supabase
       .from("amortization_schedules")
-      .select("installment_no, penalty_amount")
+      .select("id, installment_no, penalty_amount, penalty_discount_amount")
       .eq("masterlist_id", masterlistId)
       .in("installment_no", input.penaltyDiscountedInstallmentNos);
 
     if (error) throw new Error(error.message);
 
+    // Late fee already collected against these rows must not be waivable —
+    // the Penalty column keeps the CHARGED figure after a fee is paid
+    // (penalty-fee-paid-protection, 2026-09-09), so "still waivable" is
+    // charged − already-waived − already-paid.
+    const scheduleIds = (rows ?? []).map((row) => row.id as string);
+    const feePaidByScheduleId = new Map<string, number>();
+    if (scheduleIds.length > 0) {
+      const { data: postingRows, error: postingErr } = await supabase
+        .from("postings")
+        .select("amortization_schedule_id, penalty_amount")
+        .in("amortization_schedule_id", scheduleIds);
+      if (postingErr) throw new Error(postingErr.message);
+      for (const p of postingRows ?? []) {
+        const sid = p.amortization_schedule_id as string;
+        feePaidByScheduleId.set(
+          sid,
+          (feePaidByScheduleId.get(sid) ?? 0) + Number(p.penalty_amount ?? 0),
+        );
+      }
+    }
+
     const maxPenalty = halfUp(
       (rows ?? []).reduce(
-        (sum, row) => sum + Number(row.penalty_amount ?? 0),
+        (sum, row) =>
+          sum +
+          Math.max(
+            0,
+            Number(row.penalty_amount ?? 0) -
+              Number(row.penalty_discount_amount ?? 0) -
+              (feePaidByScheduleId.get(row.id as string) ?? 0),
+          ),
         0,
       ),
     );
@@ -1711,15 +1667,15 @@ export async function addPaymentToDcr(
         discountInput?.penaltyDiscountedInstallmentNos ?? [],
       discount_reason: discountInput?.discountReason?.trim() || null,
       // Phase 4b — draft-time save only; applied by post_single_dcr_item at
-      // posting, capped there at the fee actually owed.
+      // posting, capped there at the fee actually owed. A ₱0 amount with a
+      // non-empty installment list is a real instruction: "leave the fee
+      // outstanding, apply the whole payment to principal".
       penalty_paid_amount: Math.max(
         0,
         penaltyPaidInput?.penaltyPaidAmount ?? 0,
       ),
       penalty_paid_installment_nos:
-        (penaltyPaidInput?.penaltyPaidAmount ?? 0) > 0
-          ? (penaltyPaidInput?.penaltyPaidInstallmentNos ?? [])
-          : [],
+        penaltyPaidInput?.penaltyPaidInstallmentNos ?? [],
     })
     .select("id")
     .single();

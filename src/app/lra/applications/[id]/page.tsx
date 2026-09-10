@@ -31,6 +31,7 @@ import {
 import { AutofillOverlay } from "@/components/dev/AutofillOverlay";
 import { fakePdcDetails, fakeRemark } from "@/lib/dev/fake-data";
 import { GeneratedDocPanel } from "@/components/documents/GeneratedDocPanel";
+import { GenerateDocumentsModal } from "@/components/lra/GenerateDocumentsModal";
 import { addScheduleMonths, advanceSemiMonthly } from "@/lib/computation/release-date";
 import { halfUp } from "@/lib/computation/money";
 import { computeInvoiceLoan } from "@/lib/computation/invoice";
@@ -258,6 +259,7 @@ type LraWorkspace = {
     isFinalized: boolean;
     downloadUrl: string | null;
   }>;
+  documentPicker: { mode: "curated" | "catalog" };
   briefing: { acknowledged_at: string | null } | null;
   computation: {
     netReleased: number;
@@ -393,6 +395,17 @@ export default function LraApplicationPage() {
   } | null>(null);
   const [confirmSignAll, setConfirmSignAll] = useState(false);
   const [signingAll, setSigningAll] = useState(false);
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [pickerReloadToken, setPickerReloadToken] = useState(0);
+  const [docBusySlug, setDocBusySlug] = useState<string | null>(null);
+  const [confirmRegenDoc, setConfirmRegenDoc] = useState<{
+    slug: string;
+    signed: boolean;
+  } | null>(null);
+  const [confirmRemoveDoc, setConfirmRemoveDoc] = useState<{
+    id: string;
+    slug: string;
+  } | null>(null);
   const [combinedFile, setCombinedFile] = useState<File | null>(null);
   const [combinedRemarks, setCombinedRemarks] = useState("");
   const [confirmCombinedUpload, setConfirmCombinedUpload] = useState(false);
@@ -669,6 +682,65 @@ export default function LraApplicationPage() {
       setError(err instanceof Error ? err.message : "Failed");
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function generateOneDoc(slug: string) {
+    setDocBusySlug(slug);
+    setError(null);
+    try {
+      const res = await fetch(
+        `/api/lra/applications/${applicationId}/generate`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ slug }),
+        },
+      );
+      const body = (await res.json().catch(() => null)) as {
+        error?: string;
+        regenerated?: boolean;
+      } | null;
+      if (!res.ok) {
+        throw new Error(body?.error ?? "Generation failed");
+      }
+      setMessage(
+        body?.regenerated
+          ? `${slug.replace(/_/g, " ")} regenerated.`
+          : `${slug.replace(/_/g, " ")} generated.`,
+      );
+      setPickerReloadToken((t) => t + 1);
+      await load({ silent: true });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed");
+    } finally {
+      setDocBusySlug(null);
+      setConfirmRegenDoc(null);
+    }
+  }
+
+  async function removeDoc(docId: string) {
+    setSigningDocId(docId);
+    setError(null);
+    try {
+      const res = await fetch(
+        `/api/lra/applications/${applicationId}/documents/${docId}`,
+        { method: "DELETE" },
+      );
+      const body = (await res.json().catch(() => null)) as {
+        error?: string;
+      } | null;
+      if (!res.ok) {
+        throw new Error(body?.error ?? "Failed to remove document");
+      }
+      setConfirmRemoveDoc(null);
+      setMessage("Document removed.");
+      setPickerReloadToken((t) => t + 1);
+      await load({ silent: true });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed");
+    } finally {
+      setSigningDocId(null);
     }
   }
 
@@ -1454,11 +1526,43 @@ export default function LraApplicationPage() {
                   </span>
                 </div>
               ) : null}
-              <Button loading={saving} onClick={() => void generateDocs()}>
-                {data.generatedDocuments.length > 0
-                  ? "Regenerate release documents"
-                  : "Generate release documents"}
-              </Button>
+              <div className="flex flex-wrap items-center gap-2">
+                <Button onClick={() => setPickerOpen(true)}>
+                  Choose documents to generate
+                </Button>
+                {data.documentPicker.mode === "curated" ? (
+                  <Button
+                    variant="secondary"
+                    loading={saving}
+                    onClick={() => void generateDocs()}
+                  >
+                    {data.generatedDocuments.length > 0
+                      ? "Regenerate all"
+                      : "Generate all"}
+                  </Button>
+                ) : null}
+              </div>
+              <GenerateDocumentsModal
+                open={pickerOpen}
+                onClose={() => setPickerOpen(false)}
+                mode={data.documentPicker.mode}
+                applicationId={applicationId}
+                reloadToken={pickerReloadToken}
+                busySlug={docBusySlug}
+                onGenerate={(slug) => {
+                  const existing = data.generatedDocuments.find(
+                    (d) => d.slug === slug,
+                  );
+                  if (existing) {
+                    setConfirmRegenDoc({
+                      slug,
+                      signed: Boolean(existing.signedAt),
+                    });
+                  } else {
+                    void generateOneDoc(slug);
+                  }
+                }}
+              />
             </Card>
           ) : null}
 
@@ -1600,6 +1704,39 @@ export default function LraApplicationPage() {
                             Unmark signed
                           </Button>
                         ) : null}
+                        {(rf.status === "ready_generate" ||
+                          rf.status === "awaiting_signatures") &&
+                        !doc.isFinalized &&
+                        !data.briefing?.acknowledged_at ? (
+                          <>
+                            <Button
+                              variant="secondary"
+                              size="sm"
+                              loading={docBusySlug === doc.slug}
+                              onClick={() =>
+                                setConfirmRegenDoc({
+                                  slug: doc.slug,
+                                  signed: Boolean(doc.signedAt),
+                                })
+                              }
+                            >
+                              Regenerate
+                            </Button>
+                            <Button
+                              variant="danger-soft"
+                              size="sm"
+                              loading={signingDocId === doc.id}
+                              onClick={() =>
+                                setConfirmRemoveDoc({
+                                  id: doc.id,
+                                  slug: doc.slug,
+                                })
+                              }
+                            >
+                              Remove
+                            </Button>
+                          </>
+                        ) : null}
                       </span>
                     </div>
                   ))}
@@ -1668,6 +1805,60 @@ export default function LraApplicationPage() {
                 onCancel={() => setConfirmUnsignDoc(null)}
                 onConfirm={() => {
                   if (confirmUnsignDoc) void unmarkDocSigned(confirmUnsignDoc.id);
+                }}
+              />
+
+              <ConfirmDialog
+                open={confirmRegenDoc !== null}
+                title="Regenerate this document?"
+                message={
+                  <>
+                    A fresh PDF of{" "}
+                    <span className="font-medium capitalize text-ink-900">
+                      {confirmRegenDoc?.slug.replace(/_/g, " ")}
+                    </span>{" "}
+                    will replace the current one.
+                    {confirmRegenDoc?.signed ? (
+                      <>
+                        {" "}
+                        It is already marked signed — regenerating clears that
+                        signature and the borrower must sign the new copy.
+                      </>
+                    ) : null}
+                  </>
+                }
+                confirmLabel="Yes, regenerate"
+                cancelLabel="Cancel"
+                loading={
+                  confirmRegenDoc !== null && docBusySlug === confirmRegenDoc.slug
+                }
+                onCancel={() => setConfirmRegenDoc(null)}
+                onConfirm={() => {
+                  if (confirmRegenDoc) void generateOneDoc(confirmRegenDoc.slug);
+                }}
+              />
+
+              <ConfirmDialog
+                open={confirmRemoveDoc !== null}
+                title="Remove this generated document?"
+                message={
+                  <>
+                    <span className="font-medium capitalize text-ink-900">
+                      {confirmRemoveDoc?.slug.replace(/_/g, " ")}
+                    </span>{" "}
+                    will be deleted from this release. You can generate it again
+                    from “Choose documents to generate”.
+                  </>
+                }
+                confirmLabel="Yes, remove"
+                cancelLabel="Cancel"
+                loading={
+                  confirmRemoveDoc !== null &&
+                  signingDocId === confirmRemoveDoc.id
+                }
+                onCancel={() => setConfirmRemoveDoc(null)}
+                onConfirm={() => {
+                  if (confirmRemoveDoc) void removeDoc(confirmRemoveDoc.id);
                 }}
               />
             </Card>

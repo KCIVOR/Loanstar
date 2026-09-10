@@ -16,6 +16,7 @@ import {
   Spinner,
   Table,
   Td,
+  Textarea,
   Th,
 } from "@/components/ui";
 import { dcrItemTotal } from "@/lib/collector/desk";
@@ -25,7 +26,9 @@ import {
   formatMoney,
   paymentStatusVariant,
 } from "@/lib/collector/format";
+import { computeCollectorDiscount } from "@/lib/computation/collector-discount";
 import { halfUp } from "@/lib/computation/money";
+import { usePermissions } from "@/hooks/usePermissions";
 
 type SegmentFilter = "all" | "seafarer" | "sme" | "individual";
 
@@ -85,11 +88,33 @@ function installmentFreeToAllocate(row: AllocationRow): number {
   return Math.max(0, halfUp(installmentRemainingDue(row) - row.pendingElsewhere));
 }
 
+/** An overdue installment with a late fee still owed — eligible for the
+ * "Late fee paid" split and the penalty waiver. `feeOwed` = charged − waived −
+ * already paid (from the allocation-preview route). */
+type PenaltyEligibleInstallment = {
+  id: string;
+  installmentNo: number;
+  dueDate: string;
+  penaltyAmount: number;
+  feeOwed: number;
+};
+
+/** A not-yet-due installment — the only kind whose interest can still be
+ * waived. On a remedial account this list is usually empty. */
+type InterestEligibleInstallment = {
+  id: string;
+  installmentNo: number;
+  dueDate: string;
+  interestPortion: number;
+};
+
 type AllocationModalState = {
   paymentId: string;
   paymentAmount: number;
   borrowerName: string;
   rows: AllocationRow[];
+  interestEligible: InterestEligibleInstallment[];
+  penaltyEligible: PenaltyEligibleInstallment[];
 };
 
 const SEGMENT_CHIPS: Array<{ id: SegmentFilter; label: string }> = [
@@ -148,6 +173,137 @@ export default function RemedialDcrPage() {
   const [segmentFilter, setSegmentFilter] = useState<SegmentFilter>("all");
   const [allocationModal, setAllocationModal] =
     useState<AllocationModalState | null>(null);
+  // "Late fee paid" — installment no -> peso string the remedial officer marks
+  // as late-fee money on this payment. Not a waiver: no permission gate, no
+  // reason. Reset every time the allocation modal opens.
+  const [penaltyPaidSelections, setPenaltyPaidSelections] = useState<
+    Map<number, string>
+  >(new Map());
+
+  // Penalty / interest discount (waiver) — installment no -> percent string.
+  // Gated on `canDiscount`; requires a written approval note. Reset with the
+  // modal.
+  const [interestDiscountSelections, setInterestDiscountSelections] = useState<
+    Map<number, string>
+  >(new Map());
+  const [penaltyDiscountSelections, setPenaltyDiscountSelections] = useState<
+    Map<number, string>
+  >(new Map());
+  const [discountReason, setDiscountReason] = useState("");
+
+  const { permissions } = usePermissions();
+  const canDiscount =
+    permissions?.fieldRules?.remedial?.collector_discount === "edit";
+
+  const interestSelectionMap = useMemo(() => {
+    const map = new Map<number, number>();
+    for (const [no, pctStr] of interestDiscountSelections.entries()) {
+      const pct = Number(pctStr);
+      if (!Number.isNaN(pct)) map.set(no, pct);
+    }
+    return map;
+  }, [interestDiscountSelections]);
+
+  const penaltySelectionMap = useMemo(() => {
+    const map = new Map<number, number>();
+    for (const [no, pctStr] of penaltyDiscountSelections.entries()) {
+      const pct = Number(pctStr);
+      if (!Number.isNaN(pct)) map.set(no, pct);
+    }
+    return map;
+  }, [penaltyDiscountSelections]);
+
+  const interestDiscountTotal = useMemo(() => {
+    if (!allocationModal) return 0;
+    return computeCollectorDiscount(
+      allocationModal.interestEligible.map((inst) => ({
+        installmentNo: inst.installmentNo,
+        amount: inst.interestPortion,
+      })),
+      interestSelectionMap,
+    ).discountAmount;
+  }, [allocationModal, interestSelectionMap]);
+
+  const penaltyDiscountTotal = useMemo(() => {
+    if (!allocationModal) return 0;
+    return computeCollectorDiscount(
+      allocationModal.penaltyEligible.map((inst) => ({
+        installmentNo: inst.installmentNo,
+        amount: inst.feeOwed,
+      })),
+      penaltySelectionMap,
+    ).discountAmount;
+  }, [allocationModal, penaltySelectionMap]);
+
+  const hasDiscount = interestDiscountTotal > 0 || penaltyDiscountTotal > 0;
+  const discountReasonMissing = hasDiscount && discountReason.trim() === "";
+
+  function toggleDiscountInstallment(
+    kind: "interest" | "penalty",
+    installmentNo: number,
+    checked: boolean,
+  ) {
+    const setter =
+      kind === "interest"
+        ? setInterestDiscountSelections
+        : setPenaltyDiscountSelections;
+    setter((prev) => {
+      const next = new Map(prev);
+      if (checked) next.set(installmentNo, "100");
+      else next.delete(installmentNo);
+      return next;
+    });
+  }
+
+  function updateDiscountPercent(
+    kind: "interest" | "penalty",
+    installmentNo: number,
+    percent: string,
+  ) {
+    const setter =
+      kind === "interest"
+        ? setInterestDiscountSelections
+        : setPenaltyDiscountSelections;
+    setter((prev) => {
+      const next = new Map(prev);
+      next.set(installmentNo, percent);
+      return next;
+    });
+  }
+
+  // Every ticked "Late fee paid" installment. A ticked row left at ₱0 means
+  // "all to principal, leave the fee outstanding", so ticked-with-0 counts.
+  const penaltyPaidInstallmentNos = useMemo(
+    () => Array.from(penaltyPaidSelections.keys()),
+    [penaltyPaidSelections],
+  );
+  const penaltyPaidTotal = useMemo(
+    () =>
+      halfUp(
+        Array.from(penaltyPaidSelections.values()).reduce(
+          (sum, v) => sum + (Number(v) > 0 ? Number(v) : 0),
+          0,
+        ),
+      ),
+    [penaltyPaidSelections],
+  );
+
+  function togglePenaltyPaidInstallment(installmentNo: number, checked: boolean) {
+    setPenaltyPaidSelections((prev) => {
+      const next = new Map(prev);
+      if (checked) next.set(installmentNo, "");
+      else next.delete(installmentNo);
+      return next;
+    });
+  }
+
+  function updatePenaltyPaidAmount(installmentNo: number, amount: string) {
+    setPenaltyPaidSelections((prev) => {
+      const next = new Map(prev);
+      next.set(installmentNo, amount);
+      return next;
+    });
+  }
 
   const load = useCallback(async (opts?: { silent?: boolean }) => {
     if (!opts?.silent) setLoading(true);
@@ -258,6 +414,10 @@ export default function RemedialDcrPage() {
     if (!draftDcrId) return;
     setActing(true);
     setError(null);
+    setPenaltyPaidSelections(new Map());
+    setInterestDiscountSelections(new Map());
+    setPenaltyDiscountSelections(new Map());
+    setDiscountReason("");
     try {
       const pay = payments.find((p) => p.id === paymentId);
       const previewRes = await fetch(
@@ -275,6 +435,8 @@ export default function RemedialDcrPage() {
           amortizationScheduleId: string | null;
           amount: number;
         }[];
+        interestEligible?: InterestEligibleInstallment[];
+        penaltyEligible?: PenaltyEligibleInstallment[];
         pendingByInstallment?: Record<
           string,
           { amount: number; dcrCount: number }
@@ -310,6 +472,8 @@ export default function RemedialDcrPage() {
         paymentAmount: Number(pay?.amount ?? 0),
         borrowerName: firstJoin(pay?.masterlist)?.borrower_name ?? "—",
         rows,
+        interestEligible: preview.interestEligible ?? [],
+        penaltyEligible: preview.penaltyEligible ?? [],
       });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed");
@@ -373,6 +537,32 @@ export default function RemedialDcrPage() {
       });
     }
 
+    // "Late fee paid" split — sent whenever an installment is ticked (amount
+    // may be ₱0 = "all to principal, leave the fee"). No permission gate.
+    const penaltyPaidFields =
+      penaltyPaidInstallmentNos.length > 0
+        ? { penaltyPaidAmount: penaltyPaidTotal, penaltyPaidInstallmentNos }
+        : {};
+
+    if (discountReasonMissing) return;
+
+    // Penalty / interest waiver — only sent when the permission is actually
+    // held and a nonzero amount exists. The route re-checks the field rule.
+    const discountFields =
+      canDiscount && hasDiscount
+        ? {
+            interestDiscountAmount: interestDiscountTotal,
+            interestDiscountedInstallmentNos: Array.from(
+              interestSelectionMap.keys(),
+            ),
+            penaltyDiscountAmount: penaltyDiscountTotal,
+            penaltyDiscountedInstallmentNos: Array.from(
+              penaltySelectionMap.keys(),
+            ),
+            discountReason: discountReason.trim(),
+          }
+        : {};
+
     setActing(true);
     setError(null);
     try {
@@ -384,6 +574,8 @@ export default function RemedialDcrPage() {
           dcrId: draftDcrId,
           paymentId: allocationModal.paymentId,
           allocations,
+          ...discountFields,
+          ...penaltyPaidFields,
         }),
       });
       if (!res.ok) {
@@ -706,7 +898,7 @@ export default function RemedialDcrPage() {
             <Button
               onClick={() => void confirmAddToDcr()}
               loading={acting}
-              disabled={allocationMismatch}
+              disabled={allocationMismatch || discountReasonMissing}
             >
               Add to DCRR
             </Button>
@@ -843,6 +1035,301 @@ export default function RemedialDcrPage() {
                 </div>
               </section>
             )}
+
+            {canDiscount ? (
+              <section className="space-y-4 border-t border-line-soft pt-5">
+                <div>
+                  <h3 className="font-display text-base font-semibold text-navy-900">
+                    Remedial discount
+                  </h3>
+                  <p className="mt-1 text-xs text-ink-500">
+                    Only enter an amount that management has already approved
+                    for this borrower. Interest can only be waived on
+                    installments not yet due; penalty can only be waived on
+                    installments already overdue.
+                  </p>
+                </div>
+
+                {allocationModal.interestEligible.length > 0 ? (
+                  <div>
+                    <h4 className="mb-2 text-sm font-semibold text-ink-700">
+                      Interest discount
+                    </h4>
+                    <div className="tbl-wrap max-h-56 overflow-y-auto">
+                      <Table>
+                        <thead>
+                          <tr>
+                            <Th className="w-10"> </Th>
+                            <Th>#</Th>
+                            <Th>Due date</Th>
+                            <Th num>Interest</Th>
+                            <Th num>Percent</Th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {allocationModal.interestEligible.map((inst) => {
+                            const checked = interestDiscountSelections.has(
+                              inst.installmentNo,
+                            );
+                            return (
+                              <tr key={inst.id}>
+                                <Td>
+                                  <input
+                                    type="checkbox"
+                                    checked={checked}
+                                    onChange={(event) =>
+                                      toggleDiscountInstallment(
+                                        "interest",
+                                        inst.installmentNo,
+                                        event.target.checked,
+                                      )
+                                    }
+                                    aria-label={`Discount interest on installment ${inst.installmentNo}`}
+                                  />
+                                </Td>
+                                <Td className="mono">{inst.installmentNo}</Td>
+                                <Td className="mono">
+                                  {formatDate(inst.dueDate)}
+                                </Td>
+                                <Td num className="mono">
+                                  {formatMoney(inst.interestPortion)}
+                                </Td>
+                                <Td num>
+                                  <div className="affix ml-auto w-24">
+                                    <Input
+                                      type="number"
+                                      min={0}
+                                      max={100}
+                                      step="1"
+                                      className="text-right lead"
+                                      mono
+                                      value={
+                                        interestDiscountSelections.get(
+                                          inst.installmentNo,
+                                        ) ?? ""
+                                      }
+                                      disabled={!checked}
+                                      onChange={(event) =>
+                                        updateDiscountPercent(
+                                          "interest",
+                                          inst.installmentNo,
+                                          event.target.value,
+                                        )
+                                      }
+                                    />
+                                    <span className="add">%</span>
+                                  </div>
+                                </Td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </Table>
+                    </div>
+                    <p className="mt-2 text-sm">
+                      Interest discount total:{" "}
+                      <span className="mono font-semibold text-navy-900">
+                        ₱{formatMoney(interestDiscountTotal)}
+                      </span>
+                    </p>
+                  </div>
+                ) : null}
+
+                {allocationModal.penaltyEligible.length > 0 ? (
+                  <div>
+                    <h4 className="mb-2 text-sm font-semibold text-ink-700">
+                      Penalty discount
+                    </h4>
+                    <div className="tbl-wrap max-h-56 overflow-y-auto">
+                      <Table>
+                        <thead>
+                          <tr>
+                            <Th className="w-10"> </Th>
+                            <Th>#</Th>
+                            <Th>Due date</Th>
+                            <Th num>Penalty</Th>
+                            <Th num>Percent</Th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {allocationModal.penaltyEligible.map((inst) => {
+                            const checked = penaltyDiscountSelections.has(
+                              inst.installmentNo,
+                            );
+                            return (
+                              <tr key={inst.id}>
+                                <Td>
+                                  <input
+                                    type="checkbox"
+                                    checked={checked}
+                                    onChange={(event) =>
+                                      toggleDiscountInstallment(
+                                        "penalty",
+                                        inst.installmentNo,
+                                        event.target.checked,
+                                      )
+                                    }
+                                    aria-label={`Discount penalty on installment ${inst.installmentNo}`}
+                                  />
+                                </Td>
+                                <Td className="mono">{inst.installmentNo}</Td>
+                                <Td className="mono">
+                                  {formatDate(inst.dueDate)}
+                                </Td>
+                                <Td num className="mono">
+                                  {formatMoney(inst.feeOwed)}
+                                </Td>
+                                <Td num>
+                                  <div className="affix ml-auto w-24">
+                                    <Input
+                                      type="number"
+                                      min={0}
+                                      max={100}
+                                      step="1"
+                                      className="text-right lead"
+                                      mono
+                                      value={
+                                        penaltyDiscountSelections.get(
+                                          inst.installmentNo,
+                                        ) ?? ""
+                                      }
+                                      disabled={!checked}
+                                      onChange={(event) =>
+                                        updateDiscountPercent(
+                                          "penalty",
+                                          inst.installmentNo,
+                                          event.target.value,
+                                        )
+                                      }
+                                    />
+                                    <span className="add">%</span>
+                                  </div>
+                                </Td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </Table>
+                    </div>
+                    <p className="mt-2 text-sm">
+                      Penalty discount total:{" "}
+                      <span className="mono font-semibold text-navy-900">
+                        ₱{formatMoney(penaltyDiscountTotal)}
+                      </span>
+                    </p>
+                  </div>
+                ) : null}
+
+                {hasDiscount ? (
+                  <div>
+                    <label className="mb-1.5 block text-sm font-medium text-ink-700">
+                      Approval note <span className="text-red-600">*</span>
+                    </label>
+                    <Textarea
+                      value={discountReason}
+                      onChange={(event) => setDiscountReason(event.target.value)}
+                      placeholder="Who approved this discount, and when"
+                      rows={2}
+                    />
+                    {discountReasonMissing ? (
+                      <p className="mt-1 text-xs text-red-600">
+                        A reason is required before this discount can be added.
+                      </p>
+                    ) : null}
+                  </div>
+                ) : null}
+              </section>
+            ) : null}
+
+            {allocationModal.penaltyEligible.length > 0 ? (
+              <section>
+                <h3 className="mb-1 font-display text-base font-semibold text-navy-900">
+                  Late fee paid
+                </h3>
+                <p className="mb-2 text-xs text-ink-500">
+                  Of this payment, how much is late-fee money on each overdue
+                  month. Tick a month and leave it ₱0 to put the whole payment
+                  toward principal and keep the fee outstanding. Leave a month
+                  unticked to let the system split automatically (fee first).
+                </p>
+                <div className="tbl-wrap max-h-56 overflow-y-auto">
+                  <Table>
+                    <thead>
+                      <tr>
+                        <Th className="w-10"> </Th>
+                        <Th>#</Th>
+                        <Th>Due date</Th>
+                        <Th num>Fee owed</Th>
+                        <Th num>Fee paid</Th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {allocationModal.penaltyEligible.map((inst) => {
+                        const checked = penaltyPaidSelections.has(
+                          inst.installmentNo,
+                        );
+                        return (
+                          <tr key={inst.id}>
+                            <Td>
+                              <input
+                                type="checkbox"
+                                checked={checked}
+                                onChange={(event) =>
+                                  togglePenaltyPaidInstallment(
+                                    inst.installmentNo,
+                                    event.target.checked,
+                                  )
+                                }
+                                aria-label={`Mark late-fee paid on installment ${inst.installmentNo}`}
+                              />
+                            </Td>
+                            <Td className="mono">{inst.installmentNo}</Td>
+                            <Td className="mono">{formatDate(inst.dueDate)}</Td>
+                            <Td num className="mono">
+                              {formatMoney(inst.feeOwed)}
+                            </Td>
+                            <Td num>
+                              <div className="affix ml-auto w-28">
+                                <span className="add">₱</span>
+                                <Input
+                                  type="number"
+                                  min={0}
+                                  max={inst.feeOwed}
+                                  step="0.01"
+                                  className="text-right"
+                                  mono
+                                  placeholder="0 = skip fee"
+                                  value={
+                                    penaltyPaidSelections.get(
+                                      inst.installmentNo,
+                                    ) ?? ""
+                                  }
+                                  disabled={!checked}
+                                  onChange={(event) =>
+                                    updatePenaltyPaidAmount(
+                                      inst.installmentNo,
+                                      event.target.value,
+                                    )
+                                  }
+                                />
+                              </div>
+                            </Td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </Table>
+                </div>
+                {penaltyPaidTotal > 0 ? (
+                  <p className="mt-2 text-sm">
+                    Late fee paid total:{" "}
+                    <span className="mono font-semibold text-navy-900">
+                      ₱{formatMoney(penaltyPaidTotal)}
+                    </span>
+                  </p>
+                ) : null}
+              </section>
+            ) : null}
           </div>
         ) : null}
       </Modal>

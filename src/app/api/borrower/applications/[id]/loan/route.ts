@@ -125,7 +125,7 @@ export async function GET(_request: Request, ctx: { params: Promise<{ id: string
     const { data: postings } = await supabase
       .from("postings")
       .select(
-        "id, amortization_schedule_id, amount, payments ( payment_date, reference_no, channel, status, move_of_payment_batch_id )",
+        "id, amortization_schedule_id, amount, penalty_amount, payments ( payment_date, reference_no, channel, status, move_of_payment_batch_id )",
       )
       .eq("masterlist_id", ctxData.masterlistId)
       .order("posted_at", { ascending: true });

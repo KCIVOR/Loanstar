@@ -54,7 +54,7 @@ export async function GET(request: Request) {
     const { data: scheduleRows, error: scheduleError } = await supabase
       .from("amortization_schedules")
       .select(
-        "id, installment_no, due_date, amount_due, penalty_amount, discount_amount, amount_paid, status",
+        "id, installment_no, due_date, amount_due, penalty_amount, penalty_discount_amount, discount_amount, amount_paid, status",
       )
       .eq("masterlist_id", payment.masterlist_id)
       .in("status", ["pending", "partial", "overdue"])
@@ -62,16 +62,49 @@ export async function GET(request: Request) {
 
     if (scheduleError) throw new Error(scheduleError.message);
 
-    const installments = (scheduleRows ?? []).map((row) => ({
-      id: row.id as string,
-      installmentNo: row.installment_no as number,
-      dueDate: row.due_date as string,
-      amountDue: Number(row.amount_due),
-      penaltyAmount: Number(row.penalty_amount ?? 0),
-      discountAmount: Number(row.discount_amount ?? 0),
-      amountPaid: Number(row.amount_paid),
-      status: row.status as "pending" | "partial" | "overdue",
-    }));
+    // Late-fee money already collected against each installment
+    // (SUM(postings.penalty_amount) — Phase 4a auto split + Phase 4b collector
+    // override). The Penalty column stays at the CHARGED figure once paid
+    // (penalty-fee-paid-protection, 2026-09-09), so "how much fee is still
+    // owed / still waivable" has to net this out or the modal offers a fee
+    // that has already been paid. Service-role: a prior assignee's postings
+    // are RLS-invisible to this session.
+    const { data: penaltyPostings } = await createServiceClient()
+      .from("postings")
+      .select("amortization_schedule_id, penalty_amount")
+      .eq("masterlist_id", payment.masterlist_id);
+    const feePaidByScheduleId = new Map<string, number>();
+    for (const row of penaltyPostings ?? []) {
+      const sid = row.amortization_schedule_id as string | null;
+      if (!sid) continue;
+      feePaidByScheduleId.set(
+        sid,
+        (feePaidByScheduleId.get(sid) ?? 0) + Number(row.penalty_amount ?? 0),
+      );
+    }
+
+    const installments = (scheduleRows ?? []).map((row) => {
+      const penaltyAmount = Number(row.penalty_amount ?? 0);
+      const penaltyDiscountAmount = Number(row.penalty_discount_amount ?? 0);
+      const feePaid = feePaidByScheduleId.get(row.id as string) ?? 0;
+      return {
+        id: row.id as string,
+        installmentNo: row.installment_no as number,
+        dueDate: row.due_date as string,
+        amountDue: Number(row.amount_due),
+        penaltyAmount,
+        discountAmount: Number(row.discount_amount ?? 0),
+        amountPaid: Number(row.amount_paid),
+        status: row.status as "pending" | "partial" | "overdue",
+        /** Fee still owed = charged − waived − already paid, floored at 0.
+         * What the "Penalty discount" and "Late fee paid" tables should show
+         * and cap against. */
+        feeOwed: Math.max(
+          0,
+          Number((penaltyAmount - penaltyDiscountAmount - feePaid).toFixed(2)),
+        ),
+      };
+    });
 
     const allocation = isSurcharge
       ? [{ amortizationScheduleId: null, amount: Number(payment.amount) }]
@@ -102,8 +135,7 @@ export async function GET(request: Request) {
       (inst) => daysPastDue(inst.dueDate, asOf) <= 0 && inst.amountDue > 0,
     );
     const penaltyEligible = installments.filter(
-      (inst) =>
-        daysPastDue(inst.dueDate, asOf) > 0 && inst.penaltyAmount > 0,
+      (inst) => daysPastDue(inst.dueDate, asOf) > 0 && inst.feeOwed > 0,
     );
 
     // interestPortion per installment isn't stored anywhere (amountDue is
