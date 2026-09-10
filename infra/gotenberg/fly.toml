@@ -1,0 +1,49 @@
+# Gotenberg — headless-Chromium HTML->PDF service for the Loanstar document renderer.
+#
+# Deploy (one-time), from this directory:
+#   fly launch --no-deploy --copy-config --name loanstar-gotenberg --region sin
+#   fly secrets set GOTENBERG_API_BASIC_AUTH_USERNAME=loanstar \
+#                   GOTENBERG_API_BASIC_AUTH_PASSWORD="$(openssl rand -hex 24)"
+#   fly deploy
+#
+# Reachable ONLY on the Fly private network:
+#   http://loanstar-gotenberg.internal:3000
+# It is never exposed on a public hostname. Vercel calls it over the same
+# private network (both must be in the same Fly org / connected via WireGuard,
+# or Vercel calls a Fly public app with basic auth — decide at deploy time).
+#
+# The image tag is a determinism input: bump it deliberately and regenerate the
+# golden hashes in src/lib/documents/render/__tests__/chromium.integration.test.mts.
+
+app            = "loanstar-gotenberg"
+primary_region = "sin"        # Singapore — closest Fly region to PH / typical Vercel edge
+
+[build]
+  image = "gotenberg/gotenberg:8.11.1"   # PINNED
+
+# Gotenberg's entrypoint is `gotenberg`; append hardening flags.
+[processes]
+  app = "gotenberg --chromium-disable-javascript --chromium-allow-list='file:///.*' --chromium-deny-list='.*' --api-timeout=30s --api-enable-basic-auth --log-level=info"
+
+[http_service]
+  internal_port         = 3000
+  force_https           = false      # private network only
+  auto_stop_machines    = "suspend"
+  auto_start_machines   = true
+  min_machines_running  = 1          # keep one warm so Chromium stays hot
+
+  [http_service.concurrency]
+    type       = "requests"
+    hard_limit = 20
+    soft_limit = 12
+
+  [[http_service.checks]]
+    method       = "GET"
+    path         = "/health"
+    interval     = "15s"
+    timeout      = "5s"
+    grace_period = "10s"
+
+[[vm]]
+  size   = "shared-cpu-1x"
+  memory = "1024mb"
