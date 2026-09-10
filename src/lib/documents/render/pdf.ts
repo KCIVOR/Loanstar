@@ -32,30 +32,44 @@ function makeDeterministic(buf: Buffer): Buffer {
 }
 
 /**
- * Post-process pdfmake content to inject equal-width columns for tables
- * that don't have explicit widths. Makes tables span full page width.
+ * Post-process pdfmake content: give every table an explicit equal-width column
+ * spec (`['*', …]`) unless it already has one, so tables span the full page
+ * width instead of shrinking to their content — matching what the Visual editor
+ * shows (`table { width: 100% }`).
+ *
+ * pdfmake reads column widths at `node.table.widths`, so the array must be
+ * written there, NOT as a sibling of `node.table` (an earlier version wrote
+ * `node.widths`, which pdfmake silently ignores — the whole effect was a no-op).
  */
 function injectTableWidths(node: unknown): void {
   if (!node || typeof node !== "object") return;
-  
+
   if (Array.isArray(node)) {
     node.forEach(injectTableWidths);
     return;
   }
-  
+
   const obj = node as Record<string, unknown>;
-  
-  // If this node has a table without explicit widths, inject equal-width columns
-  if (obj.table && !obj.widths) {
+
+  if (obj.table && typeof obj.table === "object") {
     const tableObj = obj.table as Record<string, unknown>;
     const body = tableObj.body;
-    if (Array.isArray(body) && body.length > 0 && Array.isArray(body[0])) {
-      const columnCount = body[0].length;
-      obj.widths = Array(columnCount).fill('*'); // '*' means equal-width
+    if (
+      !Array.isArray(tableObj.widths) &&
+      Array.isArray(body) &&
+      body.length > 0 &&
+      Array.isArray(body[0])
+    ) {
+      // html-to-pdfmake pads colspan rows with filler cells, so the first row's
+      // length is the true grid column count.
+      const columnCount = (body[0] as unknown[]).length;
+      if (columnCount > 0) {
+        tableObj.widths = Array(columnCount).fill("*"); // '*' = equal-width
+      }
     }
   }
-  
-  // Recurse into child nodes
+
+  // Recurse into child nodes (covers tables nested inside table cells).
   Object.values(obj).forEach(injectTableWidths);
 }
 
@@ -68,13 +82,16 @@ export function htmlToPdf(
   customDefaultStyles?: Record<string, unknown>,
 ): Promise<Uint8Array> {
   const { window } = new JSDOM("");
-  const content = htmlToPdfmake(html, { 
+  const content = htmlToPdfmake(html, {
     window,
-    defaultStyles: customDefaultStyles, // override pdfmake's built-in defaults
-    tableAutoSize: false, // Let pdfmake compute widths based on content
+    // Merges over html-to-pdfmake's built-in per-tag defaults (undefined = leave
+    // them untouched, i.e. the legacy byte-for-byte path).
+    defaultStyles: customDefaultStyles,
   });
 
-  // Make tables full-width by injecting equal-width column specs
+  // Shared-defaults path only: force tables to full page width. The legacy path
+  // is left completely untouched so previously generated/signed PDFs still hash
+  // identically.
   if (customDefaultStyles) {
     injectTableWidths(content);
   }
