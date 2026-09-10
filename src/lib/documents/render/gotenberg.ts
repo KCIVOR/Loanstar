@@ -102,15 +102,12 @@ export async function htmlToPdfViaGotenberg(
     form.append("files", new Blob([blobPart(a.bytes)], { type: a.contentType }), a.name);
   }
 
-  // Page geometry: let PRINT_CSS's `@page` win; zero the Chromium margins so the
-  // only margin source is the stylesheet.
+  // Page geometry: PRINT_CSS's `@page { size; margin }` is the single source of
+  // truth (size + margins). Gotenberg nests header.html / footer.html inside
+  // that page margin, so the `@page` top/bottom margin must leave room for them.
   form.append("preferCssPageSize", "true");
   form.append("printBackground", "true");
   form.append("generateDocumentOutline", "false");
-  form.append("marginTop", "0");
-  form.append("marginBottom", "0");
-  form.append("marginLeft", "0");
-  form.append("marginRight", "0");
 
   const res = await fetchWithRetry(
     `${baseUrl()}/forms/chromium/convert/html`,

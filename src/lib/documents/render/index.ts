@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 
 import { htmlToPdfViaGotenberg } from "./gotenberg";
+import { buildFooterHtml, buildHeaderHtml, getLogoAsset } from "./letterhead";
 import { mergeTemplate, type RenderContext } from "./merge";
 import { htmlToPdf } from "./pdf";
 
@@ -40,8 +41,18 @@ export async function renderTemplateToPdf(
 ): Promise<Uint8Array> {
   const merged = mergeTemplate(templateHtml, context);
   return resolveEngine(opts?.engine) === "chromium"
-    ? htmlToPdfViaGotenberg(merged)
+    ? renderViaChromium(merged)
     : htmlToPdf(merged);
+}
+
+/** Chromium path: attach the running letterhead (logo header + page-number footer). */
+async function renderViaChromium(mergedHtml: string): Promise<Uint8Array> {
+  const logo = await getLogoAsset();
+  return htmlToPdfViaGotenberg(mergedHtml, {
+    headerHtml: buildHeaderHtml(Boolean(logo)),
+    footerHtml: buildFooterHtml(),
+    assets: logo ? [logo] : [],
+  });
 }
 
 /** sha256 of the rendered bytes — same content-hash contract as the LRA flow. */
