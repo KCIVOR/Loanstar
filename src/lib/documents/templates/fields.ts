@@ -265,6 +265,9 @@ export const FIELD_GROUPS: FieldGroup[] = [
       { key: "installmentCount", label: "Disclosure — number of installments", sample: "7" },
       { key: "disclosureFromDate", label: "Disclosure — interest period from", sample: "08/10/2026" },
       { key: "disclosureToDate", label: "Disclosure — interest period to", sample: "02/10/2027" },
+      { key: "demandCheckAccountNo", label: "Demand letter — drawee account no.", sample: "163-6-000089-55" },
+      { key: "demandReason", label: "Demand letter — bank dishonor reason", sample: "DAIF (Drawn Against Insufficient Funds)" },
+      { key: "firstNoticeDate", label: "Demand letter — date of first notice", sample: "06/15/2026" },
     ],
   },
   {
@@ -530,6 +533,16 @@ export const FIELD_COLLECTIONS: MergeCollection[] = [
       { key: "payor", label: "Payor / account debtor", sample: "DPWH Region IV-A" },
     ],
   },
+  {
+    key: "demandChecks",
+    label: "Demand letter — dishonored checks",
+    fields: [
+      { key: "bankName", label: "Bank", sample: "BDO" },
+      { key: "checkNumber", label: "Check number", sample: "0012345" },
+      { key: "checkDate", label: "Date", sample: "07/15/2026" },
+      { key: "amount", label: "Amount", sample: "17,428.20" },
+    ],
+  },
 ];
 
 /** Conditional flags usable with `data-if` / `data-unless`. */
@@ -552,6 +565,8 @@ export const FIELD_FLAGS: MergeField[] = [
   { key: "isPerDayInterest", label: "Per-day (prorated) interest, one-time payment", sample: "" },
   { key: "hasInvoiceAnnex", label: "Invoice-financing annex applies", sample: "" },
   { key: "isNonPdc", label: "Released without PDCs (cash path)", sample: "" },
+  { key: "isQuarterly", label: "Quarterly amortization schedule (Vienovo)", sample: "true" },
+  { key: "isEvery2Months", label: "Every-2-months amortization schedule (Vienovo)", sample: "" },
 ];
 
 /** Build the sample render context from the catalog (drives preview). */
@@ -655,6 +670,10 @@ export function buildSampleContext(): Record<string, unknown> {
   ];
   ctx.invoices = [
     { invoiceNo: "INV-2026-0042", invoiceDate: "01/05/2026", invoiceAmount: "2,244,897.96", payor: "DPWH Region IV-A" },
+  ];
+  ctx.demandChecks = [
+    { bankName: "BDO", checkNumber: "0012345", checkDate: "07/15/2026", amount: "17,428.20" },
+    { bankName: "BDO", checkNumber: "0012346", checkDate: "08/15/2026", amount: "17,428.20" },
   ];
   return ctx;
 }
