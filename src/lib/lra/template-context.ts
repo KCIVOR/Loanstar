@@ -296,6 +296,70 @@ export function buildReleaseTemplateContext(
     notaryBookNo: "",
     notarySeries: "",
 
+    // --- LSLGC servicing documents, now selectable in the LRA release modal as
+    //     optional picks (cancellation of chattel / REM mortgage, voluntary
+    //     surrender + deed of sale, SPA for cancellation, agreement for
+    //     replacement of checks, agreement for consolidation). Party / amount /
+    //     date slots are filled from the loan; slots describing events that have
+    //     not happened at release time (mortgage registration nos., surrender
+    //     amount, redemption period, the new replacement checks, the borrower's
+    //     other loans) stay "" / [] for the notary/officer to complete. ---
+    isCorpOrDti: isSme,
+    witnessOne: "",
+    witnessTwo: "",
+
+    // Agreement for Replacement of Checks — the underlying chattel loan is this loan.
+    chattelReleaseDate: computation.releaseDate ?? "",
+    totalObligation: formatMoney(blri.totalLoan),
+    totalObligationInWords: pesosAndCentavosInWords(blri.totalLoan),
+    amortStartDate: blri.firstPaymentDate,
+    amortMaturityDate: blri.pdcSchedule.at(-1)?.checkDate ?? "",
+    checkReplacementDate: "",
+    lenderDepositBank: "",
+    lenderDepositAccountName: "",
+    lenderDepositAccountNo: "",
+    replacementChecks: [] as unknown[],
+
+    // Agreement for Consolidation — "additional loan" = this loan; the totals
+    // across the borrower's other active loans are not resolved here.
+    additionalLoanAmount: formatMoney(blri.principal),
+    additionalLoanAmountInWords: pesosAndCentavosInWords(blri.principal),
+    additionalLoanTermMonths: String(blri.terms),
+    additionalLoanInterestRate: pct(computation.interestRate),
+    additionalLoanTotal: formatMoney(blri.totalLoan),
+    additionalLoanTotalInWords: pesosAndCentavosInWords(blri.totalLoan),
+    priorLoans: [] as unknown[],
+    priorLoansCount: "",
+    allLoansTotal: "",
+    allLoansTotalInWords: "",
+
+    // Cancellation of Chattel / Real Estate Mortgage — the mortgage being
+    // cancelled is this loan's own security; only its secured amount + execution
+    // date are known before it is notarised and registered.
+    priorMortgageAmount: formatMoney(blri.totalLoan),
+    priorMortgageAmountInWords: pesosAndCentavosInWords(blri.totalLoan),
+    priorMortgageExecutedOn: computation.releaseDate ?? "",
+    priorMortgageDocNo: "",
+    priorMortgagePageNo: "",
+    priorMortgageBookNo: "",
+    priorMortgageSeries: "",
+    priorMortgageNotary: "",
+    priorMortgageNotaryPlace: "",
+    priorMortgageRegistryOfDeeds: "",
+    cancellationPageCount: "",
+
+    // Voluntary Surrender + Deed of Absolute Sale — surrender occurs on default,
+    // long after release; the outstanding amount + redemption period are unknown.
+    surrenderDebtAmount: "",
+    surrenderDebtAmountInWords: "",
+    redemptionPeriod: "",
+
+    // Collateral line-item detail (make / plate / engine / chassis / TCT / area
+    // / technical description) is not captured anywhere in the system yet — these
+    // repeats render header-only until a collateral-detail model exists.
+    vehicles: [] as unknown[],
+    properties: [] as unknown[],
+
     // Amount / date / count slots the Disclosure Statement form fills in.
     amountFinanced: formatMoney(blri.principal),
     financeChargeInterest: formatMoney(blri.totalInterest),

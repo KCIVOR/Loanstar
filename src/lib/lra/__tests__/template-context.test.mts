@@ -190,3 +190,42 @@ test("v2 LSLGC merge keys are present and segment-aware", () => {
   assert.equal(sme.borrowerRepresentativeTitle, "President");
   assert.equal(sme.borrowerTin, "123-456-789-000");
 });
+
+test("servicing-document keys: loan-derived slots filled, uncaptured stay empty", () => {
+  const seafarer = buildReleaseTemplateContext(BLRI, COMPUTATION, BORROWER, "with_pdc");
+  const sme = buildReleaseTemplateContext(
+    BLRI,
+    COMPUTATION,
+    { ...BORROWER, businessInfo: { companyName: "Acme Trading Corp." } } as unknown as BorrowerProfile,
+    "with_pdc",
+    { segment: "sme" },
+  );
+
+  // isCorpOrDti drives the cancellation-deed phrasing: SME = corporate, else not.
+  assert.equal(seafarer.isCorpOrDti, false);
+  assert.equal(sme.isCorpOrDti, true);
+
+  // derived from the loan / BLRI
+  assert.equal(seafarer.totalObligation, "121,997.41");
+  assert.equal(
+    seafarer.totalObligationInWords,
+    "One Hundred Twenty One Thousand Nine Hundred Ninety Seven Pesos & Forty One Cents",
+  );
+  assert.equal(seafarer.amortStartDate, "08/10/26");
+  assert.equal(seafarer.chattelReleaseDate, "2026-06-11");
+  assert.equal(seafarer.additionalLoanTermMonths, "7");
+  assert.equal(seafarer.additionalLoanAmount, "102,605.05");
+  assert.equal(seafarer.priorMortgageAmount, "121,997.41");
+  assert.equal(seafarer.priorMortgageExecutedOn, "2026-06-11");
+
+  // events that have not happened at release time — blank / empty for the notary
+  assert.equal(seafarer.priorMortgageRegistryOfDeeds, "");
+  assert.equal(seafarer.surrenderDebtAmount, "");
+  assert.equal(seafarer.redemptionPeriod, "");
+  assert.equal(seafarer.checkReplacementDate, "");
+  assert.equal(seafarer.allLoansTotal, "");
+  assert.deepEqual(seafarer.vehicles, []);
+  assert.deepEqual(seafarer.properties, []);
+  assert.deepEqual(seafarer.priorLoans, []);
+  assert.deepEqual(seafarer.replacementChecks, []);
+});
