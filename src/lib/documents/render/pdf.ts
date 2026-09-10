@@ -32,12 +32,52 @@ function makeDeterministic(buf: Buffer): Buffer {
 }
 
 /**
+ * Post-process pdfmake content to inject equal-width columns for tables
+ * that don't have explicit widths. Makes tables span full page width.
+ */
+function injectTableWidths(node: unknown): void {
+  if (!node || typeof node !== "object") return;
+  
+  if (Array.isArray(node)) {
+    node.forEach(injectTableWidths);
+    return;
+  }
+  
+  const obj = node as Record<string, unknown>;
+  
+  // If this node has a table without explicit widths, inject equal-width columns
+  if (obj.table && !obj.widths) {
+    const tableObj = obj.table as Record<string, unknown>;
+    const body = tableObj.body;
+    if (Array.isArray(body) && body.length > 0 && Array.isArray(body[0])) {
+      const columnCount = body[0].length;
+      obj.widths = Array(columnCount).fill('*'); // '*' means equal-width
+    }
+  }
+  
+  // Recurse into child nodes
+  Object.values(obj).forEach(injectTableWidths);
+}
+
+/**
  * Render an HTML string (already merged — no template tokens) to a deterministic
  * PDF byte array using pdfmake. Pure JS, no headless browser: safe on serverless.
  */
-export function htmlToPdf(html: string): Promise<Uint8Array> {
+export function htmlToPdf(
+  html: string,
+  customDefaultStyles?: Record<string, unknown>,
+): Promise<Uint8Array> {
   const { window } = new JSDOM("");
-  const content = htmlToPdfmake(html, { window });
+  const content = htmlToPdfmake(html, { 
+    window,
+    defaultStyles: customDefaultStyles, // override pdfmake's built-in defaults
+    tableAutoSize: false, // Let pdfmake compute widths based on content
+  });
+
+  // Make tables full-width by injecting equal-width column specs
+  if (customDefaultStyles) {
+    injectTableWidths(content);
+  }
 
   const docDefinition: TDocumentDefinitions = {
     content: content as TDocumentDefinitions["content"],
