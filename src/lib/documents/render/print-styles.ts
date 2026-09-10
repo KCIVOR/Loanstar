@@ -33,6 +33,13 @@ body {
   color: var(--doc-fg);
 }
 
+/* alignment — the editor emits data-align (TipTap strips inline style); legacy
+   templates keep style="text-align:…" which is native CSS and needs no rule. */
+[data-align="center"] { text-align: center; }
+[data-align="right"]  { text-align: right; }
+[data-align="left"]   { text-align: left; }
+[data-align="justify"]{ text-align: justify; }
+
 h1 { font-size: 16pt; font-weight: 700; margin: 0 0 8pt; }
 h2 { font-size: 13pt; font-weight: 700; margin: 14pt 0 6pt; }
 h3 { font-size: 11.5pt; font-weight: 700; margin: 12pt 0 4pt; }
