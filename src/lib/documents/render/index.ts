@@ -1,9 +1,9 @@
 import { createHash } from "node:crypto";
 
-import { loadDocFont } from "./doc-font";
+import { loadDocFonts } from "./doc-font";
 import type { DocRenderConnection } from "./engine-config";
 import { htmlToPdfViaGotenberg } from "./gotenberg";
-import { buildFooterHtml, buildHeaderHtml, getLogoAsset } from "./letterhead";
+import { buildBodyLetterhead, buildFooterHtml, getLogoAsset } from "./letterhead";
 import { mergeTemplate, type RenderContext } from "./merge";
 import { htmlToPdf } from "./pdf";
 
@@ -60,18 +60,22 @@ export async function renderTemplateToPdf(
     : htmlToPdf(merged);
 }
 
-/** Chromium path: attach the running letterhead + document font. */
+/**
+ * Chromium path: prepend the centered wordmark to page 1 (matching the source
+ * documents — a one-time letterhead, not a running header), add the page-number
+ * footer, and attach the document font.
+ */
 async function renderViaChromium(
   mergedHtml: string,
   connection?: DocRenderConnection,
 ): Promise<Uint8Array> {
   const logo = await getLogoAsset();
-  const font = loadDocFont();
-  return htmlToPdfViaGotenberg(mergedHtml, {
-    headerHtml: buildHeaderHtml(Boolean(logo)),
+  const fonts = loadDocFonts();
+  const body = buildBodyLetterhead(Boolean(logo)) + mergedHtml;
+  return htmlToPdfViaGotenberg(body, {
     footerHtml: buildFooterHtml(),
     assets: logo ? [logo] : [],
-    ...(font ? { fontWoff2: font } : {}),
+    ...(fonts.length ? { fonts } : {}),
     ...(connection ? { connection } : {}),
   });
 }

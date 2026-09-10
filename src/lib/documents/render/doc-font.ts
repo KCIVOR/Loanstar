@@ -3,25 +3,41 @@ import { join } from "node:path";
 
 /**
  * The document font attached to every Gotenberg request, so the rendered PDF is
- * identical regardless of what fonts the Gotenberg container image happens to
- * ship. `PRINT_CSS` declares `@font-face { src: url("fonts/doc.woff2") }` and
- * `gotenberg.ts` uploads these bytes under that name.
+ * identical regardless of what fonts the Gotenberg container image ships and
+ * matches the editor preview (which uses the same `@font-face`).
  *
- * The file is optional: until `assets/doc.woff2` is committed, the Chromium path
- * still works — Chromium just falls back to its bundled sans-serif. Provide the
- * file per `infra/gotenberg/README.md §2` (Liberation Sans, WOFF2).
+ * `assets/doc.woff2` + `assets/doc-bold.woff2` are Tinos (Apache-2.0), which is
+ * metric-compatible with Times New Roman — the LSLGC source-document face.
+ * `PRINT_CSS` declares the matching `@font-face` rules against `fonts/<name>`.
+ *
+ * Both files are optional: if absent, Chromium falls back down the CSS stack
+ * ("Times New Roman" → "Liberation Serif" on the Gotenberg container).
  */
 
-const FONT_PATH = join(process.cwd(), "src/lib/documents/render/assets/doc.woff2");
+export type DocFontFile = { filename: string; bytes: Uint8Array };
 
-let cached: Uint8Array | null | undefined;
+const ASSET_DIR = join(process.cwd(), "src/lib/documents/render/assets");
 
-export function loadDocFont(): Uint8Array | null {
+const FILES: Array<{ asset: string; filename: string }> = [
+  { asset: "doc.woff2", filename: "fonts/doc.woff2" },
+  { asset: "doc-bold.woff2", filename: "fonts/doc-bold.woff2" },
+];
+
+let cached: DocFontFile[] | undefined;
+
+export function loadDocFonts(): DocFontFile[] {
   if (cached !== undefined) return cached;
-  try {
-    cached = new Uint8Array(readFileSync(FONT_PATH));
-  } catch {
-    cached = null;
+  const out: DocFontFile[] = [];
+  for (const f of FILES) {
+    try {
+      out.push({
+        filename: f.filename,
+        bytes: new Uint8Array(readFileSync(join(ASSET_DIR, f.asset))),
+      });
+    } catch {
+      // asset not bundled — skip, CSS fallback covers it
+    }
   }
+  cached = out;
   return cached;
 }

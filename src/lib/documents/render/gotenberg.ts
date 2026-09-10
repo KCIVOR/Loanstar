@@ -1,9 +1,6 @@
 import { makeDeterministic } from "./deterministic";
 import { PRINT_CSS } from "./print-styles";
 
-/** Bare filename Gotenberg resolves the `@font-face` src against. */
-const FONT_FILENAME = "fonts/doc.woff2";
-
 export class RenderEngineError extends Error {
   readonly detail?: string;
   constructor(message: string, detail?: string) {
@@ -28,8 +25,12 @@ export type GotenbergOptions = {
   footerHtml?: string;
   /** Images referenced by bare `<img src="…">` in the merged HTML. */
   assets?: GotenbergAsset[];
-  /** Document font, attached per-request so determinism is image-independent. */
-  fontWoff2?: Uint8Array;
+  /**
+   * Font files attached per-request (so output is image-independent), each
+   * `{ filename, bytes }` where `filename` matches the `@font-face` src, e.g.
+   * `fonts/doc.woff2`.
+   */
+  fonts?: Array<{ filename: string; bytes: Uint8Array }>;
   /** Service URL + basic-auth creds; falls back to env when a field is absent. */
   connection?: GotenbergConnection;
 };
@@ -82,11 +83,11 @@ export async function htmlToPdfViaGotenberg(
     new Blob([wrapHtml(mergedHtml)], { type: "text/html" }),
     "index.html",
   );
-  if (opts.fontWoff2) {
+  for (const f of opts.fonts ?? []) {
     form.append(
       "files",
-      new Blob([blobPart(opts.fontWoff2)], { type: "font/woff2" }),
-      FONT_FILENAME,
+      new Blob([blobPart(f.bytes)], { type: "font/woff2" }),
+      f.filename,
     );
   }
   if (opts.headerHtml) {
