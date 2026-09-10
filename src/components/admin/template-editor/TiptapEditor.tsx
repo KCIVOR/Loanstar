@@ -146,6 +146,27 @@ export const TiptapEditor = forwardRef<TiptapEditorHandle, { initialBody: string
             ))}
 
             <div>
+              <p className="mb-1 text-xs font-semibold text-ink-700">Letterhead</p>
+              <button
+                type="button"
+                title="Insert the company wordmark (renders in Preview PDF)"
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={() =>
+                  insert(
+                    `<div data-align="center"><img class="doc-logo" src="{{logoDataUri}}" alt="Loan Star Lending Group Corp." /></div><p></p>`,
+                  )
+                }
+                className="rounded border border-line bg-white px-2 py-1 text-left text-xs text-ink-700 hover:border-accent hover:text-accent"
+              >
+                Company logo
+              </button>
+              <p className="mt-1 text-xs text-ink-400">
+                Shows as a broken image while editing; resolves in Preview PDF and
+                generation. Omit it to get the default centered letterhead.
+              </p>
+            </div>
+
+            <div>
               <p className="mb-1 text-xs font-semibold text-ink-700">Repeating tables</p>
               <div className="flex flex-col gap-1">
                 {FIELD_COLLECTIONS.map((col) => (

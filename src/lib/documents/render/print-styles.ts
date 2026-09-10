@@ -51,9 +51,16 @@ body {
   text-align: justify;
 }
 
-/* running letterhead — logo once, centered, at the very top of page 1 */
+/* letterhead — the wordmark once, centered, at the top of page 1. Either the
+   renderer's auto-prepended block (.doc-letterhead) or an author-placed
+   <img class="doc-logo"> from the "Company logo" palette button. */
 .doc-letterhead { text-align: center; margin: 0 0 16pt; }
 .doc-letterhead img { height: 0.72in; width: auto; }
+/* inline-block so the wrapper's data-align (center by default, or left/right)
+   positions it. Default size 0.72in tall; a template may override by setting a
+   width attribute on the <img> (then the attr wins and height scales). */
+img.doc-logo { display: inline-block; margin: 0 0 14pt; }
+img.doc-logo:not([width]) { height: 0.72in; width: auto; }
 
 /* alignment — the editor emits data-align (TipTap strips inline style); legacy
    templates keep style="text-align:…" which is native CSS and needs no rule. */

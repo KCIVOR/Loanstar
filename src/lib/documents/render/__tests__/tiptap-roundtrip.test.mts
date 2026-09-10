@@ -42,6 +42,12 @@ function norm(html: string): string {
       .replace(/<\/?em>/g, (m) => (m[1] === "/" ? "</i>" : "<i>"))
       .replace(/<colgroup>.*?<\/colgroup>/g, "")
       .replace(/ (?:colspan|rowspan)="1"/g, "")
+      // <img>: TipTap re-emits attributes in schema order (class last); attribute
+      // order is rendering-inert, so canonicalise by sorting.
+      .replace(/<img\b([^>]*?)\s*\/?>/g, (_m, a) => {
+        const parts = (String(a).match(/[\w-]+="[^"]*"/g) ?? []).sort();
+        return `<img ${parts.join(" ")}>`;
+      })
       // alignment: `style="text-align:X"` and `data-align="X"` are equivalent —
       // PRINT_CSS turns the latter into the former. Canonicalise to data-align.
       .replace(

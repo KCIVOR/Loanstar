@@ -4,6 +4,7 @@ import { loadDocFonts } from "./doc-font";
 import type { DocRenderConnection } from "./engine-config";
 import { htmlToPdfViaGotenberg } from "./gotenberg";
 import { buildBodyLetterhead, buildFooterHtml, getLogoAsset } from "./letterhead";
+import { getLogoDataUri } from "./logo-asset";
 import { mergeTemplate, type RenderContext } from "./merge";
 import { htmlToPdf } from "./pdf";
 
@@ -54,16 +55,22 @@ export async function renderTemplateToPdf(
   context: RenderContext,
   opts?: RenderTemplateOptions,
 ): Promise<Uint8Array> {
-  const merged = mergeTemplate(templateHtml, context);
+  // `{{logoDataUri}}` — the company wordmark as a data URI, available to every
+  // template (the editor's "Company logo" palette button inserts it). The caller
+  // may override by supplying its own.
+  const merged = mergeTemplate(templateHtml, {
+    logoDataUri: getLogoDataUri(),
+    ...context,
+  });
   return resolveEngine(opts?.engine) === "chromium"
     ? renderViaChromium(merged, opts?.connection)
     : htmlToPdf(merged);
 }
 
 /**
- * Chromium path: prepend the centered wordmark to page 1 (matching the source
- * documents — a one-time letterhead, not a running header), add the page-number
- * footer, and attach the document font.
+ * Chromium path: add the page-number footer and document font. The centered
+ * wordmark is prepended to page 1 UNLESS the template already places its own
+ * logo inline (`<img class="doc-logo">` from the palette).
  */
 async function renderViaChromium(
   mergedHtml: string,
@@ -71,7 +78,10 @@ async function renderViaChromium(
 ): Promise<Uint8Array> {
   const logo = await getLogoAsset();
   const fonts = loadDocFonts();
-  const body = buildBodyLetterhead(Boolean(logo)) + mergedHtml;
+  const hasInlineLogo = /class="[^"]*\bdoc-logo\b/.test(mergedHtml);
+  const body = hasInlineLogo
+    ? mergedHtml
+    : buildBodyLetterhead(Boolean(logo)) + mergedHtml;
   return htmlToPdfViaGotenberg(body, {
     footerHtml: buildFooterHtml(),
     assets: logo ? [logo] : [],
