@@ -74,7 +74,9 @@ export async function renderAndStore(
     throw new Error(`No published template for document slug "${slug}"`);
   }
 
-  const pdf = await renderTemplateToPdf(published.body, context);
+  const pdf = await renderTemplateToPdf(published.body, context, {
+    useSharedDefaults: true,
+  });
   const contentHash = hashPdf(pdf);
   const docId = crypto.randomUUID();
   const storagePath = `${borrowerId}/rendered/${applicationId}/${slug}-${docId}.pdf`;
