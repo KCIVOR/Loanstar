@@ -671,7 +671,9 @@ export async function generateReleaseDocuments(
       throw new Error(`Missing template context for path "${contextPath}"`);
     }
 
-    const pdf = await renderTemplateToPdf(published.body, templateContext);
+    const pdf = await renderTemplateToPdf(published.body, templateContext, {
+      useSharedDefaults: true,
+    });
     const templateVersionId = published.versionId;
 
     const contentHash = hashPdf(pdf);
