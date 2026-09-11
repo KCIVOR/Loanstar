@@ -14,10 +14,12 @@ import type {
 } from "@/lib/borrowers/business-info";
 import type {
   CmInspection,
+  CmVehicleEntry,
   CollateralChecklistItem,
   CollateralConditionItem,
   CollateralYesNoItem,
   RemInspection,
+  RemPropertyEntry,
 } from "@/lib/cig/collateral-inspection";
 import type {
   FieldVisit,
@@ -694,7 +696,7 @@ function goodItem(remarks?: string): CollateralConditionItem {
   };
 }
 
-const CM_CHECKLIST_KEYS: Array<keyof NonNullable<CmInspection["vehiclesChecklist"]>> = [
+const CM_CHECKLIST_KEYS: Array<keyof NonNullable<CmVehicleEntry["vehiclesChecklist"]>> = [
   "wipers",
   "battery",
   "coolant",
@@ -713,7 +715,7 @@ const CM_CHECKLIST_KEYS: Array<keyof NonNullable<CmInspection["vehiclesChecklist
   "doors",
 ];
 
-const CM_CONDITION_KEYS: Array<keyof NonNullable<CmInspection["vehiclesCondition"]>> = [
+const CM_CONDITION_KEYS: Array<keyof NonNullable<CmVehicleEntry["vehiclesCondition"]>> = [
   "engine",
   "bumper",
   "body",
@@ -730,25 +732,22 @@ const CM_CONDITION_KEYS: Array<keyof NonNullable<CmInspection["vehiclesCondition
 const VEHICLE_MAKES = ["Toyota Vios", "Honda Civic", "Mitsubishi Mirage", "Nissan Almera", "Suzuki Ertiga"];
 const INSURERS = ["Malayan Insurance", "Pioneer Insurance", "Standard Insurance", "AXA Philippines"];
 
-export function fakeCmInspection(opts?: {
-  accountName?: string;
-  address?: string;
-  verifierName?: string;
-}): CmInspection {
-  const owner = opts?.accountName ?? `${pick(FIRST_NAMES)} ${pick(LAST_NAMES)}`;
-  const address = opts?.address ?? `${num(1, 999)} ${pick(STREETS)}, ${pick(CITIES)}`;
+function fakeVehicleEntry(): CmVehicleEntry {
   const vehiclesChecklist = Object.fromEntries(
     CM_CHECKLIST_KEYS.map((key) => [key, workingItem()]),
-  ) as NonNullable<CmInspection["vehiclesChecklist"]>;
+  ) as NonNullable<CmVehicleEntry["vehiclesChecklist"]>;
   const vehiclesCondition = Object.fromEntries(
     CM_CONDITION_KEYS.map((key) => [key, goodItem()]),
-  ) as NonNullable<CmInspection["vehiclesCondition"]>;
+  ) as NonNullable<CmVehicleEntry["vehiclesCondition"]>;
+  const owner = `${pick(FIRST_NAMES)} ${pick(LAST_NAMES)}`;
+  const address = `${num(1, 999)} ${pick(STREETS)}, ${pick(CITIES)}`;
 
   return {
-    account: { accountName: owner, address },
     orCrDetails: {
+      makeYearModel: `${new Date().getFullYear() - num(0, 6)} ${pick(VEHICLE_MAKES)}`,
       mvFile: `${num(1000, 9999)}-${num(100000000, 999999999)}`,
       plateNumber: `${pick(["ABC", "NCA", "UAA", "NBA"])} ${num(1000, 9999)}`,
+      crNo: String(num(10000000, 99999999)),
       engineNo: `${pick(["4G15", "2NR", "L15B"])}${num(100000, 999999)}`,
       chasisNo: `MM${pick(["DA", "DA"])}${num(10000000, 99999999)}`,
     },
@@ -790,19 +789,36 @@ export function fakeCmInspection(opts?: {
       },
     },
     vehiclesCondition,
+  };
+}
+
+/** `vehicleCount` defaults to 1 — additive, existing call sites are unaffected. */
+export function fakeCmInspection(opts?: {
+  accountName?: string;
+  address?: string;
+  verifierName?: string;
+  vehicleCount?: number;
+}): CmInspection {
+  const owner = opts?.accountName ?? `${pick(FIRST_NAMES)} ${pick(LAST_NAMES)}`;
+  const address = opts?.address ?? `${num(1, 999)} ${pick(STREETS)}, ${pick(CITIES)}`;
+  const count = Math.max(1, opts?.vehicleCount ?? 1);
+
+  return {
+    account: { accountName: owner, address },
+    vehicles: Array.from({ length: count }, () => fakeVehicleEntry()),
     verifiedBy: opts?.verifierName || `${pick(FIRST_NAMES)} ${pick(LAST_NAMES)}`,
   };
 }
 
-export function fakeRemInspection(opts?: {
-  accountName?: string;
-  address?: string;
-  verifierName?: string;
-}): RemInspection {
-  const owner = opts?.accountName ?? `${pick(FIRST_NAMES)} ${pick(LAST_NAMES)}`;
-  const address = opts?.address ?? `${num(1, 999)} ${pick(STREETS)}, ${pick(CITIES)}`;
+function fakePropertyEntry(owner: string, address: string): RemPropertyEntry {
   return {
-    account: { accountName: owner, address },
+    legalDescription: {
+      location: address,
+      tctNo: `T-${num(100000, 999999)}`,
+      areaSqm: num(80, 500),
+      technicalDescription:
+        "A parcel of land situated in the above location, bounded by adjoining lots on all sides per the subdivision plan on file.",
+    },
     titleDetails: {
       registeredOwnerAtTitle: owner,
       yearRegister: String(new Date().getFullYear() - num(2, 20)),
@@ -830,6 +846,23 @@ export function fakeRemInspection(opts?: {
         { label: "Fence / gate", working: true, notWorking: false, remarks: "Perimeter secured." },
       ],
     },
+  };
+}
+
+/** `propertyCount` defaults to 1 — additive, existing call sites are unaffected. */
+export function fakeRemInspection(opts?: {
+  accountName?: string;
+  address?: string;
+  verifierName?: string;
+  propertyCount?: number;
+}): RemInspection {
+  const owner = opts?.accountName ?? `${pick(FIRST_NAMES)} ${pick(LAST_NAMES)}`;
+  const address = opts?.address ?? `${num(1, 999)} ${pick(STREETS)}, ${pick(CITIES)}`;
+  const count = Math.max(1, opts?.propertyCount ?? 1);
+
+  return {
+    account: { accountName: owner, address },
+    properties: Array.from({ length: count }, () => fakePropertyEntry(owner, address)),
     others: [
       "Property occupied by the registered owner.",
       "Access road is paved and passable year-round.",
