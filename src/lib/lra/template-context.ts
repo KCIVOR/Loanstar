@@ -2,6 +2,7 @@ import type { BusinessInfo } from "@/lib/borrowers/business-info";
 import type { BorrowerProfile } from "@/lib/borrowers/types";
 
 import type { BlriData } from "./blri-data";
+import type { CollateralDocumentContext } from "./collateral-context";
 import { formatMoney } from "@/lib/documents/format";
 import type { ReleasePath } from "./constants";
 
@@ -165,6 +166,13 @@ export function buildReleaseTemplateContext(
   borrower: BorrowerProfile,
   releasePath: ReleasePath,
   scope?: ReleaseTemplateScope,
+  /**
+   * The application's CI-inspected vehicles/properties (see
+   * collateral-context.ts), one row per collateral item. Omit to keep the
+   * previous behavior (empty `[]`) — every existing call site stays
+   * backward-compatible until it's updated to pass this.
+   */
+  collateral?: CollateralDocumentContext,
 ): Record<string, unknown> {
   const isCheck = releasePath === "with_pdc";
   const disbursementCode = isCheck ? "1100115" : "1100110";
@@ -389,10 +397,12 @@ export function buildReleaseTemplateContext(
     redemptionPeriod: "",
 
     // Collateral line-item detail (make / plate / engine / chassis / TCT / area
-    // / technical description) is not captured anywhere in the system yet — these
-    // repeats render header-only until a collateral-detail model exists.
-    vehicles: [] as unknown[],
-    properties: [] as unknown[],
+    // / technical description) — from the CI inspection's vehicles[]/
+    // properties[] (see collateral-context.ts), one document row per item.
+    // Empty when the caller doesn't pass `collateral` (e.g. a CI form was
+    // never filled in) — the repeats then render header-only, same as before.
+    vehicles: collateral?.vehicles ?? [],
+    properties: collateral?.properties ?? [],
 
     // Amount / date / count slots the Disclosure Statement form fills in.
     amountFinanced: formatMoney(blri.principal),

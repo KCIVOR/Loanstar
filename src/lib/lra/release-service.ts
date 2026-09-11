@@ -30,6 +30,7 @@ import { createServiceClient } from "@/lib/supabase/server";
 
 import { syncApplicationBlocker, mapReleaseFileRow } from "./blockers";
 import { loadBlriContext } from "./blri-data";
+import { loadCollateralDocumentContext } from "./collateral-context";
 import { unsignedGeneratedDocumentIds } from "./mark-all-signed";
 import {
   canRecordRelease,
@@ -684,6 +685,14 @@ async function loadReleaseGenerationContext(
   );
   const performerNames = await resolvePerformerNames(supabase, performerIds);
 
+  // The CI inspection's vehicles/properties (see collateral-context.ts) —
+  // one document table row per collateral item, replacing the previous
+  // hardcoded empty vehicles[]/properties[] on every chattel/REM document.
+  const collateral = await loadCollateralDocumentContext(
+    supabase,
+    file.loanApplicationId,
+  );
+
   const computationInput = {
     netReleased: computation.netReleased,
     releaseDate: computation.releaseDate,
@@ -712,6 +721,7 @@ async function loadReleaseGenerationContext(
         borrowerProfile,
         p,
         segmentScope,
+        collateral,
       ),
     ]),
   );

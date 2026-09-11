@@ -262,3 +262,49 @@ test("audit fix: checkVoucherNo derives from the loan account no.'s LA->CV prefi
   );
   assert.equal(noPrefix.checkVoucherNo, "");
 });
+
+test("collateral gap fix: vehicles/properties come from the CI inspection, not hardcoded empty", () => {
+  const withCollateral = buildReleaseTemplateContext(
+    BLRI,
+    COMPUTATION,
+    BORROWER,
+    "with_pdc",
+    undefined,
+    {
+      vehicles: [
+        {
+          makeYearModel: "2022 Toyota Vios",
+          plateNo: "ABC 1234",
+          engineNo: "ENG1",
+          chassisNo: "CHS1",
+          mvFileNo: "MV1",
+          crNo: "CR1",
+          registeredOwner: "Jonathan Del Poso",
+        },
+      ],
+      properties: [],
+    },
+  );
+  assert.deepEqual(withCollateral.vehicles, [
+    {
+      makeYearModel: "2022 Toyota Vios",
+      plateNo: "ABC 1234",
+      engineNo: "ENG1",
+      chassisNo: "CHS1",
+      mvFileNo: "MV1",
+      crNo: "CR1",
+      registeredOwner: "Jonathan Del Poso",
+    },
+  ]);
+
+  // No regression: every pre-existing call site (until threaded through)
+  // still gets empty arrays, same as before this fix.
+  const withoutCollateral = buildReleaseTemplateContext(
+    BLRI,
+    COMPUTATION,
+    BORROWER,
+    "with_pdc",
+  );
+  assert.deepEqual(withoutCollateral.vehicles, []);
+  assert.deepEqual(withoutCollateral.properties, []);
+});
