@@ -732,7 +732,9 @@ const CM_CONDITION_KEYS: Array<keyof NonNullable<CmVehicleEntry["vehiclesConditi
 const VEHICLE_MAKES = ["Toyota Vios", "Honda Civic", "Mitsubishi Mirage", "Nissan Almera", "Suzuki Ertiga"];
 const INSURERS = ["Malayan Insurance", "Pioneer Insurance", "Standard Insurance", "AXA Philippines"];
 
-function fakeVehicleEntry(): CmVehicleEntry {
+/** Exported so a "add one more fake vehicle" tool can append to an existing
+ * list, not just fakeCmInspection's own fixed-count generation. */
+export function fakeVehicleEntry(): CmVehicleEntry {
   const vehiclesChecklist = Object.fromEntries(
     CM_CHECKLIST_KEYS.map((key) => [key, workingItem()]),
   ) as NonNullable<CmVehicleEntry["vehiclesChecklist"]>;
@@ -810,7 +812,9 @@ export function fakeCmInspection(opts?: {
   };
 }
 
-function fakePropertyEntry(owner: string, address: string): RemPropertyEntry {
+/** Exported so a "add one more fake property" tool can append to an
+ * existing list, not just fakeRemInspection's own fixed-count generation. */
+export function fakePropertyEntry(owner: string, address: string): RemPropertyEntry {
   return {
     legalDescription: {
       location: address,

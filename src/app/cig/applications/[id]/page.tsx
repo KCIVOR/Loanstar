@@ -41,9 +41,11 @@ import {
   fakeBorrowerProfile,
   fakeCmInspection,
   fakeFieldVisit,
+  fakePropertyEntry,
   fakeRemark,
   fakeRemInspection,
   fakeSmeReloanVerification,
+  fakeVehicleEntry,
   fakeVerificationPatch,
 } from "@/lib/dev/fake-data";
 import { CSA_ONLY_INTAKE_SLUGS } from "@/lib/documents/csa-only-intake";
@@ -2328,15 +2330,36 @@ export default function CigApplicationPage() {
           ...(collateralType === "car_refinancing"
             ? [
                 {
-                  label: "Fill CM Inspection",
+                  // Fills with 3 vehicles (not 1) so the repeatable-vehicle
+                  // UI/save/document-generation path is exercised by default,
+                  // not just the single-vehicle case.
+                  label: "Fill CM Inspection (3 vehicles)",
                   onClick: () => {
                     setVerification((prev) => ({
                       ...(prev as VerificationData),
                       cmInspection: fakeCmInspection({
                         verifierName,
+                        vehicleCount: 3,
                         ...borrowerInspectionAccount(borrower),
                       }),
                     }));
+                    setShowCmInspectionForm(true);
+                  },
+                },
+                {
+                  label: "+ Add 1 fake vehicle",
+                  onClick: () => {
+                    setVerification((prev) => {
+                      const current = (prev as VerificationData)?.cmInspection;
+                      return {
+                        ...(prev as VerificationData),
+                        cmInspection: {
+                          account: current?.account ?? borrowerInspectionAccount(borrower),
+                          verifiedBy: current?.verifiedBy ?? verifierName,
+                          vehicles: [...(current?.vehicles ?? []), fakeVehicleEntry()],
+                        },
+                      };
+                    });
                     setShowCmInspectionForm(true);
                   },
                 },
@@ -2345,15 +2368,43 @@ export default function CigApplicationPage() {
           ...(collateralType === "real_estate"
             ? [
                 {
-                  label: "Fill REM Inspection",
+                  // Fills with 3 properties so the repeatable-property UI/
+                  // save/document-generation path is exercised by default.
+                  label: "Fill REM Inspection (3 properties)",
                   onClick: () => {
                     setVerification((prev) => ({
                       ...(prev as VerificationData),
                       remInspection: fakeRemInspection({
                         verifierName,
+                        propertyCount: 3,
                         ...borrowerInspectionAccount(borrower),
                       }),
                     }));
+                    setShowRemInspectionForm(true);
+                  },
+                },
+                {
+                  label: "+ Add 1 fake property",
+                  onClick: () => {
+                    setVerification((prev) => {
+                      const current = (prev as VerificationData)?.remInspection;
+                      const account = borrowerInspectionAccount(borrower);
+                      return {
+                        ...(prev as VerificationData),
+                        remInspection: {
+                          account: current?.account ?? account,
+                          others: current?.others ?? [],
+                          verifiedBy: current?.verifiedBy ?? verifierName,
+                          properties: [
+                            ...(current?.properties ?? []),
+                            fakePropertyEntry(
+                              current?.account?.accountName ?? account.accountName ?? "",
+                              current?.account?.address ?? account.address ?? "",
+                            ),
+                          ],
+                        },
+                      };
+                    });
                     setShowRemInspectionForm(true);
                   },
                 },
