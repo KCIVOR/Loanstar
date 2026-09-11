@@ -9,6 +9,8 @@ import {
 import {
   assessCmInspectionRequired,
   assessRemInspectionRequired,
+  normalizeCmInspection,
+  normalizeRemInspection,
   type CmInspection,
   type RemInspection,
 } from "./collateral-inspection";
@@ -268,8 +270,8 @@ export function mapVerificationRow(row: Record<string, unknown>): VerificationRe
     fieldVisit: (row.field_visit as FieldVisit) ?? null,
     smeReloanVerification:
       (row.sme_reloan_verification as SmeReloanVerification) ?? null,
-    cmInspection: (row.cm_inspection as CmInspection) ?? null,
-    remInspection: (row.rem_inspection as RemInspection) ?? null,
+    cmInspection: row.cm_inspection != null ? normalizeCmInspection(row.cm_inspection) : null,
+    remInspection: row.rem_inspection != null ? normalizeRemInspection(row.rem_inspection) : null,
     finding: (row.finding as VerificationRecord["finding"]) ?? null,
     findingNotes: (row.finding_notes as string) ?? null,
     isComplete: Boolean(row.is_complete),
