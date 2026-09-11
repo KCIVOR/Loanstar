@@ -7,6 +7,15 @@
  * REM are structurally different from each other and from the SME Field
  * Visit form (no risk-rating section, no shared shape), same design
  * principle already used for FieldVisit vs SmeReloanVerification.
+ *
+ * Repeatable-collateral redesign (2026-09-11, see
+ * docs/revision-plans/ci-collateral-repeatable-entries-plan.md): a loan can
+ * be secured by more than one vehicle or property, so the per-item fields
+ * live under `vehicles[]` / `properties[]` — `account` and `verifiedBy` stay
+ * application-level (one CI visit, one sign-off, however many collateral
+ * items). Older saved rows are the pre-redesign single-object shape;
+ * `normalizeCmInspection` / `normalizeRemInspection` upgrade either shape to
+ * the current one so no caller ever needs to branch on which it got.
  */
 
 export type CollateralChecklistItem = {
@@ -43,6 +52,12 @@ export type CmOrCrDetails = {
   engineNo?: string | null;
   /** Sheet's own spelling — "Chasis," not "Chassis." Kept verbatim. */
   chasisNo?: string | null;
+  /** Not in the client's original CI sheet — added so the vehicle can be
+   * identified in the chattel-mortgage documents ({{makeYearModel}}), which
+   * need it but had no source anywhere in the system before this. */
+  makeYearModel?: string | null;
+  /** Same reason as makeYearModel — the mortgage documents' {{crNo}} token. */
+  crNo?: string | null;
 };
 
 export type CmRegistration = {
@@ -123,8 +138,9 @@ export type CmVehiclesCondition = {
   differentialBox?: CollateralConditionItem | null;
 };
 
-export type CmInspection = {
-  account?: CmAccount | null;
+/** One inspected vehicle — everything the old single-object CmInspection held
+ * except `account` and `verifiedBy`, which are application-level. */
+export type CmVehicleEntry = {
   orCrDetails?: CmOrCrDetails | null;
   registration?: CmRegistration | null;
   insurance?: CmInsurance | null;
@@ -132,8 +148,72 @@ export type CmInspection = {
   vehiclesChecklist?: CmVehiclesChecklist | null;
   others?: CmOthers | null;
   vehiclesCondition?: CmVehiclesCondition | null;
+};
+
+export type CmInspection = {
+  account?: CmAccount | null;
+  vehicles?: CmVehicleEntry[] | null;
   verifiedBy?: string | null;
 };
+
+/** Pre-redesign shape: everything CmVehicleEntry now holds sat directly on
+ * the top-level object, one vehicle only. */
+type LegacyCmInspection = CmVehicleEntry & {
+  account?: CmAccount | null;
+  verifiedBy?: string | null;
+};
+
+const CM_VEHICLE_ENTRY_KEYS = [
+  "orCrDetails",
+  "registration",
+  "insurance",
+  "odometerDuringInspection",
+  "vehiclesChecklist",
+  "others",
+  "vehiclesCondition",
+] as const;
+
+/**
+ * Upgrades a saved `cm_inspection` JSONB value (either shape) to the current
+ * `vehicles[]` shape. The single place this happens — every reader should
+ * call this instead of trusting the raw column, so a legacy single-vehicle
+ * row's data is never silently dropped.
+ */
+export function normalizeCmInspection(raw: unknown): CmInspection {
+  if (!raw || typeof raw !== "object") {
+    return { account: {}, vehicles: [], verifiedBy: null };
+  }
+  const r = raw as Record<string, unknown>;
+
+  if (Array.isArray(r.vehicles)) {
+    return {
+      account: (r.account as CmAccount | null) ?? {},
+      vehicles: r.vehicles as CmVehicleEntry[],
+      verifiedBy: (r.verifiedBy as string | null) ?? null,
+    };
+  }
+
+  const legacy = r as LegacyCmInspection;
+  const hasLegacyVehicleFields = CM_VEHICLE_ENTRY_KEYS.some((key) => key in r);
+
+  return {
+    account: (legacy.account as CmAccount | null) ?? {},
+    verifiedBy: (legacy.verifiedBy as string | null) ?? null,
+    vehicles: hasLegacyVehicleFields
+      ? [
+          {
+            orCrDetails: legacy.orCrDetails ?? {},
+            registration: legacy.registration ?? {},
+            insurance: legacy.insurance ?? {},
+            odometerDuringInspection: legacy.odometerDuringInspection ?? null,
+            vehiclesChecklist: legacy.vehiclesChecklist ?? {},
+            others: legacy.others ?? {},
+            vehiclesCondition: legacy.vehiclesCondition ?? {},
+          },
+        ]
+      : [],
+  };
+}
 
 // ---------------------------------------------------------------------------
 // REM Inspection (Real Estate)
@@ -184,16 +264,85 @@ export type RemChecklist = {
   }> | null;
 };
 
-export type RemInspection = {
-  account?: RemAccount | null;
+/** Not in the client's original CI sheet — a legal-description block added
+ * so the real-estate mortgage documents' {{location}}/{{tctNo}}/{{areaSqm}}/
+ * {{technicalDescription}} tokens (which had no source anywhere before this)
+ * have real data to render. */
+export type RemLegalDescription = {
+  location?: string | null;
+  tctNo?: string | null;
+  areaSqm?: number | null;
+  technicalDescription?: string | null;
+};
+
+/** One inspected property — everything the old single-object RemInspection
+ * held except `account`, `others`, and `verifiedBy`, which stay
+ * application-level (the client's "Others" block is 5 general notes lines,
+ * not tied to one property). */
+export type RemPropertyEntry = {
   titleDetails?: RemTitleDetails | null;
   insurance?: RemInsurance | null;
   checklist?: RemChecklist | null;
-  /** 5 blank, unstructured lines — free text only, unlike CM's structured
-   * Others section. */
+  legalDescription?: RemLegalDescription | null;
+};
+
+export type RemInspection = {
+  account?: RemAccount | null;
+  properties?: RemPropertyEntry[] | null;
+  /** 5 blank, unstructured lines — free text only, shared across every
+   * property on this CI visit (not per-property). */
   others?: string[] | null;
   verifiedBy?: string | null;
 };
+
+type LegacyRemInspection = RemPropertyEntry & {
+  account?: RemAccount | null;
+  others?: string[] | null;
+  verifiedBy?: string | null;
+};
+
+const REM_PROPERTY_ENTRY_KEYS = [
+  "titleDetails",
+  "insurance",
+  "checklist",
+  "legalDescription",
+] as const;
+
+/** Same upgrade as `normalizeCmInspection`, for REM. */
+export function normalizeRemInspection(raw: unknown): RemInspection {
+  if (!raw || typeof raw !== "object") {
+    return { account: {}, properties: [], others: [], verifiedBy: null };
+  }
+  const r = raw as Record<string, unknown>;
+
+  if (Array.isArray(r.properties)) {
+    return {
+      account: (r.account as RemAccount | null) ?? {},
+      properties: r.properties as RemPropertyEntry[],
+      others: (r.others as string[] | null) ?? [],
+      verifiedBy: (r.verifiedBy as string | null) ?? null,
+    };
+  }
+
+  const legacy = r as LegacyRemInspection;
+  const hasLegacyPropertyFields = REM_PROPERTY_ENTRY_KEYS.some((key) => key in r);
+
+  return {
+    account: (legacy.account as RemAccount | null) ?? {},
+    others: (legacy.others as string[] | null) ?? [],
+    verifiedBy: (legacy.verifiedBy as string | null) ?? null,
+    properties: hasLegacyPropertyFields
+      ? [
+          {
+            titleDetails: legacy.titleDetails ?? {},
+            insurance: legacy.insurance ?? {},
+            checklist: legacy.checklist ?? {},
+            legalDescription: legacy.legalDescription ?? {},
+          },
+        ]
+      : [],
+  };
+}
 
 // ---------------------------------------------------------------------------
 // Completeness
@@ -212,7 +361,10 @@ function filled(value: string | null | undefined): boolean {
  * Required subset to consider CM Inspection done. Neither sheet has a
  * risk-rating/recommendation section (confirmed in the extraction) — this is
  * a pure inspection checklist with a sign-off, so the minimum is: who/what
- * was inspected, and who verified it.
+ * was inspected, and who verified it. At least one vehicle must carry a
+ * plate number — the form always allows zero-or-more vehicles, so "no
+ * vehicles yet" and "vehicle without a plate number" both fail this the same
+ * way "no plate number" did before the array redesign.
  */
 export function assessCmInspectionRequired(
   cm: CmInspection | null | undefined,
@@ -221,7 +373,7 @@ export function assessCmInspectionRequired(
   if (!filled(cm?.account?.accountName)) {
     missing.push("CM Inspection: account name");
   }
-  if (!filled(cm?.orCrDetails?.plateNumber)) {
+  if (!(cm?.vehicles ?? []).some((v) => filled(v.orCrDetails?.plateNumber))) {
     missing.push("CM Inspection: plate number");
   }
   if (!filled(cm?.verifiedBy)) {
@@ -230,8 +382,8 @@ export function assessCmInspectionRequired(
   return { complete: missing.length === 0, missing };
 }
 
-/** Same minimal standard as CM: identify the borrower, identify the asset
- * (here, the title's registered owner), and who verified it. */
+/** Same minimal standard as CM: identify the borrower, identify at least one
+ * asset (here, a title's registered owner), and who verified it. */
 export function assessRemInspectionRequired(
   rem: RemInspection | null | undefined,
 ): CollateralInspectionCompleteness {
@@ -239,7 +391,11 @@ export function assessRemInspectionRequired(
   if (!filled(rem?.account?.accountName)) {
     missing.push("REM Inspection: account name");
   }
-  if (!filled(rem?.titleDetails?.registeredOwnerAtTitle)) {
+  if (
+    !(rem?.properties ?? []).some((p) =>
+      filled(p.titleDetails?.registeredOwnerAtTitle),
+    )
+  ) {
     missing.push("REM Inspection: registered owner at the title");
   }
   if (!filled(rem?.verifiedBy)) {
