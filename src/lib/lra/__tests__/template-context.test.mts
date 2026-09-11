@@ -190,3 +190,121 @@ test("v2 LSLGC merge keys are present and segment-aware", () => {
   assert.equal(sme.borrowerRepresentativeTitle, "President");
   assert.equal(sme.borrowerTin, "123-456-789-000");
 });
+
+test("servicing-document keys: loan-derived slots filled, uncaptured stay empty", () => {
+  const seafarer = buildReleaseTemplateContext(BLRI, COMPUTATION, BORROWER, "with_pdc");
+  const sme = buildReleaseTemplateContext(
+    BLRI,
+    COMPUTATION,
+    { ...BORROWER, businessInfo: { companyName: "Acme Trading Corp." } } as unknown as BorrowerProfile,
+    "with_pdc",
+    { segment: "sme" },
+  );
+
+  // isCorpOrDti drives the cancellation-deed phrasing: SME = corporate, else not.
+  assert.equal(seafarer.isCorpOrDti, false);
+  assert.equal(sme.isCorpOrDti, true);
+
+  // derived from the loan / BLRI
+  assert.equal(seafarer.totalObligation, "121,997.41");
+  assert.equal(
+    seafarer.totalObligationInWords,
+    "One Hundred Twenty One Thousand Nine Hundred Ninety Seven Pesos & Forty One Cents",
+  );
+  assert.equal(seafarer.amortStartDate, "08/10/26");
+  assert.equal(seafarer.chattelReleaseDate, "2026-06-11");
+  assert.equal(seafarer.additionalLoanTermMonths, "7");
+  assert.equal(seafarer.additionalLoanAmount, "102,605.05");
+  assert.equal(seafarer.priorMortgageAmount, "121,997.41");
+  assert.equal(seafarer.priorMortgageExecutedOn, "2026-06-11");
+
+  // events that have not happened at release time — blank / empty for the notary
+  assert.equal(seafarer.priorMortgageRegistryOfDeeds, "");
+  assert.equal(seafarer.surrenderDebtAmount, "");
+  assert.equal(seafarer.redemptionPeriod, "");
+  assert.equal(seafarer.checkReplacementDate, "");
+  assert.equal(seafarer.allLoansTotal, "");
+  assert.deepEqual(seafarer.vehicles, []);
+  assert.deepEqual(seafarer.properties, []);
+  assert.deepEqual(seafarer.priorLoans, []);
+  assert.deepEqual(seafarer.replacementChecks, []);
+});
+
+test("audit fix: preparedBy/approvedBy resolve from the caller-supplied names; checkedBy stays blank", () => {
+  const withNames = buildReleaseTemplateContext(
+    BLRI,
+    { ...COMPUTATION, preparedByName: "Juan LMA", approvedByName: "Kristoffer KCC" },
+    BORROWER,
+    "with_pdc",
+  );
+  assert.equal(withNames.preparedBy, "Juan LMA");
+  assert.equal(withNames.approvedBy, "Kristoffer KCC");
+  assert.equal(withNames.checkedBy, "");
+
+  // No regression: omitting the names (every pre-existing call site, until
+  // threaded) still resolves to blank rather than "undefined" or throwing.
+  const withoutNames = buildReleaseTemplateContext(BLRI, COMPUTATION, BORROWER, "with_pdc");
+  assert.equal(withoutNames.preparedBy, "");
+  assert.equal(withoutNames.approvedBy, "");
+});
+
+test("audit fix: checkVoucherNo derives from the loan account no.'s LA->CV prefix swap; checkNumber/checkDate stay blank (no source)", () => {
+  const ctx = buildReleaseTemplateContext(BLRI, COMPUTATION, BORROWER, "with_pdc");
+  assert.equal(ctx.checkVoucherNo, "CV303342");
+  assert.equal(ctx.checkNumber, "");
+  assert.equal(ctx.checkDate, "");
+
+  const noPrefix = buildReleaseTemplateContext(
+    { ...BLRI, loanAccountNo: "900356" },
+    COMPUTATION,
+    BORROWER,
+    "with_pdc",
+  );
+  assert.equal(noPrefix.checkVoucherNo, "");
+});
+
+test("collateral gap fix: vehicles/properties come from the CI inspection, not hardcoded empty", () => {
+  const withCollateral = buildReleaseTemplateContext(
+    BLRI,
+    COMPUTATION,
+    BORROWER,
+    "with_pdc",
+    undefined,
+    {
+      vehicles: [
+        {
+          makeYearModel: "2022 Toyota Vios",
+          plateNo: "ABC 1234",
+          engineNo: "ENG1",
+          chassisNo: "CHS1",
+          mvFileNo: "MV1",
+          crNo: "CR1",
+          registeredOwner: "Jonathan Del Poso",
+        },
+      ],
+      properties: [],
+    },
+  );
+  assert.deepEqual(withCollateral.vehicles, [
+    {
+      makeYearModel: "2022 Toyota Vios",
+      plateNo: "ABC 1234",
+      engineNo: "ENG1",
+      chassisNo: "CHS1",
+      mvFileNo: "MV1",
+      crNo: "CR1",
+      registeredOwner: "Jonathan Del Poso",
+    },
+  ]);
+
+  // No regression: every pre-existing call site (until threaded through)
+  // still gets empty arrays, same as before this fix.
+  const withoutCollateral = buildReleaseTemplateContext(
+    BLRI,
+    COMPUTATION,
+    BORROWER,
+    "with_pdc",
+  );
+  assert.deepEqual(withoutCollateral.vehicles, []);
+  assert.deepEqual(withoutCollateral.properties, []);
+});

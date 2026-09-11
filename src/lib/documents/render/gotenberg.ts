@@ -1,9 +1,6 @@
 import { makeDeterministic } from "./deterministic";
 import { PRINT_CSS } from "./print-styles";
 
-/** Bare filename Gotenberg resolves the `@font-face` src against. */
-const FONT_FILENAME = "fonts/doc.woff2";
-
 export class RenderEngineError extends Error {
   readonly detail?: string;
   constructor(message: string, detail?: string) {
@@ -20,24 +17,33 @@ export type GotenbergAsset = {
   contentType: string;
 };
 
+/** Overrides the historical `GOTENBERG_*` env vars (see `engine-config.ts`). */
+export type GotenbergConnection = { url?: string; user?: string; pass?: string };
+
 export type GotenbergOptions = {
   headerHtml?: string;
   footerHtml?: string;
   /** Images referenced by bare `<img src="…">` in the merged HTML. */
   assets?: GotenbergAsset[];
-  /** Document font, attached per-request so determinism is image-independent. */
-  fontWoff2?: Uint8Array;
+  /**
+   * Font files attached per-request (so output is image-independent), each
+   * `{ filename, bytes }` where `filename` matches the `@font-face` src, e.g.
+   * `fonts/doc.woff2`.
+   */
+  fonts?: Array<{ filename: string; bytes: Uint8Array }>;
+  /** Service URL + basic-auth creds; falls back to env when a field is absent. */
+  connection?: GotenbergConnection;
 };
 
-function baseUrl(): string {
-  const u = process.env.GOTENBERG_URL;
+function baseUrl(conn?: GotenbergConnection): string {
+  const u = (conn?.url ?? process.env.GOTENBERG_URL ?? "").trim();
   if (!u) throw new RenderEngineError("GOTENBERG_URL is not configured");
   return u.replace(/\/+$/, "");
 }
 
-function authHeaders(): Record<string, string> {
-  const user = process.env.GOTENBERG_BASIC_AUTH_USER;
-  const pass = process.env.GOTENBERG_BASIC_AUTH_PASS;
+function authHeaders(conn?: GotenbergConnection): Record<string, string> {
+  const user = conn?.user ?? process.env.GOTENBERG_BASIC_AUTH_USER;
+  const pass = conn?.pass ?? process.env.GOTENBERG_BASIC_AUTH_PASS;
   if (!user || !pass) return {};
   return {
     authorization: `Basic ${Buffer.from(`${user}:${pass}`).toString("base64")}`,
@@ -77,11 +83,11 @@ export async function htmlToPdfViaGotenberg(
     new Blob([wrapHtml(mergedHtml)], { type: "text/html" }),
     "index.html",
   );
-  if (opts.fontWoff2) {
+  for (const f of opts.fonts ?? []) {
     form.append(
       "files",
-      new Blob([blobPart(opts.fontWoff2)], { type: "font/woff2" }),
-      FONT_FILENAME,
+      new Blob([blobPart(f.bytes)], { type: "font/woff2" }),
+      f.filename,
     );
   }
   if (opts.headerHtml) {
@@ -110,8 +116,8 @@ export async function htmlToPdfViaGotenberg(
   form.append("generateDocumentOutline", "false");
 
   const res = await fetchWithRetry(
-    `${baseUrl()}/forms/chromium/convert/html`,
-    { method: "POST", headers: authHeaders(), body: form },
+    `${baseUrl(opts.connection)}/forms/chromium/convert/html`,
+    { method: "POST", headers: authHeaders(opts.connection), body: form },
   );
 
   if (!res.ok) {

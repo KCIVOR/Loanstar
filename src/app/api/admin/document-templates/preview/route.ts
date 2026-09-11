@@ -3,6 +3,7 @@ import { z } from "zod";
 
 import { handleApiError } from "@/lib/api/handler";
 import { renderTemplateToPdf } from "@/lib/documents/render";
+import { loadDocRenderConfig } from "@/lib/documents/render/engine-config";
 import { buildSampleContext } from "@/lib/documents/templates/fields";
 import { requireModulePermission } from "@/lib/permissions/server";
 
@@ -23,7 +24,11 @@ export async function POST(request: Request) {
     await requireModulePermission("system_config", "view");
     const { body } = previewSchema.parse(await request.json());
 
-    const pdf = await renderTemplateToPdf(body, buildSampleContext());
+    const cfg = await loadDocRenderConfig();
+    const pdf = await renderTemplateToPdf(body, buildSampleContext(), {
+      engine: cfg.engine,
+      connection: cfg.connection,
+    });
 
     return new NextResponse(new Uint8Array(pdf), {
       status: 200,

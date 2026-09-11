@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { getActiveComputation } from "@/lib/csa/computation";
+import { buildDeductionBreakdownRows } from "@/lib/computation/deduction-breakdown";
 import { addCalendarMonths, computeFirstPaymentDate } from "@/lib/computation/release-date";
 import { halfUp } from "@/lib/computation/money";
 import type { BorrowerRow } from "@/lib/borrowers/types";
@@ -96,6 +97,36 @@ export function buildBlriData(input: {
       accountCode: ACCOUNT_CODES.securityFee,
     },
   ];
+
+  // Audit fix (Calculator SME.xlsm is the source of truth — its BLRI/CV/
+  // CashVoucher tabs always itemise Notary Fee + Chattel Mortgage Fee +
+  // per-entry "Other Deductions" alongside the 4 fees above). These are real,
+  // already-computed `computations` columns that never reached the printed
+  // particulars table before this fix — only displayed when non-zero, same
+  // convention `buildDeductionBreakdownRows` already uses in production.
+  const notaryFeeAmount = lineByKey.notary_fee ?? input.computation.notaryFee ?? 0;
+  if (notaryFeeAmount > 0) {
+    particulars.push({
+      label: "Notary Fee",
+      amount: notaryFeeAmount,
+      accountCode: ACCOUNT_CODES.documentation,
+    });
+  }
+
+  // No GL account code has been assigned anywhere in the codebase for Chattel
+  // Mortgage Fee or the Other-Deductions line types (Other Loan / Offset /
+  // Advance Payment / Previous Loan Balance / Account Opening) — left blank
+  // rather than invented. Accounting should supply the real codes.
+  if (input.computation.chattelFee) {
+    particulars.push({
+      label: "Chattel Mortgage Fee",
+      amount: input.computation.chattelFee,
+      accountCode: "",
+    });
+  }
+  for (const row of buildDeductionBreakdownRows(input.computation.otherDeductions)) {
+    particulars.push({ label: row.label, amount: row.amount, accountCode: "" });
+  }
 
   let pdcSchedule: BlriPdcRow[];
 

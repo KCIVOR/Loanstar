@@ -124,6 +124,26 @@ const Div = Node.create({
   },
 });
 
+// <img> — keep `class` (e.g. the letterhead `doc-logo`) and `width` through a
+// round-trip; base64 allowed so a merged/previewed data-URI logo also survives.
+const DocImage = Image.extend({
+  addAttributes() {
+    return {
+      ...this.parent?.(),
+      class: {
+        default: null,
+        parseHTML: (el) => el.getAttribute("class"),
+        renderHTML: (a) => (a.class ? { class: a.class } : {}),
+      },
+      width: {
+        default: null,
+        parseHTML: (el) => el.getAttribute("width"),
+        renderHTML: (a) => (a.width ? { width: a.width } : {}),
+      },
+    };
+  },
+}).configure({ inline: false, allowBase64: true });
+
 const RepeatBlock = Node.create({
   name: "repeatBlock",
   group: "block",
@@ -264,7 +284,7 @@ export function templateExtensions() {
     RepeatTableRow,
     InlineTableHeader,
     InlineTableCell,
-    Image.configure({ inline: false, allowBase64: false }),
+    DocImage,
     Div,
     RepeatBlock,
     ConditionalBlock,

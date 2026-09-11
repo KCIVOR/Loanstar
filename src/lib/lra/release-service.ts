@@ -2,6 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { ValidationError } from "@/lib/api/errors";
 import { writeAuditEvent } from "@/lib/audit/writer";
+import { resolvePerformerNames } from "@/lib/ar/history";
 import { initializeArAccount, invoiceScheduleToInstallments } from "@/lib/ar/masterlist";
 import {
   generateBiMonthlySchedule,
@@ -19,12 +20,17 @@ import { DOCUMENT_BUCKET } from "@/lib/constants";
 import { getActiveComputation } from "@/lib/csa/computation";
 import { ensureDocumentSlots } from "@/lib/documents/checklist";
 import { hashPdf, renderTemplateToPdf } from "@/lib/documents/render";
+import {
+  loadDocRenderConfig,
+  type ResolvedDocRenderConfig,
+} from "@/lib/documents/render/engine-config";
 import { uploadDocumentBytes } from "@/lib/documents/storage";
 import { getPublishedTemplate } from "@/lib/documents/templates/service";
 import { createServiceClient } from "@/lib/supabase/server";
 
 import { syncApplicationBlocker, mapReleaseFileRow } from "./blockers";
 import { loadBlriContext } from "./blri-data";
+import { loadCollateralDocumentContext } from "./collateral-context";
 import { unsignedGeneratedDocumentIds } from "./mark-all-signed";
 import {
   canRecordRelease,
@@ -671,6 +677,22 @@ async function loadReleaseGenerationContext(
   const borrowerProfile = mapBorrowerRow(
     (Array.isArray(borrowerRaw) ? borrowerRaw[0] : borrowerRaw) as BorrowerRow,
   );
+  // Audit fix: resolve the real "who computed / who signed" actors on this
+  // computation to display names, once, for every path's context — reuses
+  // the same profiles lookup the AR module already uses for its history log.
+  const performerIds = [computation.computedBy, computation.signedBy].filter(
+    (id): id is string => Boolean(id),
+  );
+  const performerNames = await resolvePerformerNames(supabase, performerIds);
+
+  // The CI inspection's vehicles/properties (see collateral-context.ts) —
+  // one document table row per collateral item, replacing the previous
+  // hardcoded empty vehicles[]/properties[] on every chattel/REM document.
+  const collateral = await loadCollateralDocumentContext(
+    supabase,
+    file.loanApplicationId,
+  );
+
   const computationInput = {
     netReleased: computation.netReleased,
     releaseDate: computation.releaseDate,
@@ -682,6 +704,12 @@ async function loadReleaseGenerationContext(
     docStamp: computation.docStamp,
     adminCost: computation.adminCost,
     notaryFee: computation.notaryFee,
+    preparedByName: computation.computedBy
+      ? (performerNames.get(computation.computedBy) ?? "")
+      : "",
+    approvedByName: computation.signedBy
+      ? (performerNames.get(computation.signedBy) ?? "")
+      : "",
   };
   const segmentScope = { segment };
   const contextByPath = new Map(
@@ -693,6 +721,7 @@ async function loadReleaseGenerationContext(
         borrowerProfile,
         p,
         segmentScope,
+        collateral,
       ),
     ]),
   );
@@ -721,6 +750,7 @@ async function generateOneReleaseDocument(
   contextByPath: Map<ReleasePath, ReturnType<typeof buildReleaseTemplateContext>>,
   releasePaths: ReleasePath[],
   borrowerId: string,
+  renderConfig: ResolvedDocRenderConfig,
 ): Promise<{ slug: string; contentHash: string; regenerated: boolean }> {
   // All release documents render from published templates (the legacy hardcoded
   // renderer was retired in Phase 7). A missing published template is a hard
@@ -751,7 +781,10 @@ async function generateOneReleaseDocument(
     .eq("document_slug", slug)
     .maybeSingle();
 
-  const pdf = await renderTemplateToPdf(published.body, templateContext);
+  const pdf = await renderTemplateToPdf(published.body, templateContext, {
+    engine: renderConfig.engine,
+    connection: renderConfig.connection,
+  });
   const templateVersionId = published.versionId;
 
   const contentHash = hashPdf(pdf);
@@ -831,6 +864,7 @@ export async function generateReleaseDocuments(
   actorId: string,
 ) {
   const ctx = await loadReleaseGenerationContext(supabase, releaseFileId);
+  const renderConfig = await loadDocRenderConfig();
 
   const slugs = autoGenerateSlugs(
     segmentGroup(ctx.segment),
@@ -847,6 +881,7 @@ export async function generateReleaseDocuments(
       ctx.contextByPath,
       ctx.releasePaths,
       ctx.borrowerId,
+      renderConfig,
     );
   }
 
@@ -896,6 +931,7 @@ export async function generateReleaseDocumentBySlug(
     ctx.contextByPath,
     ctx.releasePaths,
     ctx.borrowerId,
+    await loadDocRenderConfig(),
   );
 
   const wasReadyGenerate = ctx.file.status === "ready_generate";

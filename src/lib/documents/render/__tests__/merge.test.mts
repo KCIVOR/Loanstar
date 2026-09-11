@@ -23,6 +23,16 @@ test("unknown tokens resolve to empty string, never leak", () => {
   assert.equal(out, "<p>[]</p>");
 });
 
+test("resolves a token inside an attribute — the {{logoDataUri}} letterhead image", () => {
+  const uri = "data:image/png;base64,AAAABBBB==";
+  const out = mergeTemplate(
+    '<div data-align="center"><img class="doc-logo" src="{{logoDataUri}}" alt="x"></div>',
+    { logoDataUri: uri },
+  );
+  assert.ok(out.includes(`src="${uri}"`), out);
+  assert.ok(out.includes('class="doc-logo"'), out);
+});
+
 test("data-repeat clones a row per array item with item scope", () => {
   const out = mergeTemplate(
     "<table><tbody><tr data-repeat=\"rows\"><td>{{checkNumber}}</td><td>{{amount}}</td></tr></tbody></table>",

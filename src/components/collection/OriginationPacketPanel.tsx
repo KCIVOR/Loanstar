@@ -23,6 +23,8 @@ import {
 import {
   assessCmInspectionRequired,
   assessRemInspectionRequired,
+  normalizeCmInspection,
+  normalizeRemInspection,
   type CmInspection,
   type RemInspection,
 } from "@/lib/cig/collateral-inspection";
@@ -124,12 +126,12 @@ function asSmeReloanVerification(value: unknown): SmeReloanVerification | null {
 
 function asCmInspection(value: unknown): CmInspection | null {
   if (!value || typeof value !== "object") return null;
-  return value as CmInspection;
+  return normalizeCmInspection(value);
 }
 
 function asRemInspection(value: unknown): RemInspection | null {
   if (!value || typeof value !== "object") return null;
-  return value as RemInspection;
+  return normalizeRemInspection(value);
 }
 
 function smeUsesReloanForm(verification: OriginationPacket["verification"]): boolean {
@@ -680,21 +682,27 @@ function CiReportCard({
             </Badge>
           </div>
           {asCmInspection(verification.cmInspection) ? (
-            <div className="mt-2 grid gap-x-4 gap-y-1 text-sm text-ink-700 sm:grid-cols-2">
-              <p>
+            <div className="mt-2 space-y-2">
+              <p className="text-sm text-ink-700">
                 <span className="text-ink-400">Account:</span>{" "}
                 {displayText(
                   asCmInspection(verification.cmInspection)?.account?.accountName,
                 )}
               </p>
-              <p>
-                <span className="text-ink-400">Plate number:</span>{" "}
-                {displayText(
-                  asCmInspection(verification.cmInspection)?.orCrDetails
-                    ?.plateNumber,
-                )}
-              </p>
-              <p>
+              {(asCmInspection(verification.cmInspection)?.vehicles ?? []).length ===
+              0 ? (
+                <p className="text-sm text-ink-400">No vehicles recorded.</p>
+              ) : (
+                (asCmInspection(verification.cmInspection)?.vehicles ?? []).map(
+                  (v, i) => (
+                    <p key={i} className="text-sm text-ink-700">
+                      <span className="text-ink-400">Vehicle {i + 1} plate:</span>{" "}
+                      {displayText(v.orCrDetails?.plateNumber)}
+                    </p>
+                  ),
+                )
+              )}
+              <p className="text-sm text-ink-700">
                 <span className="text-ink-400">Verified by:</span>{" "}
                 {displayText(asCmInspection(verification.cmInspection)?.verifiedBy)}
               </p>
@@ -728,21 +736,29 @@ function CiReportCard({
             </Badge>
           </div>
           {asRemInspection(verification.remInspection) ? (
-            <div className="mt-2 grid gap-x-4 gap-y-1 text-sm text-ink-700 sm:grid-cols-2">
-              <p>
+            <div className="mt-2 space-y-2">
+              <p className="text-sm text-ink-700">
                 <span className="text-ink-400">Account:</span>{" "}
                 {displayText(
                   asRemInspection(verification.remInspection)?.account?.accountName,
                 )}
               </p>
-              <p>
-                <span className="text-ink-400">Registered owner at title:</span>{" "}
-                {displayText(
-                  asRemInspection(verification.remInspection)?.titleDetails
-                    ?.registeredOwnerAtTitle,
-                )}
-              </p>
-              <p>
+              {(asRemInspection(verification.remInspection)?.properties ?? [])
+                .length === 0 ? (
+                <p className="text-sm text-ink-400">No properties recorded.</p>
+              ) : (
+                (asRemInspection(verification.remInspection)?.properties ?? []).map(
+                  (p, i) => (
+                    <p key={i} className="text-sm text-ink-700">
+                      <span className="text-ink-400">
+                        Property {i + 1} registered owner:
+                      </span>{" "}
+                      {displayText(p.titleDetails?.registeredOwnerAtTitle)}
+                    </p>
+                  ),
+                )
+              )}
+              <p className="text-sm text-ink-700">
                 <span className="text-ink-400">Verified by:</span>{" "}
                 {displayText(
                   asRemInspection(verification.remInspection)?.verifiedBy,

@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
+import { resolvePerformerNames } from "@/lib/ar/history";
 import { mapBorrowerRow, type BorrowerRow } from "@/lib/borrowers/types";
 import { mapComputationRow } from "@/lib/csa/computation";
 import { buildDeductionBreakdownRows } from "@/lib/computation/deduction-breakdown";
@@ -137,6 +138,15 @@ export async function generateFinalComputationSheet(
     (Array.isArray(borrowerRaw) ? borrowerRaw[0] : borrowerRaw) as BorrowerRow,
   );
 
+  // Audit fix: preparedBy/checkedBy/approvedBy were referenced by the template
+  // but always sent blank. "Prepared by" / "Approved by" resolve from the
+  // active (currently-certified) computation's real computed_by/signed_by
+  // actors; no third "checked by" actor is tracked anywhere yet.
+  const performerIds = [active.computedBy, active.signedBy].filter(
+    (id): id is string => Boolean(id),
+  );
+  const performerNames = await resolvePerformerNames(supabase, performerIds);
+
   const context = {
     companyName: COMPANY_NAME,
     borrowerName: [borrower.firstName, borrower.lastName].filter(Boolean).join(" "),
@@ -145,9 +155,9 @@ export async function generateFinalComputationSheet(
     loanAccountNo: (app.application_no as string) ?? "",
     loanType: active.loanTypeName ?? "",
     todayDate: formatDate(new Date()),
-    preparedBy: "",
+    preparedBy: active.computedBy ? (performerNames.get(active.computedBy) ?? "") : "",
     checkedBy: "",
-    approvedBy: "",
+    approvedBy: active.signedBy ? (performerNames.get(active.signedBy) ?? "") : "",
     computationRows: [
       ...buildFinalComputationRows(
         toFigures(original),

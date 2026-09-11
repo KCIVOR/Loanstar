@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { hashPdf, renderTemplateToPdf, type RenderContext } from "@/lib/documents/render";
+import { loadDocRenderConfig } from "@/lib/documents/render/engine-config";
 import { createSignedDownloadUrl, uploadDocumentBytes } from "@/lib/documents/storage";
 import { getPublishedTemplate } from "@/lib/documents/templates/service";
 
@@ -74,7 +75,11 @@ export async function renderAndStore(
     throw new Error(`No published template for document slug "${slug}"`);
   }
 
-  const pdf = await renderTemplateToPdf(published.body, context);
+  const renderCfg = await loadDocRenderConfig();
+  const pdf = await renderTemplateToPdf(published.body, context, {
+    engine: renderCfg.engine,
+    connection: renderCfg.connection,
+  });
   const contentHash = hashPdf(pdf);
   const docId = crypto.randomUUID();
   const storagePath = `${borrowerId}/rendered/${applicationId}/${slug}-${docId}.pdf`;
