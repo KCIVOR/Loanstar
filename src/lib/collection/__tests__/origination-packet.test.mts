@@ -226,9 +226,11 @@ describe("mapPacketVerificationRow", () => {
     assert.equal(mapped?.forwardedAt, "2026-01-01T00:00:00Z");
   });
 
-  it("maps CM and REM inspection JSON so Collector/Remedial can show the forms CIG filled", () => {
+  it("maps CM and REM inspection JSON so Collector/Remedial can show the forms CIG filled (repeatable vehicles/properties, normalized from legacy rows)", () => {
     const mapped = mapPacketVerificationRow({
       ...verificationRow,
+      // legacy (pre-redesign) single-vehicle/property shape — proves
+      // normalizeCmInspection/normalizeRemInspection upgrade it on read.
       cm_inspection: {
         account: { accountName: "Juan Dela Cruz" },
         orCrDetails: { plateNumber: "ABC 1234" },
@@ -241,9 +243,17 @@ describe("mapPacketVerificationRow", () => {
       },
     } as PacketVerificationRow);
 
-    assert.equal(mapped?.cmInspection?.account?.accountName, "Juan Dela Cruz");
-    assert.equal(mapped?.cmInspection?.orCrDetails?.plateNumber, "ABC 1234");
-    assert.equal(mapped?.remInspection?.account?.accountName, "Maria Santos");
+    const cm = mapped?.cmInspection as {
+      account?: { accountName?: string };
+      vehicles?: Array<{ orCrDetails?: { plateNumber?: string } }>;
+    };
+    const rem = mapped?.remInspection as {
+      account?: { accountName?: string };
+    };
+    assert.equal(cm?.account?.accountName, "Juan Dela Cruz");
+    assert.equal(cm?.vehicles?.length, 1);
+    assert.equal(cm?.vehicles?.[0]?.orCrDetails?.plateNumber, "ABC 1234");
+    assert.equal(rem?.account?.accountName, "Maria Santos");
   });
 
   it("emits exactly the evidence fields Committee returns — no votes or completeness", () => {

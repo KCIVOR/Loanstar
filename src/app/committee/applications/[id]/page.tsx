@@ -1607,38 +1607,52 @@ export default function CommitteeApplicationPage() {
                 </Badge>
               </div>
               {data.verification.cmInspection ? (
-                <div className="mt-2 grid gap-x-4 gap-y-1 text-sm text-ink-700 sm:grid-cols-2">
-                  <p>
+                <div className="mt-2 space-y-3">
+                  <p className="text-sm text-ink-700">
                     <span className="text-ink-400">Account:</span>{" "}
                     {displayText(data.verification.cmInspection.account?.accountName)}
                   </p>
-                  <p>
-                    <span className="text-ink-400">Plate number:</span>{" "}
-                    {displayText(
-                      data.verification.cmInspection.orCrDetails?.plateNumber,
-                    )}
-                  </p>
-                  <p>
-                    <span className="text-ink-400">Engine no:</span>{" "}
-                    {displayText(data.verification.cmInspection.orCrDetails?.engineNo)}
-                  </p>
-                  <p>
-                    <span className="text-ink-400">Chassis no:</span>{" "}
-                    {displayText(data.verification.cmInspection.orCrDetails?.chasisNo)}
-                  </p>
-                  <p>
-                    <span className="text-ink-400">Registered owner:</span>{" "}
-                    {displayText(
-                      data.verification.cmInspection.registration?.registeredOwner,
-                    )}
-                  </p>
-                  <p>
-                    <span className="text-ink-400">Encumbered to:</span>{" "}
-                    {displayText(
-                      data.verification.cmInspection.registration?.encumberedTo,
-                    )}
-                  </p>
-                  <p>
+                  {(data.verification.cmInspection.vehicles ?? []).length === 0 ? (
+                    <p className="text-sm text-ink-400">No vehicles recorded.</p>
+                  ) : (
+                    (data.verification.cmInspection.vehicles ?? []).map((v, i) => (
+                      <div
+                        key={i}
+                        className="rounded-[var(--r-md)] border border-line-soft p-3"
+                      >
+                        <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-ink-400">
+                          Vehicle {i + 1}
+                        </p>
+                        <div className="grid gap-x-4 gap-y-1 text-sm text-ink-700 sm:grid-cols-2">
+                          <p>
+                            <span className="text-ink-400">Plate number:</span>{" "}
+                            {displayText(v.orCrDetails?.plateNumber)}
+                          </p>
+                          <p>
+                            <span className="text-ink-400">Make/Year/Model:</span>{" "}
+                            {displayText(v.orCrDetails?.makeYearModel)}
+                          </p>
+                          <p>
+                            <span className="text-ink-400">Engine no:</span>{" "}
+                            {displayText(v.orCrDetails?.engineNo)}
+                          </p>
+                          <p>
+                            <span className="text-ink-400">Chassis no:</span>{" "}
+                            {displayText(v.orCrDetails?.chasisNo)}
+                          </p>
+                          <p>
+                            <span className="text-ink-400">Registered owner:</span>{" "}
+                            {displayText(v.registration?.registeredOwner)}
+                          </p>
+                          <p>
+                            <span className="text-ink-400">Encumbered to:</span>{" "}
+                            {displayText(v.registration?.encumberedTo)}
+                          </p>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                  <p className="text-sm text-ink-700">
                     <span className="text-ink-400">Verified by:</span>{" "}
                     {displayText(data.verification.cmInspection.verifiedBy)}
                   </p>
@@ -1670,31 +1684,52 @@ export default function CommitteeApplicationPage() {
                 </Badge>
               </div>
               {data.verification.remInspection ? (
-                <div className="mt-2 grid gap-x-4 gap-y-1 text-sm text-ink-700 sm:grid-cols-2">
-                  <p>
-                    <span className="text-ink-400">Account:</span>{" "}
-                    {displayText(
-                      data.verification.remInspection.account?.accountName,
-                    )}
-                  </p>
-                  <p>
-                    <span className="text-ink-400">Registered owner at title:</span>{" "}
-                    {displayText(
-                      data.verification.remInspection.titleDetails
-                        ?.registeredOwnerAtTitle,
-                    )}
-                  </p>
-                  <p>
-                    <span className="text-ink-400">Year registered:</span>{" "}
-                    {displayText(
-                      data.verification.remInspection.titleDetails?.yearRegister,
-                    )}
-                  </p>
-                  <p>
-                    <span className="text-ink-400">Address:</span>{" "}
-                    {displayText(data.verification.remInspection.account?.address)}
-                  </p>
-                  <p>
+                <div className="mt-2 space-y-3">
+                  <div className="grid gap-x-4 gap-y-1 text-sm text-ink-700 sm:grid-cols-2">
+                    <p>
+                      <span className="text-ink-400">Account:</span>{" "}
+                      {displayText(
+                        data.verification.remInspection.account?.accountName,
+                      )}
+                    </p>
+                    <p>
+                      <span className="text-ink-400">Address:</span>{" "}
+                      {displayText(data.verification.remInspection.account?.address)}
+                    </p>
+                  </div>
+                  {(data.verification.remInspection.properties ?? []).length === 0 ? (
+                    <p className="text-sm text-ink-400">No properties recorded.</p>
+                  ) : (
+                    (data.verification.remInspection.properties ?? []).map((p, i) => (
+                      <div
+                        key={i}
+                        className="rounded-[var(--r-md)] border border-line-soft p-3"
+                      >
+                        <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-ink-400">
+                          Property {i + 1}
+                        </p>
+                        <div className="grid gap-x-4 gap-y-1 text-sm text-ink-700 sm:grid-cols-2">
+                          <p>
+                            <span className="text-ink-400">Registered owner at title:</span>{" "}
+                            {displayText(p.titleDetails?.registeredOwnerAtTitle)}
+                          </p>
+                          <p>
+                            <span className="text-ink-400">Year registered:</span>{" "}
+                            {displayText(p.titleDetails?.yearRegister)}
+                          </p>
+                          <p>
+                            <span className="text-ink-400">TCT No.:</span>{" "}
+                            {displayText(p.legalDescription?.tctNo)}
+                          </p>
+                          <p>
+                            <span className="text-ink-400">Location:</span>{" "}
+                            {displayText(p.legalDescription?.location)}
+                          </p>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                  <p className="text-sm text-ink-700">
                     <span className="text-ink-400">Verified by:</span>{" "}
                     {displayText(data.verification.remInspection.verifiedBy)}
                   </p>
