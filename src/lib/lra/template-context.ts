@@ -2,6 +2,7 @@ import type { BusinessInfo } from "@/lib/borrowers/business-info";
 import type { BorrowerProfile } from "@/lib/borrowers/types";
 
 import type { BlriData } from "./blri-data";
+import type { CollateralDocumentContext } from "./collateral-context";
 import { formatMoney } from "@/lib/documents/format";
 import type { ReleasePath } from "./constants";
 
@@ -122,6 +123,17 @@ export type ReleaseComputation = {
   docStamp?: number | null;
   adminCost?: number | null;
   notaryFee?: number | null;
+  /**
+   * Display names (already resolved from `computations.computed_by` /
+   * `.signed_by` by the caller — this function stays synchronous/pure, so it
+   * cannot itself look up a profile). Audit fix: `{{preparedBy}}`/
+   * `{{approvedBy}}` were referenced by templates but never populated.
+   * "Checked By" has no third actor tracked anywhere in the system yet —
+   * stays a blank signature line, same convention as the notary Doc/Page/
+   * Book No. fields below.
+   */
+  preparedByName?: string | null;
+  approvedByName?: string | null;
 };
 
 function pct(rate: number | null | undefined): string {
@@ -154,6 +166,13 @@ export function buildReleaseTemplateContext(
   borrower: BorrowerProfile,
   releasePath: ReleasePath,
   scope?: ReleaseTemplateScope,
+  /**
+   * The application's CI-inspected vehicles/properties (see
+   * collateral-context.ts), one row per collateral item. Omit to keep the
+   * previous behavior (empty `[]`) — every existing call site stays
+   * backward-compatible until it's updated to pass this.
+   */
+  collateral?: CollateralDocumentContext,
 ): Record<string, unknown> {
   const isCheck = releasePath === "with_pdc";
   const disbursementCode = isCheck ? "1100115" : "1100110";
@@ -244,6 +263,29 @@ export function buildReleaseTemplateContext(
     bankName: borrower.financial?.bankName ?? "",
     bankAccountNo: borrower.financial?.accountNumber ?? "",
     checkAmount: formatMoney(computation.netReleased),
+    // Audit fix: the BLRI "CHEQUE INFORMATION" block's own check number/date
+    // (the disbursement check itself, distinct from the borrower's security
+    // PDCs in `pdcSchedule`) has no source anywhere in the system — no table
+    // tracks a disbursement check separately. Left blank rather than guessed.
+    checkNumber: "",
+    checkDate: "",
+    // Calculator SME.xlsm's own samples show this as the loan account number
+    // with its "LA" prefix swapped for "CV" (e.g. LA201270 -> CV201270) — a
+    // display label derived from data already on hand, not invented. Loan
+    // account numbers without that prefix fall back to blank.
+    checkVoucherNo: blri.loanAccountNo.replace(/^LA/i, "CV") === blri.loanAccountNo
+      ? ""
+      : blri.loanAccountNo.replace(/^LA/i, "CV"),
+
+    // Audit fix: referenced by blri / check_voucher / cash_voucher /
+    // final_computation_sheet / the 3 ar_*_voucher templates, never
+    // populated — always blank. `computedBy`/`signedBy` (real actor ids on
+    // `computations`) are resolved to names by the caller and passed in as
+    // `preparedByName`/`approvedByName`. No third "checked by" actor is
+    // tracked anywhere yet, so that slot stays a blank signature line.
+    preparedBy: computation.preparedByName ?? "",
+    checkedBy: "",
+    approvedBy: computation.approvedByName ?? "",
 
     // --- LSLGC legal-document merge keys (loan_agreement / disclosure_statement
     //     / promissory_note v2). Uncaptured fields resolve to "" per this file's
@@ -295,6 +337,72 @@ export function buildReleaseTemplateContext(
     notaryPageNo: "",
     notaryBookNo: "",
     notarySeries: "",
+
+    // --- LSLGC servicing documents, now selectable in the LRA release modal as
+    //     optional picks (cancellation of chattel / REM mortgage, voluntary
+    //     surrender + deed of sale, SPA for cancellation, agreement for
+    //     replacement of checks, agreement for consolidation). Party / amount /
+    //     date slots are filled from the loan; slots describing events that have
+    //     not happened at release time (mortgage registration nos., surrender
+    //     amount, redemption period, the new replacement checks, the borrower's
+    //     other loans) stay "" / [] for the notary/officer to complete. ---
+    isCorpOrDti: isSme,
+    witnessOne: "",
+    witnessTwo: "",
+
+    // Agreement for Replacement of Checks — the underlying chattel loan is this loan.
+    chattelReleaseDate: computation.releaseDate ?? "",
+    totalObligation: formatMoney(blri.totalLoan),
+    totalObligationInWords: pesosAndCentavosInWords(blri.totalLoan),
+    amortStartDate: blri.firstPaymentDate,
+    amortMaturityDate: blri.pdcSchedule.at(-1)?.checkDate ?? "",
+    checkReplacementDate: "",
+    lenderDepositBank: "",
+    lenderDepositAccountName: "",
+    lenderDepositAccountNo: "",
+    replacementChecks: [] as unknown[],
+
+    // Agreement for Consolidation — "additional loan" = this loan; the totals
+    // across the borrower's other active loans are not resolved here.
+    additionalLoanAmount: formatMoney(blri.principal),
+    additionalLoanAmountInWords: pesosAndCentavosInWords(blri.principal),
+    additionalLoanTermMonths: String(blri.terms),
+    additionalLoanInterestRate: pct(computation.interestRate),
+    additionalLoanTotal: formatMoney(blri.totalLoan),
+    additionalLoanTotalInWords: pesosAndCentavosInWords(blri.totalLoan),
+    priorLoans: [] as unknown[],
+    priorLoansCount: "",
+    allLoansTotal: "",
+    allLoansTotalInWords: "",
+
+    // Cancellation of Chattel / Real Estate Mortgage — the mortgage being
+    // cancelled is this loan's own security; only its secured amount + execution
+    // date are known before it is notarised and registered.
+    priorMortgageAmount: formatMoney(blri.totalLoan),
+    priorMortgageAmountInWords: pesosAndCentavosInWords(blri.totalLoan),
+    priorMortgageExecutedOn: computation.releaseDate ?? "",
+    priorMortgageDocNo: "",
+    priorMortgagePageNo: "",
+    priorMortgageBookNo: "",
+    priorMortgageSeries: "",
+    priorMortgageNotary: "",
+    priorMortgageNotaryPlace: "",
+    priorMortgageRegistryOfDeeds: "",
+    cancellationPageCount: "",
+
+    // Voluntary Surrender + Deed of Absolute Sale — surrender occurs on default,
+    // long after release; the outstanding amount + redemption period are unknown.
+    surrenderDebtAmount: "",
+    surrenderDebtAmountInWords: "",
+    redemptionPeriod: "",
+
+    // Collateral line-item detail (make / plate / engine / chassis / TCT / area
+    // / technical description) — from the CI inspection's vehicles[]/
+    // properties[] (see collateral-context.ts), one document row per item.
+    // Empty when the caller doesn't pass `collateral` (e.g. a CI form was
+    // never filled in) — the repeats then render header-only, same as before.
+    vehicles: collateral?.vehicles ?? [],
+    properties: collateral?.properties ?? [],
 
     // Amount / date / count slots the Disclosure Statement form fills in.
     amountFinanced: formatMoney(blri.principal),

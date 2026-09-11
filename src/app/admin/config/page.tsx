@@ -64,6 +64,12 @@ export default function ConfigPage() {
   const [reportsAiModel, setReportsAiModel] = useState("gpt-4o-mini");
   const [testingReportsAi, setTestingReportsAi] = useState(false);
 
+  const [docRenderEngine, setDocRenderEngine] = useState("pdfmake");
+  const [gotenbergUrl, setGotenbergUrl] = useState("");
+  const [gotenbergUser, setGotenbergUser] = useState("");
+  const [gotenbergPass, setGotenbergPass] = useState("");
+  const [testingGotenberg, setTestingGotenberg] = useState(false);
+
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
@@ -116,6 +122,15 @@ export default function ConfigPage() {
           const model = String(s.value ?? "").trim();
           setReportsAiModel(model || "gpt-4o-mini");
         }
+        if (s.key === "doc_render_engine") {
+          const eng = String(s.value ?? "").trim();
+          setDocRenderEngine(eng === "chromium" ? "chromium" : "pdfmake");
+        }
+        if (s.key === "gotenberg_url") setGotenbergUrl(String(s.value ?? ""));
+        if (s.key === "gotenberg_basic_auth_user")
+          setGotenbergUser(String(s.value ?? ""));
+        if (s.key === "gotenberg_basic_auth_pass")
+          setGotenbergPass(String(s.value ?? ""));
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load");
@@ -181,6 +196,10 @@ export default function ConfigPage() {
           reports_ai_enabled: reportsAiEnabled,
           reports_ai_api_key: reportsAiApiKey,
           reports_ai_model: reportsAiModel,
+          doc_render_engine: docRenderEngine === "chromium" ? "chromium" : "pdfmake",
+          gotenberg_url: gotenbergUrl,
+          gotenberg_basic_auth_user: gotenbergUser,
+          gotenberg_basic_auth_pass: gotenbergPass,
         }),
       });
       if (!res.ok) {
@@ -225,6 +244,31 @@ export default function ConfigPage() {
     }
   }
 
+  async function handleGotenbergTest() {
+    setTestingGotenberg(true);
+    setError(null);
+    setMessage(null);
+    try {
+      const res = await fetch("/api/admin/gotenberg/test", { method: "POST" });
+      const body = (await res.json()) as {
+        error?: string;
+        ok?: boolean;
+        bytes?: number;
+        ms?: number;
+      };
+      if (!res.ok) throw new Error(body.error ?? "Gotenberg test failed");
+      setMessage(
+        `Gotenberg reachable — rendered a ${body.bytes ?? 0}-byte PDF in ${
+          body.ms ?? 0
+        } ms`,
+      );
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Gotenberg test failed");
+    } finally {
+      setTestingGotenberg(false);
+    }
+  }
+
   async function handleReportsAiTest() {
     setTestingReportsAi(true);
     setError(null);
@@ -249,7 +293,7 @@ export default function ConfigPage() {
     <div>
       <PageHeader
         title="System Config"
-        description="Penalty rate, coverage ratio, aging thresholds, SMS (Twilio), Email (SMTP), and LoanBot"
+        description="Penalty rate, coverage ratio, aging thresholds, SMS (Twilio), Email (SMTP), LoanBot, and the document renderer"
       />
 
       {error ? (
@@ -777,6 +821,80 @@ export default function ConfigPage() {
                 variant="secondary"
                 loading={testingReportsAi}
                 onClick={() => void handleReportsAiTest()}
+              >
+                Test connection
+              </Button>
+            </div>
+          </div>
+        </Card>
+
+        <Card>
+          <h2 className="mb-1 font-display text-lg font-semibold text-navy-900">
+            Document renderer (Gotenberg)
+          </h2>
+          <p className="mb-4 text-sm text-ink-500">
+            <span className="font-medium">pdfmake</span> renders PDFs in-process
+            (default, no setup).{" "}
+            <span className="font-medium">Chromium</span> renders them through a
+            Gotenberg service so the editor preview and the generated PDF use the
+            same engine (true WYSIWYG, logo header, full-width tables). Switch to
+            Chromium only after Save + a successful Test — a blank URL falls back
+            to pdfmake. Password is masked after save; leave the masked value to
+            keep the existing secret. These override the{" "}
+            <span className="mono">DOC_RENDER_ENGINE</span> /{" "}
+            <span className="mono">GOTENBERG_*</span> env vars when set.
+          </p>
+          <div className="max-w-md space-y-4">
+            <div>
+              <Label htmlFor="doc-render-engine">PDF engine</Label>
+              <select
+                id="doc-render-engine"
+                value={docRenderEngine}
+                onChange={(e) => setDocRenderEngine(e.target.value)}
+                className="mono mt-1 block w-full rounded-lg border border-line-soft bg-white px-3 py-2 text-sm"
+              >
+                <option value="pdfmake">pdfmake (in-process, default)</option>
+                <option value="chromium">chromium (Gotenberg service)</option>
+              </select>
+            </div>
+            <div>
+              <Label htmlFor="gotenberg-url">Gotenberg URL</Label>
+              <Input
+                id="gotenberg-url"
+                value={gotenbergUrl}
+                onChange={(e) => setGotenbergUrl(e.target.value)}
+                placeholder="https://loanstar-gotenberg-xxxx.asia-southeast1.run.app"
+                className="mono"
+                autoComplete="off"
+              />
+            </div>
+            <div>
+              <Label htmlFor="gotenberg-user">Basic-auth username</Label>
+              <Input
+                id="gotenberg-user"
+                value={gotenbergUser}
+                onChange={(e) => setGotenbergUser(e.target.value)}
+                className="mono"
+                autoComplete="off"
+              />
+            </div>
+            <div>
+              <Label htmlFor="gotenberg-pass">Basic-auth password</Label>
+              <Input
+                id="gotenberg-pass"
+                type="password"
+                value={gotenbergPass}
+                onChange={(e) => setGotenbergPass(e.target.value)}
+                className="mono"
+                autoComplete="new-password"
+              />
+            </div>
+            <div className="border-t border-line-soft pt-4">
+              <Button
+                type="button"
+                variant="secondary"
+                loading={testingGotenberg}
+                onClick={() => void handleGotenbergTest()}
               >
                 Test connection
               </Button>

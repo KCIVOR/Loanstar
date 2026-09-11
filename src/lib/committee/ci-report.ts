@@ -1,4 +1,9 @@
-import type { CmInspection, RemInspection } from "@/lib/cig/collateral-inspection";
+import {
+  normalizeCmInspection,
+  normalizeRemInspection,
+  type CmInspection,
+  type RemInspection,
+} from "@/lib/cig/collateral-inspection";
 
 export type CommitteeCollateralType = "none" | "car_refinancing" | "real_estate";
 
@@ -16,7 +21,7 @@ export function mapCommitteeCollateralInspections(row: {
   remInspection: RemInspection | null;
 } {
   return {
-    cmInspection: (row.cm_inspection as CmInspection) ?? null,
-    remInspection: (row.rem_inspection as RemInspection) ?? null,
+    cmInspection: row.cm_inspection != null ? normalizeCmInspection(row.cm_inspection) : null,
+    remInspection: row.rem_inspection != null ? normalizeRemInspection(row.rem_inspection) : null,
   };
 }

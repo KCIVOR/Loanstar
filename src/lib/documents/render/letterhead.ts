@@ -1,26 +1,41 @@
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+
 import { BRANDING } from "@/lib/branding";
 
 import type { GotenbergAsset } from "./gotenberg";
 
 /**
- * Running letterhead for the Chromium renderer: a header carrying the company
- * logo and a footer with page numbers. Gotenberg renders `header.html` /
- * `footer.html` as separate mini-documents in the page's top/bottom margin, so
- * the space for them is reserved by the margin form-fields in `gotenberg.ts`,
- * not by `PRINT_CSS`'s `@page`.
+ * Letterhead for the Chromium renderer, matching the LSLGC source documents:
+ * the company wordmark appears ONCE, centered, at the very top of page 1 (as a
+ * `.doc-letterhead` block prepended to the merged body — see `index.ts`), NOT as
+ * a running page header. A discreet "Page X of Y" footer runs on every page
+ * (Chattel Mortgage / REM / Loan Agreement originals carry one; PN / Disclosure
+ * do not — a footer everywhere is the tidier house choice).
  *
- * The logo is fetched once from the PUBLIC `branding` bucket and cached at module
- * scope (warm across invocations on a reused serverless instance).
- *
- * TUNING NOTE: the exact header/footer heights + margin reservations need one
- * pass against the live Gotenberg (Phase 3 snapshot) — Chromium's print
- * header/footer sizing is finicky. Values here are a sane first cut.
+ * Logo source, in order: the bundled hi-res asset
+ * `assets/letterhead-logo.png` (extracted from the source docs' `image1.jpeg`,
+ * white background, deterministic) → else the public `branding/logo.png`.
  */
+
+const LOGO_PATH = join(
+  process.cwd(),
+  "src/lib/documents/render/assets/letterhead-logo.png",
+);
 
 let cachedLogo: GotenbergAsset | null | undefined;
 
 export async function getLogoAsset(): Promise<GotenbergAsset | null> {
   if (cachedLogo !== undefined) return cachedLogo;
+
+  try {
+    const bytes = new Uint8Array(readFileSync(LOGO_PATH));
+    cachedLogo = { name: "logo.png", bytes, contentType: "image/png" };
+    return cachedLogo;
+  } catch {
+    // fall through to the network asset
+  }
+
   try {
     const res = await fetch(BRANDING.logoUrl);
     if (!res.ok) {
@@ -39,22 +54,23 @@ export async function getLogoAsset(): Promise<GotenbergAsset | null> {
   }
 }
 
-const FRAME_STYLE =
-  "font-family:'Liberation Sans',Arial,Helvetica,sans-serif;font-size:8pt;color:#555;" +
-  "width:100%;box-sizing:border-box;padding:0 18mm;";
-
-export function buildHeaderHtml(hasLogo: boolean): string {
-  const logo = hasLogo
-    ? `<img src="logo.png" style="height:9mm;vertical-align:middle;" alt="" />`
-    : `<span style="font-weight:700;color:#333;">Loan Star Lending Group Corp.</span>`;
-  return `<div style="${FRAME_STYLE}">${logo}</div>`;
+/** The centered wordmark block prepended to page 1 (styled by `.doc-letterhead`). */
+export function buildBodyLetterhead(hasLogo: boolean): string {
+  const inner = hasLogo
+    ? `<img src="logo.png" alt="Loan Star Lending Group Corp." />`
+    : `<strong>LOAN STAR LENDING GROUP CORP.</strong>`;
+  return `<div class="doc-letterhead">${inner}</div>`;
 }
+
+const FOOTER_STYLE =
+  "font-family:'Times New Roman','Liberation Serif',Georgia,serif;" +
+  "font-size:8pt;color:#666;width:100%;box-sizing:border-box;" +
+  "padding:0 1in;text-align:center;";
 
 export function buildFooterHtml(): string {
   return (
-    `<div style="${FRAME_STYLE}display:flex;justify-content:space-between;">` +
-    `<span>Loan Star Lending Group Corp.</span>` +
-    `<span>Page <span class="pageNumber"></span> of <span class="totalPages"></span></span>` +
+    `<div style="${FOOTER_STYLE}">` +
+    `Page <span class="pageNumber"></span> of <span class="totalPages"></span>` +
     `</div>`
   );
 }

@@ -1,11 +1,15 @@
 "use client";
 
+import { useState } from "react";
+
 import { Button, Input, Label } from "@/components/ui";
-import type {
-  CmInspection,
-  CollateralChecklistItem,
-  CollateralConditionItem,
-  CollateralYesNoItem,
+import {
+  normalizeCmInspection,
+  type CmInspection,
+  type CmVehicleEntry,
+  type CollateralChecklistItem,
+  type CollateralConditionItem,
+  type CollateralYesNoItem,
 } from "@/lib/cig/collateral-inspection";
 
 type Props = {
@@ -18,17 +22,29 @@ type Props = {
 };
 
 function ensure(value: CmInspection | null): CmInspection {
+  const n = normalizeCmInspection(value);
+  return { account: n.account ?? {}, vehicles: n.vehicles ?? [], verifiedBy: n.verifiedBy ?? null };
+}
+
+function emptyVehicle(): CmVehicleEntry {
   return {
-    account: value?.account ?? {},
-    orCrDetails: value?.orCrDetails ?? {},
-    registration: value?.registration ?? {},
-    insurance: value?.insurance ?? {},
-    odometerDuringInspection: value?.odometerDuringInspection ?? null,
-    vehiclesChecklist: value?.vehiclesChecklist ?? {},
-    others: value?.others ?? {},
-    vehiclesCondition: value?.vehiclesCondition ?? {},
-    verifiedBy: value?.verifiedBy ?? null,
+    orCrDetails: {},
+    registration: {},
+    insurance: {},
+    odometerDuringInspection: null,
+    vehiclesChecklist: {},
+    others: {},
+    vehiclesCondition: {},
   };
+}
+
+function vehicleSummary(v: CmVehicleEntry, index: number): string {
+  const plate = v.orCrDetails?.plateNumber?.trim();
+  const model = v.orCrDetails?.makeYearModel?.trim();
+  if (plate && model) return `${model} — ${plate}`;
+  if (plate) return plate;
+  if (model) return model;
+  return `Vehicle ${index + 1}`;
 }
 
 function TextField({
@@ -213,7 +229,7 @@ function ConditionRow({
 }
 
 const VEHICLES_CHECKLIST_ROWS: Array<{
-  key: keyof NonNullable<CmInspection["vehiclesChecklist"]>;
+  key: keyof NonNullable<CmVehicleEntry["vehiclesChecklist"]>;
   label: string;
 }> = [
   { key: "wipers", label: "Wipers" },
@@ -235,7 +251,7 @@ const VEHICLES_CHECKLIST_ROWS: Array<{
 ];
 
 const VEHICLES_CONDITION_ROWS: Array<{
-  key: keyof NonNullable<CmInspection["vehiclesCondition"]>;
+  key: keyof NonNullable<CmVehicleEntry["vehiclesCondition"]>;
   label: string;
 }> = [
   { key: "engine", label: "Engine" },
@@ -253,6 +269,399 @@ const VEHICLES_CONDITION_ROWS: Array<{
   { key: "differentialBox", label: "Differential Box" },
 ];
 
+/** One vehicle's full inspection form — everything that used to be the whole
+ * CmInspectionForm body, now scoped to a single repeatable entry. */
+function VehicleCard({
+  vehicle,
+  index,
+  expanded,
+  onToggleExpand,
+  onChange,
+  onRemove,
+  disabled,
+}: {
+  vehicle: CmVehicleEntry;
+  index: number;
+  expanded: boolean;
+  onToggleExpand: () => void;
+  onChange: (patch: Partial<CmVehicleEntry>) => void;
+  onRemove: () => void;
+  disabled?: boolean;
+}) {
+  return (
+    <div className="rounded-[var(--r-md)] border border-line-soft">
+      <div className="flex items-center justify-between gap-2 p-3">
+        <button
+          type="button"
+          onClick={onToggleExpand}
+          className="flex flex-1 items-center gap-2 text-left"
+          aria-expanded={expanded}
+        >
+          <span aria-hidden className="text-ink-400">{expanded ? "▾" : "▸"}</span>
+          <span className="text-sm font-semibold text-navy-900">
+            {vehicleSummary(vehicle, index)}
+          </span>
+        </button>
+        {!disabled ? (
+          <Button
+            type="button"
+            variant="danger-soft"
+            size="sm"
+            aria-label={`Remove vehicle ${index + 1}`}
+            onClick={onRemove}
+          >
+            Remove
+          </Button>
+        ) : null}
+      </div>
+
+      {expanded ? (
+        <div className="space-y-6 border-t border-line-soft p-3">
+          <section className="space-y-3">
+            <h3 className="font-display text-sm font-semibold text-navy-900">
+              OR/CR Details
+            </h3>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <TextField
+                label="Make / Year / Model"
+                value={vehicle.orCrDetails?.makeYearModel}
+                disabled={disabled}
+                onChange={(v) =>
+                  onChange({ orCrDetails: { ...vehicle.orCrDetails, makeYearModel: v } })
+                }
+              />
+              <TextField
+                label="MV File"
+                value={vehicle.orCrDetails?.mvFile}
+                disabled={disabled}
+                onChange={(v) => onChange({ orCrDetails: { ...vehicle.orCrDetails, mvFile: v } })}
+              />
+              <TextField
+                label="Plate number"
+                value={vehicle.orCrDetails?.plateNumber}
+                disabled={disabled}
+                onChange={(v) =>
+                  onChange({ orCrDetails: { ...vehicle.orCrDetails, plateNumber: v } })
+                }
+              />
+              <TextField
+                label="CR No."
+                value={vehicle.orCrDetails?.crNo}
+                disabled={disabled}
+                onChange={(v) => onChange({ orCrDetails: { ...vehicle.orCrDetails, crNo: v } })}
+              />
+              <TextField
+                label="Engine no."
+                value={vehicle.orCrDetails?.engineNo}
+                disabled={disabled}
+                onChange={(v) =>
+                  onChange({ orCrDetails: { ...vehicle.orCrDetails, engineNo: v } })
+                }
+              />
+              <TextField
+                label="Chasis no."
+                value={vehicle.orCrDetails?.chasisNo}
+                disabled={disabled}
+                onChange={(v) =>
+                  onChange({ orCrDetails: { ...vehicle.orCrDetails, chasisNo: v } })
+                }
+              />
+            </div>
+          </section>
+
+          <section className="space-y-3">
+            <h3 className="font-display text-sm font-semibold text-navy-900">
+              Registration
+            </h3>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <TextField
+                label="Registered owner"
+                value={vehicle.registration?.registeredOwner}
+                disabled={disabled}
+                onChange={(v) =>
+                  onChange({ registration: { ...vehicle.registration, registeredOwner: v } })
+                }
+              />
+              <TextField
+                label="Address registered"
+                value={vehicle.registration?.addressRegistered}
+                disabled={disabled}
+                onChange={(v) =>
+                  onChange({
+                    registration: { ...vehicle.registration, addressRegistered: v },
+                  })
+                }
+              />
+              <TextField
+                label="Encumbered to"
+                value={vehicle.registration?.encumberedTo}
+                disabled={disabled}
+                onChange={(v) =>
+                  onChange({ registration: { ...vehicle.registration, encumberedTo: v } })
+                }
+              />
+              <TextField
+                label="LTO address"
+                value={vehicle.registration?.ltoAddress}
+                disabled={disabled}
+                onChange={(v) =>
+                  onChange({ registration: { ...vehicle.registration, ltoAddress: v } })
+                }
+              />
+              <TextField
+                label="OR No."
+                value={vehicle.registration?.orNo}
+                disabled={disabled}
+                onChange={(v) =>
+                  onChange({ registration: { ...vehicle.registration, orNo: v } })
+                }
+              />
+              <TextField
+                label="OR Date"
+                type="date"
+                value={vehicle.registration?.orDate}
+                disabled={disabled}
+                onChange={(v) =>
+                  onChange({ registration: { ...vehicle.registration, orDate: v } })
+                }
+              />
+              <TextField
+                label="Amount"
+                type="number"
+                value={vehicle.registration?.amount}
+                disabled={disabled}
+                onChange={(v) =>
+                  onChange({
+                    registration: { ...vehicle.registration, amount: v === "" ? null : Number(v) },
+                  })
+                }
+              />
+            </div>
+          </section>
+
+          <section className="space-y-3">
+            <h3 className="font-display text-sm font-semibold text-navy-900">
+              Insurance
+            </h3>
+            <div className="grid gap-3 sm:grid-cols-3">
+              <TextField
+                label="Insurer"
+                value={vehicle.insurance?.insurer}
+                disabled={disabled}
+                onChange={(v) => onChange({ insurance: { ...vehicle.insurance, insurer: v } })}
+              />
+              <TextField
+                label="Amount insured"
+                type="number"
+                value={vehicle.insurance?.amountInsured}
+                disabled={disabled}
+                onChange={(v) =>
+                  onChange({
+                    insurance: {
+                      ...vehicle.insurance,
+                      amountInsured: v === "" ? null : Number(v),
+                    },
+                  })
+                }
+              />
+              <TextField
+                label="Type of coverage"
+                value={vehicle.insurance?.typeOfCoverage}
+                disabled={disabled}
+                onChange={(v) =>
+                  onChange({ insurance: { ...vehicle.insurance, typeOfCoverage: v } })
+                }
+              />
+            </div>
+            <TextField
+              label="Odometer during inspection"
+              type="number"
+              value={vehicle.odometerDuringInspection}
+              disabled={disabled}
+              onChange={(v) =>
+                onChange({ odometerDuringInspection: v === "" ? null : Number(v) })
+              }
+            />
+          </section>
+
+          <section className="space-y-1">
+            <h3 className="font-display text-sm font-semibold text-navy-900">
+              Vehicles Check List
+            </h3>
+            {VEHICLES_CHECKLIST_ROWS.map((row) => (
+              <ChecklistRow
+                key={row.key}
+                label={row.label}
+                item={vehicle.vehiclesChecklist?.[row.key]}
+                disabled={disabled}
+                onChange={(next) =>
+                  onChange({
+                    vehiclesChecklist: { ...vehicle.vehiclesChecklist, [row.key]: next },
+                  })
+                }
+              />
+            ))}
+          </section>
+
+          <section className="space-y-4">
+            <h3 className="font-display text-sm font-semibold text-navy-900">
+              Others
+            </h3>
+            <div>
+              <p className="mb-1 text-xs font-medium text-ink-600">Keys</p>
+              {(
+                [
+                  ["remote", "Remote"],
+                  ["ignition", "Ignition"],
+                  ["keyless", "Key less"],
+                ] as const
+              ).map(([key, label]) => (
+                <YesNoRow
+                  key={key}
+                  label={label}
+                  item={vehicle.others?.keys?.[key]}
+                  disabled={disabled}
+                  onChange={(next) =>
+                    onChange({
+                      others: {
+                        ...vehicle.others,
+                        keys: { ...vehicle.others?.keys, [key]: next },
+                      },
+                    })
+                  }
+                />
+              ))}
+            </div>
+            <div>
+              <p className="mb-1 text-xs font-medium text-ink-600">Speedometer</p>
+              {(
+                [
+                  ["analog", "Analog"],
+                  ["digital", "Digital"],
+                ] as const
+              ).map(([key, label]) => (
+                <YesNoRow
+                  key={key}
+                  label={label}
+                  item={vehicle.others?.speedometer?.[key]}
+                  disabled={disabled}
+                  onChange={(next) =>
+                    onChange({
+                      others: {
+                        ...vehicle.others,
+                        speedometer: { ...vehicle.others?.speedometer, [key]: next },
+                      },
+                    })
+                  }
+                />
+              ))}
+            </div>
+            <div>
+              <p className="mb-1 text-xs font-medium text-ink-600">Steering Wheel</p>
+              {(
+                [
+                  ["power", "Power"],
+                  ["nonePower", "None Power"],
+                ] as const
+              ).map(([key, label]) => (
+                <YesNoRow
+                  key={key}
+                  label={label}
+                  item={vehicle.others?.steeringWheel?.[key]}
+                  disabled={disabled}
+                  onChange={(next) =>
+                    onChange({
+                      others: {
+                        ...vehicle.others,
+                        steeringWheel: { ...vehicle.others?.steeringWheel, [key]: next },
+                      },
+                    })
+                  }
+                />
+              ))}
+            </div>
+            <div>
+              <p className="mb-1 text-xs font-medium text-ink-600">Tires</p>
+              {(
+                [
+                  ["ordinary", "Ordinary"],
+                  ["mags", "Mags"],
+                ] as const
+              ).map(([key, label]) => (
+                <YesNoRow
+                  key={key}
+                  label={label}
+                  item={vehicle.others?.tires?.[key]}
+                  disabled={disabled}
+                  onChange={(next) =>
+                    onChange({
+                      others: {
+                        ...vehicle.others,
+                        tires: { ...vehicle.others?.tires, [key]: next },
+                      },
+                    })
+                  }
+                />
+              ))}
+              <div className="grid gap-2 pt-2 sm:grid-cols-2">
+                <TextField
+                  label="Thread of tires %"
+                  type="number"
+                  value={vehicle.others?.tires?.threadOfTiresPercent}
+                  disabled={disabled}
+                  onChange={(v) =>
+                    onChange({
+                      others: {
+                        ...vehicle.others,
+                        tires: {
+                          ...vehicle.others?.tires,
+                          threadOfTiresPercent: v === "" ? null : Number(v),
+                        },
+                      },
+                    })
+                  }
+                />
+                <TextField
+                  label="Remarks"
+                  value={vehicle.others?.tires?.remarks}
+                  disabled={disabled}
+                  onChange={(v) =>
+                    onChange({
+                      others: {
+                        ...vehicle.others,
+                        tires: { ...vehicle.others?.tires, remarks: v },
+                      },
+                    })
+                  }
+                />
+              </div>
+            </div>
+          </section>
+
+          <section className="space-y-1">
+            <h3 className="font-display text-sm font-semibold text-navy-900">
+              Vehicles Condition
+            </h3>
+            {VEHICLES_CONDITION_ROWS.map((row) => (
+              <ConditionRow
+                key={row.key}
+                label={row.label}
+                item={vehicle.vehiclesCondition?.[row.key]}
+                disabled={disabled}
+                onChange={(next) =>
+                  onChange({
+                    vehiclesCondition: { ...vehicle.vehiclesCondition, [row.key]: next },
+                  })
+                }
+              />
+            ))}
+          </section>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 export function CmInspectionForm({
   value,
   onChange,
@@ -262,9 +671,39 @@ export function CmInspectionForm({
   verifierName,
 }: Props) {
   const cm = ensure(value);
+  const vehicles = cm.vehicles ?? [];
+  // Presentation-only — which cards are expanded. New/only vehicle starts
+  // expanded; a read-only view with several vehicles starts collapsed so the
+  // reviewer isn't scrolling past thousands of pixels of checklist rows.
+  const [expanded, setExpanded] = useState<Set<number>>(
+    () => new Set(vehicles.length <= 1 ? vehicles.map((_, i) => i) : []),
+  );
 
   function update(patch: Partial<CmInspection>) {
     onChange({ ...cm, ...patch });
+  }
+
+  function updateVehicle(index: number, patch: Partial<CmVehicleEntry>) {
+    const next = vehicles.map((v, i) => (i === index ? { ...v, ...patch } : v));
+    update({ vehicles: next });
+  }
+
+  function addVehicle() {
+    const next = [...vehicles, emptyVehicle()];
+    update({ vehicles: next });
+    setExpanded((prev) => new Set(prev).add(next.length - 1));
+  }
+
+  function removeVehicle(index: number) {
+    update({ vehicles: vehicles.filter((_, i) => i !== index) });
+    setExpanded((prev) => {
+      const next = new Set<number>();
+      for (const i of prev) {
+        if (i < index) next.add(i);
+        else if (i > index) next.add(i - 1);
+      }
+      return next;
+    });
   }
 
   return (
@@ -292,331 +731,40 @@ export function CmInspectionForm({
       </section>
 
       <section className="space-y-3">
-        <h3 className="font-display text-sm font-semibold text-navy-900">
-          OR/CR Details
-        </h3>
-        <div className="grid gap-3 sm:grid-cols-2">
-          <TextField
-            label="MV File"
-            value={cm.orCrDetails?.mvFile}
-            disabled={readOnly}
-            onChange={(v) =>
-              update({ orCrDetails: { ...cm.orCrDetails, mvFile: v } })
-            }
-          />
-          <TextField
-            label="Plate number"
-            value={cm.orCrDetails?.plateNumber}
-            disabled={readOnly}
-            onChange={(v) =>
-              update({ orCrDetails: { ...cm.orCrDetails, plateNumber: v } })
-            }
-          />
-          <TextField
-            label="Engine no."
-            value={cm.orCrDetails?.engineNo}
-            disabled={readOnly}
-            onChange={(v) =>
-              update({ orCrDetails: { ...cm.orCrDetails, engineNo: v } })
-            }
-          />
-          <TextField
-            label="Chasis no."
-            value={cm.orCrDetails?.chasisNo}
-            disabled={readOnly}
-            onChange={(v) =>
-              update({ orCrDetails: { ...cm.orCrDetails, chasisNo: v } })
-            }
-          />
+        <div className="flex items-center justify-between">
+          <h3 className="font-display text-sm font-semibold text-navy-900">
+            Vehicles ({vehicles.length})
+          </h3>
         </div>
-      </section>
-
-      <section className="space-y-3">
-        <h3 className="font-display text-sm font-semibold text-navy-900">
-          Registration
-        </h3>
-        <div className="grid gap-3 sm:grid-cols-2">
-          <TextField
-            label="Registered owner"
-            value={cm.registration?.registeredOwner}
-            disabled={readOnly}
-            onChange={(v) =>
-              update({ registration: { ...cm.registration, registeredOwner: v } })
-            }
-          />
-          <TextField
-            label="Address registered"
-            value={cm.registration?.addressRegistered}
-            disabled={readOnly}
-            onChange={(v) =>
-              update({
-                registration: { ...cm.registration, addressRegistered: v },
-              })
-            }
-          />
-          <TextField
-            label="Encumbered to"
-            value={cm.registration?.encumberedTo}
-            disabled={readOnly}
-            onChange={(v) =>
-              update({ registration: { ...cm.registration, encumberedTo: v } })
-            }
-          />
-          <TextField
-            label="LTO address"
-            value={cm.registration?.ltoAddress}
-            disabled={readOnly}
-            onChange={(v) =>
-              update({ registration: { ...cm.registration, ltoAddress: v } })
-            }
-          />
-          <TextField
-            label="OR No."
-            value={cm.registration?.orNo}
-            disabled={readOnly}
-            onChange={(v) =>
-              update({ registration: { ...cm.registration, orNo: v } })
-            }
-          />
-          <TextField
-            label="OR Date"
-            type="date"
-            value={cm.registration?.orDate}
-            disabled={readOnly}
-            onChange={(v) =>
-              update({ registration: { ...cm.registration, orDate: v } })
-            }
-          />
-          <TextField
-            label="Amount"
-            type="number"
-            value={cm.registration?.amount}
-            disabled={readOnly}
-            onChange={(v) =>
-              update({
-                registration: { ...cm.registration, amount: v === "" ? null : Number(v) },
-              })
-            }
-          />
-        </div>
-      </section>
-
-      <section className="space-y-3">
-        <h3 className="font-display text-sm font-semibold text-navy-900">
-          Insurance
-        </h3>
-        <div className="grid gap-3 sm:grid-cols-3">
-          <TextField
-            label="Insurer"
-            value={cm.insurance?.insurer}
-            disabled={readOnly}
-            onChange={(v) => update({ insurance: { ...cm.insurance, insurer: v } })}
-          />
-          <TextField
-            label="Amount insured"
-            type="number"
-            value={cm.insurance?.amountInsured}
-            disabled={readOnly}
-            onChange={(v) =>
-              update({
-                insurance: {
-                  ...cm.insurance,
-                  amountInsured: v === "" ? null : Number(v),
-                },
-              })
-            }
-          />
-          <TextField
-            label="Type of coverage"
-            value={cm.insurance?.typeOfCoverage}
-            disabled={readOnly}
-            onChange={(v) =>
-              update({ insurance: { ...cm.insurance, typeOfCoverage: v } })
-            }
-          />
-        </div>
-        <TextField
-          label="Odometer during inspection"
-          type="number"
-          value={cm.odometerDuringInspection}
-          disabled={readOnly}
-          onChange={(v) =>
-            update({ odometerDuringInspection: v === "" ? null : Number(v) })
-          }
-        />
-      </section>
-
-      <section className="space-y-1">
-        <h3 className="font-display text-sm font-semibold text-navy-900">
-          Vehicles Check List
-        </h3>
-        {VEHICLES_CHECKLIST_ROWS.map((row) => (
-          <ChecklistRow
-            key={row.key}
-            label={row.label}
-            item={cm.vehiclesChecklist?.[row.key]}
-            disabled={readOnly}
-            onChange={(next) =>
-              update({
-                vehiclesChecklist: { ...cm.vehiclesChecklist, [row.key]: next },
-              })
-            }
-          />
-        ))}
-      </section>
-
-      <section className="space-y-4">
-        <h3 className="font-display text-sm font-semibold text-navy-900">
-          Others
-        </h3>
-        <div>
-          <p className="mb-1 text-xs font-medium text-ink-600">Keys</p>
-          {(
-            [
-              ["remote", "Remote"],
-              ["ignition", "Ignition"],
-              ["keyless", "Key less"],
-            ] as const
-          ).map(([key, label]) => (
-            <YesNoRow
-              key={key}
-              label={label}
-              item={cm.others?.keys?.[key]}
-              disabled={readOnly}
-              onChange={(next) =>
-                update({
-                  others: {
-                    ...cm.others,
-                    keys: { ...cm.others?.keys, [key]: next },
-                  },
+        {vehicles.length === 0 ? (
+          <p className="text-sm text-ink-400">No vehicles added yet.</p>
+        ) : null}
+        <div className="space-y-3">
+          {vehicles.map((vehicle, i) => (
+            <VehicleCard
+              key={i}
+              vehicle={vehicle}
+              index={i}
+              expanded={expanded.has(i)}
+              onToggleExpand={() =>
+                setExpanded((prev) => {
+                  const next = new Set(prev);
+                  if (next.has(i)) next.delete(i);
+                  else next.add(i);
+                  return next;
                 })
               }
+              onChange={(patch) => updateVehicle(i, patch)}
+              onRemove={() => removeVehicle(i)}
+              disabled={readOnly}
             />
           ))}
         </div>
-        <div>
-          <p className="mb-1 text-xs font-medium text-ink-600">Speedometer</p>
-          {(
-            [
-              ["analog", "Analog"],
-              ["digital", "Digital"],
-            ] as const
-          ).map(([key, label]) => (
-            <YesNoRow
-              key={key}
-              label={label}
-              item={cm.others?.speedometer?.[key]}
-              disabled={readOnly}
-              onChange={(next) =>
-                update({
-                  others: {
-                    ...cm.others,
-                    speedometer: { ...cm.others?.speedometer, [key]: next },
-                  },
-                })
-              }
-            />
-          ))}
-        </div>
-        <div>
-          <p className="mb-1 text-xs font-medium text-ink-600">Steering Wheel</p>
-          {(
-            [
-              ["power", "Power"],
-              ["nonePower", "None Power"],
-            ] as const
-          ).map(([key, label]) => (
-            <YesNoRow
-              key={key}
-              label={label}
-              item={cm.others?.steeringWheel?.[key]}
-              disabled={readOnly}
-              onChange={(next) =>
-                update({
-                  others: {
-                    ...cm.others,
-                    steeringWheel: { ...cm.others?.steeringWheel, [key]: next },
-                  },
-                })
-              }
-            />
-          ))}
-        </div>
-        <div>
-          <p className="mb-1 text-xs font-medium text-ink-600">Tires</p>
-          {(
-            [
-              ["ordinary", "Ordinary"],
-              ["mags", "Mags"],
-            ] as const
-          ).map(([key, label]) => (
-            <YesNoRow
-              key={key}
-              label={label}
-              item={cm.others?.tires?.[key]}
-              disabled={readOnly}
-              onChange={(next) =>
-                update({
-                  others: {
-                    ...cm.others,
-                    tires: { ...cm.others?.tires, [key]: next },
-                  },
-                })
-              }
-            />
-          ))}
-          <div className="grid gap-2 pt-2 sm:grid-cols-2">
-            <TextField
-              label="Thread of tires %"
-              type="number"
-              value={cm.others?.tires?.threadOfTiresPercent}
-              disabled={readOnly}
-              onChange={(v) =>
-                update({
-                  others: {
-                    ...cm.others,
-                    tires: {
-                      ...cm.others?.tires,
-                      threadOfTiresPercent: v === "" ? null : Number(v),
-                    },
-                  },
-                })
-              }
-            />
-            <TextField
-              label="Remarks"
-              value={cm.others?.tires?.remarks}
-              disabled={readOnly}
-              onChange={(v) =>
-                update({
-                  others: {
-                    ...cm.others,
-                    tires: { ...cm.others?.tires, remarks: v },
-                  },
-                })
-              }
-            />
-          </div>
-        </div>
-      </section>
-
-      <section className="space-y-1">
-        <h3 className="font-display text-sm font-semibold text-navy-900">
-          Vehicles Condition
-        </h3>
-        {VEHICLES_CONDITION_ROWS.map((row) => (
-          <ConditionRow
-            key={row.key}
-            label={row.label}
-            item={cm.vehiclesCondition?.[row.key]}
-            disabled={readOnly}
-            onChange={(next) =>
-              update({
-                vehiclesCondition: { ...cm.vehiclesCondition, [row.key]: next },
-              })
-            }
-          />
-        ))}
+        {!readOnly ? (
+          <Button type="button" variant="secondary" size="sm" onClick={addVehicle}>
+            Add vehicle
+          </Button>
+        ) : null}
       </section>
 
       <section className="space-y-2">

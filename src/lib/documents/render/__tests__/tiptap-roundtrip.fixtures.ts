@@ -56,4 +56,8 @@ export const FIXTURES: Record<string, string> = {
 <p>body</p>
 <hr/>
 <p style="text-align:right"><b>ANNEX &ldquo;D&rdquo;</b></p>`,
+
+  letterhead_logo: `<div data-align="center"><img class="doc-logo" src="{{logoDataUri}}" alt="Loan Star Lending Group Corp."></div>
+<h1>PROMISSORY NOTE</h1>
+<p>body</p>`,
 };

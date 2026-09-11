@@ -27,7 +27,7 @@ describe("resolveCommitteeCollateralType", () => {
 });
 
 describe("mapCommitteeCollateralInspections", () => {
-  it("maps CM and REM inspection JSON so Committee can show the forms CIG filled", () => {
+  it("maps CM and REM inspection JSON so Committee can show the forms CIG filled (legacy single-item rows normalized to vehicles[]/properties[])", () => {
     const mapped = mapCommitteeCollateralInspections({
       cm_inspection: {
         account: { accountName: "Juan Dela Cruz" },
@@ -42,13 +42,31 @@ describe("mapCommitteeCollateralInspections", () => {
     });
 
     assert.equal(mapped.cmInspection?.account?.accountName, "Juan Dela Cruz");
-    assert.equal(mapped.cmInspection?.orCrDetails?.plateNumber, "ABC 1234");
+    assert.equal(mapped.cmInspection?.vehicles?.length, 1);
+    assert.equal(mapped.cmInspection?.vehicles?.[0]?.orCrDetails?.plateNumber, "ABC 1234");
     assert.equal(mapped.cmInspection?.verifiedBy, "CIG (Seed)");
     assert.equal(mapped.remInspection?.account?.accountName, "Maria Santos");
+    assert.equal(mapped.remInspection?.properties?.length, 1);
     assert.equal(
-      mapped.remInspection?.titleDetails?.registeredOwnerAtTitle,
+      mapped.remInspection?.properties?.[0]?.titleDetails?.registeredOwnerAtTitle,
       "Maria Santos",
     );
+  });
+
+  it("already-new-shape rows (vehicles[]/properties[]) pass through with every entry intact", () => {
+    const mapped = mapCommitteeCollateralInspections({
+      cm_inspection: {
+        account: { accountName: "Acct" },
+        vehicles: [
+          { orCrDetails: { plateNumber: "AAA 111" } },
+          { orCrDetails: { plateNumber: "BBB 222" } },
+        ],
+        verifiedBy: "Investigator",
+      },
+      rem_inspection: null,
+    });
+    assert.equal(mapped.cmInspection?.vehicles?.length, 2);
+    assert.equal(mapped.cmInspection?.vehicles?.[1]?.orCrDetails?.plateNumber, "BBB 222");
   });
 
   it("returns null inspections when CIG has not recorded collateral forms", () => {
