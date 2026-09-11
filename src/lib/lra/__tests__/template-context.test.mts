@@ -190,3 +190,36 @@ test("v2 LSLGC merge keys are present and segment-aware", () => {
   assert.equal(sme.borrowerRepresentativeTitle, "President");
   assert.equal(sme.borrowerTin, "123-456-789-000");
 });
+
+test("audit fix: preparedBy/approvedBy resolve from the caller-supplied names; checkedBy stays blank", () => {
+  const withNames = buildReleaseTemplateContext(
+    BLRI,
+    { ...COMPUTATION, preparedByName: "Juan LMA", approvedByName: "Kristoffer KCC" },
+    BORROWER,
+    "with_pdc",
+  );
+  assert.equal(withNames.preparedBy, "Juan LMA");
+  assert.equal(withNames.approvedBy, "Kristoffer KCC");
+  assert.equal(withNames.checkedBy, "");
+
+  // No regression: omitting the names (every pre-existing call site, until
+  // threaded) still resolves to blank rather than "undefined" or throwing.
+  const withoutNames = buildReleaseTemplateContext(BLRI, COMPUTATION, BORROWER, "with_pdc");
+  assert.equal(withoutNames.preparedBy, "");
+  assert.equal(withoutNames.approvedBy, "");
+});
+
+test("audit fix: checkVoucherNo derives from the loan account no.'s LA->CV prefix swap; checkNumber/checkDate stay blank (no source)", () => {
+  const ctx = buildReleaseTemplateContext(BLRI, COMPUTATION, BORROWER, "with_pdc");
+  assert.equal(ctx.checkVoucherNo, "CV303342");
+  assert.equal(ctx.checkNumber, "");
+  assert.equal(ctx.checkDate, "");
+
+  const noPrefix = buildReleaseTemplateContext(
+    { ...BLRI, loanAccountNo: "900356" },
+    COMPUTATION,
+    BORROWER,
+    "with_pdc",
+  );
+  assert.equal(noPrefix.checkVoucherNo, "");
+});

@@ -2,6 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { ValidationError } from "@/lib/api/errors";
 import { writeAuditEvent } from "@/lib/audit/writer";
+import { resolvePerformerNames } from "@/lib/ar/history";
 import { initializeArAccount, invoiceScheduleToInstallments } from "@/lib/ar/masterlist";
 import {
   generateBiMonthlySchedule,
@@ -671,6 +672,14 @@ async function loadReleaseGenerationContext(
   const borrowerProfile = mapBorrowerRow(
     (Array.isArray(borrowerRaw) ? borrowerRaw[0] : borrowerRaw) as BorrowerRow,
   );
+  // Audit fix: resolve the real "who computed / who signed" actors on this
+  // computation to display names, once, for every path's context — reuses
+  // the same profiles lookup the AR module already uses for its history log.
+  const performerIds = [computation.computedBy, computation.signedBy].filter(
+    (id): id is string => Boolean(id),
+  );
+  const performerNames = await resolvePerformerNames(supabase, performerIds);
+
   const computationInput = {
     netReleased: computation.netReleased,
     releaseDate: computation.releaseDate,
@@ -682,6 +691,12 @@ async function loadReleaseGenerationContext(
     docStamp: computation.docStamp,
     adminCost: computation.adminCost,
     notaryFee: computation.notaryFee,
+    preparedByName: computation.computedBy
+      ? (performerNames.get(computation.computedBy) ?? "")
+      : "",
+    approvedByName: computation.signedBy
+      ? (performerNames.get(computation.signedBy) ?? "")
+      : "",
   };
   const segmentScope = { segment };
   const contextByPath = new Map(

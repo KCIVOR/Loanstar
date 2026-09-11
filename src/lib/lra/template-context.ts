@@ -122,6 +122,17 @@ export type ReleaseComputation = {
   docStamp?: number | null;
   adminCost?: number | null;
   notaryFee?: number | null;
+  /**
+   * Display names (already resolved from `computations.computed_by` /
+   * `.signed_by` by the caller — this function stays synchronous/pure, so it
+   * cannot itself look up a profile). Audit fix: `{{preparedBy}}`/
+   * `{{approvedBy}}` were referenced by templates but never populated.
+   * "Checked By" has no third actor tracked anywhere in the system yet —
+   * stays a blank signature line, same convention as the notary Doc/Page/
+   * Book No. fields below.
+   */
+  preparedByName?: string | null;
+  approvedByName?: string | null;
 };
 
 function pct(rate: number | null | undefined): string {
@@ -244,6 +255,29 @@ export function buildReleaseTemplateContext(
     bankName: borrower.financial?.bankName ?? "",
     bankAccountNo: borrower.financial?.accountNumber ?? "",
     checkAmount: formatMoney(computation.netReleased),
+    // Audit fix: the BLRI "CHEQUE INFORMATION" block's own check number/date
+    // (the disbursement check itself, distinct from the borrower's security
+    // PDCs in `pdcSchedule`) has no source anywhere in the system — no table
+    // tracks a disbursement check separately. Left blank rather than guessed.
+    checkNumber: "",
+    checkDate: "",
+    // Calculator SME.xlsm's own samples show this as the loan account number
+    // with its "LA" prefix swapped for "CV" (e.g. LA201270 -> CV201270) — a
+    // display label derived from data already on hand, not invented. Loan
+    // account numbers without that prefix fall back to blank.
+    checkVoucherNo: blri.loanAccountNo.replace(/^LA/i, "CV") === blri.loanAccountNo
+      ? ""
+      : blri.loanAccountNo.replace(/^LA/i, "CV"),
+
+    // Audit fix: referenced by blri / check_voucher / cash_voucher /
+    // final_computation_sheet / the 3 ar_*_voucher templates, never
+    // populated — always blank. `computedBy`/`signedBy` (real actor ids on
+    // `computations`) are resolved to names by the caller and passed in as
+    // `preparedByName`/`approvedByName`. No third "checked by" actor is
+    // tracked anywhere yet, so that slot stays a blank signature line.
+    preparedBy: computation.preparedByName ?? "",
+    checkedBy: "",
+    approvedBy: computation.approvedByName ?? "",
 
     // --- LSLGC legal-document merge keys (loan_agreement / disclosure_statement
     //     / promissory_note v2). Uncaptured fields resolve to "" per this file's
