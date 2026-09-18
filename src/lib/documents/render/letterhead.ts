@@ -6,10 +6,10 @@ import { BRANDING } from "@/lib/branding";
 import type { GotenbergAsset } from "./gotenberg";
 
 /**
- * Letterhead for the Chromium renderer, matching the LSLGC source documents:
- * the company wordmark appears ONCE, centered, at the very top of page 1 (as a
- * `.doc-letterhead` block prepended to the merged body — see `index.ts`), NOT as
- * a running page header. A discreet "Page X of Y" footer runs on every page
+ * Letterhead for the Chromium renderer: the company wordmark appears ONCE,
+ * upper-right, at the very top of page 1 (as a `.doc-letterhead` block
+ * prepended to the merged body — see `index.ts`), NOT as a running page
+ * header. A discreet "Page X of Y" footer runs on every page
  * (Chattel Mortgage / REM / Loan Agreement originals carry one; PN / Disclosure
  * do not — a footer everywhere is the tidier house choice).
  *
@@ -54,7 +54,7 @@ export async function getLogoAsset(): Promise<GotenbergAsset | null> {
   }
 }
 
-/** The centered wordmark block prepended to page 1 (styled by `.doc-letterhead`). */
+/** The upper-right wordmark block prepended to page 1 (styled by `.doc-letterhead`). */
 export function buildBodyLetterhead(hasLogo: boolean): string {
   const inner = hasLogo
     ? `<img src="logo.png" alt="Loan Star Lending Group Corp." />`

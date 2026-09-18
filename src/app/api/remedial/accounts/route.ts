@@ -147,17 +147,25 @@ export async function GET(request: Request) {
 
     // Task 4 — recorded-but-unposted payment count per account (one grouped
     // query, not N+1). `payments.status` alone is authoritative for "posted".
+    //
+    // Task 4b — same query gives the effective pending total per account too
+    // (see the identical comment in src/app/api/collector/accounts/route.ts).
     const remedialActiveIds = (data ?? []).map((row) => row.id as string);
     const unpostedByMasterlist = new Map<string, number>();
+    const pendingTotalByMasterlist = new Map<string, number>();
     if (remedialActiveIds.length) {
       const { data: pendingPayments } = await supabase
         .from("payments")
-        .select("masterlist_id")
+        .select("masterlist_id, amount")
         .in("masterlist_id", remedialActiveIds)
         .in("status", ["pending_verification", "confirmed"]);
       for (const row of pendingPayments ?? []) {
         const mid = row.masterlist_id as string;
         unpostedByMasterlist.set(mid, (unpostedByMasterlist.get(mid) ?? 0) + 1);
+        pendingTotalByMasterlist.set(
+          mid,
+          (pendingTotalByMasterlist.get(mid) ?? 0) + Number(row.amount ?? 0),
+        );
       }
     }
 
@@ -275,6 +283,14 @@ export async function GET(request: Request) {
           : null,
         unpostedPaymentCount:
           unpostedByMasterlist.get(row.id as string) ?? 0,
+        pendingTotal: pendingTotalByMasterlist.get(row.id as string) ?? 0,
+        effectiveBalance:
+          (pendingTotalByMasterlist.get(row.id as string) ?? 0) > 0
+            ? Math.max(
+                0,
+                balance - (pendingTotalByMasterlist.get(row.id as string) ?? 0),
+              )
+            : undefined,
       };
     });
 

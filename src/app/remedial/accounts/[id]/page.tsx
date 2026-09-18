@@ -121,6 +121,14 @@ export default function RemedialAccountPage() {
   const [pdcChecks, setPdcChecks] = useState<LedgerPdcCheck[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  // Task 4b — posted vs. effective (posted minus everything already
+  // recorded but not yet posted) balance. `account.outstandingBalance`
+  // above stays the authoritative posted figure regardless.
+  const [effectiveBalance, setEffectiveBalance] = useState<{
+    effectiveTotal: number;
+    pendingAllocatedTotal: number;
+    pendingUnallocatedTotal: number;
+  } | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -134,12 +142,18 @@ export default function RemedialAccountPage() {
         payments: PaymentRow[];
         postings?: DeskLedgerPosting[];
         pdcChecks?: LedgerPdcCheck[];
+        effectiveBalance?: {
+          effectiveTotal: number;
+          pendingAllocatedTotal: number;
+          pendingUnallocatedTotal: number;
+        };
       };
       setAccount(data.account);
       setSchedules(data.schedules ?? []);
       setPayments(data.payments ?? []);
       setPostings(data.postings ?? []);
       setPdcChecks(data.pdcChecks ?? []);
+      setEffectiveBalance(data.effectiveBalance ?? null);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load");
     } finally {
@@ -257,6 +271,14 @@ export default function RemedialAccountPage() {
             <div className="mt-1 mono text-2xl font-semibold text-teal-300">
               ₱{formatMoney(account.outstandingBalance)}
             </div>
+            {effectiveBalance &&
+            effectiveBalance.pendingAllocatedTotal +
+              effectiveBalance.pendingUnallocatedTotal >
+              0 ? (
+              <div className="mt-0.5 mono text-xs font-normal text-amber-300">
+                → ₱{formatMoney(effectiveBalance.effectiveTotal)} after pending
+              </div>
+            ) : null}
           </div>
           <div>
             <div className="text-[10.5px] font-medium uppercase tracking-[0.14em] text-navy-200 opacity-80">

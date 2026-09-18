@@ -658,6 +658,84 @@ describe("addPaymentToDcr", () => {
       { amortizationScheduleId: "s1", amount: 1000 },
     ]);
   });
+
+  it("Task 4b — auto-allocation (no manual allocations) SKIPS an installment already fully covered by another unposted DCRR, rolling into the next one instead", async () => {
+    const { supabase, getInsertedAllocations } = makeAddStub({
+      paymentAmount: 1500,
+      schedules: [
+        {
+          id: "s1",
+          masterlist_id: "ml-1",
+          status: "pending",
+          installment_no: 1,
+          amount_due: 1000,
+          penalty_amount: 0,
+          amount_paid: 0,
+        },
+        {
+          id: "s2",
+          masterlist_id: "ml-1",
+          status: "pending",
+          installment_no: 2,
+          amount_due: 1500,
+          penalty_amount: 0,
+          amount_paid: 0,
+        },
+      ],
+    });
+
+    // No allocations arg → auto-allocation branch. s1 owes 1000 and another
+    // unposted DCRR already claims the full 1000 — before Task 4b this new
+    // ₱1500 payment would auto-allocate 1000 onto s1 (already spoken for)
+    // and only 500 onto s2, then get REJECTED by the over-allocation check.
+    // With Task 4b, auto-allocation itself sees s1 as already covered and
+    // skips straight to s2 for the full ₱1500 — no rejection, no wasted
+    // round-trip.
+    await addPaymentToDcr(
+      supabase,
+      "dcr-1",
+      "pay-1",
+      "collector-1",
+      undefined,
+      undefined,
+      makeDupServiceStub({ s1: 1000 }),
+    );
+
+    assert.deepEqual(getInsertedAllocations(), [
+      { amortizationScheduleId: "s2", amount: 1500 },
+    ]);
+  });
+
+  it("Task 4b — auto-allocation on an account with NO pending anywhere allocates exactly as before (regression)", async () => {
+    const { supabase, getInsertedAllocations } = makeAddStub({
+      paymentAmount: 1000,
+      schedules: [
+        {
+          id: "s1",
+          masterlist_id: "ml-1",
+          status: "pending",
+          installment_no: 1,
+          amount_due: 1000,
+          penalty_amount: 0,
+          amount_paid: 0,
+        },
+      ],
+    });
+
+    await addPaymentToDcr(
+      supabase,
+      "dcr-1",
+      "pay-1",
+      "collector-1",
+      undefined,
+      undefined,
+      makeDupServiceStub({}),
+    );
+
+    assert.deepEqual(getInsertedAllocations(), [
+      { amortizationScheduleId: "s1", amount: 1000 },
+    ]);
+  });
 });
 
 describe("submitDcr — Task 4 duplicate backstop", () => {

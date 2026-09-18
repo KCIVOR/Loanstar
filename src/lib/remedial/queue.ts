@@ -30,6 +30,10 @@ export type RemedialQueueMappedRow = {
   /** Task 4 — payments recorded on this account but not yet posted. `> 0` →
    * "DCR pending" flag. Optional so callers that don't set it type-check. */
   unpostedPaymentCount?: number;
+  /** Task 4b — see the identical field on CollectorQueueMappedRow
+   * (@/lib/collector/queue). */
+  effectiveBalance?: number;
+  pendingTotal?: number;
 };
 
 export type RemedialQueueKpis = {

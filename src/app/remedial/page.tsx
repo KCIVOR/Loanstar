@@ -371,6 +371,20 @@ export default function RemedialQueuePage() {
     );
   }
 
+  function renderBalance(acc: RemedialQueueMappedRow) {
+    return (
+      <>
+        {formatMoney(acc.outstandingBalance)}
+        {acc.pendingTotal && acc.pendingTotal > 0 ? (
+          <span className="mt-0.5 block text-xs font-normal text-amber-600">
+            → ₱{formatMoney(acc.effectiveBalance ?? acc.outstandingBalance)}{" "}
+            after pending
+          </span>
+        ) : null}
+      </>
+    );
+  }
+
   function renderDcrPending(acc: RemedialQueueMappedRow) {
     const n = acc.unpostedPaymentCount ?? 0;
     if (n <= 0) return null;
@@ -697,7 +711,7 @@ export default function RemedialQueuePage() {
                   <div className="row">
                     <span className="k">Outstanding</span>
                     <span className="v mono text-teal-600">
-                      {formatMoney(acc.outstandingBalance)}
+                      {renderBalance(acc)}
                     </span>
                   </div>
                   <div className="row">
@@ -784,7 +798,7 @@ export default function RemedialQueuePage() {
                     </div>
                   </Td>
                   <Td num className="mono text-teal-600">
-                    {formatMoney(acc.outstandingBalance)}
+                    {renderBalance(acc)}
                   </Td>
                   <Td num className="mono">
                     {acc.daysPastDue}

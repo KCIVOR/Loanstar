@@ -1,6 +1,6 @@
 "use client";
 
-import { forwardRef, useImperativeHandle } from "react";
+import { forwardRef, useEffect, useImperativeHandle, useState } from "react";
 import { EditorContent, useEditor, type Editor } from "@tiptap/react";
 
 import { PRINT_CSS } from "@/lib/documents/render/print-styles";
@@ -11,6 +11,9 @@ import {
 } from "@/lib/documents/templates/fields";
 
 import { templateExtensions } from "./extensions";
+import { scopeCssToClass } from "./scope-css";
+
+const DOC_SURFACE_CLASS = "tiptap-doc-surface";
 
 export type TiptapEditorHandle = { getHTML: () => string };
 
@@ -61,7 +64,7 @@ export const TiptapEditor = forwardRef<TiptapEditorHandle, { initialBody: string
       content: initialBody,
       editorProps: {
         attributes: {
-          class: "tiptap-doc-surface focus:outline-none",
+          class: `${DOC_SURFACE_CLASS} focus:outline-none`,
         },
       },
       immediatelyRender: false,
@@ -70,6 +73,16 @@ export const TiptapEditor = forwardRef<TiptapEditorHandle, { initialBody: string
     useImperativeHandle(ref, () => ({
       getHTML: () => editor?.getHTML() ?? initialBody,
     }));
+
+    // Scoped client-side only — PRINT_CSS has bare `body`/`h1`/`table`
+    // selectors that are correct for wrapping a standalone PDF but would
+    // otherwise hijack this whole admin page's typography the moment this
+    // component mounts. Starts empty so nothing unscoped ever paints, even
+    // for a frame.
+    const [scopedPrintCss, setScopedPrintCss] = useState("");
+    useEffect(() => {
+      setScopedPrintCss(scopeCssToClass(PRINT_CSS, DOC_SURFACE_CLASS));
+    }, []);
 
     if (!editor) {
       return <div className="min-h-[460px] rounded-lg border border-line bg-white" />;
@@ -81,10 +94,10 @@ export const TiptapEditor = forwardRef<TiptapEditorHandle, { initialBody: string
     return (
       <div className="flex flex-col gap-2">
         <style>{`
-          .tiptap-doc-surface { min-height: 460px; padding: 1rem; }
-          .tiptap-doc-surface [data-repeat] { outline: 1px dashed #9aa5b1; outline-offset: 3px; }
-          .tiptap-doc-surface [data-if], .tiptap-doc-surface [data-unless] { background: rgba(255,214,0,.12); }
-          ${PRINT_CSS}
+          .${DOC_SURFACE_CLASS} { min-height: 460px; padding: 1rem; }
+          .${DOC_SURFACE_CLASS} [data-repeat] { outline: 1px dashed #9aa5b1; outline-offset: 3px; }
+          .${DOC_SURFACE_CLASS} [data-if], .${DOC_SURFACE_CLASS} [data-unless] { background: rgba(255,214,0,.12); }
+          ${scopedPrintCss}
         `}</style>
 
         <div className="flex flex-wrap items-center gap-1 rounded-lg border border-line bg-surface-2 p-1.5">

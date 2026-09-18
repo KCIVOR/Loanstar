@@ -168,22 +168,38 @@ export async function GET(request: Request) {
     // Task 4 — recorded-but-unposted payment count per account, so the queue
     // can flag "DCR pending" without opening each one. One grouped query (not
     // N+1); `payments.status` alone is authoritative for "posted".
+    //
+    // Task 4b — the SAME query also gives the "effective" pending total per
+    // account. A `dcr_items.amount` always equals its payment's amount (set
+    // that way at insert), so summing every unposted-status payment's amount
+    // for a masterlist equals `pendingAllocatedTotal + pendingUnallocatedTotal`
+    // from `deriveEffectiveBalance` (@/lib/ar/effective-balance) — whether or
+    // not each payment has been added to a DCR yet. List-level display only
+    // needs this account-wide total, not the per-installment breakdown the
+    // record-payment screen shows, so no second query is needed here.
     const unpostedByMasterlist = new Map<string, number>();
+    const pendingTotalByMasterlist = new Map<string, number>();
     if (activeIds.length) {
       const { data: pendingPayments } = await supabase
         .from("payments")
-        .select("masterlist_id")
+        .select("masterlist_id, amount")
         .in("masterlist_id", activeIds)
         .in("status", ["pending_verification", "confirmed"]);
       for (const row of pendingPayments ?? []) {
         const id = row.masterlist_id as string;
         unpostedByMasterlist.set(id, (unpostedByMasterlist.get(id) ?? 0) + 1);
+        pendingTotalByMasterlist.set(
+          id,
+          (pendingTotalByMasterlist.get(id) ?? 0) + Number(row.amount ?? 0),
+        );
       }
     }
 
     const accounts: CollectorQueueMappedRow[] = (data ?? []).map((row) => {
       const schedules = asSchedules(row.amortization_schedules);
       const next = nextOpenInstallment(schedules);
+      const outstandingBalance = Number(row.outstanding_balance ?? 0);
+      const pendingTotal = pendingTotalByMasterlist.get(row.id as string) ?? 0;
       return {
         id: row.id,
         borrowerId: row.borrower_id as string,
@@ -196,7 +212,7 @@ export async function GET(request: Request) {
             : "seafarer",
         manningAgency: (row.manning_agency as string | null) ?? null,
         vesselName: (row.vessel_name as string | null) ?? null,
-        outstandingBalance: Number(row.outstanding_balance ?? 0),
+        outstandingBalance,
         agingBucket: String(row.aging_bucket ?? ""),
         firstPaymentDate: (row.first_payment_date as string | null) ?? null,
         nextDueDate: next?.due_date ?? null,
@@ -204,6 +220,13 @@ export async function GET(request: Request) {
         lastContact: lastContactByMasterlist.get(row.id as string) ?? null,
         unpostedPaymentCount:
           unpostedByMasterlist.get(row.id as string) ?? 0,
+        // Task 4b — additive; KPIs/filters/sort below still use
+        // `outstandingBalance` only, per the plan's constraint.
+        pendingTotal,
+        effectiveBalance:
+          pendingTotal > 0
+            ? Math.max(0, outstandingBalance - pendingTotal)
+            : undefined,
       };
     });
 

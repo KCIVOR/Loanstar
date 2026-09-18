@@ -106,10 +106,6 @@ export async function GET(request: Request) {
       };
     });
 
-    const allocation = isSurcharge
-      ? [{ amortizationScheduleId: null, amount: Number(payment.amount) }]
-      : computeAutoAllocation(Number(payment.amount), installments);
-
     // Task 4 — how much of each installment is already spoken for by a
     // `pending` item on another unposted DCRR for this account, so the modal
     // can grey out / annotate those rows. Service-role (a prior assignee's
@@ -118,6 +114,24 @@ export async function GET(request: Request) {
       createServiceClient(),
       payment.masterlist_id as string,
     );
+
+    // Task 4b (Option B) — the preview's own auto-allocation uses the
+    // *effective* remaining (posted minus pending), so the preview shown
+    // here matches what `addPaymentToDcr` will actually do when this
+    // payment is added without a manual allocation. Same "inflate
+    // amountPaid" trick as `fetchEffectiveOpenInstallments`
+    // (`@/lib/ar/posting`) — capped so an over-allocated installment reads
+    // as fully covered, not a false negative-remaining advance.
+    const effectiveInstallments = installments.map((inst) => {
+      const pending = pendingByInstallment[inst.id]?.amount ?? 0;
+      if (pending <= 0) return inst;
+      const cap = inst.amountDue + inst.penaltyAmount;
+      return { ...inst, amountPaid: Math.min(cap, inst.amountPaid + pending) };
+    });
+
+    const allocation = isSurcharge
+      ? [{ amortizationScheduleId: null, amount: Number(payment.amount) }]
+      : computeAutoAllocation(Number(payment.amount), effectiveInstallments);
 
     // Collector Discount (Phase 2) — eligibility lists for the DCRR
     // discount UI (Phase 4). Uses the same daysPastDue/computeAgingBucket

@@ -40,6 +40,14 @@ export type CollectorQueueMappedRow = {
    * Accounting. `> 0` → show a "DCR pending" flag. Optional so consumers that
    * don't set it (older callers, tests) still type-check. */
   unpostedPaymentCount?: number;
+  /** Task 4b — `outstandingBalance` minus everything already recorded but
+   * not yet posted (see @/lib/ar/effective-balance). Only present when
+   * `pendingTotal > 0`; `outstandingBalance` above stays the authoritative
+   * posted figure regardless. Optional, same reason as the field above. */
+  effectiveBalance?: number;
+  /** Task 4b — the pending amount `effectiveBalance` above was derived
+   * from. `0`/absent means this account has nothing pending. */
+  pendingTotal?: number;
 };
 
 export type CollectorQueueKpis = {

@@ -111,6 +111,27 @@ const Div = Node.create({
         parseHTML: (el) => el.getAttribute("class"),
         renderHTML: (a) => (a.class ? { class: a.class } : {}),
       },
+      // `data-compact-nudge` — a boolean marker for the compact-layout pass's
+      // per-document font-size nudge (docs/revision-plans/compact-document-
+      // layout-plan.md Phase 3). No inline `style` involved (TipTap's
+      // serialiser strips those unconditionally) — the attribute alone maps
+      // to a fixed font-size via PRINT_CSS's `[data-compact-nudge]` rule.
+      dataCompactNudge: {
+        default: null,
+        parseHTML: (el) => el.getAttribute("data-compact-nudge"),
+        renderHTML: (a) =>
+          a.dataCompactNudge != null ? { "data-compact-nudge": a.dataCompactNudge } : {},
+      },
+      // `data-accurate` — a boolean marker for a document whose typography was
+      // measured directly from its real LSLGC source .doc (docx XML: font size
+      // in half-points, spacing in twips) rather than estimated. Maps to a
+      // fixed CSS scope in PRINT_CSS, same reasoning as `data-compact-nudge`:
+      // no inline style survives TipTap's serialiser.
+      dataAccurate: {
+        default: null,
+        parseHTML: (el) => el.getAttribute("data-accurate"),
+        renderHTML: (a) => (a.dataAccurate != null ? { "data-accurate": a.dataAccurate } : {}),
+      },
     };
   },
   parseHTML() {
@@ -120,6 +141,12 @@ const Div = Node.create({
     const attrs: Record<string, string> = {};
     if (node.attrs.dataAlign) attrs["data-align"] = String(node.attrs.dataAlign);
     if (node.attrs.class) attrs.class = String(node.attrs.class);
+    if (node.attrs.dataCompactNudge != null) {
+      attrs["data-compact-nudge"] = String(node.attrs.dataCompactNudge);
+    }
+    if (node.attrs.dataAccurate != null) {
+      attrs["data-accurate"] = String(node.attrs.dataAccurate);
+    }
     return ["div", attrs, 0];
   },
 });
@@ -249,6 +276,22 @@ const RepeatTableRow = TableRow.extend({
   },
 });
 
+/** `data-plain` — borderless layout tables (PRINT_CSS's `table[data-plain]`
+ * rule); same round-trip problem/fix as `data-repeat` above — an attribute
+ * not declared here is silently dropped by TipTap's parse/serialise. */
+const PlainTable = Table.extend({
+  addAttributes() {
+    return {
+      ...this.parent?.(),
+      dataPlain: {
+        default: null,
+        parseHTML: (el) => el.getAttribute("data-plain"),
+        renderHTML: (a) => (a.dataPlain != null ? { "data-plain": a.dataPlain } : {}),
+      },
+    };
+  },
+});
+
 /** Cells: inline content, and no `colspan="1"` / `rowspan="1"` noise. */
 function inlineCell<T extends typeof TableCell | typeof TableHeader>(base: T) {
   return base.extend({
@@ -280,7 +323,7 @@ export function templateExtensions() {
     AlignAttribute,
     Underline,
     Link.configure({ openOnClick: false, autolink: false }),
-    Table.configure({ resizable: false }),
+    PlainTable.configure({ resizable: false }),
     RepeatTableRow,
     InlineTableHeader,
     InlineTableCell,

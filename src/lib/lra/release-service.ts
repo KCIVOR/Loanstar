@@ -688,8 +688,14 @@ async function loadReleaseGenerationContext(
   // The CI inspection's vehicles/properties (see collateral-context.ts) —
   // one document table row per collateral item, replacing the previous
   // hardcoded empty vehicles[]/properties[] on every chattel/REM document.
+  // `verifications_select` RLS only allows `verification`/`committee` module
+  // viewers (+ super admin) to read this table — an LRA officer's session
+  // client can't see it, so this always resolved to empty without a service
+  // client, silently blanking every vehicle/property table on release
+  // documents. Same cross-module-read-needs-service-client pattern used
+  // elsewhere in this file (see `createServiceClient` call sites above).
   const collateral = await loadCollateralDocumentContext(
-    supabase,
+    createServiceClient(),
     file.loanApplicationId,
   );
 

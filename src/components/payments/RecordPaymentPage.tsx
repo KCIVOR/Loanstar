@@ -69,6 +69,23 @@ type AccountPayload = {
     totalAmount: number;
     references: string[];
   };
+  /** Task 4b — posted vs. "effective" (posted minus everything already
+   * recorded but not yet posted) balance. `outstandingBalance` on `account`
+   * above is always the authoritative posted figure; this is a secondary,
+   * always-labelled display, never a replacement. Absent on desks not yet
+   * wired. */
+  effectiveBalance?: {
+    postedTotal: number;
+    effectiveTotal: number;
+    pendingAllocatedTotal: number;
+    pendingUnallocatedTotal: number;
+    perInstallment: Array<{
+      id: string;
+      netRemaining: number;
+      pendingApplied: number;
+      effectiveRemaining: number;
+    }>;
+  };
 };
 
 async function requestAccount(apiPath: string): Promise<AccountPayload> {
@@ -134,6 +151,15 @@ export function RecordPaymentPage({
     });
   }, [data]);
 
+  const pendingByScheduleId = useMemo(() => {
+    if (!data?.effectiveBalance) return undefined;
+    const map = new Map<string, number>();
+    for (const inst of data.effectiveBalance.perInstallment) {
+      if (inst.pendingApplied > 0) map.set(inst.id, inst.pendingApplied);
+    }
+    return map;
+  }, [data]);
+
   async function handleRecorded(result?: { warning?: string }) {
     setMessage(
       result?.warning
@@ -151,6 +177,10 @@ export function RecordPaymentPage({
   if (!data) return <Alert variant="danger">{error ?? "Account not found."}</Alert>;
 
   const { account, schedules, payments } = data;
+  const pendingTotal = data.effectiveBalance
+    ? data.effectiveBalance.pendingAllocatedTotal +
+      data.effectiveBalance.pendingUnallocatedTotal
+    : 0;
   const backHref =
     desk === "collector"
       ? "/collector/accounts"
@@ -172,7 +202,11 @@ export function RecordPaymentPage({
       <Breadcrumbs className="mb-3" items={breadcrumbs} />
       <PageHeader
         title={`Record payment — ${account.borrowerName}`}
-        description={`${account.loanAccountNo ?? account.borrowerNo ?? "Loan account"} · Outstanding ₱${formatMoney(account.outstandingBalance)}`}
+        description={
+          pendingTotal > 0 && data.effectiveBalance
+            ? `${account.loanAccountNo ?? account.borrowerNo ?? "Loan account"} · Outstanding ₱${formatMoney(account.outstandingBalance)} (posted) · ₱${formatMoney(data.effectiveBalance.effectiveTotal)} after pending`
+            : `${account.loanAccountNo ?? account.borrowerNo ?? "Loan account"} · Outstanding ₱${formatMoney(account.outstandingBalance)}`
+        }
       />
 
       <div className="mb-3 flex flex-wrap items-center gap-2">
@@ -224,7 +258,7 @@ export function RecordPaymentPage({
             showMark={false}
           />
         ) : (
-          <AccountLedger rows={ledgerRows} />
+          <AccountLedger rows={ledgerRows} pendingByScheduleId={pendingByScheduleId} />
         )}
       </section>
 
@@ -239,6 +273,14 @@ export function RecordPaymentPage({
             <span className="mt-1 block text-xs text-ink-500">
               Pending ref{data.unpostedOnAccount.references.length === 1 ? "" : "s"}:{" "}
               {data.unpostedOnAccount.references.join(", ")}
+            </span>
+          ) : null}
+          {data.effectiveBalance && pendingTotal > 0 ? (
+            <span className="mt-1 block text-xs text-ink-500">
+              After those pending payments, this account effectively owes ₱
+              {formatMoney(data.effectiveBalance.effectiveTotal)} — the posted
+              balance above (₱{formatMoney(account.outstandingBalance)}) won&apos;t
+              update until Accounting posts them.
             </span>
           ) : null}
         </Alert>

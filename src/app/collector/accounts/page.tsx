@@ -364,6 +364,20 @@ export default function CollectorAccountsPage() {
     return <span className="text-ink-400">—</span>;
   }
 
+  function renderBalance(acc: CollectorQueueMappedRow) {
+    return (
+      <>
+        {formatMoney(acc.outstandingBalance)}
+        {acc.pendingTotal && acc.pendingTotal > 0 ? (
+          <span className="mt-0.5 block text-xs font-normal text-amber-600">
+            → ₱{formatMoney(acc.effectiveBalance ?? acc.outstandingBalance)}{" "}
+            after pending
+          </span>
+        ) : null}
+      </>
+    );
+  }
+
   function renderDcrPending(acc: CollectorQueueMappedRow) {
     const n = acc.unpostedPaymentCount ?? 0;
     if (n <= 0) return null;
@@ -662,7 +676,7 @@ export default function CollectorAccountsPage() {
                   <div className="row">
                     <span className="k">Balance</span>
                     <span className="v mono text-teal-600">
-                      {formatMoney(acc.outstandingBalance)}
+                      {renderBalance(acc)}
                     </span>
                   </div>
                   <div className="row">
@@ -728,7 +742,7 @@ export default function CollectorAccountsPage() {
                     </span>
                   </Td>
                   <Td num className="mono text-teal-600">
-                    {formatMoney(acc.outstandingBalance)}
+                    {renderBalance(acc)}
                   </Td>
                   <Td>
                     <Badge variant={agingVariant(acc.agingBucket)}>

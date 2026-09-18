@@ -564,6 +564,7 @@ export const FIELD_FLAGS: MergeField[] = [
   { key: "isBiMonthly", label: "Bi-monthly amortization schedule", sample: "" },
   { key: "isPerDayInterest", label: "Per-day (prorated) interest, one-time payment", sample: "" },
   { key: "hasInvoiceAnnex", label: "Invoice-financing annex applies", sample: "" },
+  { key: "isStandardSchedule", label: "Standard monthly schedule (none of the above apply)", sample: "true" },
   { key: "isNonPdc", label: "Released without PDCs (cash path)", sample: "" },
   { key: "isQuarterly", label: "Quarterly amortization schedule (Vienovo)", sample: "true" },
   { key: "isEvery2Months", label: "Every-2-months amortization schedule (Vienovo)", sample: "" },

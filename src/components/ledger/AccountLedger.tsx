@@ -28,6 +28,12 @@ type AccountLedgerProps = {
   className?: string;
   caption?: string;
   selection?: LedgerSelection;
+  /** Task 4b — an optional "Pending" column, keyed by `row.scheduleId`,
+   * showing how much of this installment is already recorded on a
+   * draft/submitted DCR but not yet posted. Ignored entirely when omitted,
+   * same convention as `selection` above — every other AccountLedger
+   * consumer (e.g. AR, which doesn't pass this) renders exactly as before. */
+  pendingByScheduleId?: Map<string, number>;
 };
 
 function moneyCell(value: number | null) {
@@ -132,7 +138,22 @@ export function AccountLedger({
   className = "",
   caption,
   selection,
+  pendingByScheduleId,
 }: AccountLedgerProps) {
+  const showPending = pendingByScheduleId != null;
+  function pendingCell(scheduleId: string | null) {
+    if (!showPending) return null;
+    const amount = scheduleId ? pendingByScheduleId!.get(scheduleId) : undefined;
+    return (
+      <Td num className="mono">
+        {amount != null && amount > 0 ? (
+          <span className="text-amber-700">{moneyCell(amount)}</span>
+        ) : (
+          "—"
+        )}
+      </Td>
+    );
+  }
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
 
   function toggle(scheduleId: string) {
@@ -167,6 +188,7 @@ export function AccountLedger({
             <Th num>Balance</Th>
             <Th num>This month</Th>
             <Th num>Penalty left</Th>
+            {showPending ? <Th num>Pending</Th> : null}
             <Th>Status</Th>
             {selection ? <Th num>Surcharge</Th> : null}
           </tr>
@@ -240,6 +262,7 @@ export function AccountLedger({
                   <Td num className="mono">
                     {moneyCell(row.penaltyRemaining)}
                   </Td>
+                  {pendingCell(row.scheduleId)}
                   <Td>
                     {row.status ? (
                       <Badge variant={statusVariant(row.status)} dot>
@@ -311,6 +334,7 @@ export function AccountLedger({
                   <Td num className="mono">
                     {moneyCell(last.penaltyRemaining)}
                   </Td>
+                  {pendingCell(item.scheduleId)}
                   <Td>
                     {last.status ? (
                       <Badge variant={statusVariant(last.status)} dot>
@@ -358,6 +382,11 @@ export function AccountLedger({
                         <Td num className="mono text-ink-600">
                           {moneyCell(r.penaltyRemaining)}
                         </Td>
+                        {showPending ? (
+                          <Td num className="mono text-ink-400">
+                            —
+                          </Td>
+                        ) : null}
                         <Td>—</Td>
                         {selection ? <Td num className="mono">—</Td> : null}
                       </tr>

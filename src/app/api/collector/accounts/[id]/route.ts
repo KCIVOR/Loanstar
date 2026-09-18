@@ -1,5 +1,6 @@
 import { handleApiError, jsonOk } from "@/lib/api/handler";
 import { summarizeUnpostedForAccount } from "@/lib/ar/duplicate-dcr";
+import { getAccountEffectiveBalance } from "@/lib/ar/effective-balance";
 import { fetchAccountPostings } from "@/lib/collection/account-postings";
 import { COLLECTOR_QUEUE_ACCOUNT_STATUS } from "@/lib/collector/queue";
 import { AMORTIZATION_SCHEDULE_LEDGER_COLUMNS } from "@/lib/ledger/build-account-ledger-rows";
@@ -105,6 +106,11 @@ export async function GET(_request: Request, { params }: RouteParams) {
     // listMoveOfPaymentCandidates would otherwise fail to find it.
     const admin = createServiceClient();
     const moveOfPayment = await listMoveOfPaymentCandidates(admin, id);
+    // Task 4b — the "effective" balance (posted minus everything already
+    // recorded but not yet posted). Additive only; `outstandingBalance`
+    // below is untouched and stays the authoritative posted figure. See
+    // docs/revision-plans/task-04b-effective-balance-plan.md.
+    const effectiveBalance = await getAccountEffectiveBalance(admin, id);
     const scheduleRows = (
       Array.isArray(data.amortization_schedules)
         ? data.amortization_schedules
@@ -171,6 +177,13 @@ export async function GET(_request: Request, { params }: RouteParams) {
       postings,
       pdcChecks,
       moveOfPayment,
+      effectiveBalance: {
+        postedTotal: effectiveBalance.postedTotal,
+        effectiveTotal: effectiveBalance.effectiveTotal,
+        pendingAllocatedTotal: effectiveBalance.pendingAllocatedTotal,
+        pendingUnallocatedTotal: effectiveBalance.pendingUnallocatedTotal,
+        perInstallment: effectiveBalance.perInstallment,
+      },
     });
   } catch (error) {
     return handleApiError(error);

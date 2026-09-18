@@ -100,6 +100,46 @@ export async function fetchOpenInstallments(
 }
 
 /**
+ * Task 4b — `fetchOpenInstallments` minus whatever's already sitting on
+ * another draft/submitted DCR, so the DCR builder's auto-allocation can't
+ * pick an installment another unposted DCR already covers. Does NOT modify
+ * `fetchOpenInstallments` itself — `recomputeOutstandingBalance` and every
+ * other existing caller must keep reading the true posted view. Only
+ * `addPaymentToDcr`'s auto-allocation branch and the DCR allocation-preview
+ * route use this variant; `postSingleDcrItem`'s own internal
+ * `fetchOpenInstallments` call must stay on the posted view (it's computing
+ * what the payment being posted right now applies to).
+ *
+ * Implemented as `amountPaid` inflated by the pending amount rather than a
+ * parallel "remaining" field, so `netInstallmentDue` (called inside
+ * `computeAutoAllocation` exactly as it always has) naturally nets pending
+ * out without `computeAutoAllocation` itself needing to change at all —
+ * per the plan's constraint that its shape/behaviour stay untouched.
+ * `admin` must be a service-role client — a collector's own session can't
+ * see another collector's unposted DCRs (RLS), same reasoning as
+ * `loadPendingAllocationsForAccount` itself.
+ */
+export async function fetchEffectiveOpenInstallments(
+  admin: SupabaseClient,
+  masterlistId: string,
+): Promise<OpenInstallment[]> {
+  const [openInstallments, pendingRaw] = await Promise.all([
+    fetchOpenInstallments(admin, masterlistId),
+    loadPendingAllocationsForAccount(admin, masterlistId),
+  ]);
+
+  return openInstallments.map((inst) => {
+    const pending = pendingRaw[inst.id]?.amount ?? 0;
+    if (pending <= 0) return inst;
+    // Floored at amountDue+penalty so an over-allocated installment (pending
+    // exceeds what it owes) still reads as "fully covered," not negative
+    // remaining feeding back in as a false advance.
+    const cap = inst.amountDue + inst.penaltyAmount;
+    return { ...inst, amountPaid: Math.min(cap, inst.amountPaid + pending) };
+  });
+}
+
+/**
  * Interest portion per installment isn't stored anywhere (amount_due is
  * principal+interest blended) — derive it from the loan's own active
  * computation, same even-split convention (totalInterest ÷ terms, halved
@@ -1581,6 +1621,18 @@ export async function addPaymentToDcr(
 
   const masterlistId = payment.masterlist_id as string;
   let resolvedAllocations: AllocationLine[];
+  // Populated by the auto-allocation branch below (Task 4b), and reused by
+  // the over-allocation check afterward instead of re-fetching — but ONLY
+  // in that branch. The manual-allocation branch must call
+  // `validateAllocationLines` as its very first action, with no client
+  // creation or query before it (existing callers, incl. tests, rely on it
+  // throwing before touching the DB) — so it deliberately does NOT populate
+  // these; the over-allocation check fetches fresh for that path, exactly as
+  // it did before this task (2026-09-15 fix — an earlier version of this
+  // consolidation hoisted the fetch above `validateAllocationLines` and
+  // broke that contract; caught by the existing test suite).
+  let openInstallments: OpenInstallment[] | undefined;
+  let pendingByInstallment: Record<string, number> | undefined;
 
   if (allocations) {
     await validateAllocationLines(
@@ -1591,10 +1643,30 @@ export async function addPaymentToDcr(
     );
     resolvedAllocations = allocations;
   } else {
-    const openInstallments = await fetchOpenInstallments(supabase, masterlistId);
+    // Task 4b (Option B) — auto-allocation uses the *effective* open
+    // installments, so it skips an installment another unposted DCR already
+    // fully covers instead of allocating onto it and then getting rejected
+    // by the over-allocation check below. Manual allocation (the `if`
+    // branch above) is deliberately untouched — see Part F #6 of the plan.
+    const dupAdmin = serviceClient ?? createServiceClient();
+    const [fetchedOpen, pendingRaw] = await Promise.all([
+      fetchOpenInstallments(supabase, masterlistId),
+      loadPendingAllocationsForAccount(dupAdmin, masterlistId),
+    ]);
+    openInstallments = fetchedOpen;
+    pendingByInstallment = {};
+    for (const [sid, v] of Object.entries(pendingRaw)) {
+      pendingByInstallment[sid] = v.amount;
+    }
+    const effectiveOpenInstallments = fetchedOpen.map((inst) => {
+      const pending = pendingByInstallment![inst.id] ?? 0;
+      if (pending <= 0) return inst;
+      const cap = inst.amountDue + inst.penaltyAmount;
+      return { ...inst, amountPaid: Math.min(cap, inst.amountPaid + pending) };
+    });
     resolvedAllocations = computeAutoAllocation(
       Number(payment.amount),
-      openInstallments,
+      effectiveOpenInstallments,
     );
   }
 
@@ -1602,8 +1674,10 @@ export async function addPaymentToDcr(
   // partly-claimed installment is fine; only a real *over*-fill is refused —
   // where this payment's allocation + everything already pending on OTHER
   // unposted DCRRs for this account would exceed what the installment still
-  // owes. This matches the "₱X free" hint the Allocate modal shows. Service-
-  // role lookup (RLS hides other collectors' DCRRs); throws on error.
+  // owes. This matches the "₱X free" hint the Allocate modal shows. Kept as
+  // a real safety net even with Task 4b's smarter auto-allocation above,
+  // since the manual-allocation path (skipped by Task 4b entirely) can still
+  // reach this state.
   const candidateByInstallment: Record<string, number> = {};
   for (const line of resolvedAllocations) {
     if (line.amortizationScheduleId) {
@@ -1612,20 +1686,23 @@ export async function addPaymentToDcr(
     }
   }
   if (Object.keys(candidateByInstallment).length > 0) {
-    const dupAdmin = serviceClient ?? createServiceClient();
-    // No excludeDcrId: this draft's own already-added items count toward the
-    // installment total too, so re-filling the same row twice is caught.
-    const pendingRaw = await loadPendingAllocationsForAccount(
-      dupAdmin,
-      masterlistId,
-    );
-    const pendingByInstallment: Record<string, number> = {};
-    for (const [sid, v] of Object.entries(pendingRaw)) {
-      pendingByInstallment[sid] = v.amount;
+    // Reuse the auto-allocation branch's fetch when we have it (Task 4b
+    // consolidation); the manual-allocation path never populated these
+    // above, so fetch fresh here — same as before this task.
+    if (!openInstallments || !pendingByInstallment) {
+      const dupAdmin = serviceClient ?? createServiceClient();
+      const [fetchedOpen, pendingRaw] = await Promise.all([
+        fetchOpenInstallments(supabase, masterlistId),
+        loadPendingAllocationsForAccount(dupAdmin, masterlistId),
+      ]);
+      openInstallments = fetchedOpen;
+      pendingByInstallment = {};
+      for (const [sid, v] of Object.entries(pendingRaw)) {
+        pendingByInstallment[sid] = v.amount;
+      }
     }
-    const openForDue = await fetchOpenInstallments(supabase, masterlistId);
     const remainingDue: Record<string, number> = {};
-    for (const inst of openForDue) {
+    for (const inst of openInstallments) {
       remainingDue[inst.id] = netInstallmentDue({
         amountDue: inst.amountDue,
         discountAmount: inst.discountAmount,

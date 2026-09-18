@@ -1,5 +1,6 @@
 import { handleApiError, jsonOk } from "@/lib/api/handler";
 import { summarizeUnpostedForAccount } from "@/lib/ar/duplicate-dcr";
+import { getAccountEffectiveBalance } from "@/lib/ar/effective-balance";
 import { fetchAccountPostings } from "@/lib/collection/account-postings";
 import { nextOpenInstallment, type ScheduleLite } from "@/lib/collector/desk";
 import { AMORTIZATION_SCHEDULE_LEDGER_COLUMNS } from "@/lib/ledger/build-account-ledger-rows";
@@ -188,6 +189,12 @@ export async function GET(_request: Request, { params }: RouteParams) {
     });
 
     const postings = await fetchAccountPostings(id);
+    // Task 4b — see docs/revision-plans/task-04b-effective-balance-plan.md.
+    // Additive only; `outstandingBalance` above is untouched.
+    const effectiveBalance = await getAccountEffectiveBalance(
+      createServiceClient(),
+      id,
+    );
 
     const scheduleRows = (
       Array.isArray(data.amortization_schedules)
@@ -265,6 +272,13 @@ export async function GET(_request: Request, { params }: RouteParams) {
       ),
       postings,
       pdcChecks,
+      effectiveBalance: {
+        postedTotal: effectiveBalance.postedTotal,
+        effectiveTotal: effectiveBalance.effectiveTotal,
+        pendingAllocatedTotal: effectiveBalance.pendingAllocatedTotal,
+        pendingUnallocatedTotal: effectiveBalance.pendingUnallocatedTotal,
+        perInstallment: effectiveBalance.perInstallment,
+      },
     });
   } catch (error) {
     return handleApiError(error);

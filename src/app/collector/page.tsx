@@ -351,6 +351,11 @@ export default function CollectorOverviewPage() {
                 <div className="flex items-center gap-2">
                   <span className="mono text-sm text-teal-600">
                     ₱{formatMoney(acc.outstandingBalance)}
+                    {acc.pendingTotal && acc.pendingTotal > 0 ? (
+                      <span className="ml-1 text-xs font-normal text-amber-600">
+                        → ₱{formatMoney(acc.effectiveBalance ?? acc.outstandingBalance)}
+                      </span>
+                    ) : null}
                   </span>
                   <Badge variant={agingVariant(acc.agingBucket)}>
                     {acc.agingBucket}

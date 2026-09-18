@@ -226,6 +226,17 @@ export function buildReleaseTemplateContext(
     })),
   ];
 
+  // Loan Agreement payment-structure flags — not inferable from release data
+  // yet, so they stay false until wired (see the `base` comment below). Kept
+  // as locals so `isStandardSchedule` (used by the template's Clause 2/3 to
+  // pick the plain-monthly text with a single condition, since nested
+  // data-if/data-unless doesn't survive the editor round-trip — see
+  // docs/revision-plans/document-fidelity-audit.md Phase 2) always follows
+  // them correctly once they're wired, without a second fix to remember.
+  const isBiMonthly = false;
+  const isPerDayInterest = false;
+  const hasInvoiceAnnex = false;
+
   const base: Record<string, unknown> = {
     companyName: "Loan Star Lending Group Corp.",
     borrowerName: blri.borrowerName,
@@ -420,9 +431,15 @@ export function buildReleaseTemplateContext(
     isDtiBorrower: false,
     isIndividualBorrower: isIndividual,
     hasSecurityCheck: true,
-    isBiMonthly: false,
-    isPerDayInterest: false,
-    hasInvoiceAnnex: false,
+    isBiMonthly,
+    isPerDayInterest,
+    hasInvoiceAnnex,
+    // Single-condition-per-paragraph is what actually survives the TipTap
+    // editor round-trip (nested data-if/data-unless spans do not — verified
+    // empirically, see docs/revision-plans/document-fidelity-audit.md Phase
+    // 2). This lets the template pick the standard Clause 2/3 text with one
+    // flag instead of a triple negation.
+    isStandardSchedule: !isBiMonthly && !isPerDayInterest && !hasInvoiceAnnex,
     isNonPdc: !isCheck,
     invoices: [] as unknown[],
 
