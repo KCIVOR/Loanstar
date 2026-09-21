@@ -3,15 +3,29 @@ import { createSignedDownloadUrl } from "@/lib/documents/storage";
 import {
   ForbiddenError,
   NotFoundError,
-  requireModulePermission,
+  hasModulePermission,
+  isSuperAdmin,
+  requireAuth,
 } from "@/lib/permissions/server";
+import {
+  canReviewAssignedPayment,
+  getPaymentReviewContext,
+} from "@/lib/notifications/workflow-recipients";
 import { createClient } from "@/lib/supabase/server";
 
 type RouteParams = { params: Promise<{ id: string }> };
 
 export async function GET(_request: Request, { params }: RouteParams) {
   try {
-    const user = await requireModulePermission("collection", "view");
+    const user = await requireAuth();
+    const [canCollect, canRemedial, superAdmin] = await Promise.all([
+      hasModulePermission("collection", "view", user.id),
+      hasModulePermission("remedial", "view", user.id),
+      isSuperAdmin(user.id),
+    ]);
+    if (!canCollect && !canRemedial && !superAdmin) {
+      throw new ForbiddenError("Payment not found");
+    }
     const { id } = await params;
     const supabase = await createClient();
 
@@ -28,14 +42,11 @@ export async function GET(_request: Request, { params }: RouteParams) {
       );
     }
 
-    const { data: assignment } = await supabase
-      .from("assignments")
-      .select("id")
-      .eq("masterlist_id", payment.masterlist_id)
-      .eq("collector_user_id", user.id)
-      .maybeSingle();
-
-    if (!assignment) {
+    const context = await getPaymentReviewContext(supabase, id);
+    if (
+      !context ||
+      !canReviewAssignedPayment(user.id, context.assignment, superAdmin)
+    ) {
       throw new ForbiddenError("Payment not found");
     }
 
