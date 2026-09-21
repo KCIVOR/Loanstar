@@ -9,6 +9,8 @@ import {
   assertPaymentProofPathOwnedByBorrower,
   isAllowedPaymentProofMime,
 } from "@/lib/payments/proof-storage";
+import { getProofReviewRecipient } from "@/lib/notifications/workflow-recipients";
+import { notifyUser } from "@/lib/notifications/write";
 import {
   ForbiddenError,
   requireModulePermission,
@@ -271,6 +273,24 @@ export async function POST(request: Request, ctx: { params: Promise<{ id: string
         bucket: DOCUMENT_BUCKET,
       },
     });
+
+    // Service role: borrowers cannot read `assignments` under RLS, and the
+    // assignment is looked up for the borrower's own verified masterlist only.
+    const reviewerId = await getProofReviewRecipient(
+      createServiceClient(),
+      ctxData.masterlistId,
+    );
+    if (reviewerId) {
+      await notifyUser({
+        userId: reviewerId,
+        title: "Payment proof awaiting verification",
+        body: "A borrower submitted a payment proof that requires review.",
+        link: "/collector/proofs",
+        kind: "payment_proof_submitted",
+        entityType: "payment",
+        entityId: data.id as string,
+      });
+    }
 
     return jsonOk({ payment: data });
   } catch (error) {
