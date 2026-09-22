@@ -971,7 +971,7 @@ export default function CommitteeApplicationPage() {
           onClose={() => setShowApplicationForm(false)}
           className="!max-w-4xl"
         >
-          <div className="max-h-[65vh] overflow-y-auto pr-1">
+          <div className="pr-1 pb-4">
             <ApplicantProfileFields
               profile={data.borrower}
               segment={data.application.segment}
@@ -1870,7 +1870,7 @@ export default function CommitteeApplicationPage() {
             </p>
           }
         >
-          <div className="max-h-[65vh] overflow-y-auto pr-1">
+          <div className="pr-1 pb-4">
             {isSme && data.application.isReloan ? (
               <SmeReloanVerificationForm
                 value={data.verification.smeReloanVerification}
@@ -1905,7 +1905,7 @@ export default function CommitteeApplicationPage() {
             </p>
           }
         >
-          <div className="max-h-[65vh] overflow-y-auto pr-1">
+          <div className="pr-1 pb-4">
             <CmInspectionForm
               value={data.verification.cmInspection}
               onChange={() => undefined}
@@ -1930,7 +1930,7 @@ export default function CommitteeApplicationPage() {
             </p>
           }
         >
-          <div className="max-h-[65vh] overflow-y-auto pr-1">
+          <div className="pr-1 pb-4">
             <RemInspectionForm
               value={data.verification.remInspection}
               onChange={() => undefined}

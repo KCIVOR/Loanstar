@@ -450,7 +450,18 @@ function fakeReferenceVerifications(): ReferenceVerification[] {
   });
 }
 
+function informants(): Array<{ name: string; address: string }> {
+  return Array.from({ length: 3 }, () => ({
+    name: `${pick(FIRST_NAMES)} ${pick(LAST_NAMES)}`,
+    address: `${pick(STREETS)}, ${pick(BARANGAYS)}, ${pick(CITIES)}`,
+  }));
+}
+
 export function fakeFieldVisit(): FieldVisit {
+  const totalSalesYearly = num(1200000, 6000000);
+  const netIncomePercentage = num(12, 30);
+  const netIncomeYearly = Math.round((totalSalesYearly * netIncomePercentage) / 100);
+  const netIncomePerMonth = Math.round(netIncomeYearly / 12);
   const header = {
     dateRequested: pastDate(0, 0),
     dateVisited: pastDate(0, 0),
@@ -470,19 +481,35 @@ export function fakeFieldVisit(): FieldVisit {
       provincialResidence: pick(PROVINCES),
       provincialYearsOfStay: num(1, 20),
       ownedBy: pick(["Applicant", "Parents", "Spouse"]),
-      previousAddress: "",
-      previousYearsOfStay: 0,
+      previousAddress: `${pick(STREETS)}, ${pick(BARANGAYS)}, ${pick(CITIES)}`,
+      previousYearsOfStay: num(1, 8),
       residenceType: "bungalow",
-      landlordName: "",
-      neighborhood: {},
+      landlordName: `${pick(FIRST_NAMES)} ${pick(LAST_NAMES)}`,
+      neighborhood: {
+        residential: { class: "middle", quality: "good" },
+        commercial: { class: "middle", quality: "fair" },
+        mixed: { class: "low", quality: "fair" },
+      },
       findingsReport: "Residence confirmed, well-maintained, family present during visit.",
       adverseFindingsClient: "None",
       adverseFindingsArea: "None",
-      informants: [],
+      informants: informants(),
       expenses: {
-        propertyMortgage: null,
+        propertyMortgage: {
+          flag: true,
+          toWhom: pick(BANKS),
+          monthlyAmort: num(5000, 15000),
+          yearsToPay: num(5, 15),
+          monthsLeft: num(12, 120),
+        },
         vehicles: { flag: false, howMany: 0, kindModel: "" },
-        vehicleMortgage: null,
+        vehicleMortgage: {
+          flag: true,
+          toWhom: pick(BANKS),
+          monthlyAmort: num(4000, 12000),
+          yearsToPay: num(3, 7),
+          monthsLeft: num(6, 60),
+        },
         householdCount: num(2, 6),
         maidCount: 0,
         maidSalary: 0,
@@ -492,20 +519,100 @@ export function fakeFieldVisit(): FieldVisit {
         food: num(6000, 15000),
         school: num(0, 10000),
       },
-      otherRemarks: "",
+      otherRemarks: "Neighbors confirmed the applicant has resided at the address for years.",
     },
-    business: null,
+    business: {
+      availability: { date: pastDate(0, 0), time: "02:00 PM" },
+      yearOfStay: num(2, 20),
+      floorAreaSqm: num(60, 400),
+      rented: {
+        landlordName: `${pick(FIRST_NAMES)} ${pick(LAST_NAMES)}`,
+        telephone: phone(),
+      },
+      previousAddress: `${pick(STREETS)}, ${pick(CITIES)}`,
+      previousYearsOfStay: num(1, 6),
+      reasonOfTransfer: "Moved to a larger commercial space near the main road.",
+      neighborhood: {
+        residential: { class: "middle", quality: "fair" },
+        commercial: { class: "upper", quality: "good" },
+        mixed: { class: "middle", quality: "good" },
+      },
+      findingsReport: "Business premises verified in active operation with visible signage.",
+      otherOffices: {
+        branch: true,
+        warehouse: false,
+        address: `${pick(STREETS)}, ${pick(CITIES)}`,
+        yearOfStay: num(1, 8),
+        rented: {
+          landlordName: `${pick(FIRST_NAMES)} ${pick(LAST_NAMES)}`,
+          telephone: phone(),
+        },
+        floorAreaSqm: num(40, 200),
+        neighborhood: {
+          residential: { class: "middle", quality: "fair" },
+          commercial: { class: "middle", quality: "good" },
+          mixed: { class: "middle", quality: "fair" },
+        },
+        findingsReport: "Branch office confirmed operational during the visit.",
+      },
+      adverseFindingsClient: "None",
+      adverseFindingsArea: "None",
+      informants: informants(),
+      adjudication: {
+        stocks: { flag: true, howMany: num(50, 500), estimatedAmount: num(200000, 900000) },
+        employees: {
+          flag: true,
+          howMany: num(3, 20),
+          totalSalaryPerMonth: num(60000, 250000),
+        },
+        electricity: num(4000, 15000),
+        water: num(800, 3000),
+        operationProblem: "None reported; operations are stable year-round.",
+        collectionProblems: "Minor delays from a few accounts, settled within 30 days.",
+        branchOperationProblem: "None reported at the branch office.",
+        clients: {
+          count: num(10, 80),
+          major: pick(COMPANIES),
+          namesAndContacts: `${pick(COMPANIES)} - ${phone()}; ${pick(COMPANIES)} - ${phone()}`,
+        },
+        suppliers: {
+          count: num(3, 25),
+          major: pick(COMPANIES),
+          namesAndContacts: `${pick(COMPANIES)} - ${phone()}; ${pick(COMPANIES)} - ${phone()}`,
+        },
+      },
+      otherRemarks: "Business verified as declared; no adverse findings in the area.",
+    },
     recommendation: {
       evaluationSummary: "Applicant and residence verified as declared. No adverse findings.",
       creditRealizationRisk: "low",
       notes: "Recommended for approval based on field verification.",
-      houseExpenses: null,
-      businessIncome: null,
+      houseExpenses: {
+        rental: num(5000, 15000),
+        salary: num(4000, 12000),
+        electricity: num(1000, 4000),
+        school: num(2000, 12000),
+        water: num(300, 1000),
+        internet: num(1000, 2500),
+        foods: num(6000, 15000),
+        others: num(500, 3000),
+      },
+      businessIncome: {
+        totalSalesYearly: totalSalesYearly,
+        netIncomeYearly: netIncomeYearly,
+        netIncomePercentage: netIncomePercentage,
+        operationalExpenses: num(50000, 200000),
+        netIncomePerMonth: netIncomePerMonth,
+        netIncome: netIncomeYearly,
+        thirtyPercentOfMonthlyNetIncome: Math.round(netIncomePerMonth * 0.3),
+        unlabeled: num(1000, 10000),
+        total: netIncomePerMonth,
+      },
       recommendation: "for_approval",
       preparedBy: `${pick(FIRST_NAMES)} ${pick(LAST_NAMES)}`,
       preparedDate: pastDate(0, 0),
-      reviewedBy: "",
-      reviewedDate: "",
+      reviewedBy: `${pick(FIRST_NAMES)} ${pick(LAST_NAMES)}`,
+      reviewedDate: pastDate(0, 0),
     },
   };
 }

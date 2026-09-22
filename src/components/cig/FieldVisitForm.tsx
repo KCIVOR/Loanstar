@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  Button,
   Input,
   Label,
   Select,
@@ -30,15 +31,11 @@ function ensureVisit(value: FieldVisit | null): FieldVisit {
     header: value?.header ?? {},
     residence: {
       ...value?.residence,
-      informants: value?.residence?.informants?.length
-        ? value.residence.informants
-        : emptyInformants(3),
+      informants: value?.residence?.informants ?? emptyInformants(3),
     },
     business: {
       ...value?.business,
-      informants: value?.business?.informants?.length
-        ? value.business.informants
-        : emptyInformants(3),
+      informants: value?.business?.informants ?? emptyInformants(3),
     },
     recommendation: value?.recommendation ?? {},
   };
@@ -448,17 +445,41 @@ export function FieldVisitForm({
           />
         </div>
         <div className="space-y-2">
-          <Label>Informants (3)</Label>
-          {(visit.residence?.informants ?? emptyInformants(3)).map((row, i) => (
-            <div key={`res-inf-${i}`} className="grid gap-2 sm:grid-cols-2">
+          <div className="flex items-center justify-between">
+            <Label>Informants</Label>
+            {readOnly ? null : (
+              <Button
+                type="button"
+                variant="secondary"
+                size="sm"
+                onClick={() =>
+                  patch({
+                    ...visit,
+                    residence: {
+                      ...visit.residence,
+                      informants: [
+                        ...(visit.residence?.informants ?? []),
+                        { name: "", address: "" },
+                      ],
+                    },
+                  })
+                }
+              >
+                Add informant
+              </Button>
+            )}
+          </div>
+          {(visit.residence?.informants ?? []).map((row, i) => (
+            <div
+              key={`res-inf-${i}`}
+              className="grid gap-2 sm:grid-cols-[1fr_1fr_auto]"
+            >
               <Input
                 placeholder="Name"
                 disabled={readOnly}
                 value={row.name ?? ""}
                 onChange={(e) => {
-                  const informants = [
-                    ...(visit.residence?.informants ?? emptyInformants(3)),
-                  ];
+                  const informants = [...(visit.residence?.informants ?? [])];
                   informants[i] = { ...informants[i], name: e.target.value };
                   patch({
                     ...visit,
@@ -471,9 +492,7 @@ export function FieldVisitForm({
                 disabled={readOnly}
                 value={row.address ?? ""}
                 onChange={(e) => {
-                  const informants = [
-                    ...(visit.residence?.informants ?? emptyInformants(3)),
-                  ];
+                  const informants = [...(visit.residence?.informants ?? [])];
                   informants[i] = { ...informants[i], address: e.target.value };
                   patch({
                     ...visit,
@@ -481,6 +500,26 @@ export function FieldVisitForm({
                   });
                 }}
               />
+              {readOnly ? null : (
+                <Button
+                  type="button"
+                  variant="danger-soft"
+                  size="sm"
+                  className="self-center"
+                  aria-label={`Remove informant ${i + 1}`}
+                  onClick={() => {
+                    const informants = [
+                      ...(visit.residence?.informants ?? []),
+                    ].filter((_, idx) => idx !== i);
+                    patch({
+                      ...visit,
+                      residence: { ...visit.residence, informants },
+                    });
+                  }}
+                >
+                  Remove
+                </Button>
+              )}
             </div>
           ))}
         </div>

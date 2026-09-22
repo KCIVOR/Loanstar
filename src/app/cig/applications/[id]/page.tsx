@@ -1154,7 +1154,7 @@ export default function CigApplicationPage() {
             onClose={() => setShowApplicationForm(false)}
             className="!max-w-4xl"
           >
-            <div className="max-h-[65vh] overflow-y-auto pr-1">
+            <div className="pr-1 pb-4">
               <ApplicantProfileFields
                 profile={borrower}
                 segment={segment}
@@ -2141,7 +2141,7 @@ export default function CigApplicationPage() {
                 )
               }
             >
-              <div className="max-h-[65vh] overflow-y-auto pr-1">
+              <div className="pr-1 pb-4">
                 {segment === "individual" ? (
                   <FieldVisitForm
                     variant="individual"
@@ -2214,7 +2214,7 @@ export default function CigApplicationPage() {
                 )
               }
             >
-              <div className="max-h-[65vh] overflow-y-auto pr-1">
+              <div className="pr-1 pb-4">
                 <CmInspectionForm
                   value={verification.cmInspection}
                   onChange={(next) =>
@@ -2257,7 +2257,7 @@ export default function CigApplicationPage() {
                 )
               }
             >
-              <div className="max-h-[65vh] overflow-y-auto pr-1">
+              <div className="pr-1 pb-4">
                 <RemInspectionForm
                   value={verification.remInspection}
                   onChange={(next) =>
