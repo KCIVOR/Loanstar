@@ -1864,13 +1864,17 @@ export default function CommitteeApplicationPage() {
                 : "SME Field Visit"
           }
           className="!max-w-4xl"
+          footer={
+            <p className="text-xs text-ink-400">
+              View only — edits are locked.
+            </p>
+          }
         >
           <div className="max-h-[65vh] overflow-y-auto pr-1">
             {isSme && data.application.isReloan ? (
               <SmeReloanVerificationForm
                 value={data.verification.smeReloanVerification}
                 onChange={() => undefined}
-                onSave={() => undefined}
                 verifierName=""
                 readOnly
               />
@@ -1878,7 +1882,6 @@ export default function CommitteeApplicationPage() {
               <FieldVisitForm
                 value={data.verification.fieldVisit}
                 onChange={() => undefined}
-                onSave={() => undefined}
                 verifierName=""
                 variant={isSme ? "sme" : "individual"}
                 readOnly
@@ -1896,12 +1899,16 @@ export default function CommitteeApplicationPage() {
           onClose={() => setShowCmInspectionForm(false)}
           title="CM Inspection"
           className="!max-w-4xl"
+          footer={
+            <p className="text-xs text-ink-400">
+              View only — edits are locked.
+            </p>
+          }
         >
           <div className="max-h-[65vh] overflow-y-auto pr-1">
             <CmInspectionForm
               value={data.verification.cmInspection}
               onChange={() => undefined}
-              onSave={() => undefined}
               verifierName=""
               readOnly
             />
@@ -1917,12 +1924,16 @@ export default function CommitteeApplicationPage() {
           onClose={() => setShowRemInspectionForm(false)}
           title="REM Inspection"
           className="!max-w-4xl"
+          footer={
+            <p className="text-xs text-ink-400">
+              View only — edits are locked.
+            </p>
+          }
         >
           <div className="max-h-[65vh] overflow-y-auto pr-1">
             <RemInspectionForm
               value={data.verification.remInspection}
               onChange={() => undefined}
-              onSave={() => undefined}
               verifierName=""
               readOnly
             />

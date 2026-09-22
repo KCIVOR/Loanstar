@@ -1,7 +1,6 @@
 "use client";
 
 import {
-  Button,
   Input,
   Label,
   Select,
@@ -20,8 +19,6 @@ import {
 type Props = {
   value: FieldVisit | null;
   onChange: (next: FieldVisit) => void;
-  onSave: (next: FieldVisit) => void;
-  saving?: boolean;
   readOnly?: boolean;
   verifierName: string;
   /** "individual" hides Business checking + the Business Income column. */
@@ -44,6 +41,20 @@ function ensureVisit(value: FieldVisit | null): FieldVisit {
         : emptyInformants(3),
     },
     recommendation: value?.recommendation ?? {},
+  };
+}
+
+/** The exact payload the Save action submits. Exported so a Modal footer
+ *  can drive the save from outside the scrolling body — the form body no
+ *  longer renders its own button (see the modal-f band in globals.css). */
+export function fieldVisitSavePayload(
+  value: FieldVisit | null,
+  verifierName: string,
+): FieldVisit {
+  const visit = ensureVisit(value);
+  return {
+    ...visit,
+    recommendation: { ...visit.recommendation, preparedBy: verifierName },
   };
 }
 
@@ -102,8 +113,6 @@ function NeighborhoodSelects({
 export function FieldVisitForm({
   value,
   onChange,
-  onSave,
-  saving,
   readOnly,
   verifierName,
   variant = "sme",
@@ -869,24 +878,6 @@ export function FieldVisitForm({
           </div>
         </div>
       </section>
-
-      {!readOnly ? (
-        <Button
-          type="button"
-          loading={saving}
-          onClick={() =>
-            onSave({
-              ...visit,
-              recommendation: {
-                ...visit.recommendation,
-                preparedBy: verifierName,
-              },
-            })
-          }
-        >
-          Save field visit
-        </Button>
-      ) : null}
     </div>
   );
 }

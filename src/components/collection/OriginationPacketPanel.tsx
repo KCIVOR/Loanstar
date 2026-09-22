@@ -665,7 +665,6 @@ function CiReportCard({
             <SmeReloanVerificationForm
               value={asSmeReloanVerification(verification.smeReloanVerification)}
               onChange={() => undefined}
-              onSave={() => undefined}
               verifierName=""
               readOnly
             />
@@ -673,7 +672,6 @@ function CiReportCard({
             <FieldVisitForm
               value={asFieldVisit(verification.fieldVisit)}
               onChange={() => undefined}
-              onSave={() => undefined}
               verifierName=""
               variant={individualUsesFieldVisit ? "individual" : "sme"}
               readOnly
@@ -825,7 +823,6 @@ function CiReportCard({
             <CmInspectionForm
               value={asCmInspection(verification.cmInspection)}
               onChange={() => undefined}
-              onSave={() => undefined}
               verifierName=""
               readOnly
             />
@@ -843,7 +840,6 @@ function CiReportCard({
             <RemInspectionForm
               value={asRemInspection(verification.remInspection)}
               onChange={() => undefined}
-              onSave={() => undefined}
               verifierName=""
               readOnly
             />

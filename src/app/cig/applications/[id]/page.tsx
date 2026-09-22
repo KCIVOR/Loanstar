@@ -30,10 +30,10 @@ import {
   type CiFormDraft,
 } from "@/components/cig/CiReferencesFormModal";
 import { EditApplicationFormModal } from "@/components/cig/EditApplicationFormModal";
-import { FieldVisitForm } from "@/components/cig/FieldVisitForm";
-import { SmeReloanVerificationForm } from "@/components/cig/SmeReloanVerificationForm";
-import { CmInspectionForm } from "@/components/cig/CmInspectionForm";
-import { RemInspectionForm } from "@/components/cig/RemInspectionForm";
+import { FieldVisitForm, fieldVisitSavePayload } from "@/components/cig/FieldVisitForm";
+import { SmeReloanVerificationForm, smeReloanSavePayload } from "@/components/cig/SmeReloanVerificationForm";
+import { CmInspectionForm, cmInspectionSavePayload } from "@/components/cig/CmInspectionForm";
+import { RemInspectionForm, remInspectionSavePayload } from "@/components/cig/RemInspectionForm";
 import { usePermissions } from "@/hooks/usePermissions";
 import { formatStatusLabel, statusBadgeVariant } from "@/lib/applications/status";
 import type { BorrowerProfile } from "@/lib/borrowers/types";
@@ -2091,6 +2091,55 @@ export default function CigApplicationPage() {
                     : "SME Field Visit"
               }
               className="!max-w-4xl"
+              footer={
+                !editable ? (
+                  <p className="text-xs text-ink-400">
+                    View only — edits are locked.
+                  </p>
+                ) : isReloan && segment !== "individual" ? (
+                  <div className="flex justify-end">
+                    <Button
+                      type="button"
+                      loading={saving}
+                      onClick={() => {
+                        const next = smeReloanSavePayload(
+                          verification.smeReloanVerification,
+                          verifierName,
+                        );
+                        setVerification({
+                          ...verification,
+                          smeReloanVerification: next,
+                        });
+                        void saveVerification({
+                          smeReloanVerification: next,
+                        });
+                      }}
+                    >
+                      Save re-loan verification
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="flex justify-end">
+                    <Button
+                      type="button"
+                      loading={saving}
+                      onClick={() => {
+                        const next = fieldVisitSavePayload(
+                          verification.fieldVisit,
+                          verifierName,
+                        );
+                        setVerification({
+                          ...verification,
+                          fieldVisit: next,
+                        });
+                        void saveVerification({ fieldVisit: next });
+                      }}
+                    >
+                      Save field visit
+                    </Button>
+                  </div>
+                )
+              }
             >
               <div className="max-h-[65vh] overflow-y-auto pr-1">
                 {segment === "individual" ? (
@@ -2103,14 +2152,6 @@ export default function CigApplicationPage() {
                         fieldVisit: next,
                       })
                     }
-                    onSave={(next) => {
-                      setVerification({
-                        ...verification,
-                        fieldVisit: next,
-                      });
-                      void saveVerification({ fieldVisit: next });
-                    }}
-                    saving={saving}
                     readOnly={!editable}
                     verifierName={verifierName}
                   />
@@ -2123,16 +2164,6 @@ export default function CigApplicationPage() {
                         smeReloanVerification: next,
                       })
                     }
-                    onSave={(next) => {
-                      setVerification({
-                        ...verification,
-                        smeReloanVerification: next,
-                      });
-                      void saveVerification({
-                        smeReloanVerification: next,
-                      });
-                    }}
-                    saving={saving}
                     readOnly={!editable}
                     verifierName={verifierName}
                   />
@@ -2145,14 +2176,6 @@ export default function CigApplicationPage() {
                         fieldVisit: next,
                       })
                     }
-                    onSave={(next) => {
-                      setVerification({
-                        ...verification,
-                        fieldVisit: next,
-                      });
-                      void saveVerification({ fieldVisit: next });
-                    }}
-                    saving={saving}
                     readOnly={!editable}
                     verifierName={verifierName}
                   />
@@ -2167,6 +2190,29 @@ export default function CigApplicationPage() {
               onClose={() => setShowCmInspectionForm(false)}
               title="CM Inspection"
               className="!max-w-4xl"
+              footer={
+                !editable ? (
+                  <p className="text-xs text-ink-400">
+                    View only — edits are locked.
+                  </p>
+                ) : (
+                  <div className="flex justify-end">
+                    <Button
+                      type="button"
+                      loading={saving}
+                      onClick={() => {
+                        const next = cmInspectionSavePayload(
+                          verification.cmInspection,
+                        );
+                        setVerification({ ...verification, cmInspection: next });
+                        void saveVerification({ cmInspection: next });
+                      }}
+                    >
+                      Save CM Inspection
+                    </Button>
+                  </div>
+                )
+              }
             >
               <div className="max-h-[65vh] overflow-y-auto pr-1">
                 <CmInspectionForm
@@ -2174,11 +2220,6 @@ export default function CigApplicationPage() {
                   onChange={(next) =>
                     setVerification({ ...verification, cmInspection: next })
                   }
-                  onSave={(next) => {
-                    setVerification({ ...verification, cmInspection: next });
-                    void saveVerification({ cmInspection: next });
-                  }}
-                  saving={saving}
                   readOnly={!editable}
                   verifierName={verifierName}
                 />
@@ -2192,6 +2233,29 @@ export default function CigApplicationPage() {
               onClose={() => setShowRemInspectionForm(false)}
               title="REM Inspection"
               className="!max-w-4xl"
+              footer={
+                !editable ? (
+                  <p className="text-xs text-ink-400">
+                    View only — edits are locked.
+                  </p>
+                ) : (
+                  <div className="flex justify-end">
+                    <Button
+                      type="button"
+                      loading={saving}
+                      onClick={() => {
+                        const next = remInspectionSavePayload(
+                          verification.remInspection,
+                        );
+                        setVerification({ ...verification, remInspection: next });
+                        void saveVerification({ remInspection: next });
+                      }}
+                    >
+                      Save REM Inspection
+                    </Button>
+                  </div>
+                )
+              }
             >
               <div className="max-h-[65vh] overflow-y-auto pr-1">
                 <RemInspectionForm
@@ -2199,11 +2263,6 @@ export default function CigApplicationPage() {
                   onChange={(next) =>
                     setVerification({ ...verification, remInspection: next })
                   }
-                  onSave={(next) => {
-                    setVerification({ ...verification, remInspection: next });
-                    void saveVerification({ remInspection: next });
-                  }}
-                  saving={saving}
                   readOnly={!editable}
                   verifierName={verifierName}
                 />

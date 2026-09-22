@@ -1,6 +1,6 @@
 "use client";
 
-import { Button, Input, Label, Select, Textarea } from "@/components/ui";
+import { Input, Label, Select, Textarea } from "@/components/ui";
 import {
   computeReloanTotalNetIncome,
   sumReloanBusinessExpenses,
@@ -11,17 +11,24 @@ import {
 type Props = {
   value: SmeReloanVerification | null;
   onChange: (next: SmeReloanVerification) => void;
-  onSave: (next: SmeReloanVerification) => void;
-  saving?: boolean;
   readOnly?: boolean;
   verifierName: string;
 };
 
+/** The exact payload the Save action submits. Exported so a Modal footer
+ *  can drive the save from outside the scrolling body — the form body no
+ *  longer renders its own button (see the modal-f band in globals.css). */
+export function smeReloanSavePayload(
+  value: SmeReloanVerification | null,
+  verifierName: string,
+): SmeReloanVerification {
+  const form: SmeReloanVerification = value ?? {};
+  return { ...form, verifiedBy: verifierName };
+}
+
 export function SmeReloanVerificationForm({
   value,
   onChange,
-  onSave,
-  saving,
   readOnly,
   verifierName,
 }: Props) {
@@ -360,16 +367,6 @@ export function SmeReloanVerificationForm({
           created in this phase).
         </p>
       </section>
-
-      {!readOnly ? (
-        <Button
-          type="button"
-          loading={saving}
-          onClick={() => onSave({ ...form, verifiedBy: verifierName })}
-        >
-          Save re-loan verification
-        </Button>
-      ) : null}
     </div>
   );
 }
