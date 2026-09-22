@@ -153,6 +153,7 @@ User supplied the real file (`C:\Users\Rovick\Downloads\SYSTEM DEV\Step 2 - CIG\
   - CM Inspection → any application (SME or Individual) where `collateral_type = 'car_refinancing'`.
   - REM Inspection → any application (SME or Individual) where `collateral_type = 'real_estate'`.
   - **Individual-segment base CIG verification resolved 2026-08-18:** Individual applicants get the same phone/reference-verification approach as Seafarer (not SME's in-person field visit) — see Phase 8.1, now resolved.
+  - > ⚠️ **SUPERSEDED 2026-09-22.** The line above is kept as project history. Individual no longer uses the CI & References (phone/reference) Form — it now uses the **Field Visit form** (`FieldVisitForm` with `variant="individual"`: Residence checking + Recommendation, no Business checking). See `docs/revision-plans/feature-individual-cig-field-visit.md`. Pre-2026-09-22 Individual files that hold `pic_verification` still render their old CI & References data in Committee and the Collector packet, resolved by data via `individualCiKind`.
 
 ### 0.8 — ✅ AUDITED, 2026-08-19 — Config-key inventory for `_individual` and collateral variants
 - [x] Live query confirms exactly two segment-suffixed `config_settings` keys exist: `penalty_rate_sme` (0.05) and `committee_size_sme` (1). Phase 1.3 adding `penalty_rate_individual` and `committee_size_individual` is the **complete** list — no other `_sme` key was missed.

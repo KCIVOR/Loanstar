@@ -1,7 +1,7 @@
 # Individual segment — replace the CI & References Form with the Field CI Form (Field Visit)
 
-**Written:** 2026-09-22 · **Status:** PLAN ONLY — nothing implemented.
-**Workflow:** Claude plans, Cursor implements, Claude validates the summary.
+**Written:** 2026-09-22 · **Status:** ✅ **Phases 0–12 IMPLEMENTED 2026-09-22.** Phase 13's live UI click-through is the only step outstanding — see §8 Implementation log.
+**Implemented by:** Claude (sequential subagents, one commit per phase group), on `main`.
 **Supersedes:** `feature-individual-cig-field-visit-surgical.md` (deleted — it had 6 build/data defects found in validation; all corrected here).
 
 **Source workbook:** `C:\Users\Rovick\Downloads\SYSTEM DEV\Step 2 - CIG\SME-IND\FIELD CI FORM (SME) revised.xlsx`
@@ -327,23 +327,23 @@ export function isIndividualFieldVisitComplete(
 ### Phase 9 — Collector Remedial origination packet
 **File:** `src/components/collection/OriginationPacketPanel.tsx` (loader needs no change)
 
-- [ ] Import `individualCiKind`, `assessIndividualFieldVisitRequired`.
-- [ ] `ciBadge` (`:325-334`) and `smeComplete` (`:336-340`) — add the Individual path via `individualCiKind(verification)`; note the panel's fields are `unknown`, so pass `asFieldVisit(verification.fieldVisit)` into `assessIndividualFieldVisitRequired`. `individualCiKind` itself takes the raw object (structural, `unknown`-typed — §2.2).
-- [ ] CI block (`:500-626`) vs Field Visit block (`:630-660`) — choose by resolver for Individual; legacy keeps the CI block; new renders `<FieldVisitForm variant="individual" readOnly>`.
-- [ ] `smeUsesReloanForm` (`:137`) stays SME-only.
-- [ ] `src/lib/collection/__tests__/origination-packet.test.mts` — extend if it asserts on segment gating.
+- [x] Import `individualCiKind`, `assessIndividualFieldVisitRequired`.
+- [x] `ciBadge` (`:325-334`) and `smeComplete` (`:336-340`) — add the Individual path via `individualCiKind(verification)`; note the panel's fields are `unknown`, so pass `asFieldVisit(verification.fieldVisit)` into `assessIndividualFieldVisitRequired`. `individualCiKind` itself takes the raw object (structural, `unknown`-typed — §2.2).
+- [x] CI block (`:500-626`) vs Field Visit block (`:630-660`) — choose by resolver for Individual; legacy keeps the CI block; new renders `<FieldVisitForm variant="individual" readOnly>`.
+- [x] `smeUsesReloanForm` (`:137`) stays SME-only.
+- [x] `src/lib/collection/__tests__/origination-packet.test.mts` — extend if it asserts on segment gating.
 
 ### Phase 10 — Dev data
 **File:** `src/lib/dev/fake-data.ts` — *absent from the superseded plan; without it the dev "fill" button produces an Individual app that cannot pass the new gate.*
 
-- [ ] Add `fakeIndividualFieldVisit()`: reuse `fakeFieldVisit()`'s header + residence + recommendation (house expenses), **omit `business` and `recommendation.businessIncome`**.
-- [ ] Segment branch in the full-fill helper (`:1004-1011`): add an `individual` arm returning `base` + `{ fieldVisit: fakeIndividualFieldVisit() }` instead of falling through to the Seafarer arm (`:1013-1040`), which currently supplies PIC + crewing data.
-- [ ] CIG page dev menu (`:2422-2437`) — the current `segment === "sme"` gate must also offer Individual a "Fill Field Visit" action; drop the Individual "Fill CI Form" action if one is reachable.
+- [x] Add `fakeIndividualFieldVisit()`: reuse `fakeFieldVisit()`'s header + residence + recommendation (house expenses), **omit `business` and `recommendation.businessIncome`**.
+- [x] Segment branch in the full-fill helper (`:1004-1011`): add an `individual` arm returning `base` + `{ fieldVisit: fakeIndividualFieldVisit() }` instead of falling through to the Seafarer arm (`:1013-1040`), which currently supplies PIC + crewing data.
+- [x] CIG page dev menu (`:2422-2437`) — the current `segment === "sme"` gate must also offer Individual a "Fill Field Visit" action; drop the Individual "Fill CI Form" action if one is reachable.
 
 ### Phase 11 — Docs
-- [ ] `docs/individual-collateral-expansion-plan.md:155` — the line asserting Individual gets "the same phone/reference-verification approach as Seafarer" is now wrong. Add a dated superseding note pointing here. Do not delete the history.
-- [ ] `docs/cig-references-form-plan.md` — header note: the CI & References Form is Seafarer-only as of 2026-09-22.
-- [ ] Append an implementation log to this file (phases done, test counts, live-test result).
+- [x] `docs/individual-collateral-expansion-plan.md:155` — the line asserting Individual gets "the same phone/reference-verification approach as Seafarer" is now wrong. Add a dated superseding note pointing here. Do not delete the history.
+- [x] `docs/cig-references-form-plan.md` — header note: the CI & References Form is Seafarer-only as of 2026-09-22.
+- [x] Append an implementation log to this file (phases done, test counts, live-test result).
 
 ### Phase 12 — Test rewrites (explicit, not "update assertions")
 **File:** `src/lib/cig/__tests__/sequence.test.mts` — the `describe("getCigSequenceState — Individual segment …")` block at `:265`. Its helper `s3Complete()` (`:118-128`) sets **only** PIC, references, checklist and rating — no `fieldVisit` — so **three tests fail after Phase 4.** Each needs a specific rewrite:
@@ -404,3 +404,23 @@ export function isIndividualFieldVisitComplete(
 Revert the Individual branches in: `field-visit.ts`, `sequence.ts`, `verification.ts`, `workspace.ts`, `cig/applications/[id]/page.tsx`, `committee/applications/[id]/page.tsx`, `OriginationPacketPanel.tsx`, `fake-data.ts`. Delete `individual-ci.ts`. Restore the Phase 12 tests.
 
 No data migration to undo. Any `field_visit` rows written for Individual become inert, and `pic_verification` was never touched, so legacy files keep rendering either way.
+
+---
+
+## 8. Implementation log
+
+| Commit | Phases | Note |
+|---|---|---|
+| `71fa9a7` | 1–2 | `individual-ci.ts` (`hasCiContent`, `individualCiKind`), `assessIndividualFieldVisitRequired`, `FieldVisitForm` `variant` prop |
+| `927d2f4` | 3, 4, 12 | Sequence + submit gates require the Field Visit for Individual; Individual sequence tests rewritten (atomic, per §4 constraint 2) |
+| `0fcff96` | 5–7 | Workspace chips/coaching copy; CIG page Field Visit card + modal for Individual |
+| `a374176` | 8 | Committee page resolves by data via the shared `individualUsesFieldVisit` const |
+| *(this commit)* | 9, 10, 11 | Collector packet, dev fake data, docs |
+
+**Phase 9** — `OriginationPacketPanel.tsx`: added `individualUsesFieldVisit` (mirrors Committee), gated the header badge, the CI summary body, the Field Visit body (`variant="individual"`) and the CI modal on it. Legacy Individual files (PIC data, no field visit) keep the CI & References path in both the badge and the body. `smeUsesReloanForm` remains SME-only, so an Individual can never reach `SmeReloanVerificationForm`. The loader needed no change. `origination-packet.test.mts` asserts only on `seafarer`/`sme` packets — no Individual segment gating to extend.
+
+**Phase 10** — `fake-data.ts`: new `fakeIndividualFieldVisit()` (header + residence + recommendation, no `business`, no `recommendation.businessIncome`); the full-fill helper gained an `individual` arm so Individual no longer falls through to the Seafarer PIC/crewing arm. CIG page dev menu gained an Individual "Fill Field Visit" action (no Individual "Fill CI Form" action existed to remove).
+
+**Phase 11** — superseding note added at `docs/individual-collateral-expansion-plan.md` (original 2026-08-18 line kept), Seafarer-only header note added to `docs/cig-references-form-plan.md`, this log appended.
+
+**Verification:** `npm test` → 1797 pass / 0 fail / 7 skipped (1804 total). `npm run build` clean. Phase 13's live UI click-through is still outstanding.

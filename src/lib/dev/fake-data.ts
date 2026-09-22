@@ -510,6 +510,27 @@ export function fakeFieldVisit(): FieldVisit {
   };
 }
 
+/**
+ * Individual Field Visit (2026-09-22): same header + residence + recommendation
+ * as the SME field visit, but without any business checking — Section II and the
+ * Business Income figure are hidden for Individual (`FieldVisitForm`
+ * `variant="individual"`). House expenses are kept.
+ */
+export function fakeIndividualFieldVisit(): FieldVisit {
+  const visit = fakeFieldVisit();
+  const recommendation = visit.recommendation ?? null;
+  let individualRecommendation: FieldVisit["recommendation"] = recommendation;
+  if (recommendation) {
+    const { businessIncome: _businessIncome, ...rest } = recommendation;
+    individualRecommendation = rest;
+  }
+  return {
+    header: visit.header,
+    residence: visit.residence,
+    recommendation: individualRecommendation,
+  };
+}
+
 export function fakeSmeReloanVerification(): SmeReloanVerification {
   return {
     header: {
@@ -1007,6 +1028,15 @@ export function fakeVerificationPatch(
       ...(isReloan
         ? { smeReloanVerification: fakeSmeReloanVerification() }
         : { fieldVisit: fakeFieldVisit() }),
+    };
+  }
+
+  if (segment === "individual") {
+    // Individual uses the Field Visit form, not the CI & References Form
+    // (2026-09-22) — no PIC / crewing data.
+    return {
+      ...base,
+      fieldVisit: fakeIndividualFieldVisit(),
     };
   }
 

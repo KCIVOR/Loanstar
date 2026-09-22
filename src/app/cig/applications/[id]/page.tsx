@@ -41,6 +41,7 @@ import {
   fakeBorrowerProfile,
   fakeCmInspection,
   fakeFieldVisit,
+  fakeIndividualFieldVisit,
   fakePropertyEntry,
   fakeRemark,
   fakeRemInspection,
@@ -2501,6 +2502,20 @@ export default function CigApplicationPage() {
                       ...(isReloan
                         ? { smeReloanVerification: fakeSmeReloanVerification() }
                         : { fieldVisit: fakeFieldVisit() }),
+                    }));
+                    setShowFieldVisitForm(true);
+                  },
+                },
+              ]
+            : []),
+          ...(segment === "individual"
+            ? [
+                {
+                  label: "Fill Field Visit",
+                  onClick: () => {
+                    setVerification((prev) => ({
+                      ...(prev as VerificationData),
+                      fieldVisit: fakeIndividualFieldVisit(),
                     }));
                     setShowFieldVisitForm(true);
                   },
