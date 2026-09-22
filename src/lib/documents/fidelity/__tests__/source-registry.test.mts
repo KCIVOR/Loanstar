@@ -70,3 +70,15 @@ test("never selects a source from a Backup directory", () => {
     assert.doesNotMatch(variant.sourcePath, /[/\\]Backup[/\\]/i);
   }
 });
+
+test("represents a page target only for variants established by source inspection", () => {
+  const variants = listSourceVariants();
+  const disclosure = variants.find((variant) => variant.id === "sf-disclosure-statement");
+
+  assert.equal(disclosure?.pageTarget, 1);
+  assert.equal(Object.hasOwn(disclosure ?? {}, "pageTarget"), true);
+
+  for (const variant of variants.filter((entry) => entry.id !== "sf-disclosure-statement")) {
+    assert.equal(Object.hasOwn(variant, "pageTarget"), false);
+  }
+});

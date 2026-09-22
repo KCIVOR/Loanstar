@@ -49,3 +49,4 @@ next-env.d.ts
 
 .worktrees/
 _snapshots/
+tmp/document-fidelity/
