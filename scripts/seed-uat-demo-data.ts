@@ -228,16 +228,21 @@ async function createApplication(opts: {
 }) {
   const segment = opts.segment ?? "seafarer";
 
-  // Idempotency keyed on (borrower_id, status), which is unique across every
-  // application this script seeds — no demo borrower gets two applications in
-  // the same status. Deliberately NOT keyed on a marker written into
-  // status_history: that text renders in the borrower's "Recent updates" feed,
-  // so a seeding artifact would be visible to the client during the demo.
+  // Idempotency keyed on (borrower_id, status, segment, collateral_type).
+  // status alone is NOT enough: phase 4 seeds two applications for the same
+  // borrower both in `for_verification`, differing only by segment and
+  // collateral — keying on status alone silently skipped the second one.
+  // Deliberately NOT keyed on a marker written into status_history: that text
+  // renders in the borrower's "Recent updates" feed, so a seeding artifact
+  // would be visible to the client during the demo.
+  const collateral = opts.collateralType ?? "none";
   const { data: dupes } = await db
     .from("loan_applications")
     .select("id, application_no")
     .eq("borrower_id", opts.borrowerId)
-    .eq("status", opts.status);
+    .eq("status", opts.status)
+    .eq("segment", segment)
+    .eq("collateral_type", collateral);
   const already = (dupes ?? [])[0];
   if (already) {
     log(`application exists: ${already.application_no} — ${opts.note}`);
@@ -569,7 +574,430 @@ async function phase2() {
 }
 
 // ---------------------------------------------------------------------------
+// Staff actor ids — used as `recorded_by` / `acted_by` / `uploaded_by` on the
+// supporting rows. Resolved by email so this never hard-codes a uuid.
+// ---------------------------------------------------------------------------
+const STAFF_EMAILS = [
+  "csa@loanstar.local",
+  "cig@loanstar.local",
+  "committee@loanstar.local",
+  "lra@loanstar.local",
+  "collector@loanstar.local",
+] as const;
+const staff: Record<string, string> = {};
+
+async function loadStaff() {
+  const { data } = await db.auth.admin.listUsers({ page: 1, perPage: 1000 });
+  for (const email of STAFF_EMAILS) {
+    const u = data?.users.find((x) => x.email?.toLowerCase() === email);
+    if (!u) throw new Error(`staff account missing: ${email}`);
+    staff[email] = u.id;
+  }
+}
+
+/** One shared borrower for all the workflow-status demo applications. */
+async function workflowBorrower() {
+  const email = "demo.borrower.workflow@example.local";
+  const userId = await ensureAuthUser(email, "Demo WorkflowBorrower");
+  await ensureRole(userId, "borrower");
+  return ensureBorrower(userId, email, "Demo", "WorkflowBorrower");
+}
+
+// ---------------------------------------------------------------------------
+// PHASE 3 — the six workflow statuses that have zero rows
+// ---------------------------------------------------------------------------
+async function phase3() {
+  console.log("\n=== PHASE 3 — workflow statuses ===");
+  const borrowerId = await workflowBorrower();
+  if (!APPLY) {
+    log("would create 6 applications: on_hold, committee_hold, negotiating_terms,");
+    log("  for_revision, lra_pending, release_briefing (+ their supporting rows)");
+    return;
+  }
+
+  // --- on_hold (UAT-026/027) ---------------------------------------------
+  // status_history must END with on_hold preceded by the status to restore to,
+  // because resolveStatusAfterClearHold walks it backwards for the last
+  // non-on_hold entry. Without the 'submitted' entry, Clear hold silently
+  // falls back to CLEAR_HOLD_FALLBACK_STATUS.
+  const holdReason =
+    "Waiting for original signed POEA contract and proof of allottee relationship";
+  const hold = await createApplication({
+    borrowerId,
+    status: "on_hold",
+    blocker: holdReason,
+    statusHistory: [
+      { status: "submitted", at: monthsAgo(1).toISOString() },
+      { status: "on_hold", at: new Date().toISOString(), note: holdReason },
+    ],
+    withComputation: { net: 110000, terms: 6 },
+    note: "UAT-026/027 on_hold",
+  });
+  if (hold.appId && !hold.appId.startsWith("DRY")) {
+    const { data: existingHold } = await db
+      .from("file_holds")
+      .select("id")
+      .eq("loan_application_id", hold.appId)
+      .maybeSingle();
+    if (!existingHold) {
+      const { data: fh, error } = await db
+        .from("file_holds")
+        .insert({
+          loan_application_id: hold.appId,
+          reason: holdReason,
+          recorded_by: staff["csa@loanstar.local"],
+        })
+        .select("id")
+        .single();
+      if (error || !fh) throw new Error(`file_holds: ${error?.message}`);
+      record("file_holds", fh.id as string, "UAT-027");
+      log("  + file_holds row");
+    }
+  }
+
+  // --- committee_hold (UAT-040) ------------------------------------------
+  const cHold = await createApplication({
+    borrowerId,
+    status: "committee_hold",
+    statusHistory: [
+      { status: "submitted", at: monthsAgo(2).toISOString() },
+      { status: "for_approval", at: monthsAgo(1).toISOString() },
+      { status: "committee_hold", at: new Date().toISOString() },
+    ],
+    withComputation: { net: 260000, terms: 6 },
+    note: "UAT-040 committee_hold",
+  });
+  await ensureCommitteeAction(cHold.appId, "hold", "[UAT] Requires Executive Committee review");
+
+  // --- negotiating_terms (UAT-041) ---------------------------------------
+  const nego = await createApplication({
+    borrowerId,
+    status: "negotiating_terms",
+    statusHistory: [
+      { status: "submitted", at: monthsAgo(2).toISOString() },
+      { status: "for_approval", at: monthsAgo(1).toISOString() },
+      { status: "negotiating_terms", at: new Date().toISOString() },
+    ],
+    withComputation: { net: 120000, terms: 4 },
+    note: "UAT-041 negotiating_terms",
+  });
+  if (!nego.appId.startsWith("DRY")) {
+    const { data: existingNego } = await db
+      .from("negotiations")
+      .select("id")
+      .eq("loan_application_id", nego.appId)
+      .maybeSingle();
+    if (!existingNego) {
+      const { data: n, error } = await db
+        .from("negotiations")
+        .insert({
+          loan_application_id: nego.appId,
+          status: "negotiating",
+          last_counter_by: "committee",
+        })
+        .select("id")
+        .single();
+      if (error || !n) throw new Error(`negotiations: ${error?.message}`);
+      record("negotiations", n.id as string, "UAT-041");
+      const { error: mErr } = await db.from("negotiation_messages").insert({
+        loan_application_id: nego.appId,
+        author_id: staff["committee@loanstar.local"],
+        author_role: "committee",
+        kind: "offer",
+        amount: 120000,
+        body: "Counter-offer: PHP 120,000 over 4 months.",
+      });
+      if (mErr) throw new Error(`negotiation_messages: ${mErr.message}`);
+      log("  + negotiation + counter-offer message");
+    }
+  }
+
+  // --- for_revision (UAT / CIG revision loop) -----------------------------
+  const rev = await createApplication({
+    borrowerId,
+    status: "for_revision",
+    statusHistory: [
+      { status: "submitted", at: monthsAgo(2).toISOString() },
+      { status: "for_approval", at: monthsAgo(1).toISOString() },
+      { status: "for_revision", at: new Date().toISOString() },
+    ],
+    withComputation: { net: 95000, terms: 6 },
+    note: "for_revision (CIG revision loop)",
+  });
+  const revActionId = await ensureCommitteeAction(
+    rev.appId,
+    "revisit",
+    "[UAT] Please re-verify employment details with the manning agency.",
+  );
+  if (revActionId && !rev.appId.startsWith("DRY")) {
+    const { data: existingNotice } = await db
+      .from("revisit_notices")
+      .select("id")
+      .eq("loan_application_id", rev.appId)
+      .maybeSingle();
+    if (!existingNotice) {
+      // revisit_notices.committee_action_id is NOT NULL — the action above
+      // must exist first.
+      const { data: rn, error } = await db
+        .from("revisit_notices")
+        .insert({
+          loan_application_id: rev.appId,
+          committee_action_id: revActionId,
+          route_to: "cig",
+          comment: "Please re-verify employment details with the manning agency.",
+        })
+        .select("id")
+        .single();
+      if (error || !rn) throw new Error(`revisit_notices: ${error?.message}`);
+      record("revisit_notices", rn.id as string, "for_revision");
+      log("  + revisit_notice (route_to=cig)");
+    }
+  }
+
+  // --- lra_pending (UAT-045/046) -----------------------------------------
+  const lra = await createApplication({
+    borrowerId,
+    status: "lra_pending",
+    statusHistory: [
+      { status: "for_approval", at: monthsAgo(1).toISOString() },
+      { status: "approved", at: monthsAgo(1).toISOString() },
+      { status: "lra_pending", at: new Date().toISOString() },
+    ],
+    withComputation: { net: 150000, terms: 6 },
+    note: "UAT-045/046 lra_pending",
+  });
+  if (!lra.appId.startsWith("DRY") && lra.computationId) {
+    const { data: existingQ } = await db
+      .from("release_queue")
+      .select("id")
+      .eq("loan_application_id", lra.appId)
+      .maybeSingle();
+    if (!existingQ) {
+      // release_queue.computation_id is NOT NULL.
+      const { data: q, error } = await db
+        .from("release_queue")
+        .insert({ loan_application_id: lra.appId, computation_id: lra.computationId })
+        .select("id")
+        .single();
+      if (error || !q) throw new Error(`release_queue: ${error?.message}`);
+      record("release_queue", q.id as string, "UAT-046");
+      log("  + release_queue entry");
+    }
+  }
+
+  // --- release_briefing (UAT-049/050) ------------------------------------
+  const brief = await createApplication({
+    borrowerId,
+    status: "release_briefing",
+    statusHistory: [
+      { status: "approved", at: monthsAgo(1).toISOString() },
+      { status: "release_signing", at: monthsAgo(1).toISOString() },
+      { status: "release_briefing", at: new Date().toISOString() },
+    ],
+    withComputation: { net: 130000, terms: 6 },
+    note: "UAT-049/050 release_briefing",
+  });
+  if (!brief.appId.startsWith("DRY") && brief.computationId) {
+    const { data: existingRf } = await db
+      .from("release_files")
+      .select("id")
+      .eq("loan_application_id", brief.appId)
+      .maybeSingle();
+    let releaseFileId = existingRf?.id as string | undefined;
+    if (!releaseFileId) {
+      // briefings.release_file_id is NOT NULL, and release_files.computation_id
+      // is NOT NULL — so the chain must be computation -> release_file -> briefing.
+      const { data: rf, error } = await db
+        .from("release_files")
+        .insert({
+          loan_application_id: brief.appId,
+          computation_id: brief.computationId,
+          status: "awaiting_briefing",
+          release_paths: ["with_pdc"],
+        })
+        .select("id")
+        .single();
+      if (error || !rf) throw new Error(`release_files: ${error?.message}`);
+      releaseFileId = rf.id as string;
+      record("release_files", releaseFileId, "UAT-049/050");
+      log("  + release_file (awaiting_briefing)");
+    }
+    const { data: existingBrief } = await db
+      .from("briefings")
+      .select("id")
+      .eq("release_file_id", releaseFileId)
+      .maybeSingle();
+    if (!existingBrief) {
+      const { data: bf, error } = await db
+        .from("briefings")
+        .insert({ release_file_id: releaseFileId })
+        .select("id")
+        .single();
+      if (error || !bf) throw new Error(`briefings: ${error?.message}`);
+      record("briefings", bf.id as string, "UAT-049/050");
+      log("  + briefing (pending sign-off)");
+    }
+  }
+}
+
+/** committee_actions.action is CHECK'd to approve|deny|revisit|hold. */
+async function ensureCommitteeAction(appId: string, action: string, comment: string) {
+  if (!APPLY || appId.startsWith("DRY")) return null;
+  const { data: existing } = await db
+    .from("committee_actions")
+    .select("id")
+    .eq("loan_application_id", appId)
+    .eq("action", action)
+    .maybeSingle();
+  if (existing) return existing.id as string;
+  const { data, error } = await db
+    .from("committee_actions")
+    .insert({
+      loan_application_id: appId,
+      action,
+      acted_by: staff["committee@loanstar.local"],
+      comment,
+    })
+    .select("id")
+    .single();
+  if (error || !data) throw new Error(`committee_actions (${action}): ${error?.message}`);
+  record("committee_actions", data.id as string, action);
+  log(`  + committee_action '${action}'`);
+  return data.id as string;
+}
+
+// ---------------------------------------------------------------------------
+// PHASE 4 — collateral applications sitting IN CIG (UAT-105..108)
+//
+// These must be in `for_verification`: the verifications_write RLS policy is
+// `has_module_permission('verification','edit') AND status='for_verification'`,
+// so outside that status Postgres rejects the write and the inspection form
+// silently fails to save. Every existing collateral application is already
+// past CIG, which is why UAT-105-108 had nothing to act on.
+// ---------------------------------------------------------------------------
+async function phase4() {
+  console.log("\n=== PHASE 4 — collateral applications in CIG ===");
+  const borrowerId = await workflowBorrower();
+
+  await createApplication({
+    borrowerId,
+    status: "for_verification",
+    segment: "sme",
+    entityType: "corporate", // loan_applications_entity_type_sme_only
+    collateralType: "car_refinancing",
+    statusHistory: [
+      { status: "submitted", at: monthsAgo(1).toISOString() },
+      { status: "for_verification", at: new Date().toISOString() },
+    ],
+    withComputation: { net: 250000, terms: 6 },
+    note: "UAT-105/106 SME car_refinancing in CIG",
+  });
+
+  await createApplication({
+    borrowerId,
+    status: "for_verification",
+    segment: "individual",
+    collateralType: "real_estate",
+    statusHistory: [
+      { status: "submitted", at: monthsAgo(1).toISOString() },
+      { status: "for_verification", at: new Date().toISOString() },
+    ],
+    withComputation: { net: 300000, terms: 6 },
+    note: "UAT-107/108 Individual real_estate in CIG",
+  });
+}
+
+// ---------------------------------------------------------------------------
+// PHASE 5 — a DCR awaiting reconciliation (UAT-055/060)
+//
+// dcr_items.payment_id is NOT NULL, so the chain is
+// masterlist -> payments -> dcr -> dcr_items. Built against the servicing
+// account seeded in phase 1b so it reconciles against a real schedule.
+// ---------------------------------------------------------------------------
+async function phase5() {
+  console.log("\n=== PHASE 5 — submitted DCR ===");
+
+  const { data: ml } = await db
+    .from("masterlist")
+    .select("id, loan_application_id, borrower_id, loan_account_no, monthly_amortization")
+    .eq("loan_account_no", "AN300491")
+    .maybeSingle();
+  if (!ml) {
+    log("servicing masterlist not found — run phase 1 first");
+    return;
+  }
+
+  const { data: existingDcr } = await db
+    .from("dcr")
+    .select("id")
+    .eq("collector_user_id", staff["collector@loanstar.local"])
+    .eq("status", "submitted")
+    .maybeSingle();
+  if (existingDcr) {
+    log("submitted DCR already exists");
+    return;
+  }
+
+  if (!APPLY) {
+    log(`would create 2 payments + 1 submitted DCR against ${ml.loan_account_no}`);
+    return;
+  }
+
+  // payments.channel is CHECK'd to bank_deposit|check|pos_cash — "cash" in the
+  // UAT document maps to pos_cash.
+  const amount = Number(ml.monthly_amortization);
+  const paymentIds: string[] = [];
+  for (const [i, channel] of (["pos_cash", "bank_deposit"] as const).entries()) {
+    const { data: p, error } = await db
+      .from("payments")
+      .insert({
+        masterlist_id: ml.id,
+        loan_application_id: ml.loan_application_id,
+        borrower_id: ml.borrower_id,
+        payment_date: toIso(new Date()),
+        amount,
+        channel,
+        status: "pending_verification",
+        uploaded_by: staff["collector@loanstar.local"],
+        reference_no: `OR-88910${i + 2}`,
+      })
+      .select("id")
+      .single();
+    if (error || !p) throw new Error(`payments: ${error?.message}`);
+    paymentIds.push(p.id as string);
+    record("payments", p.id as string, "UAT-055/060");
+  }
+  log(`  + ${paymentIds.length} payments of ${amount}`);
+
+  const { data: dcr, error: dcrErr } = await db
+    .from("dcr")
+    .insert({
+      collector_user_id: staff["collector@loanstar.local"],
+      status: "submitted",
+      submitted_at: new Date().toISOString(),
+      deposit_amount: amount * paymentIds.length,
+      deposit_reference: "DEP-UAT-0001",
+    })
+    .select("id")
+    .single();
+  if (dcrErr || !dcr) throw new Error(`dcr: ${dcrErr?.message}`);
+  record("dcr", dcr.id as string, "UAT-055/060");
+
+  for (const pid of paymentIds) {
+    const { data: item, error } = await db
+      .from("dcr_items")
+      .insert({ dcr_id: dcr.id, payment_id: pid, amount, status: "pending" })
+      .select("id")
+      .single();
+    if (error || !item) throw new Error(`dcr_items: ${error?.message}`);
+    record("dcr_items", item.id as string, "UAT-055/060");
+  }
+  log(`  + submitted DCR with ${paymentIds.length} items, deposit=${amount * paymentIds.length}`);
+}
+
+// ---------------------------------------------------------------------------
 async function main() {
+  await loadStaff();
   console.log(
     APPLY
       ? "APPLYING — writing to the database"
@@ -579,6 +1007,9 @@ async function main() {
   if (!ONLY_PHASE || ONLY_PHASE === 1) await phase1();
   if (!ONLY_PHASE || ONLY_PHASE === 1) await phase1b();
   if (!ONLY_PHASE || ONLY_PHASE === 2) await phase2();
+  if (!ONLY_PHASE || ONLY_PHASE === 3) await phase3();
+  if (!ONLY_PHASE || ONLY_PHASE === 4) await phase4();
+  if (!ONLY_PHASE || ONLY_PHASE === 5) await phase5();
 
   console.log(`\nInserted rows this run: ${inserted.length}`);
   if (APPLY) console.log(`Rollback log: ${LOG_PATH}`);
