@@ -8,6 +8,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { Avatar, Button } from "@/components/ui";
 import { cn } from "@/components/ui/cn";
 import { usePermissions } from "@/hooks/usePermissions";
+import { formatNotificationTime } from "@/lib/notifications/inbox";
 import { createClient } from "@/lib/supabase/client";
 
 export type HeaderLink = {
@@ -248,6 +249,30 @@ export function Header({
     setUnreadCount(0);
   }
 
+  async function setNotificationRead(id: string, read: boolean) {
+    const target = notifItems.find((n) => n.id === id);
+    if (!target || (target.readAt == null) === !read) return;
+    const previous = { items: notifItems, unread: unreadCount };
+    setNotifItems((prev) =>
+      prev.map((n) =>
+        n.id === id ? { ...n, readAt: read ? new Date().toISOString() : null } : n,
+      ),
+    );
+    setUnreadCount((c) => Math.max(0, c + (read ? -1 : 1)));
+    try {
+      const res = await fetch("/api/account/notifications", {
+        method: "PATCH",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(read ? { ids: [id] } : { ids: [id], unread: true }),
+      });
+      if (!res.ok) throw new Error("update failed");
+    } catch {
+      setNotifItems(previous.items);
+      setUnreadCount(previous.unread);
+    }
+  }
+
   const [prevPathname, setPrevPathname] = useState(pathname);
   if (pathname !== prevPathname) {
     setPrevPathname(pathname);
@@ -375,7 +400,7 @@ export function Header({
           </Button>
 
           {openMenu === "bell" ? (
-            <div className="menu absolute right-0 top-11 z-50 w-80">
+            <div className="menu absolute right-0 top-11 z-50 !w-[22rem] max-sm:!fixed max-sm:!inset-x-3 max-sm:!top-14 max-sm:!w-auto">
               <div className="flex items-center justify-between px-3 pb-2 pt-1">
                 <p className="font-mono text-[10.5px] font-normal uppercase tracking-[0.14em] text-ink-400 opacity-70">
                   Notifications
@@ -408,48 +433,76 @@ export function Header({
                   </p>
                 </div>
               ) : (
-                <ul className="max-h-80 overflow-y-auto py-1">
-                  {notifItems.map((n) => (
-                    <li key={n.id}>
-                      {n.link ? (
-                        <Link
-                          href={n.link}
-                          className="mi block px-3 py-2"
-                          onClick={() => setOpenMenu(null)}
+                <ul className="max-h-[min(24rem,60vh)] overflow-y-auto py-1">
+                  {notifItems.map((n) => {
+                    const unread = n.readAt == null;
+                    const content = (
+                      <>
+                        <span className="flex w-full items-start justify-between gap-2">
+                          <span className="flex min-w-0 items-start gap-1.5">
+                            {unread ? (
+                              <span
+                                aria-label="Unread"
+                                className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-teal-600"
+                              />
+                            ) : null}
+                            <span
+                              className={cn(
+                                "text-[13px] leading-snug",
+                                unread
+                                  ? "font-semibold text-ink-900"
+                                  : "font-medium text-ink-700",
+                              )}
+                            >
+                              {n.title}
+                            </span>
+                          </span>
+                          <time
+                            dateTime={n.createdAt}
+                            title={new Date(n.createdAt).toLocaleString()}
+                            className="shrink-0 whitespace-nowrap pt-0.5 text-[11px] font-normal text-ink-400"
+                          >
+                            {formatNotificationTime(n.createdAt)}
+                          </time>
+                        </span>
+                        <span
+                          className={cn(
+                            "line-clamp-3 w-full text-xs font-normal text-ink-400",
+                            unread && "pl-3.5",
+                          )}
                         >
-                          <p
-                            className={cn(
-                              "text-[13px]",
-                              n.readAt
-                                ? "font-medium text-ink-700"
-                                : "font-semibold text-ink-900",
-                            )}
+                          {n.body}
+                        </span>
+                      </>
+                    );
+                    const itemClass =
+                      "min-w-0 flex-1 px-2 py-2 !flex-col !items-start !gap-0.5";
+                    return (
+                      <li key={n.id} className="flex items-start gap-1 px-1">
+                        {n.link ? (
+                          <Link
+                            href={n.link}
+                            className={cn("mi", itemClass)}
+                            onClick={() => {
+                              if (unread) void setNotificationRead(n.id, true);
+                              setOpenMenu(null);
+                            }}
                           >
-                            {n.title}
-                          </p>
-                          <p className="mt-0.5 line-clamp-2 text-xs text-ink-400">
-                            {n.body}
-                          </p>
-                        </Link>
-                      ) : (
-                        <div className="px-3 py-2">
-                          <p
-                            className={cn(
-                              "text-[13px]",
-                              n.readAt
-                                ? "font-medium text-ink-700"
-                                : "font-semibold text-ink-900",
-                            )}
-                          >
-                            {n.title}
-                          </p>
-                          <p className="mt-0.5 line-clamp-2 text-xs text-ink-400">
-                            {n.body}
-                          </p>
-                        </div>
-                      )}
-                    </li>
-                  ))}
+                            {content}
+                          </Link>
+                        ) : (
+                          <div className={cn("flex", itemClass)}>{content}</div>
+                        )}
+                        <button
+                          type="button"
+                          className="mt-2 shrink-0 rounded px-1.5 py-1 text-[11px] font-semibold text-teal-700 hover:bg-surface-2"
+                          onClick={() => void setNotificationRead(n.id, unread)}
+                        >
+                          {unread ? "Mark read" : "Mark unread"}
+                        </button>
+                      </li>
+                    );
+                  })}
                 </ul>
               )}
               <hr />

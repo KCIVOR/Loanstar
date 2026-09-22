@@ -79,6 +79,8 @@ const VALID_PAYMENT_SCHEDULES = new Set([
   "quarterly",
   "two_monthly",
   "daily",
+  "quarterly_special",
+  "two_monthly_special",
 ]);
 
 export async function POST(request: Request) {
@@ -180,7 +182,9 @@ export async function POST(request: Request) {
       | "bi_monthly"
       | "quarterly"
       | "two_monthly"
-      | "daily" =
+      | "daily"
+      | "quarterly_special"
+      | "two_monthly_special" =
       (segment === "sme" || segment === "individual") &&
       body.paymentSchedule &&
       VALID_PAYMENT_SCHEDULES.has(body.paymentSchedule)
@@ -192,7 +196,9 @@ export async function POST(request: Request) {
             | "bi_monthly"
             | "quarterly"
             | "two_monthly"
-            | "daily")
+            | "daily"
+            | "quarterly_special"
+            | "two_monthly_special")
         : "monthly";
 
     const collateralScheduleError = validateCollateralPaymentSchedule(

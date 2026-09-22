@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
+import { notifyWorkflowEvent } from "@/lib/notifications/workflow-events";
 import { writeAuditEvent } from "@/lib/audit/writer";
 import { handleApiError, jsonOk } from "@/lib/api/handler";
 import { STAGES } from "@/lib/constants";
@@ -152,6 +153,15 @@ export async function POST(request: Request, { params }: RouteParams) {
         status: "uploaded",
       },
     });
+
+    // Only replacements of a document CSA flagged for revision notify CSA —
+    // notifying on every intake upload would send one alert per file.
+    if (existingDoc?.status === "needs_revision") {
+      await notifyWorkflowEvent("document_uploaded_by_borrower", application.id, {
+        actorId: user.id,
+        detail: `Replacement for: ${body.fileName}.`,
+      });
+    }
 
     return jsonOk({
       document: {

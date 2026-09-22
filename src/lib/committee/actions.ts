@@ -4,6 +4,7 @@ import { assertCoBorrowerRequirementAllowed } from "@/lib/applications/co-borrow
 import { appendStatusHistory } from "@/lib/applications/status";
 import { writeAuditEvent } from "@/lib/audit/writer";
 import { discloseTerms, witnessSignComputation } from "@/lib/negotiation/service";
+import { notifyWorkflowEvent } from "@/lib/notifications/workflow-events";
 import { notifyBorrowerForApplication } from "@/lib/notifications/write";
 
 import { getCommitteeSize } from "./committee-size";
@@ -312,6 +313,26 @@ export async function executeFinalAction(
         : {}),
     },
   });
+
+  // Staff who act next: CSA discloses approved terms; CIG makes the denial
+  // call; a revisit goes to whichever team it was routed to.
+  if (action === "approve") {
+    await notifyWorkflowEvent("committee_approved_disclose_terms", applicationId, {
+      actorId,
+    });
+  } else if (action === "deny") {
+    await notifyWorkflowEvent("committee_denied_call_needed", applicationId, {
+      actorId,
+    });
+  } else if (action === "revisit" && options?.revisitRoute) {
+    await notifyWorkflowEvent(
+      options.revisitRoute === "cig"
+        ? "committee_revisit_cig"
+        : "committee_revisit_csa",
+      applicationId,
+      { actorId, detail: options.comment ? `Reason: ${options.comment}` : undefined },
+    );
+  }
 
   if (action === "approve") {
     void notifyBorrowerForApplication(applicationId, {

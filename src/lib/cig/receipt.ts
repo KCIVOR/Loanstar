@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { appendStatusHistory } from "@/lib/applications/status";
+import { notifyWorkflowEvent } from "@/lib/notifications/workflow-events";
 import {
   getCompletionSummary,
   getStageChecklist,
@@ -105,5 +106,10 @@ export async function returnToCsa(
   await appendStatusHistory(supabase, applicationId, "submitted", {
     actorId,
     note: `Returned to CSA by CIG — ${note}`,
+  });
+
+  await notifyWorkflowEvent("application_returned_to_csa", applicationId, {
+    actorId,
+    detail: `Note: ${note}`,
   });
 }

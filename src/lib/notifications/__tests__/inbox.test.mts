@@ -5,6 +5,7 @@ import {
   countUnread,
   mapNotificationRow,
   parseMarkReadPatch,
+  formatNotificationTime,
 } from "../inbox";
 import { isInAppNotifyAllowed } from "../write";
 
@@ -30,7 +31,25 @@ describe("notifications inbox helpers (Phase 5)", () => {
     assert.deepEqual(parseMarkReadPatch({ ids: ["a", "b"] }), {
       ids: ["a", "b"],
     });
+    assert.deepEqual(parseMarkReadPatch({ ids: ["a"], unread: true }), {
+      ids: ["a"],
+      unread: true,
+    });
+    assert.deepEqual(parseMarkReadPatch({ all: true, unread: true }), {
+      all: true,
+    });
     assert.equal(parseMarkReadPatch({}), null);
+  });
+
+  it("formats notification time relative then absolute", () => {
+    const now = new Date("2026-09-22T12:00:00Z");
+    assert.equal(formatNotificationTime("2026-09-22T11:59:40Z", now), "Just now");
+    assert.equal(formatNotificationTime("2026-09-22T11:30:00Z", now), "30m ago");
+    assert.equal(formatNotificationTime("2026-09-22T07:00:00Z", now), "5h ago");
+    assert.equal(formatNotificationTime("2026-09-20T12:00:00Z", now), "2d ago");
+    assert.equal(formatNotificationTime("2026-08-01T12:00:00Z", now), "Aug 1");
+    assert.equal(formatNotificationTime("2025-08-01T12:00:00Z", now), "Aug 1, 2025");
+    assert.equal(formatNotificationTime("garbage", now), "");
   });
 
   it("in-app notify allowed fail-open unless explicit false", () => {

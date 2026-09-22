@@ -88,7 +88,9 @@ type StartPaymentSchedule =
   | "bi_monthly"
   | "quarterly"
   | "two_monthly"
-  | "daily";
+  | "daily"
+  | "quarterly_special"
+  | "two_monthly_special";
 
 function formatMoney(value: number) {
   return value.toLocaleString("en-PH", {
@@ -1090,7 +1092,9 @@ export default function BorrowerDashboardPage() {
                     <option value="weekly">Invoice Financing (Weekly)</option>
                     <option value="bi_monthly">Bi-monthly (every 15 days)</option>
                     <option value="quarterly">Quarterly</option>
+                    <option value="quarterly_special">Quarterly (Special)</option>
                     <option value="two_monthly">Two-monthly</option>
+                    <option value="two_monthly_special">Two-monthly (Special)</option>
                     <option value="daily">Daily</option>
                   </>
                 ) : null}
