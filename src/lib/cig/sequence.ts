@@ -215,7 +215,7 @@ export function cigSequenceStageLabel(
   stage: CigSequenceStage,
   segment?: "seafarer" | "sme" | "individual" | null,
 ): string {
-  if (segment === "sme") {
+  if (segment === "sme" || segment === "individual") {
     if (stage === "ci_references") return "Field Visit";
     if (stage === "crewing_manager") return "Field Visit (complete)";
   }

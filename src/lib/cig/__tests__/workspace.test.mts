@@ -144,6 +144,45 @@ describe("buildCigWorkspaceSteps", () => {
     assert.equal(steps[2].state, "todo");
     assert.equal(steps.length, 6);
   });
+
+  it("keeps default chip labels when no segment is passed", () => {
+    const steps = buildCigWorkspaceSteps({
+      status: "for_verification",
+      sequenceCurrent: "external_checks",
+      forwarded: false,
+    });
+    assert.deepEqual(
+      steps.map((s) => s.label),
+      ["Borrower", "Checks", "CI & Refs", "Crewing", "Finding", "Forward"],
+    );
+  });
+
+  it("relabels the CI chips as Field Visit for Individual", () => {
+    const steps = buildCigWorkspaceSteps({
+      status: "for_verification",
+      sequenceCurrent: "ci_references",
+      forwarded: false,
+      segment: "individual",
+    });
+    assert.equal(steps[2].label, "Field Visit");
+    assert.equal(steps[3].label, "Field Visit (complete)");
+    assert.equal(steps[0].label, "Borrower");
+  });
+
+  it("leaves Seafarer and SME chip labels unchanged", () => {
+    for (const segment of ["seafarer", "sme"] as const) {
+      const steps = buildCigWorkspaceSteps({
+        status: "for_verification",
+        sequenceCurrent: "ci_references",
+        forwarded: false,
+        segment,
+      });
+      assert.deepEqual(
+        steps.map((s) => s.label),
+        ["Borrower", "Checks", "CI & Refs", "Crewing", "Finding", "Forward"],
+      );
+    }
+  });
 });
 
 describe("cigForwardReady / cigHasFinding", () => {
@@ -209,6 +248,51 @@ describe("cigNextStep", () => {
     });
     assert.match(step.title, /crewing/i);
     assert.doesNotMatch(step.body, /unlock finding/i);
+  });
+
+  it("uses Field Visit coaching copy for Individual", () => {
+    const step = cigNextStep({
+      status: "for_verification",
+      missing: ["Field visit: date visited"],
+      sequence: sequenceAt("ci_references"),
+      forwarded: false,
+      activeCallbackAt: null,
+      segment: "individual",
+    });
+    assert.match(step.title, /field visit/i);
+    assert.match(step.body, /Field visit: date visited/);
+    assert.doesNotMatch(
+      `${step.title} ${step.body}`,
+      /PIC|reference|checklist|rating|crewing/i,
+    );
+  });
+
+  it("falls back to generic Field Visit copy for Individual with no match", () => {
+    const step = cigNextStep({
+      status: "for_verification",
+      missing: [],
+      sequence: sequenceAt("ci_references"),
+      forwarded: false,
+      activeCallbackAt: null,
+      segment: "individual",
+    });
+    assert.match(step.title, /field visit/i);
+    assert.doesNotMatch(
+      `${step.title} ${step.body}`,
+      /PIC|reference|checklist|rating|crewing/i,
+    );
+  });
+
+  it("keeps CI & References copy for Seafarer", () => {
+    const step = cigNextStep({
+      status: "for_verification",
+      missing: ["PIC name required"],
+      sequence: sequenceAt("ci_references"),
+      forwarded: false,
+      activeCallbackAt: null,
+      segment: "seafarer",
+    });
+    assert.match(step.title, /CI & References/i);
   });
 });
 

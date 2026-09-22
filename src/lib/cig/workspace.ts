@@ -110,14 +110,34 @@ export function cigWorkspaceStageIndex(input: {
   return STAGE_INDEX[input.sequenceCurrent];
 }
 
+/**
+ * Chip label for a workspace stage.
+ *
+ * Individual swapped the CI & References Form for the Field Visit form
+ * (2026-09-22), so its two CI-era chips are relabelled. Seafarer and SME keep
+ * the short default labels — passing no segment (or any other segment) yields
+ * byte-identical output to before.
+ */
+function workspaceStageLabel(
+  stage: { id: CigWorkspaceStageId; label: string },
+  segment?: "seafarer" | "sme" | "individual" | null,
+): string {
+  if (segment === "individual") {
+    if (stage.id === "ci_references") return "Field Visit";
+    if (stage.id === "crewing_manager") return "Field Visit (complete)";
+  }
+  return stage.label;
+}
+
 export function buildCigWorkspaceSteps(input: {
   status: string;
   sequenceCurrent: CigSequenceStage;
   forwarded: boolean;
+  segment?: "seafarer" | "sme" | "individual" | null;
 }): CigWorkspaceStep[] {
   const current = cigWorkspaceStageIndex(input);
   return CIG_WORKSPACE_STAGES.map((stage, index) => ({
-    label: stage.label,
+    label: workspaceStageLabel(stage, input.segment),
     description:
       index === current ? formatStatusLabel(input.status) : undefined,
     state:
@@ -150,6 +170,7 @@ export function cigNextStep(input: {
   forwarded: boolean;
   activeCallbackAt: string | null;
   callbackOverdue?: boolean;
+  segment?: "seafarer" | "sme" | "individual" | null;
 }): CigNextStep {
   if (input.status === "for_revision") {
     return {
@@ -214,9 +235,19 @@ export function cigNextStep(input: {
   if (current === "ci_references") {
     const first = input.missing.find(
       (item) =>
-        /PIC |Reference |CI & References|rating/i.test(item) &&
+        (input.segment === "individual"
+          ? /PIC |Reference |CI & References|rating|Field visit:/i.test(item)
+          : /PIC |Reference |CI & References|rating/i.test(item)) &&
         !item.endsWith(" check not recorded"),
     );
+    if (input.segment === "individual") {
+      return {
+        title: "Complete Field Visit",
+        body: first
+          ? `${first}. Every section must be complete before you can submit.`
+          : "Open the Field Visit form and finish the required site visit details.",
+      };
+    }
     return {
       title: "Complete CI & References Form",
       body: first

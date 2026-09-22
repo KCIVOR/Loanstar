@@ -55,6 +55,7 @@ import type {
 } from "@/lib/cig/field-visit";
 import {
   assessFieldVisitRequired,
+  assessIndividualFieldVisitRequired,
   assessSmeReloanRequired,
 } from "@/lib/cig/field-visit";
 import type {
@@ -727,11 +728,13 @@ export default function CigApplicationPage() {
     forwarded,
     activeCallbackAt: activeCallback?.scheduledAt ?? null,
     callbackOverdue,
+    segment,
   });
   const workspaceSteps = buildCigWorkspaceSteps({
     status: applicationStatus || "for_verification",
     sequenceCurrent: sequence.current,
     forwarded,
+    segment,
   });
   const waiting = cigWaitingLabel(endorsedAt);
   const checksUnlocked = !editable || sequence.unlocked.external_checks;
@@ -1336,7 +1339,7 @@ export default function CigApplicationPage() {
                   ? segment === "sme"
                     ? "Complete sections in order: borrower review → checks → Field Visit → finding."
                     : segment === "individual"
-                      ? "Complete sections in order: borrower review → checks → CI & Refs → finding."
+                      ? "Complete sections in order: borrower review → checks → Field Visit → finding."
                       : "Complete sections in order: borrower review → checks → CI & Refs → crewing → finding."
                   : "Submitted to Committee — view only."}
               </p>
@@ -1625,6 +1628,47 @@ export default function CigApplicationPage() {
                         : isReloan
                           ? "View SME re-loan verification"
                           : "View SME Field Visit"}
+                    </Button>
+                  </Card>
+                ) : null}
+              </>
+            ) : segment === "individual" ? (
+              <>
+                {ciUnlocked ? (
+                  <Card>
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <h2 className="mb-1 font-display text-lg font-semibold text-navy-900">
+                          Field Visit
+                        </h2>
+                        <p className="mb-3 text-sm text-ink-500">
+                          {editable
+                            ? "Site visit form — replaces PIC phone verification for Individual."
+                            : "Submitted to Committee — view only."}
+                        </p>
+                      </div>
+                      <Badge
+                        variant={
+                          assessIndividualFieldVisitRequired(
+                            verification.fieldVisit,
+                          ).complete
+                            ? "success"
+                            : "warning"
+                        }
+                      >
+                        {assessIndividualFieldVisitRequired(
+                          verification.fieldVisit,
+                        ).complete
+                          ? "Complete"
+                          : "In progress"}
+                      </Badge>
+                    </div>
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      onClick={() => setShowFieldVisitForm(true)}
+                    >
+                      {editable ? "Open Field Visit" : "View Field Visit"}
                     </Button>
                   </Card>
                 ) : null}
@@ -2019,7 +2063,7 @@ export default function CigApplicationPage() {
               </Card>
             ) : null}
           </div>
-          {showCiForm && segment !== "sme" ? (
+          {showCiForm && segment === "seafarer" ? (
             <CiReferencesFormModal
               key={ciFormKey}
               open={showCiForm}
@@ -2033,17 +2077,43 @@ export default function CigApplicationPage() {
             />
           ) : null}
 
-          {showFieldVisitForm && segment === "sme" ? (
+          {showFieldVisitForm &&
+          (segment === "sme" || segment === "individual") ? (
             <Modal
               open={showFieldVisitForm}
               onClose={() => setShowFieldVisitForm(false)}
               title={
-                isReloan ? "SME re-loan verification" : "SME Field Visit"
+                segment === "individual"
+                  ? "Field Visit"
+                  : isReloan
+                    ? "SME re-loan verification"
+                    : "SME Field Visit"
               }
               className="!max-w-4xl"
             >
               <div className="max-h-[65vh] overflow-y-auto pr-1">
-                {isReloan ? (
+                {segment === "individual" ? (
+                  <FieldVisitForm
+                    variant="individual"
+                    value={verification.fieldVisit}
+                    onChange={(next) =>
+                      setVerification({
+                        ...verification,
+                        fieldVisit: next,
+                      })
+                    }
+                    onSave={(next) => {
+                      setVerification({
+                        ...verification,
+                        fieldVisit: next,
+                      });
+                      void saveVerification({ fieldVisit: next });
+                    }}
+                    saving={saving}
+                    readOnly={!editable}
+                    verifierName={verifierName}
+                  />
+                ) : isReloan ? (
                   <SmeReloanVerificationForm
                     value={verification.smeReloanVerification}
                     onChange={(next) =>
