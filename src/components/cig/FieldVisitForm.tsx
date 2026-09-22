@@ -13,6 +13,7 @@ import {
   sumHouseExpenses,
   type FieldVisit,
   type NeighborhoodClass,
+  type NeighborhoodGrid,
   type NeighborhoodQuality,
   type ResidenceTypeId,
 } from "@/lib/cig/field-visit";
@@ -103,6 +104,121 @@ function NeighborhoodSelects({
           <option value="good">Good</option>
         </Select>
       </div>
+    </div>
+  );
+}
+
+/** The workbook's three fixed neighbourhood area types, in sheet order. */
+const NEIGHBORHOOD_AREAS = [
+  { key: "residential", label: "Residential" },
+  { key: "commercial", label: "Commercial" },
+  { key: "mixed", label: "Mixed" },
+] as const;
+
+/**
+ * Neighborhood — the three workbook area types, each removable and
+ * re-addable (the Field CI form's 3x2 grid; there is no fourth type, so
+ * "Add neighborhood" only ever offers one that was removed).
+ *
+ * An area is hidden ONLY when its key is explicitly `null`. A missing key
+ * still renders, so the 29 existing SME field visits — which store `{}` or
+ * a partial grid — keep showing every row exactly as they do today.
+ */
+function NeighborhoodGroup({
+  value,
+  disabled,
+  onChange,
+}: {
+  value?: NeighborhoodGrid | null;
+  disabled?: boolean;
+  onChange: (next: NeighborhoodGrid) => void;
+}) {
+  const grid: NeighborhoodGrid = value ?? {};
+  const shown = NEIGHBORHOOD_AREAS.filter((area) => grid[area.key] !== null);
+  const removed = NEIGHBORHOOD_AREAS.filter((area) => grid[area.key] === null);
+
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center justify-between">
+        <Label>Neighborhood</Label>
+        {!disabled && removed.length > 0 ? (
+          <Button
+            type="button"
+            variant="secondary"
+            size="sm"
+            onClick={() => onChange({ ...grid, [removed[0].key]: {} })}
+          >
+            Add neighborhood
+          </Button>
+        ) : null}
+      </div>
+
+      {shown.length === 0 ? (
+        <p className="text-sm text-ink-400">No neighborhood recorded.</p>
+      ) : null}
+
+      {shown.map((area) => (
+        <div key={area.key} className="space-y-2">
+          <div className="flex items-center justify-between">
+            <p className="text-xs font-medium text-ink-600">{area.label}</p>
+            {!disabled ? (
+              <Button
+                type="button"
+                variant="danger-soft"
+                size="sm"
+                aria-label={`Remove ${area.label.toLowerCase()} neighborhood`}
+                onClick={() => onChange({ ...grid, [area.key]: null })}
+              >
+                Remove
+              </Button>
+            ) : null}
+          </div>
+          <div className="grid gap-2 sm:grid-cols-2">
+            <div>
+              <Label className="text-xs">Class</Label>
+              <Select
+                disabled={disabled}
+                value={grid[area.key]?.class ?? ""}
+                onChange={(e) =>
+                  onChange({
+                    ...grid,
+                    [area.key]: {
+                      ...grid[area.key],
+                      class: (e.target.value || null) as NeighborhoodClass | null,
+                    },
+                  })
+                }
+              >
+                <option value="">—</option>
+                <option value="low">Low</option>
+                <option value="middle">Middle</option>
+                <option value="upper">Upper</option>
+              </Select>
+            </div>
+            <div>
+              <Label className="text-xs">Quality</Label>
+              <Select
+                disabled={disabled}
+                value={grid[area.key]?.quality ?? ""}
+                onChange={(e) =>
+                  onChange({
+                    ...grid,
+                    [area.key]: {
+                      ...grid[area.key],
+                      quality: (e.target.value || null) as NeighborhoodQuality | null,
+                    },
+                  })
+                }
+              >
+                <option value="">—</option>
+                <option value="poor">Poor</option>
+                <option value="fair">Fair</option>
+                <option value="good">Good</option>
+              </Select>
+            </div>
+          </div>
+        </div>
+      ))}
     </div>
   );
 }
@@ -317,116 +433,16 @@ export function FieldVisitForm({
             />
           </div>
         </div>
-        <div className="space-y-3 rounded border border-line-100 p-3">
-          <NeighborhoodSelects
-            label="Neighborhood — Residential"
-            classValue={visit.residence?.neighborhood?.residential?.class}
-            qualityValue={visit.residence?.neighborhood?.residential?.quality}
-            disabled={readOnly}
-            onClass={(v) =>
-              patch({
-                ...visit,
-                residence: {
-                  ...visit.residence,
-                  neighborhood: {
-                    ...visit.residence?.neighborhood,
-                    residential: {
-                      ...visit.residence?.neighborhood?.residential,
-                      class: v,
-                    },
-                  },
-                },
-              })
-            }
-            onQuality={(v) =>
-              patch({
-                ...visit,
-                residence: {
-                  ...visit.residence,
-                  neighborhood: {
-                    ...visit.residence?.neighborhood,
-                    residential: {
-                      ...visit.residence?.neighborhood?.residential,
-                      quality: v,
-                    },
-                  },
-                },
-              })
-            }
-          />
-          <NeighborhoodSelects
-            label="Neighborhood — Commercial"
-            classValue={visit.residence?.neighborhood?.commercial?.class}
-            qualityValue={visit.residence?.neighborhood?.commercial?.quality}
-            disabled={readOnly}
-            onClass={(v) =>
-              patch({
-                ...visit,
-                residence: {
-                  ...visit.residence,
-                  neighborhood: {
-                    ...visit.residence?.neighborhood,
-                    commercial: {
-                      ...visit.residence?.neighborhood?.commercial,
-                      class: v,
-                    },
-                  },
-                },
-              })
-            }
-            onQuality={(v) =>
-              patch({
-                ...visit,
-                residence: {
-                  ...visit.residence,
-                  neighborhood: {
-                    ...visit.residence?.neighborhood,
-                    commercial: {
-                      ...visit.residence?.neighborhood?.commercial,
-                      quality: v,
-                    },
-                  },
-                },
-              })
-            }
-          />
-          <NeighborhoodSelects
-            label="Neighborhood — Mixed"
-            classValue={visit.residence?.neighborhood?.mixed?.class}
-            qualityValue={visit.residence?.neighborhood?.mixed?.quality}
-            disabled={readOnly}
-            onClass={(v) =>
-              patch({
-                ...visit,
-                residence: {
-                  ...visit.residence,
-                  neighborhood: {
-                    ...visit.residence?.neighborhood,
-                    mixed: {
-                      ...visit.residence?.neighborhood?.mixed,
-                      class: v,
-                    },
-                  },
-                },
-              })
-            }
-            onQuality={(v) =>
-              patch({
-                ...visit,
-                residence: {
-                  ...visit.residence,
-                  neighborhood: {
-                    ...visit.residence?.neighborhood,
-                    mixed: {
-                      ...visit.residence?.neighborhood?.mixed,
-                      quality: v,
-                    },
-                  },
-                },
-              })
-            }
-          />
-        </div>
+        <NeighborhoodGroup
+          value={visit.residence?.neighborhood}
+          disabled={readOnly}
+          onChange={(next) =>
+            patch({
+              ...visit,
+              residence: { ...visit.residence, neighborhood: next },
+            })
+          }
+        />
         <div>
           <Label>Findings report</Label>
           <Textarea
