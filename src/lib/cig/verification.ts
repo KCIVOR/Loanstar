@@ -2,7 +2,9 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 
 import {
   assessFieldVisitRequired,
+  assessIndividualFieldVisitRequired,
   assessSmeReloanRequired,
+  isIndividualFieldVisitComplete,
   type FieldVisit,
   type SmeReloanVerification,
 } from "./field-visit";
@@ -193,8 +195,11 @@ export type VerificationRecord = {
 };
 
 export type VerificationScope = {
-  /** Individual reuses Seafarer's phone/reference verification (CI & References
-   * Form, confirmed 2026-08-18) but has NO Crewing manager step at all (confirmed
+  /** Individual uses the Field Visit form, not the CI & References Form
+   * (decided 2026-09-22 —
+   * docs/revision-plans/feature-individual-cig-field-visit.md; the CI &
+   * References Form is Seafarer-only from that date). Individual also has NO
+   * Crewing manager step at all (confirmed
    * 2026-08-19 — Individual has no manning agency/vessel to verify, so nothing
    * replaces it; the sequence stage auto-completes like SME's does). Keep this
    * a real 3-way segment, not a 2-way "sme vs everything else" coercion. */
@@ -475,6 +480,12 @@ export function assessVerificationCompleteness(
       ? assessSmeReloanRequired(verification.smeReloanVerification)
       : assessFieldVisitRequired(verification.fieldVisit);
     missing.push(...smeForm.missing);
+  } else if (segment === "individual") {
+    // Field Visit replaced the CI & References Form for Individual
+    // (2026-09-22, docs/revision-plans/feature-individual-cig-field-visit.md).
+    missing.push(
+      ...assessIndividualFieldVisitRequired(verification.fieldVisit).missing,
+    );
   } else {
     if (segment === "seafarer") {
       if (!isFilled(verification.cmPosition)) {
@@ -575,7 +586,7 @@ export function assessVerificationCompleteness(
     (segment === "sme"
       ? smeFormOk
       : segment === "individual"
-        ? isCiReferencesComplete(verification)
+        ? isIndividualFieldVisitComplete(verification.fieldVisit)
         : isCiReferencesComplete(verification) &&
           isCrewingManagerComplete(verification)) &&
     collateralOk &&

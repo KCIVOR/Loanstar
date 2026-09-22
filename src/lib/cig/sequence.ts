@@ -1,6 +1,7 @@
 import {
   assessFieldVisitRequired,
   assessSmeReloanRequired,
+  isIndividualFieldVisitComplete,
 } from "./field-visit";
 import {
   isBorrowerReviewComplete,
@@ -106,11 +107,12 @@ export function getCigSequenceState(
     s3 = s2 && isSmeFieldStageComplete(verification, scope);
     s4 = s3;
   } else if (segment === "individual") {
-    // CI & References Form applies (reuses Seafarer's phone-verification
-    // approach, confirmed 2026-08-18), but Individual has no Crewing manager
-    // step at all (confirmed 2026-08-19 — no manning agency/vessel to verify).
-    // Crewing slot auto-completes, same pattern as SME's Field Visit above.
-    s3 = s2 && isCiReferencesComplete(verification);
+    // The Field Visit replaced the CI & References Form for Individual as of
+    // 2026-09-22 (docs/revision-plans/feature-individual-cig-field-visit.md).
+    // Individual still has no Crewing manager step at all (confirmed
+    // 2026-08-19 — no manning agency/vessel to verify), so the crewing slot
+    // auto-completes, same pattern as SME's Field Visit above.
+    s3 = s2 && isIndividualFieldVisitComplete(verification.fieldVisit);
     s4 = s3;
   } else {
     s3 = s2 && isCiReferencesComplete(verification);
