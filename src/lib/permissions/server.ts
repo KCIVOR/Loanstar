@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import type { User } from "@supabase/supabase-js";
 
 import { MODULE_SLUGS } from "@/lib/constants";
+import { fetchActiveProfile, isActiveProfile } from "@/lib/permissions/active-profile";
 import { createClient, createServiceClient } from "@/lib/supabase/server";
 import type {
   FieldRule,
@@ -51,6 +52,15 @@ export async function requireAuth(): Promise<User> {
     throw new AuthError();
   }
 
+  // Active-profile gate: this is what makes deactivation take effect on the
+  // very next request, independent of the still-valid Auth access token.
+  // A missing/inactive profile throws the same AuthError as "not signed
+  // in" — deliberately indistinguishable to a caller.
+  const profile = await fetchActiveProfile(supabase, user.id);
+  if (!isActiveProfile(profile)) {
+    throw new AuthError();
+  }
+
   return user;
 }
 
@@ -86,6 +96,7 @@ export async function getUserPermissions(
         canExecuteTrigger: true,
       })),
       fieldRules: {},
+      roleSlugs: [],
     };
   }
 
@@ -102,6 +113,7 @@ export async function getUserPermissions(
       role_id,
       roles!inner (
         id,
+        slug,
         is_active,
         role_module_permissions (
           can_view,
@@ -126,6 +138,7 @@ export async function getUserPermissions(
 
   const moduleMap = new Map<ModuleSlug, ModulePermission>();
   const fieldRules: Partial<Record<ModuleSlug, FieldRule>> = {};
+  const roleSlugs: string[] = [];
 
   for (const slug of MODULE_SLUGS) {
     moduleMap.set(slug, {
@@ -142,6 +155,7 @@ export async function getUserPermissions(
     const rolesRaw = row.roles;
     const role = (Array.isArray(rolesRaw) ? rolesRaw[0] : rolesRaw) as
       | {
+          slug: string;
           is_active: boolean;
           role_module_permissions: Array<{
             can_view: boolean;
@@ -160,6 +174,8 @@ export async function getUserPermissions(
       | undefined;
 
     if (!role?.is_active) continue;
+
+    if (role.slug) roleSlugs.push(role.slug);
 
     for (const perm of role.role_module_permissions ?? []) {
       const moduleRef = Array.isArray(perm.modules)
@@ -191,6 +207,7 @@ export async function getUserPermissions(
     isSuperAdmin: false,
     modules: Array.from(moduleMap.values()),
     fieldRules,
+    roleSlugs,
   };
 }
 

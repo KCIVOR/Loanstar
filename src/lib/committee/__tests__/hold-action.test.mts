@@ -78,3 +78,78 @@ describe("committee hold final action (Phase 3)", () => {
     );
   });
 });
+
+describe("clear_hold final action (UAT committee hold clear)", () => {
+  it("allows clear_hold from committee_hold with a reason and resolves to for_approval", () => {
+    assert.doesNotThrow(() =>
+      assertFinalActionPreconditions("committee_hold", "clear_hold" as FinalAction, {
+        comment: "CI report received; ready for re-review",
+      }),
+    );
+    assert.equal(resolveFinalActionStatus("clear_hold" as FinalAction), "for_approval");
+  });
+
+  it("requires a non-blank reason to clear a hold", () => {
+    assert.throws(
+      () =>
+        assertFinalActionPreconditions("committee_hold", "clear_hold" as FinalAction, {}),
+      /[Rr]eason.*required|required.*[Rr]eason/,
+    );
+    assert.throws(
+      () =>
+        assertFinalActionPreconditions("committee_hold", "clear_hold" as FinalAction, {
+          comment: "   ",
+        }),
+      /[Rr]eason.*required|required.*[Rr]eason/,
+    );
+  });
+
+  it("rejects clear_hold from for_approval (only committee_hold may be cleared)", () => {
+    assert.throws(
+      () =>
+        assertFinalActionPreconditions("for_approval", "clear_hold" as FinalAction, {
+          comment: "Reason",
+        }),
+      /not on committee hold/,
+    );
+  });
+
+  it("rejects clear_hold from CSA on_hold and other non-committee statuses", () => {
+    assert.throws(
+      () =>
+        assertFinalActionPreconditions("on_hold", "clear_hold" as FinalAction, {
+          comment: "Reason",
+        }),
+      /Application is not pending committee decision/,
+    );
+    assert.throws(
+      () =>
+        assertFinalActionPreconditions("approved", "clear_hold" as FinalAction, {
+          comment: "Reason",
+        }),
+      /Application is not pending committee decision/,
+    );
+  });
+
+  it(
+    "regression: does not strand an application if committee size grows while on hold " +
+      "(clear_hold must not require assertAllVotesCast — see plan's Open Questions)",
+    () => {
+      // A hold can predate a committee-size increase (getCommitteeSize reads
+      // live config, not a value frozen at hold time). If clear_hold enforced
+      // the full-vote gate the way approve/deny/revisit do, an application
+      // sitting on committee_hold with e.g. 2 of a now-3-member committee's
+      // votes cast would throw here and could never be cleared — there is no
+      // way to cast the missing vote from committee_hold (RLS only allows new
+      // committee_votes rows while status = 'for_approval'). Precondition
+      // checking alone must not perform any vote-count assertion for
+      // clear_hold; the executeFinalAction-level skip is covered by the
+      // source-contract test in clear-hold-route.test.mts.
+      assert.doesNotThrow(() =>
+        assertFinalActionPreconditions("committee_hold", "clear_hold" as FinalAction, {
+          comment: "Clearing despite committee size change",
+        }),
+      );
+    },
+  );
+});

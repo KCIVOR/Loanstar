@@ -47,6 +47,7 @@ export function EditApplicationFormModal({
   onSaved,
   segment = "seafarer",
   entityType = null,
+  agent,
 }: {
   open: boolean;
   onClose: () => void;
@@ -55,6 +56,18 @@ export function EditApplicationFormModal({
   onSaved: () => Promise<void> | void;
   segment?: "seafarer" | "sme" | "individual";
   entityType?: "individual" | "corporate" | null;
+  /** Relational Agent assignment — saved independently and immediately via
+   * its own PATCH (mirrors CSA), not bundled into this modal's "Save
+   * changes" borrower payload. See `/api/cig/applications/[id]` PATCH,
+   * which requires `intake:edit` for this field specifically. */
+  agent?: {
+    value: string | null;
+    displayName?: string | null;
+    options?: Array<{ id: string; fullName: string }>;
+    editable?: boolean;
+    saving?: boolean;
+    onChange?: (nextAgentUserId: string | null) => void;
+  };
 }) {
   // Parent mounts this only while `open` is true, so each open is a fresh
   // mount — draft initializes from the current borrower record.
@@ -122,6 +135,7 @@ export function EditApplicationFormModal({
           onChange={setDraft}
           segment={segment}
           entityType={entityType}
+          agent={agent}
         />
       </div>
     </Modal>

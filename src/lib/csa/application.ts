@@ -65,6 +65,7 @@ export async function getApplicationForStaff(
       payment_schedule,
       is_reloan,
       parent_application_id,
+      agent_user_id,
       endorsed_at,
       endorsed_by,
       privacy_orientation_at,

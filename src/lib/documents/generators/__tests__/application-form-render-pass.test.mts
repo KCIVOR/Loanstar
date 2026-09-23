@@ -254,6 +254,29 @@ test("Phase 4: SME Corporate template sections match extraction — officers/ban
   if (slug.ok) assert.equal(slug.slug, "application_form_sme_corporate");
 });
 
+test("Agent assignment: SME Individual template prints the resolved assignedAgentName, not the legacy field", () => {
+  // application_form_sme_individual already carries {{salesAgent}} (confirmed
+  // live 2026-09-23), so this exercises the real precedence end to end
+  // without depending on Task 4a's pending application_form template
+  // publish (Seafarer only — see docs/uat-agent-field-implementation-plan.md).
+  const body = smeBodies.get("application_form_sme_individual");
+  assert.ok(body);
+
+  const ctx = buildApplicationFormContext({
+    segment: "sme",
+    entityType: "individual",
+    profile: baseProfile({
+      businessInfo: { salesAgent: "Legacy Agent" },
+    }),
+    assignedAgentName: "Agent Smith",
+  });
+
+  const html = mergeTemplate(body!, ctx);
+  assert.match(html, /Agent Smith/);
+  assert.doesNotMatch(html, /Legacy Agent/);
+  assert.doesNotMatch(html, leftoverToken);
+});
+
 test("Phase 4: replaceUnsigned is scoped by document_slug", () => {
   const src = readFileSync(
     join(root, "src/lib/documents/render-store.ts"),

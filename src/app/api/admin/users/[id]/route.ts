@@ -2,13 +2,17 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 
 import { syncAuthDisplayNameMetadata } from "@/lib/account/sync-display-name";
+import {
+  assertDeactivationAllowed,
+  resolveBanDuration,
+} from "@/lib/admin/users/deactivation";
 import { writeAuditEvent } from "@/lib/audit/writer";
 import { handleApiError, jsonOk } from "@/lib/api/handler";
 import {
   ForbiddenError,
   requireModulePermission,
 } from "@/lib/permissions/server";
-import { createClient } from "@/lib/supabase/server";
+import { createClient, createServiceClient } from "@/lib/supabase/server";
 
 type RouteContext = { params: Promise<{ id: string }> };
 
@@ -35,7 +39,96 @@ export async function PATCH(request: Request, context: RouteContext) {
       return NextResponse.json({ error: "User not found" }, { status: 404 });
     }
 
+    let authBanned: boolean | null = null;
+    let sessionsPurged = false;
+
+    if (body.is_active === false) {
+      const { data: superAdminRole } = await supabase
+        .from("roles")
+        .select("id")
+        .eq("slug", "super_admin")
+        .single();
+
+      if (superAdminRole) {
+        const { data: targetSuperAdminRow } = await supabase
+          .from("user_roles")
+          .select("user_id")
+          .eq("user_id", userId)
+          .eq("role_id", superAdminRole.id)
+          .maybeSingle();
+
+        if (targetSuperAdminRow) {
+          const { data: otherSuperAdminRows, error: otherSuperAdminError } =
+            await supabase
+              .from("user_roles")
+              .select("user_id")
+              .eq("role_id", superAdminRole.id)
+              .neq("user_id", userId);
+          if (otherSuperAdminError) {
+            throw new Error(otherSuperAdminError.message);
+          }
+
+          const otherSuperAdminIds = (otherSuperAdminRows ?? []).map(
+            (row) => row.user_id,
+          );
+
+          let otherActiveSuperAdminCount = 0;
+          if (otherSuperAdminIds.length) {
+            const { count, error: activeCountError } = await supabase
+              .from("profiles")
+              .select("id", { count: "exact", head: true })
+              .in("id", otherSuperAdminIds)
+              .eq("is_active", true);
+            if (activeCountError) throw new Error(activeCountError.message);
+            otherActiveSuperAdminCount = count ?? 0;
+          }
+
+          assertDeactivationAllowed({
+            actorUserId: actor.id,
+            targetUserId: userId,
+            requestedIsActive: false,
+            targetHasSuperAdminRole: true,
+            otherActiveSuperAdminCount,
+          });
+        }
+      }
+    }
+
     if (body.is_active !== undefined || body.full_name !== undefined) {
+      // Auth-side ban/unban and session purge run BEFORE the profile
+      // mutation and are not meaningfully reversible mid-request: if either
+      // fails, bail out without touching the profile row so we never report
+      // a completed deactivation/reactivation that didn't actually happen.
+      // admin.signOut() is deliberately not used here — it requires the
+      // target's own JWT, which the deactivating admin does not have.
+      if (body.is_active !== undefined) {
+        const service = createServiceClient();
+        const banDuration = resolveBanDuration(body.is_active);
+        const { error: banError } = await service.auth.admin.updateUserById(
+          userId,
+          { ban_duration: banDuration },
+        );
+        if (banError) {
+          throw new Error(
+            `Failed to update Auth account status: ${banError.message}`,
+          );
+        }
+        authBanned = !body.is_active;
+
+        if (!body.is_active) {
+          const { error: purgeError } = await service.rpc(
+            "purge_auth_sessions",
+            { p_user_id: userId },
+          );
+          if (purgeError) {
+            throw new Error(
+              `Failed to purge existing sessions: ${purgeError.message}`,
+            );
+          }
+          sessionsPurged = true;
+        }
+      }
+
       const { error } = await supabase
         .from("profiles")
         .update({
@@ -129,6 +222,9 @@ export async function PATCH(request: Request, context: RouteContext) {
       afterData: {
         ...(after as unknown as Record<string, unknown>),
         roleIds: body.roleIds,
+        ...(authBanned !== null
+          ? { authBanned, sessionsPurged }
+          : {}),
       },
     });
 

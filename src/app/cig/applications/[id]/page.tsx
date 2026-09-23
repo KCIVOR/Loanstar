@@ -297,6 +297,15 @@ export default function CigApplicationPage() {
   const [submitOpen, setSubmitOpen] = useState(false);
   const [cancelOpen, setCancelOpen] = useState(false);
   const [cancelReason, setCancelReason] = useState("");
+  const [agentUserId, setAgentUserId] = useState<string | null>(null);
+  const [assignedAgentName, setAssignedAgentName] = useState<string | null>(
+    null,
+  );
+  const [canEditAgent, setCanEditAgent] = useState(false);
+  const [eligibleAgents, setEligibleAgents] = useState<
+    Array<{ id: string; fullName: string }>
+  >([]);
+  const [savingAgent, setSavingAgent] = useState(false);
 
   const load = useCallback(async (opts?: { silent?: boolean }) => {
     if (!opts?.silent) setLoading(true);
@@ -331,7 +340,11 @@ export default function CigApplicationPage() {
             at: string;
             note?: string | null;
           }>;
+          agentUserId?: string | null;
+          assignedAgentName?: string | null;
+          canEditAgent?: boolean;
         };
+        eligibleAgents?: Array<{ id: string; fullName: string }>;
         borrower: (BorrowerProfile & { id?: string }) | null;
         verification: VerificationData;
         completeness: { complete: boolean; missing: string[] };
@@ -380,6 +393,10 @@ export default function CigApplicationPage() {
         timeline: appData.application.timeline ?? [],
       });
       setCsaScreening(appData.csaScreening ?? null);
+      setAgentUserId(appData.application.agentUserId ?? null);
+      setAssignedAgentName(appData.application.assignedAgentName ?? null);
+      setCanEditAgent(Boolean(appData.application.canEditAgent));
+      setEligibleAgents(appData.eligibleAgents ?? []);
 
       if (checksRes.ok) {
         const checksData = (await checksRes.json()) as { checks: CheckItem[] };
@@ -559,6 +576,25 @@ export default function CigApplicationPage() {
       setError(err instanceof Error ? err.message : "Save failed");
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function handleSaveAgent(nextAgentUserId: string | null) {
+    setSavingAgent(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/cig/applications/${applicationId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ agentUserId: nextAgentUserId }),
+      });
+      const data = (await res.json()) as { error?: string };
+      if (!res.ok) throw new Error(data.error ?? "Save failed");
+      await load({ silent: true });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Save failed");
+    } finally {
+      setSavingAgent(false);
     }
   }
 
@@ -1160,6 +1196,11 @@ export default function CigApplicationPage() {
                 segment={segment}
                 entityType={entityType}
                 readOnly
+                agent={{
+                  value: agentUserId,
+                  displayName: assignedAgentName,
+                  editable: false,
+                }}
               />
             </div>
           </Modal>
@@ -1170,6 +1211,14 @@ export default function CigApplicationPage() {
               borrower={borrower}
               applicationId={applicationId}
               onSaved={() => load({ silent: true })}
+              agent={{
+                value: agentUserId,
+                displayName: assignedAgentName,
+                options: eligibleAgents,
+                editable: canEditAgent,
+                saving: savingAgent,
+                onChange: (next) => void handleSaveAgent(next),
+              }}
               segment={segment}
               entityType={entityType}
             />

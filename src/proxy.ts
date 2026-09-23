@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 
+import { getRequiredPageModules } from "@/lib/permissions/navigation";
 import { updateSession } from "@/lib/supabase/middleware";
 
 const ADMIN_PREFIX = "/admin";
@@ -15,6 +16,7 @@ const REMEDIAL_PREFIX = "/remedial";
 const REPORTS_PREFIX = "/reports";
 const DASHBOARD_PREFIX = "/dashboard";
 const ACCOUNT_PREFIX = "/account";
+const ACCESS_DENIED_PREFIX = "/access-denied";
 const AUTH_ROUTES = [
   "/login",
   "/register",
@@ -35,8 +37,8 @@ function resolveAuthedRedirect(request: NextRequest): string {
   return "/dashboard";
 }
 
-export async function middleware(request: NextRequest) {
-  const { supabaseResponse, user } = await updateSession(request);
+export async function proxy(request: NextRequest) {
+  const { supabase, supabaseResponse, user } = await updateSession(request);
   const { pathname } = request.nextUrl;
 
   if (pathname === "/signup" || pathname === "/borrower/register") {
@@ -59,9 +61,11 @@ export async function middleware(request: NextRequest) {
   const isReportsRoute = pathname.startsWith(REPORTS_PREFIX);
   const isDashboardRoute = pathname.startsWith(DASHBOARD_PREFIX);
   const isAccountRoute = pathname.startsWith(ACCOUNT_PREFIX);
+  const isAccessDeniedRoute = pathname.startsWith(ACCESS_DENIED_PREFIX);
   const isProtectedPortal =
     isDashboardRoute ||
     isAccountRoute ||
+    isAccessDeniedRoute ||
     isAdminRoute ||
     isBorrowerRoute ||
     isAgentRoute ||
@@ -79,6 +83,30 @@ export async function middleware(request: NextRequest) {
     loginUrl.pathname = "/login";
     loginUrl.searchParams.set("redirect", pathname);
     return NextResponse.redirect(loginUrl);
+  }
+
+  const requiredModules = getRequiredPageModules(pathname);
+  if (user && requiredModules) {
+    const checks = await Promise.all(
+      requiredModules.map(async (moduleSlug) => {
+        const { data, error } = await supabase.rpc("has_module_permission", {
+          p_module_slug: moduleSlug,
+          p_permission: "view",
+          p_user_id: user.id,
+        });
+        if (error) {
+          throw new Error(`Permission check failed: ${error.message}`);
+        }
+        return Boolean(data);
+      }),
+    );
+
+    if (!checks.some(Boolean)) {
+      const deniedUrl = request.nextUrl.clone();
+      deniedUrl.pathname = ACCESS_DENIED_PREFIX;
+      deniedUrl.search = "";
+      return NextResponse.redirect(deniedUrl);
+    }
   }
 
   if (isAuthRoute(pathname) && user) {

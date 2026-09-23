@@ -107,6 +107,7 @@ type CommitteeDetail = {
     committeeSize: number;
     canOverride: boolean;
     canAdjustPreDecision: boolean;
+    assignedAgentName: string | null;
   };
   borrower: BorrowerProfile | null;
   verification: {
@@ -429,6 +430,14 @@ export default function CommitteeApplicationPage() {
   const [confirmAction, setConfirmAction] = useState<
     "approve" | "deny" | "hold" | null
   >(null);
+  // Clear-hold control (UAT committee hold clear): kept independent of the
+  // approve/deny/hold confirm dialog and its `decisionComment` state so it
+  // can render outside the canDecide-gated "Final action" card below — a
+  // committee-size change while on hold must never hide this control (see
+  // the plan's Open Questions section on the vote-count stranding risk).
+  const [confirmClearHold, setConfirmClearHold] = useState(false);
+  const [clearHoldReason, setClearHoldReason] = useState("");
+  const [clearingHold, setClearingHold] = useState(false);
   const [confirmApproveWithoutSign, setConfirmApproveWithoutSign] =
     useState(false);
   const [approvingWithoutSign, setApprovingWithoutSign] = useState(false);
@@ -544,6 +553,36 @@ export default function CommitteeApplicationPage() {
       setError(err instanceof Error ? err.message : "Action failed");
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function handleClearHold() {
+    if (!clearHoldReason.trim()) return;
+    setClearingHold(true);
+    setMessage(null);
+    setError(null);
+    try {
+      const res = await fetch(
+        `/api/committee/applications/${applicationId}/action`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            action: "clear_hold",
+            comment: clearHoldReason,
+          }),
+        },
+      );
+      const body = (await res.json()) as { error?: string; status?: string };
+      if (!res.ok) throw new Error(body.error ?? "Clear hold failed");
+      setMessage("Hold cleared — returned to committee review.");
+      setClearHoldReason("");
+      setConfirmClearHold(false);
+      await load({ silent: true });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Clear hold failed");
+    } finally {
+      setClearingHold(false);
     }
   }
 
@@ -977,6 +1016,11 @@ export default function CommitteeApplicationPage() {
               segment={data.application.segment}
               entityType={data.application.entityType}
               readOnly
+              agent={{
+                value: null,
+                displayName: data.application.assignedAgentName,
+                editable: false,
+              }}
             />
           </div>
         </Modal>
@@ -2457,6 +2501,55 @@ export default function CommitteeApplicationPage() {
               </Button>
             </div>
           </form>
+        </Card>
+      ) : null}
+
+      {isCommitteeHold ? (
+        // Deliberately its own block, not nested inside the `canDecide`
+        // card below: canDecide requires votes.length >= committeeSize,
+        // which can go false on committee_hold if committee size grows
+        // after the hold was placed (see actions.ts's clear_hold vote-skip
+        // for the backend half of this). Clearing a hold must stay
+        // reachable even then, or the file gets stranded with no visible
+        // way to re-queue it.
+        <Card className="mb-6">
+          <Button
+            type="button"
+            variant="secondary"
+            loading={clearingHold}
+            onClick={() => setConfirmClearHold(true)}
+          >
+            Clear hold
+          </Button>
+          <ConfirmDialog
+            open={confirmClearHold}
+            title="Clear committee hold?"
+            message="Returns this application to committee review (for_approval). This does not change any vote, and does not approve, deny, or revisit the loan."
+            confirmLabel="Yes, clear hold"
+            cancelLabel="Cancel"
+            variant="primary"
+            loading={clearingHold}
+            confirmDisabled={!clearHoldReason.trim()}
+            onCancel={() => {
+              setConfirmClearHold(false);
+              setClearHoldReason("");
+            }}
+            onConfirm={() => void handleClearHold()}
+          >
+            <Label htmlFor="clearHoldReason">
+              Reason <span className="req">*</span>{" "}
+              <span style={{ fontWeight: 400, color: "var(--ink-400)" }}>
+                (required to clear a hold)
+              </span>
+            </Label>
+            <Textarea
+              id="clearHoldReason"
+              value={clearHoldReason}
+              onChange={(e) => setClearHoldReason(e.target.value)}
+              placeholder="What was resolved…"
+              rows={3}
+            />
+          </ConfirmDialog>
         </Card>
       ) : null}
 

@@ -18,6 +18,7 @@ import {
   resolveCommitteeCollateralType,
 } from "@/lib/committee/ci-report";
 import { getApplicationForStaff } from "@/lib/csa/application";
+import { resolveAssignedAgentName } from "@/lib/csa/agent-assignment";
 import { getActiveComputation, getSmeRateHistory } from "@/lib/csa/computation";
 import { csaScreeningCheckSlug } from "@/lib/csa/sme-duplication";
 import {
@@ -98,6 +99,14 @@ export async function GET(_request: Request, { params }: RouteParams) {
     const computation = await getActiveComputation(supabase, id);
     const rateHistory = await getSmeRateHistory(supabase, id);
     const admin = createServiceClient();
+
+    // profiles RLS blocks an ordinary committee session from reading another
+    // user's profile, so the assigned agent's name must resolve via service
+    // role — same justified pattern as the CSA route (see agent-assignment.ts).
+    const assignedAgentName = await resolveAssignedAgentName(
+      admin,
+      application.agent_user_id as string | null,
+    );
 
     // masterlist RLS only grants SELECT to super_admin, accounting_ar, the
     // borrower, or the assigned collector — Committee has none of those, so
@@ -371,6 +380,7 @@ export async function GET(_request: Request, { params }: RouteParams) {
         committeeSize,
         canOverride: application.status === "negotiating_terms",
         canAdjustPreDecision: application.status === "for_approval",
+        assignedAgentName,
       },
       borrower: borrower ? mapBorrowerRow(borrower as BorrowerRow) : null,
       verification: verification

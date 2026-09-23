@@ -889,6 +889,11 @@ function ApplicationFormCard({ packet }: { packet: OriginationPacketDto }) {
             segment={packet.application.segment}
             entityType={packet.application.entityType}
             readOnly
+            agent={{
+              value: null,
+              displayName: packet.csaSummary.assignedAgentName,
+              editable: false,
+            }}
           />
         </div>
       </Modal>

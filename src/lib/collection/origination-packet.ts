@@ -15,6 +15,7 @@ import {
   resolveCommitteeCollateralType,
   type CommitteeCollateralType,
 } from "@/lib/committee/ci-report";
+import { resolveAssignedAgentName } from "@/lib/csa/agent-assignment";
 import { csaScreeningCheckSlug } from "@/lib/csa/sme-duplication";
 import {
   getCompletionSummary,
@@ -327,6 +328,7 @@ export type OriginationPacket = {
     initialInterviewNotes: string | null;
     initialInterviewByName: string | null;
     timeline: Array<StatusHistoryEntry & { label: string }>;
+    assignedAgentName: string | null;
   };
   csaScreening: {
     slug: string;
@@ -351,7 +353,7 @@ export async function loadOriginationPacket(
       entity_type, is_reloan, collateral_type,
       privacy_orientation_at, privacy_orientation_by,
       initial_interview_at, initial_interview_notes, initial_interview_by,
-      endorsed_at, endorsed_by, status_history
+      endorsed_at, endorsed_by, status_history, agent_user_id
     `,
     )
     .eq("id", ctx.loanApplicationId)
@@ -443,6 +445,11 @@ export async function loadOriginationPacket(
     (application.status_history ?? []) as StatusHistoryEntry[]
   ).map((entry) => ({ ...entry, label: formatStatusLabel(entry.status) }));
 
+  const assignedAgentName = await resolveAssignedAgentName(
+    admin,
+    application.agent_user_id as string | null,
+  );
+
   return {
     masterlistId: ctx.masterlistId,
     application: {
@@ -489,6 +496,7 @@ export async function loadOriginationPacket(
         ? (nameById.get(application.initial_interview_by as string) ?? null)
         : null,
       timeline,
+      assignedAgentName,
     },
     csaScreening,
     verification: mapPacketVerificationRow(

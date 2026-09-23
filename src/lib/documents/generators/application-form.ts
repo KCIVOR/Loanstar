@@ -2,8 +2,10 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { normalizeCoBorrowers } from "@/lib/applications/co-borrower";
 import { mapBorrowerRow, type BorrowerRow } from "@/lib/borrowers/types";
+import { resolveAssignedAgentName } from "@/lib/csa/agent-assignment";
 import { getActiveComputation } from "@/lib/csa/computation";
 import { renderAndStore, type RenderedDocumentResult } from "@/lib/documents/render-store";
+import { createServiceClient } from "@/lib/supabase/server";
 
 import {
   buildApplicationFormContext,
@@ -30,7 +32,7 @@ export async function generateApplicationForm(
   const { data: app, error } = await supabase
     .from("loan_applications")
     .select(
-      "application_no, created_at, segment, entity_type, co_borrowers, borrowers (*)",
+      "application_no, created_at, segment, entity_type, co_borrowers, agent_user_id, borrowers (*)",
     )
     .eq("id", applicationId)
     .single();
@@ -51,6 +53,14 @@ export async function generateApplicationForm(
 
   const computation = await getActiveComputation(supabase, applicationId);
 
+  // profiles RLS requires a service client to resolve another user's name
+  // (see agent-assignment.ts) — read-only, scoped to the one id already
+  // stored on an application this caller is authorized to render.
+  const assignedAgentName = await resolveAssignedAgentName(
+    createServiceClient(),
+    app.agent_user_id as string | null,
+  );
+
   const context = buildApplicationFormContext({
     segment: app.segment,
     entityType: app.entity_type,
@@ -59,6 +69,7 @@ export async function generateApplicationForm(
     profile: borrower,
     computation,
     coBorrowers: normalizeCoBorrowers(app.co_borrowers),
+    assignedAgentName,
   });
 
   const result = await renderAndStore(supabase, {

@@ -97,10 +97,57 @@ export function classifyExistingApplications(apps: ExistingApplicationLite[]): {
   return { servicing, origination };
 }
 
+export type CreateApplicationOptions = {
+  /**
+   * Assigned agent to carry onto the new application's `agent_user_id`.
+   * Omitted (undefined) leaves the column untouched by this insert (DB
+   * default null); an explicit `null` is distinct from omitted and is used
+   * by callers that want to state "no agent" deliberately. Only the CSA
+   * lead-conversion route currently supplies this — see
+   * src/app/api/csa/leads/[id]/convert/route.ts. Do not derive this from the
+   * CSA actor or infer it for any other creation path (see the plan's
+   * assignment contract).
+   */
+  agentUserId?: string | null;
+};
+
+/**
+ * Build the `loan_applications` insert row. Exported (in addition to being
+ * used by `createCsaApplication` below) so the omitted-vs-null distinction
+ * for `agent_user_id` can be unit tested without a Supabase client.
+ */
+export function buildApplicationInsertRow(
+  body: CreateApplicationInput,
+  borrowerId: string,
+  actorId: string,
+  options?: CreateApplicationOptions,
+): Record<string, unknown> {
+  return {
+    borrower_id: borrowerId,
+    status: "submitted",
+    segment: body.segment,
+    entity_type: body.entityType ?? null,
+    collateral_type: body.collateralType,
+    payment_schedule: body.paymentSchedule,
+    status_history: [
+      {
+        status: "submitted",
+        at: new Date().toISOString(),
+        actorId,
+        note: "CSA created application",
+      },
+    ],
+    ...(options?.agentUserId !== undefined
+      ? { agent_user_id: options.agentUserId }
+      : {}),
+  };
+}
+
 export async function createCsaApplication(
   supabase: SupabaseClient,
   actorId: string,
   body: CreateApplicationInput,
+  options?: CreateApplicationOptions,
 ): Promise<{ applicationId: string; borrowerId: string }> {
   const { data: existingBorrower } = await supabase
     .from("borrowers")
@@ -131,22 +178,7 @@ export async function createCsaApplication(
 
   const { data: application, error: appError } = await supabase
     .from("loan_applications")
-    .insert({
-      borrower_id: borrowerId,
-      status: "submitted",
-      segment: body.segment,
-      entity_type: body.entityType ?? null,
-      collateral_type: body.collateralType,
-      payment_schedule: body.paymentSchedule,
-      status_history: [
-        {
-          status: "submitted",
-          at: new Date().toISOString(),
-          actorId,
-          note: "CSA created application",
-        },
-      ],
-    })
+    .insert(buildApplicationInsertRow(body, borrowerId, actorId, options))
     .select("id, status, created_at")
     .single();
 
@@ -178,6 +210,9 @@ export async function createCsaApplication(
       entityType: body.entityType ?? null,
       collateralType: body.collateralType,
       paymentSchedule: body.paymentSchedule,
+      ...(options?.agentUserId !== undefined
+        ? { agentUserId: options.agentUserId }
+        : {}),
     },
   });
 

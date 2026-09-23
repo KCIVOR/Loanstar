@@ -117,6 +117,10 @@ export type WidgetDataMap = {
 
 export type WidgetSlug = keyof WidgetDataMap;
 
+/** Trusted dashboard data scope, resolved server-side from `UserPermissions`
+ * (see `resolveDashboardScope`) — never accepted from a request. */
+export type DashboardScope = { kind: "agent"; userId: string } | { kind: "aggregate" };
+
 export type WidgetError = { error: true };
 
 export type WidgetsResponse = {
