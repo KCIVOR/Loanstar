@@ -1,5 +1,8 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import { dirname, join } from "node:path";
 import { describe, it } from "node:test";
+import { fileURLToPath } from "node:url";
 
 import {
   AR_HISTORY_PAGE_SIZES,
@@ -7,6 +10,13 @@ import {
   clampArHistoryPageSize,
   sumPostingAmounts,
 } from "../history";
+
+const here = dirname(fileURLToPath(import.meta.url));
+const src = join(here, "..", "..", "..");
+
+function source(...parts: string[]) {
+  return readFileSync(join(src, ...parts), "utf8");
+}
 
 describe("AR_HISTORY_PAGE_SIZES / POSTING_AMOUNT_FETCH_PAGE", () => {
   it("exposes the allowlisted page sizes used by history routes", () => {
@@ -55,5 +65,22 @@ describe("sumPostingAmounts", () => {
       { amount: undefined as unknown as number },
     ];
     assert.equal(sumPostingAmounts(rows), 30);
+  });
+});
+
+describe("AR internal-transfer source-loan navigation", () => {
+  it("keeps AR source-loan links inside the AR masterlist", () => {
+    const historyPage = source("app", "ar", "history", "page.tsx");
+    const transfersPage = source("app", "ar", "internal-transfers", "page.tsx");
+    const history = source("lib", "ar", "history.ts");
+    const transfers = source("lib", "ar", "internal-transfers.ts");
+
+    assert.match(history, /sourceMasterlistId/);
+    assert.match(transfers, /sourceMasterlistId/);
+
+    for (const page of [historyPage, transfersPage]) {
+      assert.match(page, /href=\{`\/ar\/masterlist\/\$\{row\.sourceMasterlistId\}`\}/);
+      assert.doesNotMatch(page, /href=\{`\/lra\/applications\/\$\{row\.sourceLoanApplicationId\}`\}/);
+    }
   });
 });
