@@ -16,6 +16,25 @@ bun dev
 
 Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
 
+## Document-fidelity evidence
+
+Source originals are retained outside this repository and are never edited. Render a generated
+published template only through the configured Docker Chromium/Gotenberg renderer, using an empty
+evidence directory outside either retained-source directory:
+
+```powershell
+npx tsx scripts/document-fidelity/render-generated-evidence.mts `
+  --slug disclosure_statement `
+  --outdir C:\path\to\an-empty-evidence-directory `
+  --env-file C:\Users\Rovick\Desktop\Loanstar System\loanstar\.env.local
+```
+
+The command reads runtime credentials from the supplied environment file without printing them,
+queries the active published template, and writes only `generated.pdf` plus `page-N.png` images.
+It rejects a fallback renderer, a non-empty output directory, and output below the retained client
+source directories. Compare every generated page against the matching source-evidence PNG before
+changing a template.
+
 You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
 
 This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
