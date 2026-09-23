@@ -1,0 +1,42 @@
+[
+  {
+    "id": "sf-disclosure-statement",
+    "family": "sf-disclosure-statement",
+    "requiredVariantDimensions": {},
+    "templateSlug": "disclosure_statement",
+    "sourcePath": "C:/Users/Rovick/Downloads/SFCalculator/DISC.doc",
+    "pageTarget": 1
+  },
+  {
+    "id": "sf-promissory-note",
+    "family": "sf-promissory-note",
+    "requiredVariantDimensions": {},
+    "templateSlug": "promissory_note",
+    "sourcePath": "C:/Users/Rovick/Downloads/SFCalculator/PN.doc"
+  },
+  {
+    "id": "sf-demand-letter-second-notice",
+    "family": "sf-demand-letter-second-notice",
+    "requiredVariantDimensions": {},
+    "templateSlug": "demand_letter_second_notice",
+    "sourcePath": "C:/Users/Rovick/Downloads/SFCalculator/DL2 - No address.doc"
+  },
+  {
+    "id": "sf-atm-acknowledgement-receipt-no-spouse",
+    "family": "sf-atm-acknowledgement-receipt",
+    "requiredVariantDimensions": {
+      "hasSpouse": false
+    },
+    "templateSlug": "ar_atm_voucher",
+    "sourcePath": "C:/Users/Rovick/Downloads/SFCalculator/AR ATM.doc"
+  },
+  {
+    "id": "sf-atm-acknowledgement-receipt-with-spouse",
+    "family": "sf-atm-acknowledgement-receipt",
+    "requiredVariantDimensions": {
+      "hasSpouse": true
+    },
+    "templateSlug": "ar_atm_voucher",
+    "sourcePath": "C:/Users/Rovick/Downloads/SFCalculator/AR ATM - With Spouse.doc"
+  }
+]

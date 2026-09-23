@@ -52,3 +52,5 @@ _snapshots/
 
 # UAT seed rollback log (local, environment-specific)
 scripts/.uat-seed-log.json
+
+tmp/document-fidelity/
