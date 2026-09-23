@@ -1,7 +1,7 @@
 import fs from "node:fs/promises";
 import { FileBlob, PresentationFile } from "file:///C:/Users/Rovick/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/@oai/artifact-tool/dist/artifact_tool.mjs";
 
-const presentation = await PresentationFile.importPptx(await FileBlob.load("C:/Users/Rovick/Desktop/Loanstar System/loanstar/output/Loanstar_UAT_Progress_Presentation_updated.pptx"));
+const presentation = await PresentationFile.importPptx(await FileBlob.load("C:/Users/Rovick/Desktop/Loanstar System/loanstar/output/Loanstar_UAT_Progress_Presentation_updated_v2.pptx"));
 const slide = presentation.resolve("sl/vaxsvy10");
 const image = await slide.export({ format: "png", scale: 2 });
 await fs.writeFile("C:/Users/Rovick/Desktop/Loanstar System/loanstar/tmp/slide-15-final.png", new Uint8Array(await image.arrayBuffer()));

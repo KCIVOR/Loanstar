@@ -7,7 +7,7 @@ process.env.RUNTIME_NODE_MODULES = "C:/Users/Rovick/.cache/codex-runtimes/codex-
 const skillDir = "C:/Users/Rovick/.codex/plugins/cache/openai-primary-runtime/presentations/26.915.20218/skills/presentations";
 const workspaceDir = "C:/Users/Rovick/Desktop/Loanstar System/loanstar";
 const candidatePath = path.join(workspaceDir, ".codex-finalizer", "loanstar-uat-progress-candidate.pptx");
-const finalPath = path.join(workspaceDir, "output", "Loanstar_UAT_Progress_Presentation_updated.pptx");
+const finalPath = path.join(workspaceDir, "output", "Loanstar_UAT_Progress_Presentation_updated_v2.pptx");
 const runtimePython = "C:/Users/Rovick/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/python.exe";
 
 await fs.mkdir(path.dirname(finalPath), { recursive: true });
