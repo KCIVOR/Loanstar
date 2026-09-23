@@ -1,0 +1,247 @@
+{"kind":"deck","id":"pr/t89tfz","name":"Deck"}
+{"kind":"layout","layoutId":"/ppt/slideMasters/slideMaster1.xml","name":"Master","type":"master"}
+{"kind":"layout","layoutId":"/ppt/slideLayouts/slideLayout1.xml","name":"Title Slide","type":"title"}
+{"kind":"slide","id":"sl/y90nupkv","slide":1,"title":"STARTUPLAB","textShapes":5}
+{"kind":"textbox","id":"sh/utg3698n","slide":1,"name":"Rectangle 8","text":"STARTUPLAB","textPreview":"STARTUPLAB","textChars":10,"textLines":1,"bbox":[48,32,220,18]}
+{"kind":"shape","id":"sh/k3yl0zql","slide":1,"name":"Rectangle 2","bbox":[48,90,90,5]}
+{"kind":"textbox","id":"sh/7qp4be9c","slide":1,"name":"Rectangle 3","text":"User Acceptance Testing\nProgress and Decision Presentation","textPreview":"User Acceptance Testing | Progress and Decision Presentation","textChars":58,"textLines":2,"bbox":[48,130,970,150]}
+{"kind":"textbox","id":"sh/65g3298r","slide":1,"name":"Rectangle 4","text":"Loan Star Lending Group Company.","textPreview":"Loan Star Lending Group Company.","textChars":32,"textLines":1,"bbox":[48,315,850,38]}
+{"kind":"textbox","id":"sh/ts7md4r2","slide":1,"name":"Rectangle 5","text":"UAT Date: 09/22/2026  |  |  Prepared by Rovick Romasanta","textPreview":"UAT Date: 09/22/2026  |  |  Prepared by Rovick Romasanta","textChars":56,"textLines":1,"bbox":[48,368,1000,28]}
+{"kind":"shape","id":"sh/sryl4zqx","slide":1,"name":"Rectangle 6","bbox":[48,628,900,24]}
+{"kind":"textbox","id":"sh/fu94fe98","slide":1,"name":"Rectangle 7","text":"01","textPreview":"01","textChars":2,"textLines":1,"bbox":[1160,680,70,16]}
+{"kind":"notes","id":"nt/y90nupkv","slide":1,"text":"HOW TO USE THIS SLIDE\nUse this cover for the formal client UAT session. Confirm the project name, client, date, tested version, and presenter.\n\nSUGGESTED CLIENT-FACING WORDING\nGood [morning/afternoon]. Today we will review the project progress, validate the agreed solution, record the results, and confirm the next step."}
+{"kind":"slide","id":"sl/hwbqtkby","slide":2,"title":"STARTUPLAB","textShapes":18}
+{"kind":"textbox","id":"sh/65kfmpor","slide":2,"name":"Rectangle 22","text":"STARTUPLAB","textPreview":"STARTUPLAB","textChars":10,"textLines":1,"bbox":[48,28,190,18]}
+{"kind":"shape","id":"sh/9072xkry","slide":2,"name":"Rectangle 1","bbox":[965,28,265,18]}
+{"kind":"textbox","id":"sh/ozy1ofad","slide":2,"name":"Rectangle 2","text":"ORIENTATION","textPreview":"ORIENTATION","textChars":11,"textLines":1,"bbox":[48,54,240,16]}
+{"kind":"textbox","id":"sh/b29kza94","slide":2,"name":"Rectangle 3","text":"02","textPreview":"02","textChars":2,"textLines":1,"bbox":[1160,680,70,16]}
+{"kind":"textbox","id":"sh/a10jqpsj","slide":2,"name":"Rectangle 4","text":"UAT presentation flow","textPreview":"UAT presentation flow","textChars":21,"textLines":1,"bbox":[48,82,1160,58]}
+{"kind":"textbox","id":"sh/x4r21kru","slide":2,"name":"Rectangle 5","text":"The presentation covers project progress before moving into client validation and approval.","textPreview":"The presentation covers project progress before moving into client validation and approval.","textChars":91,"textLines":1,"bbox":[48,142,1120,28]}
+{"kind":"textbox","id":"sh/w3i1sfa9","slide":2,"name":"Rectangle 6","text":"01","textPreview":"01","textChars":2,"textLines":1,"bbox":[55,230,55,70]}
+{"kind":"textbox","id":"sh/r65knqtk","slide":2,"name":"Rectangle 7","text":"PROJECT PROGRESS","textPreview":"PROJECT PROGRESS","textChars":16,"textLines":1,"bbox":[117,232,220,28]}
+{"kind":"textbox","id":"sh/q5wjelsz","slide":2,"name":"Rectangle 8","text":"Objective, scope, timeline, completed work","textPreview":"Objective, scope, timeline, completed work","textChars":42,"textLines":1,"bbox":[117,270,210,90]}
+{"kind":"shape","id":"sh/ove9o7yd","slide":2,"name":"Rectangle 9","bbox":[333,252,18,3]}
+{"kind":"textbox","id":"sh/9wnqhczy","slide":2,"name":"Rectangle 10","text":"02","textPreview":"02","textChars":2,"textLines":1,"bbox":[355,230,55,70]}
+{"kind":"textbox","id":"sh/mtwrmxg7","slide":2,"name":"Rectangle 11","text":"UAT READINESS","textPreview":"UAT READINESS","textChars":13,"textLines":1,"bbox":[417,232,220,28]}
+{"kind":"textbox","id":"sh/nu58f2hs","slide":2,"name":"Rectangle 12","text":"Environment, users, data, scenarios","textPreview":"Environment, users, data, scenarios","textChars":35,"textLines":1,"bbox":[417,270,210,90]}
+{"kind":"shape","id":"sh/wjy9sry9","slide":2,"name":"Rectangle 13","bbox":[633,252,18,3]}
+{"kind":"textbox","id":"sh/xk7qlczu","slide":2,"name":"Rectangle 14","text":"03","textPreview":"03","textChars":2,"textLines":1,"bbox":[655,230,55,70]}
+{"kind":"textbox","id":"sh/ahwrqhgj","slide":2,"name":"Rectangle 15","text":"CLIENT TESTING","textPreview":"CLIENT TESTING","textChars":14,"textLines":1,"bbox":[717,232,220,28]}
+{"kind":"textbox","id":"sh/bip8jmho","slide":2,"name":"Rectangle 16","text":"Execute scenarios and record evidence","textPreview":"Execute scenarios and record evidence","textChars":37,"textLines":1,"bbox":[717,270,210,90]}
+{"kind":"shape","id":"sh/cnupgny5","slide":2,"name":"Rectangle 17","bbox":[933,252,18,3]}
+{"kind":"textbox","id":"sh/do3q9szq","slide":2,"name":"Rectangle 18","text":"04","textPreview":"04","textChars":2,"textLines":1,"bbox":[955,230,55,70]}
+{"kind":"textbox","id":"sh/t8byxkn2","slide":2,"name":"Rectangle 19","text":"DECISION","textPreview":"DECISION","textChars":8,"textLines":1,"bbox":[1017,232,220,28]}
+{"kind":"textbox","id":"sh/s72xofmh","slide":2,"name":"Rectangle 20","text":"Results, actions, approval, next step","textPreview":"Results, actions, approval, next step","textChars":37,"textLines":1,"bbox":[1017,270,210,90]}
+{"kind":"textbox","id":"sh/76twva5c","slide":2,"name":"Rectangle 21","text":"Keep the project story short enough to leave most of the session for client testing and decisions.","textPreview":"Keep the project story short enough to leave most of the session for client testing and decisions.","textChars":98,"textLines":1,"bbox":[48,646,1100,24]}
+{"kind":"notes","id":"nt/hwbqtkby","slide":2,"text":"HOW TO USE THIS SLIDE\nUse this slide as the agenda. State that the client will see the complete project status before testing begins.\n\nSUGGESTED CLIENT-FACING WORDING\nWe will first confirm what the project set out to deliver and where it stands. We will then complete the UAT cycle and agree on the decision and follow-up actions."}
+{"kind":"slide","id":"sl/ofy9wn61","slide":3,"title":"STARTUPLAB","textShapes":6}
+{"kind":"textbox","id":"sh/n6ls3alk","slide":3,"name":"Rectangle 8","text":"STARTUPLAB","textPreview":"STARTUPLAB","textChars":10,"textLines":1,"bbox":[48,28,190,18]}
+{"kind":"shape","id":"sh/cza94vmx","slide":3,"name":"Rectangle 1","bbox":[965,28,265,18]}
+{"kind":"textbox","id":"sh/d0jax03i","slide":3,"name":"Rectangle 2","text":"PROJECT PROGRESS","textPreview":"PROJECT PROGRESS","textChars":16,"textLines":1,"bbox":[48,54,240,16]}
+{"kind":"textbox","id":"sh/298ryl4v","slide":3,"name":"Rectangle 3","text":"03","textPreview":"03","textChars":2,"textLines":1,"bbox":[1160,680,70,16]}
+{"kind":"textbox","id":"sh/3ah8rqlg","slide":3,"name":"Rectangle 4","text":"Project overview","textPreview":"Project overview","textChars":16,"textLines":1,"bbox":[48,82,1160,58]}
+{"kind":"textbox","id":"sh/obq90bml","slide":3,"name":"Rectangle 5","text":"Summarize the business reason for the project before discussing features or technical details.","textPreview":"Summarize the business reason for the project before discussing features or technical details.","textChars":94,"textLines":1,"bbox":[48,142,1120,28]}
+{"kind":"textbox","id":"sh/m5cra54z","slide":3,"name":"Rectangle 7","text":"The Project Owner presents verified records and coordinates with the CEO when approval exceeds assigned authority.","textPreview":"The Project Owner presents verified records and coordinates with the CEO when approval exceeds assigned authority.","textChars":114,"textLines":1,"bbox":[48,646,1100,24]}
+{"kind":"table","id":"tb/on2ts7ut","slide":3,"name":"Table 14","rows":7,"cols":3,"preview":"Topic | Information to Present | Client Confirmation","bbox":[48,195,1184,390]}
+{"kind":"notes","id":"nt/ofy9wn61","slide":3,"text":"HOW TO USE THIS SLIDE\nUse plain business language. Do not begin with technical architecture unless the client asks for it.\n\nSUGGESTED CLIENT-FACING WORDING\nThis project started because [business problem]. The agreed objective was [objective]. Today we will validate whether the completed solution supports that objective."}
+{"kind":"slide","id":"sl/jyx0ra1s","slide":4,"title":"STARTUPLAB","textShapes":6}
+{"kind":"textbox","id":"sh/ih8ju9sn","slide":4,"name":"Rectangle 8","text":"STARTUPLAB","textPreview":"STARTUPLAB","textChars":10,"textLines":1,"bbox":[48,28,190,18]}
+{"kind":"shape","id":"sh/1cj2d8b6","slide":4,"name":"Rectangle 1","bbox":[965,28,265,18]}
+{"kind":"textbox","id":"sh/0ba143al","slide":4,"name":"Rectangle 2","text":"PROJECT PROGRESS","textPreview":"PROJECT PROGRESS","textChars":16,"textLines":1,"bbox":[48,54,240,16]}
+{"kind":"textbox","id":"sh/rm1k7yt4","slide":4,"name":"Rectangle 3","text":"04","textPreview":"04","textChars":2,"textLines":1,"bbox":[1160,680,70,16]}
+{"kind":"textbox","id":"sh/ql8jytsj","slide":4,"name":"Rectangle 4","text":"Approved scope and success criteria","textPreview":"Approved scope and success criteria","textChars":35,"textLines":1,"bbox":[48,82,1160,58]}
+{"kind":"textbox","id":"sh/doj29oba","slide":4,"name":"Rectangle 5","text":"Set the testing boundary before showing progress or accepting new requests.","textPreview":"Set the testing boundary before showing progress or accepting new requests.","textChars":75,"textLines":1,"bbox":[48,142,1120,28]}
+{"kind":"textbox","id":"sh/3ihk3et8","slide":4,"name":"Rectangle 7","text":"Record new requests separately. Assess scope, cost, timeline, and risk before making a commitment.","textPreview":"Record new requests separately. Assess scope, cost, timeline, and risk before making a commitment.","textChars":98,"textLines":1,"bbox":[48,646,1100,24]}
+{"kind":"table","id":"tb/fe1wvuh4","slide":4,"name":"Table 14","rows":7,"cols":3,"preview":"Area | Approved Requirement or Measure | Status / Evidence","bbox":[48,195,1184,390]}
+{"kind":"notes","id":"nt/jyx0ra1s","slide":4,"text":"HOW TO USE THIS SLIDE\nConfirm the baseline that UAT will validate. If the client disputes the scope, stop and reconcile the approved records.\n\nSUGGESTED CLIENT-FACING WORDING\nThese are the items included in the approved project and the measures we will use during acceptance. New ideas will be recorded for assessment after the session."}
+{"kind":"slide","id":"sl/i107q5of","slide":5,"title":"STARTUPLAB","textShapes":25}
+{"kind":"textbox","id":"sh/zmlk3yhk","slide":5,"name":"Rectangle 38","text":"STARTUPLAB","textPreview":"STARTUPLAB","textChars":10,"textLines":1,"bbox":[48,28,190,18]}
+{"kind":"shape","id":"sh/dgbulwnm","slide":5,"name":"Rectangle 1","bbox":[965,28,265,18]}
+{"kind":"textbox","id":"sh/cf2tcr61","slide":5,"name":"Rectangle 2","text":"PROJECT PROGRESS","textPreview":"PROJECT PROGRESS","textChars":16,"textLines":1,"bbox":[48,54,240,16]}
+{"kind":"textbox","id":"sh/z2tcnm5s","slide":5,"name":"Rectangle 3","text":"05","textPreview":"05","textChars":2,"textLines":1,"bbox":[1160,680,70,16]}
+{"kind":"textbox","id":"sh/yhkbe1o7","slide":5,"name":"Rectangle 4","text":"Project timeline and current position","textPreview":"Project timeline and current position","textChars":37,"textLines":1,"bbox":[48,82,1160,58]}
+{"kind":"textbox","id":"sh/l4bupwny","slide":5,"name":"Rectangle 5","text":"Show the client how the project moved from approval to UAT.","textPreview":"Show the client how the project moved from approval to UAT.","textChars":59,"textLines":1,"bbox":[48,142,1120,28]}
+{"kind":"shape","id":"sh/032tgr6d","slide":5,"name":"Rectangle 6","bbox":[100,330,1040,3]}
+{"kind":"shape","id":"sh/n6dcr65o","slide":5,"name":"Rectangle: Rounded Corners 7","bbox":[118,316,28,28]}
+{"kind":"textbox","id":"sh/m5kbi1oj","slide":5,"name":"Rectangle 8","text":"1","textPreview":"1","textChars":1,"textLines":1,"bbox":[118,319,28,20]}
+{"kind":"textbox","id":"sh/w32dkbuh","slide":5,"name":"Rectangle 9","text":"DISCOVERY","textPreview":"DISCOVERY","textChars":9,"textLines":1,"bbox":[78,370,110,24]}
+{"kind":"shape","id":"sh/x4vedgvm","slide":5,"name":"Rectangle 10","bbox":[78,402,110,20]}
+{"kind":"textbox","id":"sh/ahkvi1cb","slide":5,"name":"Rectangle 11","text":"Approved requirements & 14-module scope","textPreview":"Approved requirements & 14-module scope","textChars":39,"textLines":1,"bbox":[72,416.5,126,56]}
+{"kind":"shape","id":"sh/v2twb6dw","slide":5,"name":"Rectangle: Rounded Corners 12","bbox":[312,316,28,28]}
+{"kind":"textbox","id":"sh/k7mxovud","slide":5,"name":"Rectangle 13","text":"2","textPreview":"2","textChars":1,"textLines":1,"bbox":[312,319,28,20]}
+{"kind":"textbox","id":"sh/58vehgvy","slide":5,"name":"Rectangle 14","text":"DESIGN","textPreview":"DESIGN","textChars":6,"textLines":1,"bbox":[272,370,110,24]}
+{"kind":"shape","id":"sh/i54fmlc7","slide":5,"name":"Rectangle 15","bbox":[272,402,110,20]}
+{"kind":"textbox","id":"sh/j6dwfqds","slide":5,"name":"Rectangle 16","text":"Design system UI/UX finalized","textPreview":"Design system UI/UX finalized","textChars":29,"textLines":1,"bbox":[266,416.5,126,56]}
+{"kind":"shape","id":"sh/sb6xsvu9","slide":5,"name":"Rectangle: Rounded Corners 17","bbox":[506,316,28,28]}
+{"kind":"textbox","id":"sh/tcfel0vu","slide":5,"name":"Rectangle 18","text":"3","textPreview":"3","textChars":1,"textLines":1,"bbox":[506,319,28,20]}
+{"kind":"textbox","id":"sh/hgrmpwj2","slide":5,"name":"Rectangle 19","text":"BUILD","textPreview":"BUILD","textChars":5,"textLines":1,"bbox":[466,370,110,24]}
+{"kind":"textbox","id":"sh/fe94nm1w","slide":5,"name":"Rectangle 21","text":"14 modules built end to end","textPreview":"14 modules built end to end","textChars":27,"textLines":1,"bbox":[460,416.5,126,56]}
+{"kind":"shape","id":"sh/ud0ne10b","slide":5,"name":"Rectangle: Rounded Corners 22","bbox":[700,316,28,28]}
+{"kind":"textbox","id":"sh/pkr6tgjy","slide":5,"name":"Rectangle 23","text":"4","textPreview":"4","textChars":1,"textLines":1,"bbox":[700,319,28,20]}
+{"kind":"textbox","id":"sh/4ji5kbid","slide":5,"name":"Rectangle 24","text":"INTERNAL TEST","textPreview":"INTERNAL TEST","textChars":13,"textLines":1,"bbox":[660,370,110,24]}
+{"kind":"textbox","id":"sh/3i94r61s","slide":5,"name":"Rectangle 25","text":"TBD","textPreview":"TBD","textChars":3,"textLines":1,"bbox":[660,402,110,20]}
+{"kind":"textbox","id":"sh/2h0ni107","slide":5,"name":"Rectangle 26","text":"Internal QA & E2E simulation done","textPreview":"Internal QA & E2E simulation done","textChars":33,"textLines":1,"bbox":[654,416.5,126,56]}
+{"kind":"shape","id":"sh/5o7mhcju","slide":5,"name":"Rectangle: Rounded Corners 27","bbox":[894,316,28,28]}
+{"kind":"textbox","id":"sh/kny587i9","slide":5,"name":"Rectangle 28","text":"5","textPreview":"5","textChars":1,"textLines":1,"bbox":[894,319,28,20]}
+{"kind":"textbox","id":"sh/atcjidg7","slide":5,"name":"Rectangle 29","text":"UAT","textPreview":"UAT","textChars":3,"textLines":1,"bbox":[854,370,110,24]}
+{"kind":"textbox","id":"sh/wve1knyx","slide":5,"name":"Rectangle 31","text":"110 test cases ready (Appx B)","textPreview":"110 test cases ready (Appx B)","textChars":29,"textLines":1,"bbox":[848,416.5,126,56]}
+{"kind":"shape","id":"sh/xwn2dszi","slide":5,"name":"Rectangle: Rounded Corners 32","bbox":[1088,316,28,28]}
+{"kind":"textbox","id":"sh/ihw3mxg3","slide":5,"name":"Rectangle 33","text":"6","textPreview":"6","textChars":1,"textLines":1,"bbox":[1088,319,28,20]}
+{"kind":"textbox","id":"sh/ji5kf2ho","slide":5,"name":"Rectangle 34","text":"HANDOVER","textPreview":"HANDOVER","textChars":8,"textLines":1,"bbox":[1048,370,110,24]}
+{"kind":"textbox","id":"sh/5kn2hszu","slide":5,"name":"Rectangle 36","text":"Signed UAT acceptance (Appx G)","textPreview":"Signed UAT acceptance (Appx G)","textChars":30,"textLines":1,"bbox":[1042,416.5,126,56]}
+{"kind":"textbox","id":"sh/e1sjatgz","slide":5,"name":"Rectangle 37","text":"Use actual approval and completion dates. Do not present estimated work as completed work.","textPreview":"Use actual approval and completion dates. Do not present estimated work as completed work.","textChars":90,"textLines":1,"bbox":[48,646,1100,24]}
+{"kind":"notes","id":"nt/i107q5of","slide":5,"text":"HOW TO USE THIS SLIDE\nReplace each date and output. Highlight the current UAT stage and the planned handover gate.\n\nSUGGESTED CLIENT-FACING WORDING\nThe project completed the approved discovery, design, build, and internal testing activities. We are now at UAT, where your users validate the solution before final handover."}
+{"kind":"slide","id":"sl/x8f69ofe","slide":6,"title":"STARTUPLAB","textShapes":6}
+{"kind":"textbox","id":"sh/pc76hkr2","slide":6,"name":"Rectangle 8","text":"STARTUPLAB","textPreview":"STARTUPLAB","textChars":10,"textLines":1,"bbox":[48,28,190,18]}
+{"kind":"shape","id":"sh/yhg7epsj","slide":6,"name":"Rectangle 1","bbox":[965,28,265,18]}
+{"kind":"textbox","id":"sh/zi98nu94","slide":6,"name":"Rectangle 2","text":"PROJECT PROGRESS","textPreview":"PROJECT PROGRESS","textChars":16,"textLines":1,"bbox":[48,54,240,16]}
+{"kind":"textbox","id":"sh/87ipkzal","slide":6,"name":"Rectangle 3","text":"06","textPreview":"06","textChars":2,"textLines":1,"bbox":[1160,680,70,16]}
+{"kind":"textbox","id":"sh/98rqt4r6","slide":6,"name":"Rectangle 4","text":"Overall project progress","textPreview":"Overall project progress","textChars":24,"textLines":1,"bbox":[48,82,1160,58]}
+{"kind":"textbox","id":"sh/ml07i9sv","slide":6,"name":"Rectangle 5","text":"Present completion by deliverable, supported by evidence rather than a general percentage alone.","textPreview":"Present completion by deliverable, supported by evidence rather than a general percentage alone.","textChars":96,"textLines":1,"bbox":[48,142,1120,28]}
+{"kind":"textbox","id":"sh/oryp8fah","slide":6,"name":"Rectangle 7","text":"Use a documented calculation for the overall percentage. Clearly separate completed, in progress, blocked, and deferred work.","textPreview":"Use a documented calculation for the overall percentage. Clearly separate completed, in progress, blocked, and deferred work.","textChars":125,"textLines":1,"bbox":[48,646,1100,24]}
+{"kind":"table","id":"tb/epsjupkr","slide":6,"name":"Table 14","rows":7,"cols":4,"preview":"Deliverable | Planned Output | Progress | Evidence / Comment","bbox":[48,195,1184,390]}
+{"kind":"notes","id":"nt/x8f69ofe","slide":6,"text":"HOW TO USE THIS SLIDE\nPopulate using the project tracker and approved deliverables. Explain any incomplete or deferred item and its effect on UAT.\n\nSUGGESTED CLIENT-FACING WORDING\nThe project is [percentage] complete based on the approved deliverables. These items are ready for UAT, while [item] remains [status] because [reason]."}
+{"kind":"slide","id":"sl/gnmp4jqx","slide":7,"title":"STARTUPLAB","textShapes":6}
+{"kind":"textbox","id":"sh/fi9c369c","slide":7,"name":"Rectangle 8","text":"STARTUPLAB","textPreview":"STARTUPLAB","textChars":10,"textLines":1,"bbox":[48,28,190,18]}
+{"kind":"shape","id":"sh/cb2tkvap","slide":7,"name":"Rectangle 1","bbox":[965,28,265,18]}
+{"kind":"textbox","id":"sh/dcbud0ra","slide":7,"name":"Rectangle 2","text":"PROJECT PROGRESS","textPreview":"PROJECT PROGRESS","textChars":16,"textLines":1,"bbox":[48,54,240,16]}
+{"kind":"textbox","id":"sh/ydkbm5sv","slide":7,"name":"Rectangle 3","text":"07","textPreview":"07","textChars":2,"textLines":1,"bbox":[1160,680,70,16]}
+{"kind":"textbox","id":"sh/zedcfa9g","slide":7,"name":"Rectangle 4","text":"Delivered solution overview","textPreview":"Delivered solution overview","textChars":27,"textLines":1,"bbox":[48,82,1160,58]}
+{"kind":"textbox","id":"sh/kzmdova1","slide":7,"name":"Rectangle 5","text":"Connect completed features to the client’s daily work.","textPreview":"Connect completed features to the client’s daily work.","textChars":54,"textLines":1,"bbox":[48,142,1120,28]}
+{"kind":"textbox","id":"sh/eh0ba1sr","slide":7,"name":"Rectangle 7","text":"Keep this overview focused. The detailed validation happens in the UAT scenarios.","textPreview":"Keep this overview focused. The detailed validation happens in the UAT scenarios.","textChars":81,"textLines":1,"bbox":[48,646,1100,24]}
+{"kind":"table","id":"tb/o7u5obyx","slide":7,"name":"Table 14","rows":6,"cols":4,"preview":"Business Area | Delivered Capability | User Benefit | UAT Scenario","bbox":[48,195,1184,360]}
+{"kind":"notes","id":"nt/gnmp4jqx","slide":7,"text":"HOW TO USE THIS SLIDE\nUse one row for each important business capability. Avoid listing technical tasks that the client cannot validate.\n\nSUGGESTED CLIENT-FACING WORDING\nThe completed solution supports these business areas. Each capability connects to a UAT scenario that your users will perform today."}
+{"kind":"slide","id":"sl/fu1gfa1s","slide":8,"title":"STARTUPLAB","textShapes":6}
+{"kind":"textbox","id":"sh/id0fu50z","slide":8,"name":"Rectangle 8","text":"STARTUPLAB","textPreview":"STARTUPLAB","textChars":10,"textLines":1,"bbox":[48,28,190,18]}
+{"kind":"shape","id":"sh/18byd4zy","slide":8,"name":"Rectangle 1","bbox":[965,28,265,18]}
+{"kind":"textbox","id":"sh/g72x4zyd","slide":8,"name":"Rectangle 2","text":"PROJECT PROGRESS","textPreview":"PROJECT PROGRESS","textChars":16,"textLines":1,"bbox":[48,54,240,16]}
+{"kind":"textbox","id":"sh/ri9g7uhw","slide":8,"name":"Rectangle 3","text":"08","textPreview":"08","textChars":2,"textLines":1,"bbox":[1160,680,70,16]}
+{"kind":"textbox","id":"sh/6h0fypgb","slide":8,"name":"Rectangle 4","text":"Approved changes and key decisions","textPreview":"Approved changes and key decisions","textChars":34,"textLines":1,"bbox":[48,82,1160,58]}
+{"kind":"textbox","id":"sh/tkby9kzm","slide":8,"name":"Rectangle 5","text":"Show how approved changes affected the final scope, schedule, or solution.","textPreview":"Show how approved changes affected the final scope, schedule, or solution.","textChars":74,"textLines":1,"bbox":[48,142,1120,28]}
+{"kind":"textbox","id":"sh/je9g3ahk","slide":8,"name":"Rectangle 7","text":"Material commitments require the required internal approval, including CEO approval when applicable.","textPreview":"Material commitments require the required internal approval, including CEO approval when applicable.","textChars":100,"textLines":1,"bbox":[48,646,1100,24]}
+{"kind":"table","id":"tb/v29wvm5o","slide":8,"name":"Table 14","rows":2,"cols":5,"preview":"Reference | Change or Decision | Approved By / Date | Effect on Project | Current Status","bbox":[48,200,1184,132]}
+{"kind":"notes","id":"nt/fu1gfa1s","slide":8,"text":"HOW TO USE THIS SLIDE\nInclude only approved changes and decisions relevant to the final solution or UAT. Keep unapproved requests in the issue and action log.\n\nSUGGESTED CLIENT-FACING WORDING\nThese approved changes explain how the final solution differs from the original plan. The UAT scope already reflects these decisions."}
+{"kind":"slide","id":"sl/udsvah03","slide":9,"title":"STARTUPLAB","textShapes":11}
+{"kind":"textbox","id":"sh/3y107axw","slide":9,"name":"Rectangle 12","text":"STARTUPLAB","textPreview":"STARTUPLAB","textChars":10,"textLines":1,"bbox":[48,28,190,18]}
+{"kind":"shape","id":"sh/1cfmhgne","slide":9,"name":"Rectangle 1","bbox":[965,28,265,18]}
+{"kind":"textbox","id":"sh/0b65obm9","slide":9,"name":"Rectangle 2","text":"UAT CYCLE","textPreview":"UAT CYCLE","textChars":9,"textLines":1,"bbox":[48,54,240,16]}
+{"kind":"textbox","id":"sh/nex4jq5k","slide":9,"name":"Rectangle 3","text":"09","textPreview":"09","textChars":2,"textLines":1,"bbox":[1160,680,70,16]}
+{"kind":"textbox","id":"sh/mdonql4z","slide":9,"name":"Rectangle 4","text":"UAT objective and decision required","textPreview":"UAT objective and decision required","textChars":35,"textLines":1,"bbox":[48,82,1160,58]}
+{"kind":"textbox","id":"sh/9gzml0nq","slide":9,"name":"Rectangle 5","text":"Clarify what the client is validating and the decision expected at the end of the cycle.","textPreview":"Clarify what the client is validating and the decision expected at the end of the cycle.","textChars":88,"textLines":1,"bbox":[48,142,1120,28]}
+{"kind":"textbox","id":"sh/ofq5svm5","slide":9,"name":"Rectangle 6","text":"Confirm the platform performs onboarding, underwriting, committee review, release, collections, accounting, admin, and access control correctly, before handover.","textPreview":"Confirm the platform performs onboarding, underwriting, committee review, release, collections, accounting, admin, and access control cor...","textChars":161,"textLines":1,"bbox":[80,220,520,120]}
+{"kind":"textbox","id":"sh/bih4na5w","slide":9,"name":"Rectangle 7","text":"CLIENT VALIDATES","textPreview":"CLIENT VALIDATES","textChars":16,"textLines":1,"bbox":[680,215,220,22]}
+{"kind":"textbox","id":"sh/ah8nu54b","slide":9,"name":"Rectangle 8","text":"• Agreed business workflows\n• Correct outputs and data behavior\n• User roles and access\n• Known limitations","textPreview":"• Agreed business workflows | • Correct outputs and data behavior | • User roles and access | • Known limitations","textChars":107,"textLines":4,"bbox":[680,250,480,145]}
+{"kind":"textbox","id":"sh/oza1gfyh","slide":9,"name":"Rectangle 9","text":"DECISION AT THE END","textPreview":"DECISION AT THE END","textChars":19,"textLines":1,"bbox":[680,420,250,22]}
+{"kind":"textbox","id":"sh/p0ji9kf2","slide":9,"name":"Rectangle 10","text":"To be determined at the end of the UAT cycle","textPreview":"To be determined at the end of the UAT cycle","textChars":44,"textLines":1,"bbox":[680,455,470,80]}
+{"kind":"textbox","id":"sh/2xsjepgb","slide":9,"name":"Rectangle 11","text":"UAT confirms the agreed solution. It does not provide automatic approval for new scope.","textPreview":"UAT confirms the agreed solution. It does not provide automatic approval for new scope.","textChars":87,"textLines":1,"bbox":[48,646,1100,24]}
+{"kind":"notes","id":"nt/udsvah03","slide":9,"text":"HOW TO USE THIS SLIDE\nUse this transition slide before readiness and testing. Make the expected decision explicit.\n\nSUGGESTED CLIENT-FACING WORDING\nUAT allows your authorized users to confirm that the agreed solution works for the approved business processes. At the end, we will record the acceptance status and any remaining actions."}
+{"kind":"slide","id":"sl/m90b6t0r","slide":10,"title":"STARTUPLAB","textShapes":6}
+{"kind":"textbox","id":"sh/m1cnetkj","slide":10,"name":"Rectangle 8","text":"STARTUPLAB","textPreview":"STARTUPLAB","textChars":10,"textLines":1,"bbox":[48,28,190,18]}
+{"kind":"shape","id":"sh/xc3mho32","slide":10,"name":"Rectangle 1","bbox":[965,28,265,18]}
+{"kind":"textbox","id":"sh/cbu58j2h","slide":10,"name":"Rectangle 2","text":"UAT CYCLE","textPreview":"UAT CYCLE","textChars":9,"textLines":1,"bbox":[48,54,240,16]}
+{"kind":"textbox","id":"sh/zelojyl8","slide":10,"name":"Rectangle 3","text":"10","textPreview":"10","textChars":2,"textLines":1,"bbox":[1160,680,70,16]}
+{"kind":"textbox","id":"sh/ydcnatkn","slide":10,"name":"Rectangle 4","text":"UAT readiness confirmation","textPreview":"UAT readiness confirmation","textChars":26,"textLines":1,"bbox":[48,82,1160,58]}
+{"kind":"textbox","id":"sh/l036l83y","slide":10,"name":"Rectangle 5","text":"Confirm that the system, people, data, and documents are ready before client testing begins.","textPreview":"Confirm that the system, people, data, and documents are ready before client testing begins.","textChars":92,"textLines":1,"bbox":[48,142,1120,28]}
+{"kind":"textbox","id":"sh/725onyl4","slide":10,"name":"Rectangle 7","text":"Do not start affected tests when a critical readiness item remains unresolved.","textPreview":"Do not start affected tests when a critical readiness item remains unresolved.","textChars":78,"textLines":1,"bbox":[48,646,1100,24]}
+{"kind":"table","id":"tb/fqhg3ixs","slide":10,"name":"Table 14","rows":7,"cols":4,"preview":"Readiness Check | Owner | Status | Evidence / Remaining Action","bbox":[48,195,1184,390]}
+{"kind":"notes","id":"nt/m90b6t0r","slide":10,"text":"HOW TO USE THIS SLIDE\nUpdate the status immediately before the meeting. If an item is not ready, state its effect and the revised testing plan.\n\nSUGGESTED CLIENT-FACING WORDING\nBefore testing begins, we will confirm each readiness item. Any critical gap will be resolved or the affected scenario will be rescheduled."}
+{"kind":"slide","id":"sl/jetc3ut0","slide":11,"title":"STARTUPLAB","textShapes":6}
+{"kind":"textbox","id":"sh/61kzalof","slide":11,"name":"Rectangle 8","text":"STARTUPLAB","textPreview":"STARTUPLAB","textChars":10,"textLines":1,"bbox":[48,28,190,18]}
+{"kind":"shape","id":"sh/xcryxg7y","slide":11,"name":"Rectangle 1","bbox":[965,28,265,18]}
+{"kind":"textbox","id":"sh/wbih4b6d","slide":11,"name":"Rectangle 2","text":"UAT CYCLE","textPreview":"UAT CYCLE","textChars":9,"textLines":1,"bbox":[48,54,240,16]}
+{"kind":"textbox","id":"sh/n69grmpw","slide":11,"name":"Rectangle 3","text":"11","textPreview":"11","textChars":2,"textLines":1,"bbox":[1160,680,70,16]}
+{"kind":"textbox","id":"sh/250zy18b","slide":11,"name":"Rectangle 4","text":"Test users, access, and data","textPreview":"Test users, access, and data","textChars":28,"textLines":1,"bbox":[48,82,1160,58]}
+{"kind":"textbox","id":"sh/98rytw72","slide":11,"name":"Rectangle 5","text":"Confirm who will test, what access they have, and what data supports the scenarios.","textPreview":"Confirm who will test, what access they have, and what data supports the scenarios.","textChars":83,"textLines":1,"bbox":[48,142,1120,28]}
+{"kind":"textbox","id":"sh/72t03qp0","slide":11,"name":"Rectangle 7","text":"Never guess missing client data. Record gaps and ask the authorized client owner to confirm the correct value.","textPreview":"Never guess missing client data. Record gaps and ask the authorized client owner to confirm the correct value.","textChars":110,"textLines":1,"bbox":[48,646,1100,24]}
+{"kind":"table","id":"tb/rexkf2d4","slide":11,"name":"Table 14","rows":7,"cols":4,"preview":"Control | Planned / Expected | Actual / Verified | Client Confirmation","bbox":[48,195,1184,390]}
+{"kind":"notes","id":"nt/jetc3ut0","slide":11,"text":"HOW TO USE THIS SLIDE\nUse totals and sample records to show that the correct data was loaded. Do not expose passwords or unnecessary sensitive information.\n\nSUGGESTED CLIENT-FACING WORDING\nWe prepared the users and test data based on the approved records. Please confirm the roles, source file, counts, and important totals before we execute the scenarios."}
+{"kind":"slide","id":"sl/8f2psfyx","slide":12,"title":"STARTUPLAB","textShapes":6}
+{"kind":"textbox","id":"sh/a543mx4r","slide":12,"name":"Rectangle 8","text":"STARTUPLAB","textPreview":"STARTUPLAB","textChars":10,"textLines":1,"bbox":[48,28,190,18]}
+{"kind":"shape","id":"sh/1gbm9s3a","slide":12,"name":"Rectangle 1","bbox":[965,28,265,18]}
+{"kind":"textbox","id":"sh/0f2lgnmp","slide":12,"name":"Rectangle 2","text":"UAT CYCLE","textPreview":"UAT CYCLE","textChars":9,"textLines":1,"bbox":[48,54,240,16]}
+{"kind":"textbox","id":"sh/ra943il8","slide":12,"name":"Rectangle 3","text":"12","textPreview":"12","textChars":2,"textLines":1,"bbox":[1160,680,70,16]}
+{"kind":"textbox","id":"sh/q903ad4n","slide":12,"name":"Rectangle 4","text":"UAT scenarios and expected results","textPreview":"UAT scenarios and expected results","textChars":34,"textLines":1,"bbox":[48,82,1160,58]}
+{"kind":"textbox","id":"sh/dcbm583y","slide":12,"name":"Rectangle 5","text":"List the business tasks that client users will perform.","textPreview":"List the business tasks that client users will perform.","textChars":55,"textLines":1,"bbox":[48,142,1120,28]}
+{"kind":"textbox","id":"sh/b6d4f2lc","slide":12,"name":"Rectangle 7","text":"5 representative scenarios shown; the full 110-case set across 14 modules is in Appendix B of the UAT Plan (POL-006).","textPreview":"5 representative scenarios shown; the full 110-case set across 14 modules is in Appendix B of the UAT Plan (POL-006).","textChars":117,"textLines":1,"bbox":[48,646,1100,24]}
+{"kind":"table","id":"tb/3ilgzeds","slide":12,"name":"Table 14","rows":6,"cols":5,"preview":"UAT ID | Business Scenario | Tester / Role | Expected Result | Priority","bbox":[48,195,1184,360]}
+{"kind":"notes","id":"nt/8f2psfyx","slide":12,"text":"HOW TO USE THIS SLIDE\nUse the full UAT document for detailed steps. This slide gives the client a clear testing map.\n\nSUGGESTED CLIENT-FACING WORDING\nThese are the business scenarios we agreed to validate. Each tester will complete the assigned task and confirm whether the actual result matches the expected result."}
+{"kind":"slide","id":"sl/hgzapcr6","slide":13,"title":"STARTUPLAB","textShapes":21}
+{"kind":"textbox","id":"sh/bmhgfatc","slide":13,"name":"Rectangle 22","text":"STARTUPLAB","textPreview":"STARTUPLAB","textChars":10,"textLines":1,"bbox":[48,28,190,18]}
+{"kind":"shape","id":"sh/q50nydsj","slide":13,"name":"Rectangle 1","bbox":[965,28,265,18]}
+{"kind":"textbox","id":"sh/bq9orito","slide":13,"name":"Rectangle 2","text":"UAT CYCLE","textPreview":"UAT CYCLE","textChars":9,"textLines":1,"bbox":[48,54,240,16]}
+{"kind":"textbox","id":"sh/o3i5w3ad","slide":13,"name":"Rectangle 3","text":"13","textPreview":"13","textChars":2,"textLines":1,"bbox":[1160,680,70,16]}
+{"kind":"textbox","id":"sh/p4r6p8by","slide":13,"name":"Rectangle 4","text":"UAT execution flow","textPreview":"UAT execution flow","textChars":18,"textLines":1,"bbox":[48,82,1160,58]}
+{"kind":"textbox","id":"sh/21gnuts7","slide":13,"name":"Rectangle 5","text":"Use the same five-step method for every business scenario.","textPreview":"Use the same five-step method for every business scenario.","textChars":58,"textLines":1,"bbox":[48,142,1120,28]}
+{"kind":"textbox","id":"sh/32ponyts","slide":13,"name":"Rectangle 6","text":"1","textPreview":"1","textChars":1,"textLines":1,"bbox":[48,235,55,62]}
+{"kind":"textbox","id":"sh/gzy5s3a1","slide":13,"name":"Rectangle 7","text":"STATE THE TASK","textPreview":"STATE THE TASK","textChars":14,"textLines":1,"bbox":[48,315,205,28]}
+{"kind":"textbox","id":"sh/1076lobm","slide":13,"name":"Rectangle 8","text":"Confirm the business goal and expected result","textPreview":"Confirm the business goal and expected result","textChars":45,"textLines":1,"bbox":[48,358,205,100]}
+{"kind":"textbox","id":"sh/hcfy9k3u","slide":13,"name":"Rectangle 9","text":"2","textPreview":"2","textChars":1,"textLines":1,"bbox":[286,235,55,62]}
+{"kind":"textbox","id":"sh/gb6x0zm9","slide":13,"name":"Rectangle 10","text":"CLIENT PERFORMS","textPreview":"CLIENT PERFORMS","textChars":15,"textLines":1,"bbox":[286,315,205,28]}
+{"kind":"textbox","id":"sh/vaxg7ulo","slide":13,"name":"Rectangle 11","text":"The tester uses the system as in daily work","textPreview":"The tester uses the system as in daily work","textChars":43,"textLines":1,"bbox":[286,358,205,100]}
+{"kind":"textbox","id":"sh/u9ofyp43","slide":13,"name":"Rectangle 12","text":"3","textPreview":"3","textChars":1,"textLines":1,"bbox":[524,235,55,62]}
+{"kind":"textbox","id":"sh/t8fy5k3i","slide":13,"name":"Rectangle 13","text":"COMPARE RESULTS","textPreview":"COMPARE RESULTS","textChars":15,"textLines":1,"bbox":[524,315,205,28]}
+{"kind":"textbox","id":"sh/876xwfmx","slide":13,"name":"Rectangle 14","text":"Review actual result against the expected result","textPreview":"Review actual result against the expected result","textChars":48,"textLines":1,"bbox":[524,358,205,100]}
+{"kind":"textbox","id":"sh/7mdg3als","slide":13,"name":"Rectangle 15","text":"4","textPreview":"4","textChars":1,"textLines":1,"bbox":[762,235,55,62]}
+{"kind":"textbox","id":"sh/6l4fu547","slide":13,"name":"Rectangle 16","text":"SAVE EVIDENCE","textPreview":"SAVE EVIDENCE","textChars":13,"textLines":1,"bbox":[762,315,205,28]}
+{"kind":"textbox","id":"sh/lkvy103m","slide":13,"name":"Rectangle 17","text":"Record safe screenshots, references, or notes","textPreview":"Record safe screenshots, references, or notes","textChars":45,"textLines":1,"bbox":[762,358,205,100]}
+{"kind":"textbox","id":"sh/kjmxsfm1","slide":13,"name":"Rectangle 18","text":"5","textPreview":"5","textChars":1,"textLines":1,"bbox":[1000,235,55,62]}
+{"kind":"textbox","id":"sh/cnqh8fux","slide":13,"name":"Rectangle 19","text":"SET STATUS","textPreview":"SET STATUS","textChars":10,"textLines":1,"bbox":[1000,315,205,28]}
+{"kind":"textbox","id":"sh/xozyhkbi","slide":13,"name":"Rectangle 20","text":"Passed, Failed, Blocked, or Pending","textPreview":"Passed, Failed, Blocked, or Pending","textChars":35,"textLines":1,"bbox":[1000,358,205,100]}
+{"kind":"textbox","id":"sh/q18f65cr","slide":13,"name":"Rectangle 21","text":"The client performs the test. The Project Owner facilitates, observes, records evidence, and avoids leading the result.","textPreview":"The client performs the test. The Project Owner facilitates, observes, records evidence, and avoids leading the result.","textChars":119,"textLines":1,"bbox":[48,646,1100,24]}
+{"kind":"notes","id":"nt/hgzapcr6","slide":13,"text":"HOW TO USE THIS SLIDE\nDisplay this slide before the first test case. Repeat the method when new testers join.\n\nSUGGESTED CLIENT-FACING WORDING\nFor every scenario, we will state the task, let the assigned user perform it, compare the result, save appropriate evidence, and record the status together."}
+{"kind":"slide","id":"sl/6lsnupw7","slide":14,"title":"STARTUPLAB","textShapes":14}
+{"kind":"textbox","id":"sh/z650byxo","slide":14,"name":"Rectangle 16","text":"STARTUPLAB","textPreview":"STARTUPLAB","textChars":10,"textLines":1,"bbox":[48,28,190,18]}
+{"kind":"shape","id":"sh/xc7eds76","slide":14,"name":"Rectangle 1","bbox":[965,28,265,18]}
+{"kind":"textbox","id":"sh/wbydknq1","slide":14,"name":"Rectangle 2","text":"UAT CYCLE","textPreview":"UAT CYCLE","textChars":9,"textLines":1,"bbox":[48,54,240,16]}
+{"kind":"textbox","id":"sh/jepwf2pc","slide":14,"name":"Rectangle 3","text":"14","textPreview":"14","textChars":2,"textLines":1,"bbox":[1160,680,70,16]}
+{"kind":"textbox","id":"sh/idgvmx8r","slide":14,"name":"Rectangle 4","text":"UAT results summary","textPreview":"UAT results summary","textChars":19,"textLines":1,"bbox":[48,82,1160,58]}
+{"kind":"textbox","id":"sh/5grehs7i","slide":14,"name":"Rectangle 5","text":"Summarize results by status and show the detailed record for important scenarios.","textPreview":"Summarize results by status and show the detailed record for important scenarios.","textChars":81,"textLines":1,"bbox":[48,142,1120,28]}
+{"kind":"textbox","id":"sh/kfidonqx","slide":14,"name":"Rectangle 6","text":"0","textPreview":"0","textChars":1,"textLines":1,"bbox":[55,195,110,65]}
+{"kind":"textbox","id":"sh/zi5c3y98","slide":14,"name":"Rectangle 7","text":"PASSED","textPreview":"PASSED","textChars":6,"textLines":1,"bbox":[167,215,150,25]}
+{"kind":"textbox","id":"sh/ehwvat8n","slide":14,"name":"Rectangle 8","text":"0","textPreview":"0","textChars":1,"textLines":1,"bbox":[350,195,110,65]}
+{"kind":"textbox","id":"sh/c3e1gjyd","slide":14,"name":"Rectangle 9","text":"FAILED","textPreview":"FAILED","textChars":6,"textLines":1,"bbox":[462,215,150,25]}
+{"kind":"textbox","id":"sh/x4ni9ofy","slide":14,"name":"Rectangle 10","text":"0","textPreview":"0","textChars":1,"textLines":1,"bbox":[645,195,110,65]}
+{"kind":"textbox","id":"sh/a1wze9g7","slide":14,"name":"Rectangle 11","text":"BLOCKED","textPreview":"BLOCKED","textChars":7,"textLines":1,"bbox":[757,215,150,25]}
+{"kind":"textbox","id":"sh/b2507exs","slide":14,"name":"Rectangle 12","text":"110","textPreview":"110","textChars":3,"textLines":1,"bbox":[940,195,110,65]}
+{"kind":"textbox","id":"sh/kre1k3y9","slide":14,"name":"Rectangle 13","text":"PENDING","textPreview":"PENDING","textChars":7,"textLines":1,"bbox":[1052,215,150,25]}
+{"kind":"textbox","id":"sh/y5wjitgj","slide":14,"name":"Rectangle 15","text":"Use the detailed UAT record as the source. Explain blocked tests separately from failed tests.","textPreview":"Use the detailed UAT record as the source. Explain blocked tests separately from failed tests.","textChars":94,"textLines":1,"bbox":[48,646,1100,24]}
+{"kind":"table","id":"tb/bulsbixk","slide":14,"name":"Table 30","rows":2,"cols":4,"preview":"UAT ID / Scenario | Expected Result | Actual Result | Status","bbox":[48,300,1184,112]}
+{"kind":"notes","id":"nt/6lsnupw7","slide":14,"text":"HOW TO USE THIS SLIDE\nPopulate the counts and important scenario results after testing. Do not label an unexecuted scenario as passed.\n\nSUGGESTED CLIENT-FACING WORDING\nWe completed [number] scenarios. [Number] passed, while the remaining items require the actions shown in the next slide."}
+{"kind":"slide","id":"sl/vaxsvy10","slide":15,"title":"STARTUPLAB","textShapes":6}
+{"kind":"textbox","id":"sh/m9c3e1kn","slide":15,"name":"Rectangle 8","text":"STARTUPLAB","textPreview":"STARTUPLAB","textChars":10,"textLines":1,"bbox":[48,28,190,18]}
+{"kind":"shape","id":"sh/547mhg3m","slide":15,"name":"Rectangle 1","bbox":[965,28,265,18]}
+{"kind":"textbox","id":"sh/k3y5ov21","slide":15,"name":"Rectangle 2","text":"UAT CYCLE","textPreview":"UAT CYCLE","textChars":9,"textLines":1,"bbox":[48,54,240,16]}
+{"kind":"textbox","id":"sh/76p4jqls","slide":15,"name":"Rectangle 3","text":"15","textPreview":"15","textChars":2,"textLines":1,"bbox":[1160,680,70,16]}
+{"kind":"textbox","id":"sh/65gnqlk7","slide":15,"name":"Rectangle 4","text":"Issues, retesting, and action plan","textPreview":"Issues, retesting, and action plan","textChars":34,"textLines":1,"bbox":[48,82,1160,58]}
+{"kind":"textbox","id":"sh/t87ml0ji","slide":15,"name":"Rectangle 5","text":"Separate confirmed defects from data, access, training, and new-scope concerns.","textPreview":"Separate confirmed defects from data, access, training, and new-scope concerns.","textChars":79,"textLines":1,"bbox":[48,142,1120,28]}
+{"kind":"textbox","id":"sh/na5476l8","slide":15,"name":"Rectangle 7","text":"Every action needs one accountable owner, a target date, and a clear condition for closure.","textPreview":"Every action needs one accountable owner, a target date, and a clear condition for closure.","textChars":91,"textLines":1,"bbox":[48,646,1100,24]}
+{"kind":"table","id":"tb/7itgz6to","slide":15,"name":"Table 14","rows":7,"cols":5,"preview":"Issue ID | Type / Impact | Agreed Action | Owner | Target / Retest","bbox":[48,195,1184,120]}
+{"kind":"notes","id":"nt/vaxsvy10","slide":15,"text":"HOW TO USE THIS SLIDE\nReview each open item with the client. State whether it affects acceptance. Escalate material commitments for CEO approval before confirming them.\n\nSUGGESTED CLIENT-FACING WORDING\nWe classified each concern so the right action is clear. These are the owners, target dates, and retesting requirements agreed during the session."}
+{"kind":"slide","id":"sl/gny5sjyp","slide":16,"title":"STARTUPLAB","textShapes":10}
+{"kind":"textbox","id":"sh/oruhcf65","slide":16,"name":"Rectangle 16","text":"STARTUPLAB","textPreview":"STARTUPLAB","textChars":10,"textLines":1,"bbox":[48,28,190,18]}
+{"kind":"shape","id":"sh/8z2h8bq1","slide":16,"name":"Rectangle 1","bbox":[965,28,265,18]}
+{"kind":"textbox","id":"sh/9kby1g7m","slide":16,"name":"Rectangle 2","text":"UAT CYCLE","textPreview":"UAT CYCLE","textChars":9,"textLines":1,"bbox":[48,54,240,16]}
+{"kind":"textbox","id":"sh/ytkf2h8j","slide":16,"name":"Rectangle 3","text":"16","textPreview":"16","textChars":2,"textLines":1,"bbox":[1160,680,70,16]}
+{"kind":"textbox","id":"sh/zutgvm94","slide":16,"name":"Rectangle 4","text":"UAT decision and sign-off","textPreview":"UAT decision and sign-off","textChars":25,"textLines":1,"bbox":[48,82,1160,58]}
+{"kind":"textbox","id":"sh/kv2h4rqp","slide":16,"name":"Rectangle 5","text":"Record one decision supported by the completed tests, evidence, and agreed actions.","textPreview":"Record one decision supported by the completed tests, evidence, and agreed actions.","textChars":83,"textLines":1,"bbox":[48,142,1120,28]}
+{"kind":"shape","id":"sh/lwbyxwra","slide":16,"name":"Rectangle: Rounded Corners 6","bbox":[55,205,270,70]}
+{"kind":"textbox","id":"sh/ip4zel83","slide":16,"name":"Rectangle 7","text":"ACCEPTED","textPreview":"ACCEPTED","textChars":8,"textLines":1,"bbox":[63,225,254,28]}
+{"kind":"shape","id":"sh/3qdg7qpo","slide":16,"name":"Rectangle: Rounded Corners 8","bbox":[350,205,270,70]}
+{"kind":"textbox","id":"sh/fm1gzq5o","slide":16,"name":"Rectangle 9","text":"ACCEPTED WITH ACTIONS","textPreview":"ACCEPTED WITH ACTIONS","textChars":21,"textLines":1,"bbox":[358,225,254,28]}
+{"kind":"shape","id":"sh/e1sf65o3","slide":16,"name":"Rectangle: Rounded Corners 10","bbox":[645,205,270,70]}
+{"kind":"textbox","id":"sh/1ojy10ne","slide":16,"name":"Rectangle 11","text":"RETEST REQUIRED","textPreview":"RETEST REQUIRED","textChars":15,"textLines":1,"bbox":[653,225,254,28]}
+{"kind":"shape","id":"sh/gnax8v6t","slide":16,"name":"Rectangle: Rounded Corners 12","bbox":[940,205,270,70]}
+{"kind":"textbox","id":"sh/nqlg3a5k","slide":16,"name":"Rectangle 13","text":"NOT ACCEPTED","textPreview":"NOT ACCEPTED","textChars":12,"textLines":1,"bbox":[948,225,254,28]}
+{"kind":"textbox","id":"sh/ps3y5knq","slide":16,"name":"Rectangle 15","text":"Do not pressure the client to accept critical incomplete work. Read back the decision and conditions before closing.","textPreview":"Do not pressure the client to accept critical incomplete work. Read back the decision and conditions before closing.","textChars":116,"textLines":1,"bbox":[48,646,1100,24]}
+{"kind":"table","id":"tb/c3udkjmx","slide":16,"name":"Table 30","rows":6,"cols":2,"preview":"Decision Record | Information to Complete","bbox":[48,320,1184,285]}
+{"kind":"notes","id":"nt/gny5sjyp","slide":16,"text":"HOW TO USE THIS SLIDE\nSelect only the applicable status in the final client copy. Link the signed or written approval record after the meeting.\n\nSUGGESTED CLIENT-FACING WORDING\nBased on the completed tests and recorded evidence, the proposed UAT status is [status]. Please confirm the reason, conditions, and authorized approval record."}
+{"kind":"slide","id":"sl/14bup87q","slide":17,"title":"STARTUPLAB","textShapes":6}
+{"kind":"textbox","id":"sh/ihcvml4j","slide":17,"name":"Rectangle 8","text":"STARTUPLAB","textPreview":"STARTUPLAB","textChars":10,"textLines":1,"bbox":[48,28,190,18]}
+{"kind":"shape","id":"sh/1c7e50ni","slide":17,"name":"Rectangle 1","bbox":[965,28,265,18]}
+{"kind":"textbox","id":"sh/gbedwfmx","slide":17,"name":"Rectangle 2","text":"CLOSEOUT","textPreview":"CLOSEOUT","textChars":8,"textLines":1,"bbox":[48,54,240,16]}
+{"kind":"textbox","id":"sh/rm5czq50","slide":17,"name":"Rectangle 3","text":"17","textPreview":"17","textChars":2,"textLines":1,"bbox":[1160,680,70,16]}
+{"kind":"textbox","id":"sh/6lwvql4v","slide":17,"name":"Rectangle 4","text":"Next steps toward final handover","textPreview":"Next steps toward final handover","textChars":32,"textLines":1,"bbox":[48,82,1160,58]}
+{"kind":"textbox","id":"sh/t8ne10n6","slide":17,"name":"Rectangle 5","text":"Close the UAT cycle with owners, dates, and the next decision gate.","textPreview":"Close the UAT cycle with owners, dates, and the next decision gate.","textChars":67,"textLines":1,"bbox":[48,142,1120,28]}
+{"kind":"textbox","id":"sh/jilcvq54","slide":17,"name":"Rectangle 7","text":"The UAT cycle closes when results, actions, approval, and the next gate are documented and shared.","textPreview":"The UAT cycle closes when results, actions, approval, and the next gate are documented and shared.","textChars":98,"textLines":1,"bbox":[48,646,1100,24]}
+{"kind":"table","id":"tb/jet0vi5k","slide":17,"name":"Table 14","rows":7,"cols":4,"preview":"Next Step | Owner | Target Date | Completion Evidence","bbox":[48,195,1184,390]}
+{"kind":"notes","id":"nt/14bup87q","slide":17,"text":"HOW TO USE THIS SLIDE\nConfirm every owner and target date before ending. Send the written record promptly and prepare the separate final handover presentation after UAT approval.\n\nSUGGESTED CLIENT-FACING WORDING\nTo close today’s UAT cycle, these are the agreed next steps, owners, and dates. I will send the written record for confirmation and prepare the final handover once the acceptance requirements are complete."}

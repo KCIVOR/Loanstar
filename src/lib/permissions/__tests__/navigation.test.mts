@@ -1,7 +1,10 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { getRequiredPageModules } from "../navigation";
+import {
+  getRequiredPageModules,
+  resolveAuthenticatedRedirectPath,
+} from "../navigation";
 
 test("maps the AR portal to the accounting view permission", () => {
   assert.deepEqual(getRequiredPageModules("/ar"), ["accounting_ar"]);
@@ -35,4 +38,9 @@ test("does not gate public, account, dashboard, API, or unknown paths", () => {
   ]) {
     assert.equal(getRequiredPageModules(pathname), null);
   }
+});
+
+test("sends a borrower to their portal when no post-login destination was requested", () => {
+  assert.equal(resolveAuthenticatedRedirectPath(null, true), "/borrower");
+  assert.equal(resolveAuthenticatedRedirectPath(null, false), "/dashboard");
 });

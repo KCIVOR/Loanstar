@@ -1,6 +1,9 @@
 import { NextResponse, type NextRequest } from "next/server";
 
-import { getRequiredPageModules } from "@/lib/permissions/navigation";
+import {
+  getRequiredPageModules,
+  resolveAuthenticatedRedirectPath,
+} from "@/lib/permissions/navigation";
 import { updateSession } from "@/lib/supabase/middleware";
 
 const ADMIN_PREFIX = "/admin";
@@ -27,14 +30,6 @@ const AUTH_ROUTES = [
 
 function isAuthRoute(pathname: string) {
   return AUTH_ROUTES.some((route) => pathname.startsWith(route));
-}
-
-function resolveAuthedRedirect(request: NextRequest): string {
-  const redirect = request.nextUrl.searchParams.get("redirect");
-  if (redirect && redirect.startsWith("/")) {
-    return redirect;
-  }
-  return "/dashboard";
 }
 
 export async function proxy(request: NextRequest) {
@@ -110,7 +105,19 @@ export async function proxy(request: NextRequest) {
   }
 
   if (isAuthRoute(pathname) && user) {
-    const target = resolveAuthedRedirect(request);
+    const { data: borrower, error } = await supabase
+      .from("borrowers")
+      .select("id")
+      .eq("user_id", user.id)
+      .maybeSingle();
+    if (error) {
+      throw new Error(`Failed to resolve borrower portal: ${error.message}`);
+    }
+
+    const target = resolveAuthenticatedRedirectPath(
+      request.nextUrl.searchParams.get("redirect"),
+      Boolean(borrower),
+    );
     const destUrl = request.nextUrl.clone();
     destUrl.pathname = target;
     destUrl.search = "";

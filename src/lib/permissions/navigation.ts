@@ -45,3 +45,18 @@ export function getRequiredPageModules(
       ?.modules ?? null
   );
 }
+
+/** Returns a safe post-authentication destination for the current user. */
+export function resolveAuthenticatedRedirectPath(
+  requestedPath: string | null,
+  isBorrower: boolean,
+) {
+  if (
+    requestedPath &&
+    requestedPath.startsWith("/") &&
+    !requestedPath.startsWith("//")
+  ) {
+    return requestedPath;
+  }
+  return isBorrower ? "/borrower" : "/dashboard";
+}
