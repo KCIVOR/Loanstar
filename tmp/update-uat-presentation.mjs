@@ -12,7 +12,7 @@ table.setValues([
   ["UAT-025", "Defect: agent information missing from loan applications", "Added staff-editable agent assignment and form display", "Rovick Romasanta", "Closed today"],
   ["UAT-040", "Defect: committee hold could not be cleared", "Added clear-hold action; return application to committee review", "Rovick Romasanta", "Closed today"],
   ["UAT-076", "Enhancement: User Management filtering and account separation", "Added role filters, pagination, and borrower/staff separation", "Rovick Romasanta", "Closed today"],
-  ["UAT-078 / 079", "Defect: deactivated account retained access", "Disabled access immediately; reactivation requires fresh access", "Rovick Romasanta", "Closed today"],
+  ["UAT-078 / 079", "Defect: deactivated account retained access", "Disabled access immediately; reactivation restores access", "Rovick Romasanta", "Closed today"],
   ["UAT-094", "Defect: restricted-page message unclear", "Added clear restricted-access message and safe return route", "Rovick Romasanta", "Closed today"],
   ["Meeting follow-up", "Agent dashboard showed organisation-wide Agent data", "Scoped Agent dashboard analytics to the signed-in Agent", "Rovick Romasanta", "Closed today"],
 ]);
