@@ -37,6 +37,6 @@ const result = await finalizePresentation({
   ],
   requiredNativeTableOwnerSlides: [3, 4, 6, 7, 8, 10, 11, 12, 14, 15, 16, 17],
   verifyArtifactToolImport: true,
-  receiptPath: path.join(workspaceDir, ".codex-finalizer", "loanstar-uat-progress-validation.json"),
+  receiptPath: path.join(workspaceDir, ".codex-finalizer", "loanstar-uat-progress-validation-v2.json"),
 });
 console.log(JSON.stringify(result));
