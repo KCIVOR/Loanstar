@@ -200,6 +200,13 @@ export type AccountLedgerRow = {
    * they hold the account-wide sums, which add up to `balance`. */
   monthRemaining: number | null;
   penaltyRemaining: number | null;
+  /** The check/payment amount that bounced (2026-09-25) — display-only, set
+   * exclusively on "bounced_check" rows. Deliberately separate from
+   * `debit`/`credit`, which stay 0 on those rows so this never leaks into
+   * `balance`, `creditTotal`, or any other sum that treats debit/credit as
+   * real money moved (see pushBounce's comment). Lets the ledger show how
+   * much the check was for without pretending it was collected. */
+  bouncedAmount?: number | null;
 };
 
 const NO_CARRY = { carriedInterest: null, carriedPenalty: null, carriedFrom: null } as const;
@@ -476,7 +483,12 @@ export function buildAccountLedgerRows(
    * entirely (2026-09-24 follow-up, caught from a live screenshot). Safe to
    * call unconditionally: `schedRemaining` only seeds once and never
    * mutates, so it just reports whatever a prior real credit already left
-   * remaining, or the full original amount if none did. */
+   * remaining, or the full original amount if none did.
+   *
+   * `bouncedAmount` (2026-09-25) surfaces the actual check amount for
+   * display — the ledger UI reads this instead of `credit` for a bounce row
+   * so the amount is visible without it counting as real money anywhere
+   * `credit`/`debit` are summed (balance, creditTotal, group header totals). */
   function pushBounce(bounced: LedgerBouncedItem, schedule: LedgerSchedule | null) {
     rows.push({
       kind: "bounced_check",
@@ -494,6 +506,7 @@ export function buildAccountLedgerRows(
       status: "bounced",
       debit: 0,
       credit: 0,
+      bouncedAmount: halfUpMoney(Number(bounced.amount) || 0),
       balance,
       scheduleId: schedule?.id ?? null,
       ...carryFields(schedule),
