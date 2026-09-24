@@ -975,11 +975,12 @@ describe("buildAccountLedgerRows — bounced check (2026-09-24, nested under its
 
     const bounceRow = rows.find((r) => r.kind === "bounced_check");
     assert.ok(bounceRow, "expected a bounced_check row");
-    // Posted as 0/0, not the bounced amount — no real money moved, and the
-    // row still reads as a real event because date/reference/status render
-    // regardless of the amount (2026-09-24 design correction).
-    assert.equal(bounceRow?.debit, 0);
-    assert.equal(bounceRow?.credit, 0);
+    // Posted as debit === credit === the bounced amount (2026-09-25: shows
+    // the actual amount in both columns, not 0/0) — a deliberate net-zero
+    // pair, not real money: `balance` below still carries through unchanged,
+    // same as before.
+    assert.equal(bounceRow?.debit, 58000);
+    assert.equal(bounceRow?.credit, 58000);
     assert.equal(bounceRow?.referenceNo, "DAIF");
     assert.equal(bounceRow?.status, "bounced");
     // Nested under its installment: same scheduleId and dueDate as the

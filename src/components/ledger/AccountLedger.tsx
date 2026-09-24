@@ -251,7 +251,13 @@ export function AccountLedger({
                   <Td className="mono">
                     {isTotals ? "—" : formatLedgerTextCell(row.referenceNo)}
                   </Td>
-                  <Td num className="mono">
+                  <Td
+                    num
+                    className={cn(
+                      "mono",
+                      row.kind === "bounced_check" && "text-rose-600",
+                    )}
+                  >
                     {moneyCell(row.debit)}
                   </Td>
                   <Td
@@ -263,9 +269,7 @@ export function AccountLedger({
                         : "text-teal-600",
                     )}
                   >
-                    {row.kind === "bounced_check"
-                      ? moneyCell(row.bouncedAmount ?? null)
-                      : moneyCell(row.credit)}
+                    {moneyCell(row.credit)}
                   </Td>
                   <Td num className="mono">
                     {moneyCell(row.balance)}
@@ -302,20 +306,27 @@ export function AccountLedger({
             const isOpen = expanded.has(item.scheduleId);
             const first = item.rows[0]!;
             const last = item.rows[item.rows.length - 1]!;
+            // A bounced_check row posts debit === credit === the bounced
+            // amount (a deliberate net-zero pair, not real money — see
+            // pushBounce's comment), so the header's "real money collected"
+            // figure has to subtract the group's debit back out, or a bounce
+            // would inflate it as if it were an extra payment. Only
+            // bounced_check rows carry a non-null debit here (grouping only
+            // ever includes "payment"/"bounced_check" kinds, and a real
+            // payment row's debit is always null), so totalDebit doubles as
+            // "total bounced" for the header's own Debit cell below.
             const totalCredit = item.rows.reduce(
               (sum, r) => sum + (r.credit ?? 0),
               0,
             );
+            const totalDebit = item.rows.reduce(
+              (sum, r) => sum + (r.debit ?? 0),
+              0,
+            );
+            const netCredit = totalCredit - totalDebit;
             // A bounce is never a real payment — "N payments" would be
             // misleading if one of them bounced.
             const hasBounce = item.rows.some((r) => r.kind === "bounced_check");
-            // Collapsed-header amount for a bounce-only group (no real credit
-            // to show): the bounced check's own amount, so the header doesn't
-            // read as a blank/zero collection when it's collapsed.
-            const totalBounced = item.rows.reduce(
-              (sum, r) => sum + (r.bouncedAmount ?? 0),
-              0,
-            );
             const groupLabel = hasBounce ? "entries" : "payments";
             // Header status: prefer the installment's real, schedule-derived
             // status (identical on every non-bounce row here, since it comes
@@ -359,19 +370,14 @@ export function AccountLedger({
                     </span>
                   </Td>
                   <Td className="mono">—</Td>
-                  <Td num className="mono">
-                    —
-                  </Td>
                   <Td
                     num
-                    className={cn(
-                      "mono",
-                      totalCredit > 0 ? "text-teal-600" : "text-rose-600",
-                    )}
+                    className={cn("mono", totalDebit > 0 && "text-rose-600")}
                   >
-                    {totalCredit > 0
-                      ? moneyCell(totalCredit)
-                      : moneyCell(totalBounced || null)}
+                    {moneyCell(totalDebit || null)}
+                  </Td>
+                  <Td num className="mono text-teal-600">
+                    {moneyCell(netCredit || null)}
                   </Td>
                   <Td num className="mono">
                     {moneyCell(last.balance)}
@@ -415,8 +421,16 @@ export function AccountLedger({
                         <Td className="mono text-ink-600">
                           {formatLedgerTextCell(r.referenceNo)}
                         </Td>
-                        <Td num className="mono text-ink-400">
-                          —
+                        <Td
+                          num
+                          className={cn(
+                            "mono",
+                            r.kind === "bounced_check"
+                              ? "text-rose-600"
+                              : "text-ink-400",
+                          )}
+                        >
+                          {moneyCell(r.debit)}
                         </Td>
                         <Td
                           num
@@ -427,9 +441,7 @@ export function AccountLedger({
                               : "text-teal-600",
                           )}
                         >
-                          {r.kind === "bounced_check"
-                            ? moneyCell(r.bouncedAmount ?? null)
-                            : moneyCell(r.credit)}
+                          {moneyCell(r.credit)}
                         </Td>
                         <Td num className="mono">
                           {moneyCell(r.balance)}

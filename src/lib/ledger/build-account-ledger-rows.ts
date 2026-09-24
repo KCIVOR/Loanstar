@@ -200,13 +200,6 @@ export type AccountLedgerRow = {
    * they hold the account-wide sums, which add up to `balance`. */
   monthRemaining: number | null;
   penaltyRemaining: number | null;
-  /** The check/payment amount that bounced (2026-09-25) — display-only, set
-   * exclusively on "bounced_check" rows. Deliberately separate from
-   * `debit`/`credit`, which stay 0 on those rows so this never leaks into
-   * `balance`, `creditTotal`, or any other sum that treats debit/credit as
-   * real money moved (see pushBounce's comment). Lets the ledger show how
-   * much the check was for without pretending it was collected. */
-  bouncedAmount?: number | null;
 };
 
 const NO_CARRY = { carriedInterest: null, carriedPenalty: null, carriedFrom: null } as const;
@@ -468,13 +461,20 @@ export function buildAccountLedgerRows(
   /** A bounced/returned check (2026-09-24, moved under its target
    * installment 2026-09-24 follow-up) — shares the "payment" row's
    * schedule-derived fields (checkNo/dueDate/target/penalty/discount) so a
-   * group header still reads correctly if this happens to sort first, but
-   * posts 0/0 and deliberately skips both the balance/creditTotal mutation
-   * pushCredit does AND applyCreditToRemaining — no real money moved, so
-   * nothing about what's still owed changes.
+   * group header still reads correctly if this happens to sort first.
    *
-   * `monthRemaining`/`penaltyRemaining` are the one exception to "no real
-   * money moved": they must still reflect what's actually still owed on
+   * `debit`/`credit` (2026-09-25: both set to the bounced amount, not 0) are
+   * a deliberate net-zero pair, not two real entries: they surface the check
+   * amount in both columns for the reader, while cancelling out to no actual
+   * change — this function still never mutates the running `balance` or
+   * `creditTotal` closure variables (compare pushCredit, which does both),
+   * so nothing about the account's real running total moves. Any UI/report
+   * that sums a group's or account's credit must subtract that group's/
+   * account's debit alongside it to keep this net-zero pair from inflating
+   * a "money collected" total (see AccountLedger.tsx's totalCredit).
+   *
+   * `monthRemaining`/`penaltyRemaining` are the one case where a real number
+   * does carry over: they must still reflect what's actually still owed on
    * this installment (via `schedRemaining`, not `NO_REMAIN`) — otherwise a
    * bounce-only schedule never seeds/tracks its remaining amount at all,
    * so the row (and, since the group header reads `last`, the whole
@@ -483,13 +483,9 @@ export function buildAccountLedgerRows(
    * entirely (2026-09-24 follow-up, caught from a live screenshot). Safe to
    * call unconditionally: `schedRemaining` only seeds once and never
    * mutates, so it just reports whatever a prior real credit already left
-   * remaining, or the full original amount if none did.
-   *
-   * `bouncedAmount` (2026-09-25) surfaces the actual check amount for
-   * display — the ledger UI reads this instead of `credit` for a bounce row
-   * so the amount is visible without it counting as real money anywhere
-   * `credit`/`debit` are summed (balance, creditTotal, group header totals). */
+   * remaining, or the full original amount if none did. */
   function pushBounce(bounced: LedgerBouncedItem, schedule: LedgerSchedule | null) {
+    const amount = halfUpMoney(Number(bounced.amount) || 0);
     rows.push({
       kind: "bounced_check",
       key: `bounced_check:${bounced.id}`,
@@ -504,9 +500,8 @@ export function buildAccountLedgerRows(
       date: bounced.date,
       referenceNo: bounced.referenceNo,
       status: "bounced",
-      debit: 0,
-      credit: 0,
-      bouncedAmount: halfUpMoney(Number(bounced.amount) || 0),
+      debit: amount,
+      credit: amount,
       balance,
       scheduleId: schedule?.id ?? null,
       ...carryFields(schedule),
