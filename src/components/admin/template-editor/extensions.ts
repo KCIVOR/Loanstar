@@ -132,6 +132,16 @@ const Div = Node.create({
         parseHTML: (el) => el.getAttribute("data-accurate"),
         renderHTML: (a) => (a.dataAccurate != null ? { "data-accurate": a.dataAccurate } : {}),
       },
+      // `data-document-footer` — opts a source-faithful template out of the
+      // house page-number footer (checked as a literal string against the
+      // merged HTML in render/index.ts, so it must survive a round-trip
+      // through this editor too, same reasoning as the two attributes above.
+      dataDocumentFooter: {
+        default: null,
+        parseHTML: (el) => el.getAttribute("data-document-footer"),
+        renderHTML: (a) =>
+          a.dataDocumentFooter != null ? { "data-document-footer": a.dataDocumentFooter } : {},
+      },
     };
   },
   parseHTML() {
@@ -146,6 +156,9 @@ const Div = Node.create({
     }
     if (node.attrs.dataAccurate != null) {
       attrs["data-accurate"] = String(node.attrs.dataAccurate);
+    }
+    if (node.attrs.dataDocumentFooter != null) {
+      attrs["data-document-footer"] = String(node.attrs.dataDocumentFooter);
     }
     return ["div", attrs, 0];
   },
@@ -292,9 +305,31 @@ const PlainTable = Table.extend({
   },
 });
 
+/** `data-underline` — a single-side (bottom) rule on an otherwise borderless
+ * cell, for source forms that fill in a value on an underline rather than a
+ * ruled box (e.g. disclosure_statement). Same round-trip problem/fix as
+ * `data-plain`/`data-repeat` above: an inline `border-bottom` style would be
+ * silently stripped by TipTap's serialiser, so this travels as a declared
+ * boolean attribute instead, mapped to a real border by PRINT_CSS. */
+function withUnderline<T extends typeof TableCell | typeof TableHeader>(base: T) {
+  return base.extend({
+    addAttributes() {
+      return {
+        ...this.parent?.(),
+        dataUnderline: {
+          default: null,
+          parseHTML: (el: HTMLElement) => el.getAttribute("data-underline"),
+          renderHTML: (a: { dataUnderline?: string | null }) =>
+            a.dataUnderline != null ? { "data-underline": a.dataUnderline } : {},
+        },
+      };
+    },
+  });
+}
+
 /** Cells: inline content, and no `colspan="1"` / `rowspan="1"` noise. */
 function inlineCell<T extends typeof TableCell | typeof TableHeader>(base: T) {
-  return base.extend({
+  return withUnderline(base).extend({
     content: "inline*",
     renderHTML({ HTMLAttributes }) {
       const attrs: Record<string, unknown> = { ...HTMLAttributes };

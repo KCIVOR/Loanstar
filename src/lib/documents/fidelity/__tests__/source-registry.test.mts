@@ -73,12 +73,26 @@ test("never selects a source from a Backup directory", () => {
 
 test("represents a page target only for variants established by source inspection", () => {
   const variants = listSourceVariants();
+  // Each id here was individually rendered through the configured
+  // Chromium/Gotenberg source-evidence pipeline and its page count read off
+  // the rasterized PNGs — not assumed. sf-disclosure-statement (Phase 1);
+  // lslgc-consent-form-corporate / lslgc-consent-form-individual (Phase 2,
+  // both confirmed single-page from LSLGC CONSENT FORM 2025 - Corp./
+  // Individual.docx).
+  const pageTargetEstablished = new Set([
+    "sf-disclosure-statement",
+    "lslgc-consent-form-corporate",
+    "lslgc-consent-form-individual",
+  ]);
+
   const disclosure = variants.find((variant) => variant.id === "sf-disclosure-statement");
-
   assert.equal(disclosure?.pageTarget, 1);
-  assert.equal(Object.hasOwn(disclosure ?? {}, "pageTarget"), true);
 
-  for (const variant of variants.filter((entry) => entry.id !== "sf-disclosure-statement")) {
-    assert.equal(Object.hasOwn(variant, "pageTarget"), false);
+  for (const variant of variants) {
+    assert.equal(
+      Object.hasOwn(variant, "pageTarget"),
+      pageTargetEstablished.has(variant.id),
+      `unexpected pageTarget presence for ${variant.id}`,
+    );
   }
 });

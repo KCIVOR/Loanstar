@@ -1,3 +1,15 @@
+import { SOURCE_FAITHFUL_DISCLOSURE_PREVIEW } from "@/lib/documents/fidelity/disclosure-preview";
+import { SOURCE_FAITHFUL_PROMISSORY_NOTE_PREVIEW } from "@/lib/documents/fidelity/promissory-note-preview";
+import { SOURCE_FAITHFUL_DEMAND_LETTER_SECOND_NOTICE_PREVIEW } from "@/lib/documents/fidelity/demand-letter-second-notice-preview";
+import { SOURCE_FAITHFUL_AR_ATM_VOUCHER_PREVIEW } from "@/lib/documents/fidelity/ar-atm-voucher-preview";
+import { SOURCE_FAITHFUL_CONSENT_FORM_PREVIEW } from "@/lib/documents/fidelity/consent-form-preview";
+import { SOURCE_FAITHFUL_DEMAND_LETTER_V2_PREVIEW } from "@/lib/documents/fidelity/demand-letter-v2-preview";
+import { SOURCE_FAITHFUL_LOAN_AGREEMENT_VIENOVO_PREVIEW } from "@/lib/documents/fidelity/loan-agreement-vienovo-preview";
+import { SOURCE_FAITHFUL_DEED_OF_CHATTEL_MORTGAGE_PREVIEW } from "@/lib/documents/fidelity/deed-of-chattel-mortgage-preview";
+import { SOURCE_FAITHFUL_CANCELLATION_OF_CHATTEL_MORTGAGE_PREVIEW } from "@/lib/documents/fidelity/cancellation-of-chattel-mortgage-preview";
+import { SOURCE_FAITHFUL_VOLUNTARY_SURRENDER_DEED_AUTO_PREVIEW } from "@/lib/documents/fidelity/voluntary-surrender-deed-auto-preview";
+import { SOURCE_FAITHFUL_SPA_MORTGAGE_CANCELLATION_PREVIEW } from "@/lib/documents/fidelity/spa-mortgage-cancellation-preview";
+
 /**
  * Representative template-HTML patterns drawn from the 29 published templates —
  * every construct the TipTap schema must round-trip. Kept as a committed fixture
@@ -60,4 +72,33 @@ export const FIXTURES: Record<string, string> = {
   letterhead_logo: `<div data-align="center"><img class="doc-logo" src="{{logoDataUri}}" alt="Loan Star Lending Group Corp."></div>
 <h1>PROMISSORY NOTE</h1>
 <p>body</p>`,
+
+  disclosure_statement_source_faithful: SOURCE_FAITHFUL_DISCLOSURE_PREVIEW,
+  promissory_note_source_faithful: SOURCE_FAITHFUL_PROMISSORY_NOTE_PREVIEW,
+  demand_letter_second_notice_source_faithful: SOURCE_FAITHFUL_DEMAND_LETTER_SECOND_NOTICE_PREVIEW,
+  ar_atm_voucher_source_faithful: SOURCE_FAITHFUL_AR_ATM_VOUCHER_PREVIEW,
+  consent_form_source_faithful: SOURCE_FAITHFUL_CONSENT_FORM_PREVIEW,
+  demand_letter_v2_source_faithful: SOURCE_FAITHFUL_DEMAND_LETTER_V2_PREVIEW,
+  loan_agreement_vienovo_source_faithful: SOURCE_FAITHFUL_LOAN_AGREEMENT_VIENOVO_PREVIEW,
+  deed_of_chattel_mortgage_source_faithful: SOURCE_FAITHFUL_DEED_OF_CHATTEL_MORTGAGE_PREVIEW,
+  cancellation_of_chattel_mortgage_source_faithful: SOURCE_FAITHFUL_CANCELLATION_OF_CHATTEL_MORTGAGE_PREVIEW,
+  voluntary_surrender_deed_auto_source_faithful: SOURCE_FAITHFUL_VOLUNTARY_SURRENDER_DEED_AUTO_PREVIEW,
+  spa_mortgage_cancellation_source_faithful: SOURCE_FAITHFUL_SPA_MORTGAGE_CANCELLATION_PREVIEW,
+
+  // Repeated per-vehicle key/value block, exercised with 2 vehicles (the
+  // Phase 4 vehicle-collateral fix: `<div data-repeat="vehicles">` wrapping
+  // a per-vehicle 2-column table, the block-repeat equivalent of the
+  // already-correct `repeat_block` / `data-repeat="properties"` pattern
+  // above — see deed-of-chattel-mortgage-preview.ts's header comment).
+  repeat_block_vehicles: `<div data-repeat="vehicles">
+<table><tbody>
+<tr><th>Make / Year Model</th><td>{{makeYearModel}}</td></tr>
+<tr><th>Engine No.</th><td>{{engineNo}}</td></tr>
+<tr><th>Chassis No.</th><td>{{chassisNo}}</td></tr>
+<tr><th>Plate No.</th><td>{{plateNo}}</td></tr>
+<tr><th>CR No.</th><td>{{crNo}}</td></tr>
+<tr><th>MV File No.</th><td>{{mvFileNo}}</td></tr>
+<tr><th>Registered Owner</th><td>{{registeredOwner}}</td></tr>
+</tbody></table>
+</div>`,
 };

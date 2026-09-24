@@ -270,6 +270,17 @@ export function buildReleaseTemplateContext(
     docStamp: money(computation.docStamp),
     adminCost: money(computation.adminCost),
     notaryFee: money(computation.notaryFee),
+    // Disclosure Statement item 4 total. Sums only the fees this system
+    // actually computes (Taxes/Other Loan/Payment for Previous Loan/Advance
+    // Payment/Bank Account Opening have no source anywhere yet and stay
+    // blank on the form, per this file's established convention).
+    nonFinanceCharges: money(
+      (computation.processingFee ?? 0) +
+        (computation.securityFee ?? 0) +
+        (computation.docStamp ?? 0) +
+        (computation.adminCost ?? 0) +
+        (computation.notaryFee ?? 0),
+    ),
 
     bankName: borrower.financial?.bankName ?? "",
     bankAccountNo: borrower.financial?.accountNumber ?? "",
@@ -287,6 +298,11 @@ export function buildReleaseTemplateContext(
     checkVoucherNo: blri.loanAccountNo.replace(/^LA/i, "CV") === blri.loanAccountNo
       ? ""
       : blri.loanAccountNo.replace(/^LA/i, "CV"),
+    // SF Promissory Note's own "PN Number" header field — same LA->prefix-swap
+    // convention as checkVoucherNo above, derived from data already on hand.
+    promissoryNoteNo: blri.loanAccountNo.replace(/^LA/i, "PN") === blri.loanAccountNo
+      ? ""
+      : blri.loanAccountNo.replace(/^LA/i, "PN"),
 
     // Audit fix: referenced by blri / check_voucher / cash_voucher /
     // final_computation_sheet / the 3 ar_*_voucher templates, never
@@ -422,6 +438,23 @@ export function buildReleaseTemplateContext(
     installmentCount: String(blri.terms),
     disclosureFromDate: blri.firstPaymentDate,
     disclosureToDate: blri.pdcSchedule.at(-1)?.checkDate ?? "",
+    // SF Promissory Note's interest-accrual term (distinct from the
+    // installment-count `termsInWords` above — the source PN.doc states the
+    // interest accrual months separately from the number of monthly
+    // payments). Sourced from the same `computation.addonMonths` already
+    // captured on `ReleaseComputation`, never invented.
+    addonMonthsInWords: countInWords(
+      computation.addonMonths != null ? Number(computation.addonMonths) : null,
+    ),
+
+    // SF ATM Acknowledgement Receipt "with spouse" variant. `hasSpouse` is
+    // derived from the borrower's own captured `civilStatus` (real data);
+    // the spouse's printed name has no source anywhere in the system yet
+    // (no spouse-name field exists on BorrowerProfile), so it stays blank —
+    // same established convention as `witnessOne`/`witnessTwo` above — for
+    // the borrower to fill in by hand on the printed form.
+    hasSpouse: (borrower.civilStatus ?? "").trim().toLowerCase() === "married",
+    spouseName: "",
 
     // Loan Agreement structural flags. Default: a Seafarer/Individual loan is a
     // standard monthly PDC loan; an SME loan is treated as corporate. The

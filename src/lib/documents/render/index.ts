@@ -83,7 +83,11 @@ async function renderViaChromium(
     ? mergedHtml
     : buildBodyLetterhead(Boolean(logo)) + mergedHtml;
   return htmlToPdfViaGotenberg(body, {
-    footerHtml: buildFooterHtml(),
+    // A source-faithful template may opt out of the house page-number footer.
+    // The marker is local to that template; all existing documents retain it.
+    ...(!/data-document-footer="none"/.test(mergedHtml)
+      ? { footerHtml: buildFooterHtml() }
+      : {}),
     assets: logo ? [logo] : [],
     ...(fonts.length ? { fonts } : {}),
     ...(connection ? { connection } : {}),

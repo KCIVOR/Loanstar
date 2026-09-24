@@ -38,5 +38,221 @@
     },
     "templateSlug": "ar_atm_voucher",
     "sourcePath": "C:/Users/Rovick/Downloads/SFCalculator/AR ATM - With Spouse.doc"
+  },
+  {
+    "id": "lslgc-consent-form-corporate",
+    "family": "lslgc-consent-form",
+    "requiredVariantDimensions": {
+      "isCorporateBorrower": true
+    },
+    "templateSlug": "consent_form",
+    "sourcePath": "C:/Users/Rovick/Downloads/LSLGC Calculator and Docs/LSLGC CONSENT FORM 2025 - Corp..docx",
+    "pageTarget": 1
+  },
+  {
+    "id": "lslgc-consent-form-individual",
+    "family": "lslgc-consent-form",
+    "requiredVariantDimensions": {
+      "isCorporateBorrower": false
+    },
+    "templateSlug": "consent_form",
+    "sourcePath": "C:/Users/Rovick/Downloads/LSLGC Calculator and Docs/LSLGC CONSENT FORM 2025 - Individual.docx",
+    "pageTarget": 1
+  },
+  {
+    "id": "vienovo-demand-letter-without-pdc-address-attention",
+    "family": "vienovo-demand-letter-without-pdc",
+    "requiredVariantDimensions": {
+      "hasAddress": true,
+      "hasAttentionLine": true
+    },
+    "templateSlug": "demand_letter_v2",
+    "sourcePath": "C:/Users/Rovick/Downloads/LSLGC Calculator and Docs/Demand Letter - without PDC 2024.doc"
+  },
+  {
+    "id": "vienovo-demand-letter-without-pdc-no-address-attention",
+    "family": "vienovo-demand-letter-without-pdc",
+    "requiredVariantDimensions": {
+      "hasAddress": false,
+      "hasAttentionLine": true
+    },
+    "templateSlug": "demand_letter_v2",
+    "sourcePath": "C:/Users/Rovick/Downloads/LSLGC Calculator and Docs/Demand Letter - without PDC 2024 - no address - final.doc"
+  },
+  {
+    "id": "vienovo-demand-letter-without-pdc-address-no-attention",
+    "family": "vienovo-demand-letter-without-pdc",
+    "requiredVariantDimensions": {
+      "hasAddress": true,
+      "hasAttentionLine": false
+    },
+    "templateSlug": "demand_letter_v2",
+    "sourcePath": "C:/Users/Rovick/Downloads/LSLGC Calculator and Docs/Demand Letter - without PDC - Individual.doc"
+  },
+  {
+    "id": "vienovo-demand-letter-without-pdc-no-address-no-attention",
+    "family": "vienovo-demand-letter-without-pdc",
+    "requiredVariantDimensions": {
+      "hasAddress": false,
+      "hasAttentionLine": false
+    },
+    "templateSlug": "demand_letter_v2",
+    "sourcePath": "C:/Users/Rovick/Downloads/LSLGC Calculator and Docs/Demand Letter - without PDC - Individual - No Address.doc"
+  },
+  {
+    "id": "vienovo-loan-agreement",
+    "family": "vienovo-loan-agreement",
+    "requiredVariantDimensions": {},
+    "templateSlug": "loan_agreement_vienovo",
+    "sourcePath": "C:/Users/Rovick/Downloads/LSLGC Calculator and Docs/Vienovo/Vienovo Loan Agreement - quarter2months 02.20.26.doc"
+  },
+  {
+    "id": "lslgc-deed-of-chattel-mortgage-1-unit",
+    "family": "lslgc-deed-of-chattel-mortgage",
+    "requiredVariantDimensions": {
+      "vehicleCount": 1
+    },
+    "templateSlug": "deed_of_chattel_mortgage",
+    "sourcePath": "C:/Users/Rovick/Downloads/LSLGC Calculator and Docs/CHATTEL MORTGAGE - 1 unit.doc"
+  },
+  {
+    "id": "lslgc-deed-of-chattel-mortgage-2-units",
+    "family": "lslgc-deed-of-chattel-mortgage",
+    "requiredVariantDimensions": {
+      "vehicleCount": 2
+    },
+    "templateSlug": "deed_of_chattel_mortgage",
+    "sourcePath": "C:/Users/Rovick/Downloads/LSLGC Calculator and Docs/CHATTEL MORTGAGE - 2 units.doc"
+  },
+  {
+    "id": "lslgc-deed-of-chattel-mortgage-3-units",
+    "family": "lslgc-deed-of-chattel-mortgage",
+    "requiredVariantDimensions": {
+      "vehicleCount": 3
+    },
+    "templateSlug": "deed_of_chattel_mortgage",
+    "sourcePath": "C:/Users/Rovick/Downloads/LSLGC Calculator and Docs/CHATTEL MORTGAGE - 3 units.doc"
+  },
+  {
+    "id": "lslgc-deed-of-chattel-mortgage-4-units",
+    "family": "lslgc-deed-of-chattel-mortgage",
+    "requiredVariantDimensions": {
+      "vehicleCount": 4
+    },
+    "templateSlug": "deed_of_chattel_mortgage",
+    "sourcePath": "C:/Users/Rovick/Downloads/LSLGC Calculator and Docs/CHATTEL MORTGAGE - 4 units.doc"
+  },
+  {
+    "id": "lslgc-cancellation-of-chattel-mortgage-individual-1-unit",
+    "family": "lslgc-cancellation-of-chattel-mortgage",
+    "requiredVariantDimensions": {
+      "vehicleCount": 1,
+      "isCorpOrDti": false
+    },
+    "templateSlug": "cancellation_of_chattel_mortgage",
+    "sourcePath": "C:/Users/Rovick/Downloads/LSLGC Calculator and Docs/Cancellation of Mortgage/CANCELLATION OF CHATTEL - 1 unit.doc"
+  },
+  {
+    "id": "lslgc-cancellation-of-chattel-mortgage-individual-2-units",
+    "family": "lslgc-cancellation-of-chattel-mortgage",
+    "requiredVariantDimensions": {
+      "vehicleCount": 2,
+      "isCorpOrDti": false
+    },
+    "templateSlug": "cancellation_of_chattel_mortgage",
+    "sourcePath": "C:/Users/Rovick/Downloads/LSLGC Calculator and Docs/Cancellation of Mortgage/CANCELLATION OF CHATTEL - 2 units.doc"
+  },
+  {
+    "id": "lslgc-cancellation-of-chattel-mortgage-individual-3-units",
+    "family": "lslgc-cancellation-of-chattel-mortgage",
+    "requiredVariantDimensions": {
+      "vehicleCount": 3,
+      "isCorpOrDti": false
+    },
+    "templateSlug": "cancellation_of_chattel_mortgage",
+    "sourcePath": "C:/Users/Rovick/Downloads/LSLGC Calculator and Docs/Cancellation of Mortgage/CANCELLATION OF CHATTEL - 3 units.doc"
+  },
+  {
+    "id": "lslgc-cancellation-of-chattel-mortgage-individual-4-units",
+    "family": "lslgc-cancellation-of-chattel-mortgage",
+    "requiredVariantDimensions": {
+      "vehicleCount": 4,
+      "isCorpOrDti": false
+    },
+    "templateSlug": "cancellation_of_chattel_mortgage",
+    "sourcePath": "C:/Users/Rovick/Downloads/LSLGC Calculator and Docs/Cancellation of Mortgage/CANCELLATION OF CHATTEL - 4 units.doc"
+  },
+  {
+    "id": "lslgc-cancellation-of-chattel-mortgage-corp-dti-1-unit",
+    "family": "lslgc-cancellation-of-chattel-mortgage",
+    "requiredVariantDimensions": {
+      "vehicleCount": 1,
+      "isCorpOrDti": true
+    },
+    "templateSlug": "cancellation_of_chattel_mortgage",
+    "sourcePath": "C:/Users/Rovick/Downloads/LSLGC Calculator and Docs/Cancellation of Mortgage/CANCELLATION OF CHATTEL Corp and DTI- 1 unit.doc"
+  },
+  {
+    "id": "lslgc-cancellation-of-chattel-mortgage-corp-dti-2-units",
+    "family": "lslgc-cancellation-of-chattel-mortgage",
+    "requiredVariantDimensions": {
+      "vehicleCount": 2,
+      "isCorpOrDti": true
+    },
+    "templateSlug": "cancellation_of_chattel_mortgage",
+    "sourcePath": "C:/Users/Rovick/Downloads/LSLGC Calculator and Docs/Cancellation of Mortgage/CANCELLATION OF CHATTEL Corp and DTI- 2 units.doc"
+  },
+  {
+    "id": "lslgc-cancellation-of-chattel-mortgage-corp-dti-3-units",
+    "family": "lslgc-cancellation-of-chattel-mortgage",
+    "requiredVariantDimensions": {
+      "vehicleCount": 3,
+      "isCorpOrDti": true
+    },
+    "templateSlug": "cancellation_of_chattel_mortgage",
+    "sourcePath": "C:/Users/Rovick/Downloads/LSLGC Calculator and Docs/Cancellation of Mortgage/CANCELLATION OF CHATTEL Corp and DTI- 3 units.doc"
+  },
+  {
+    "id": "lslgc-cancellation-of-chattel-mortgage-corp-dti-4-units",
+    "family": "lslgc-cancellation-of-chattel-mortgage",
+    "requiredVariantDimensions": {
+      "vehicleCount": 4,
+      "isCorpOrDti": true
+    },
+    "templateSlug": "cancellation_of_chattel_mortgage",
+    "sourcePath": "C:/Users/Rovick/Downloads/LSLGC Calculator and Docs/Cancellation of Mortgage/CANCELLATION OF CHATTEL Corp and DTI- 4 units.doc"
+  },
+  {
+    "id": "lslgc-voluntary-surrender-deed-auto-unit-1",
+    "family": "lslgc-voluntary-surrender-deed-auto",
+    "requiredVariantDimensions": {
+      "vehicleCount": 1
+    },
+    "templateSlug": "voluntary_surrender_deed_auto",
+    "sourcePath": "C:/Users/Rovick/Downloads/LSLGC Calculator and Docs/Voluntary and Deed Auto - Unit 1.doc"
+  },
+  {
+    "id": "lslgc-spa-mortgage-cancellation",
+    "family": "lslgc-spa-mortgage-cancellation",
+    "requiredVariantDimensions": {},
+    "templateSlug": "spa_mortgage_cancellation",
+    "sourcePath": "C:/Users/Rovick/Downloads/LSLGC Calculator and Docs/SPECIAL POWER OF ATTORNEY Cancellation of Mortgage.docx",
+    "notes": "Two near-identical filled-sample source files exist (`SPECIAL POWER OF ATTORNEY Cancellation of Mortgage.docx` and `... (1).docx`); the prose is byte-identical, the only difference is the principal's passport number being filled into the acknowledgment ID table in the `(1)` copy. Fixed the vehicle-detail block from a wide repeated-row table (with an invented, never-wired `{{transmission}}` field) to the established `<div data-repeat=\"vehicles\">` key/value block shared with deed_of_chattel_mortgage; prose otherwise already matched."
+  },
+  {
+    "id": "lslgc-agreement-check-replacement",
+    "family": "lslgc-agreement-check-replacement",
+    "requiredVariantDimensions": {},
+    "templateSlug": "agreement_check_replacement",
+    "sourcePath": "C:/Users/Rovick/Downloads/LSLGC Calculator and Docs/Additional Agreement 1.23.23 - check replacement.docx",
+    "notes": "Confirmed already correct — the published body's structure, table, and merge fields already match the source's structure/wording; no change made."
+  },
+  {
+    "id": "lslgc-agreement-for-consolidation",
+    "family": "lslgc-agreement-for-consolidation",
+    "requiredVariantDimensions": {},
+    "templateSlug": "agreement_for_consolidation",
+    "sourcePath": "C:/Users/Rovick/Downloads/LSLGC Calculator and Docs/AGREEMENT FOR CONSOLIDATION.doc",
+    "notes": "Confirmed already correct — the published body's structure, clause ordering, repeated prior-loans block, and merge fields already match the source; no change made."
   }
 ]

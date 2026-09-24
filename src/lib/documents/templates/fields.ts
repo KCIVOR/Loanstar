@@ -227,9 +227,12 @@ export const FIELD_GROUPS: FieldGroup[] = [
       { key: "penaltyAmount", label: "Penalty / charges", sample: "1,742.82" },
       { key: "totalAmountDue", label: "Total amount due", sample: "36,599.22" },
       { key: "daysPastDue", label: "Days past due", sample: "45" },
+      { key: "monthsPastDue", label: "Months past due (Three (3))", sample: "Three (3)" },
       { key: "dueDate", label: "Due date", sample: "05/26/2026" },
       { key: "paymentDeadline", label: "Payment deadline", sample: "07/26/2026" },
       { key: "amountReleased", label: "Amount released", sample: "90,000.00" },
+      { key: "attentionName", label: "Demand letter — attention line name(s)", sample: "Mathieu Francis Marie Guillaume And Charo Mae Abadilla" },
+      { key: "attentionTitle", label: "Demand letter — attention line title", sample: "Pres" },
     ],
   },
   {
@@ -568,6 +571,8 @@ export const FIELD_FLAGS: MergeField[] = [
   { key: "isNonPdc", label: "Released without PDCs (cash path)", sample: "" },
   { key: "isQuarterly", label: "Quarterly amortization schedule (Vienovo)", sample: "true" },
   { key: "isEvery2Months", label: "Every-2-months amortization schedule (Vienovo)", sample: "" },
+  { key: "hasAddress", label: "Demand letter — recipient address block on file", sample: "true" },
+  { key: "hasAttentionLine", label: "Demand letter — addressed to a named officer (Attention line)", sample: "true" },
 ];
 
 /** Build the sample render context from the catalog (drives preview). */
@@ -650,6 +655,20 @@ export function buildSampleContext(): Record<string, unknown> {
       crNo: "123654",
       mvFileNo: "139-000000123456",
       registeredOwner: "Rene Dela Pena",
+    },
+    // Second item so any `data-repeat="vehicles"` fixture/test actually
+    // exercises the repeat (2 units), not a 1-item smoke test — see the
+    // Phase 4 vehicle-collateral fidelity fix
+    // (deed-of-chattel-mortgage-preview.ts et al.).
+    {
+      makeYearModel: "Honda Click 2018",
+      transmission: "Automatic",
+      engineNo: "9876543210ABCDE",
+      chassisNo: "MNPQRS7654321000",
+      plateNo: "ABC123",
+      crNo: "998877",
+      mvFileNo: "139-000000998877",
+      registeredOwner: "Juan Dela Cruz",
     },
   ];
   ctx.properties = [

@@ -109,6 +109,16 @@ th { font-weight: 700; background: var(--doc-th-bg); }
 table[data-plain] th, table[data-plain] td { border: none; padding: 1.5pt 5pt; }
 table[data-plain] th { background: none; }
 
+/* data-underline — a cell that fills in on a single bottom rule rather than a
+   ruled box (disclosure/legal forms that mirror a Word underline field). Works
+   inside a bordered or a data-plain table alike. First added for
+   disclosure_statement, whose source (SFCalculator/DISC.doc) enters every
+   figure on an underline, not in a boxed grid. */
+th[data-underline], td[data-underline],
+table[data-plain] th[data-underline], table[data-plain] td[data-underline] {
+  border: none; border-bottom: 0.5pt solid var(--doc-rule);
+}
+
 /* data-compact-nudge — compact-layout pass Phase 3 (docs/revision-plans/
    compact-document-layout-plan.md): a small per-document font-size trim for
    documents that were only spilling a few lines onto a 2nd page. Fixed value
