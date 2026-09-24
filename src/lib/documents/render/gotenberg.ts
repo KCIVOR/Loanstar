@@ -35,13 +35,16 @@ export type GotenbergOptions = {
   connection?: GotenbergConnection;
 };
 
-function baseUrl(conn?: GotenbergConnection): string {
+/** Exported for gotenberg-office.ts, which POSTs to a different Gotenberg
+ * route (LibreOffice conversion) but shares the same connection resolution,
+ * auth, retry, and error-shape conventions as the Chromium route below. */
+export function baseUrl(conn?: GotenbergConnection): string {
   const u = (conn?.url ?? process.env.GOTENBERG_URL ?? "").trim();
   if (!u) throw new RenderEngineError("GOTENBERG_URL is not configured");
   return u.replace(/\/+$/, "");
 }
 
-function authHeaders(conn?: GotenbergConnection): Record<string, string> {
+export function authHeaders(conn?: GotenbergConnection): Record<string, string> {
   const user = conn?.user ?? process.env.GOTENBERG_BASIC_AUTH_USER;
   const pass = conn?.pass ?? process.env.GOTENBERG_BASIC_AUTH_PASS;
   if (!user || !pass) return {};
@@ -51,7 +54,7 @@ function authHeaders(conn?: GotenbergConnection): Record<string, string> {
 }
 
 /** A copied, non-shared ArrayBuffer view — satisfies the `BlobPart` type. */
-function blobPart(u: Uint8Array): ArrayBuffer {
+export function blobPart(u: Uint8Array): ArrayBuffer {
   return u.buffer.slice(
     u.byteOffset,
     u.byteOffset + u.byteLength,
@@ -133,7 +136,7 @@ export async function htmlToPdfViaGotenberg(
 }
 
 /** Retry 5xx / network errors with capped exponential backoff. */
-async function fetchWithRetry(
+export async function fetchWithRetry(
   url: string,
   init: RequestInit,
   attempts = 3,

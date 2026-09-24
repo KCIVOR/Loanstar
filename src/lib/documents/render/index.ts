@@ -2,7 +2,9 @@ import { createHash } from "node:crypto";
 
 import { loadDocFonts } from "./doc-font";
 import type { DocRenderConnection } from "./engine-config";
+import { mergeDocxTemplate, DocxTemplateMergeError } from "./docx-merge";
 import { htmlToPdfViaGotenberg } from "./gotenberg";
+import { officeToPdfViaGotenberg } from "./gotenberg-office";
 import { buildBodyLetterhead, buildFooterHtml, getLogoAsset } from "./letterhead";
 import { getLogoDataUri } from "./logo-asset";
 import { mergeTemplate, type RenderContext } from "./merge";
@@ -12,6 +14,8 @@ export type { RenderContext } from "./merge";
 export { mergeTemplate } from "./merge";
 export { htmlToPdf } from "./pdf";
 export { htmlToPdfViaGotenberg, RenderEngineError } from "./gotenberg";
+export { officeToPdfViaGotenberg } from "./gotenberg-office";
+export { mergeDocxTemplate, DocxTemplateMergeError } from "./docx-merge";
 export { PRINT_CSS } from "./print-styles";
 // `loadDocRenderConfig` is intentionally NOT re-exported here: it pulls in the
 // Supabase service client (`next/headers`), which would poison this barrel for
@@ -65,6 +69,35 @@ export async function renderTemplateToPdf(
   return resolveEngine(opts?.engine) === "chromium"
     ? renderViaChromium(merged, opts?.connection)
     : htmlToPdf(merged);
+}
+
+/**
+ * Render a docx-format template (an uploaded .docx with {{field}} /
+ * {{#loop}}...{{/loop}} tags — same tag name reused for conditionals, see
+ * docx-merge.ts — inserted directly in Word) against a data context,
+ * producing a PDF. See the "Upload a Word file as template" plan.
+ *
+ * Sibling to renderTemplateToPdf, not a replacement: an html-format template
+ * still goes through mergeTemplate + Gotenberg's Chromium route; a
+ * docx-format template goes through mergeDocxTemplate (docxtemplater, fills
+ * tags directly in the Word XML — no HTML step, no schema ceiling) +
+ * Gotenberg's LibreOffice route (officeToPdfViaGotenberg). Same context
+ * shape as renderTemplateToPdf — buildReleaseTemplateContext's flat
+ * Record<string, unknown> needs no changes for either path.
+ */
+export async function renderDocxTemplateToPdf(
+  docxBytes: Buffer | Uint8Array,
+  context: RenderContext,
+  opts?: RenderTemplateOptions,
+): Promise<Uint8Array> {
+  // No `{{logoDataUri}}` injection here (unlike renderTemplateToPdf): that's
+  // an HTML-only convention for the editor's "Company logo" palette button.
+  // A docx template's logo is a static image already embedded in the source
+  // file, not inserted via a merge token.
+  const filled = mergeDocxTemplate(docxBytes, context);
+  return officeToPdfViaGotenberg(filled, {
+    ...(opts?.connection ? { connection: opts.connection } : {}),
+  });
 }
 
 /**

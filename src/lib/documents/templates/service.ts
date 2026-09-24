@@ -5,6 +5,12 @@ export type TemplateStatus = "draft" | "published" | "archived";
 /** Per-segment generation eligibility for `category = 'release'` templates. */
 export type DocGenerationEligibility = "always" | "optional" | "hidden";
 
+/** html: `body` is the merge-field HTML string (TipTap editor). docx:
+ * `docxStoragePath` points at an uploaded .docx filled via docxtemplater at
+ * render time — see docs plan "Upload a Word file as template". Exactly one
+ * of body/docxStoragePath is set per format (DB CHECK enforces this). */
+export type TemplateFormat = "html" | "docx";
+
 export type DocumentTemplate = {
   id: string;
   slug: string;
@@ -22,7 +28,9 @@ export type DocumentTemplateVersion = {
   id: string;
   templateId: string;
   versionNo: number;
-  body: string;
+  format: TemplateFormat;
+  body: string | null;
+  docxStoragePath: string | null;
   mergeFields: unknown;
   status: TemplateStatus;
   publishedAt: string | null;
@@ -47,7 +55,9 @@ type VersionRow = {
   id: string;
   template_id: string;
   version_no: number;
-  body: string;
+  format: TemplateFormat;
+  body: string | null;
+  docx_storage_path: string | null;
   merge_fields: unknown;
   status: TemplateStatus;
   published_at: string | null;
@@ -75,7 +85,9 @@ function mapVersion(row: VersionRow): DocumentTemplateVersion {
     id: row.id,
     templateId: row.template_id,
     versionNo: row.version_no,
+    format: row.format,
     body: row.body,
+    docxStoragePath: row.docx_storage_path,
     mergeFields: row.merge_fields,
     status: row.status,
     publishedAt: row.published_at,
@@ -87,7 +99,7 @@ function mapVersion(row: VersionRow): DocumentTemplateVersion {
 const TEMPLATE_COLS =
   "id, slug, name, description, category, is_active, seafarer_generation, sme_generation, created_at, updated_at";
 const VERSION_COLS =
-  "id, template_id, version_no, body, merge_fields, status, published_at, created_at, updated_at";
+  "id, template_id, version_no, format, body, docx_storage_path, merge_fields, status, published_at, created_at, updated_at";
 
 export async function listTemplates(
   supabase: SupabaseClient,
@@ -213,7 +225,11 @@ export async function getTemplateWithVersions(
 export async function getPublishedTemplate(
   supabase: SupabaseClient,
   slug: string,
-): Promise<{ versionId: string; body: string } | null> {
+): Promise<
+  | { versionId: string; format: "html"; body: string }
+  | { versionId: string; format: "docx"; docxStoragePath: string }
+  | null
+> {
   const { data: template, error } = await supabase
     .from("document_templates")
     .select("id, is_active")
@@ -224,17 +240,20 @@ export async function getPublishedTemplate(
 
   const { data: version, error: vError } = await supabase
     .from("document_template_versions")
-    .select("id, body")
+    .select("id, format, body, docx_storage_path")
     .eq("template_id", (template as { id: string }).id)
     .eq("status", "published")
     .maybeSingle();
   if (vError) throw new Error(vError.message);
   if (!version) return null;
 
-  return {
-    versionId: (version as { id: string }).id,
-    body: (version as { body: string }).body,
-  };
+  const row = version as Pick<VersionRow, "id" | "format" | "body" | "docx_storage_path">;
+  if (row.format === "docx") {
+    // The format='docx' CHECK constraint guarantees docx_storage_path is set
+    // whenever format is 'docx' — this branch can't observe a null path.
+    return { versionId: row.id, format: "docx", docxStoragePath: row.docx_storage_path as string };
+  }
+  return { versionId: row.id, format: "html", body: row.body as string };
 }
 
 export async function createTemplate(
@@ -315,7 +334,9 @@ export async function saveDraft(
     const { data, error } = await supabase
       .from("document_template_versions")
       .update({
+        format: "html",
         body: input.body,
+        docx_storage_path: null,
         merge_fields: input.mergeFields ?? [],
       })
       .eq("id", (existingDraft as VersionRow).id)
@@ -341,8 +362,83 @@ export async function saveDraft(
     .insert({
       template_id: templateId,
       version_no: nextVersionNo,
+      format: "html",
       body: input.body,
       merge_fields: input.mergeFields ?? [],
+      status: "draft",
+      created_by: actorId,
+    })
+    .select(VERSION_COLS)
+    .single();
+  if (error) throw new Error(error.message);
+  return mapVersion(data as VersionRow);
+}
+
+/**
+ * Save the working draft for a docx-format template. Mirrors saveDraft's
+ * single-draft-per-template semantics, but the file itself already lives in
+ * Storage (uploaded by the caller before this is called) — this just points
+ * the draft row at it. For a brand-new draft (no existing draft row), the
+ * caller must supply `newVersionId` (used both as the inserted row's `id`
+ * and as the storage path's version segment — see buildTemplateAssetPath —
+ * chosen by the caller upfront so the upload path is known before the row
+ * exists).
+ */
+export async function saveDocxDraft(
+  supabase: SupabaseClient,
+  templateId: string,
+  input: { docxStoragePath: string; newVersionId?: string },
+  actorId: string,
+): Promise<DocumentTemplateVersion> {
+  const { data: existingDraft, error: draftError } = await supabase
+    .from("document_template_versions")
+    .select(VERSION_COLS)
+    .eq("template_id", templateId)
+    .eq("status", "draft")
+    .maybeSingle();
+  if (draftError) throw new Error(draftError.message);
+
+  if (existingDraft) {
+    const { data, error } = await supabase
+      .from("document_template_versions")
+      .update({
+        format: "docx",
+        body: null,
+        docx_storage_path: input.docxStoragePath,
+        merge_fields: [],
+      })
+      .eq("id", (existingDraft as VersionRow).id)
+      .select(VERSION_COLS)
+      .single();
+    if (error) throw new Error(error.message);
+    return mapVersion(data as VersionRow);
+  }
+
+  if (!input.newVersionId) {
+    throw new Error("newVersionId is required when there is no existing draft");
+  }
+
+  const { data: maxRow, error: maxError } = await supabase
+    .from("document_template_versions")
+    .select("version_no")
+    .eq("template_id", templateId)
+    .order("version_no", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (maxError) throw new Error(maxError.message);
+
+  const nextVersionNo = ((maxRow as { version_no: number } | null)?.version_no ?? 0) + 1;
+
+  const { data, error } = await supabase
+    .from("document_template_versions")
+    .insert({
+      id: input.newVersionId,
+      template_id: templateId,
+      version_no: nextVersionNo,
+      format: "docx",
+      body: null,
+      docx_storage_path: input.docxStoragePath,
+      merge_fields: [],
       status: "draft",
       created_by: actorId,
     })

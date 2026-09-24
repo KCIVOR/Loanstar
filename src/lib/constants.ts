@@ -157,6 +157,10 @@ export type ApplicationStatus = (typeof APPLICATION_STATUSES)[number];
 
 export const DOCUMENT_BUCKET = "loan-documents";
 
+/** Uploaded docx-format document templates (admin-authored assets, not
+ * borrower PII — kept out of DOCUMENT_BUCKET on purpose). */
+export const DOCUMENT_TEMPLATE_ASSET_BUCKET = "document-template-assets";
+
 /** Document checklist stages across the loan lifecycle. */
 export const STAGES = [
   "intake",

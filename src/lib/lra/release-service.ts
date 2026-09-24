@@ -19,12 +19,13 @@ import { addScheduleMonths, advanceSemiMonthly } from "@/lib/computation/release
 import { DOCUMENT_BUCKET } from "@/lib/constants";
 import { getActiveComputation } from "@/lib/csa/computation";
 import { ensureDocumentSlots } from "@/lib/documents/checklist";
-import { hashPdf, renderTemplateToPdf } from "@/lib/documents/render";
+import { hashPdf, renderDocxTemplateToPdf, renderTemplateToPdf } from "@/lib/documents/render";
 import {
   loadDocRenderConfig,
   type ResolvedDocRenderConfig,
 } from "@/lib/documents/render/engine-config";
 import { uploadDocumentBytes } from "@/lib/documents/storage";
+import { downloadTemplateAssetBytes } from "@/lib/documents/template-storage";
 import { getPublishedTemplate } from "@/lib/documents/templates/service";
 import { createServiceClient } from "@/lib/supabase/server";
 
@@ -788,10 +789,22 @@ async function generateOneReleaseDocument(
     .eq("document_slug", slug)
     .maybeSingle();
 
-  const pdf = await renderTemplateToPdf(published.body, templateContext, {
-    engine: renderConfig.engine,
-    connection: renderConfig.connection,
-  });
+  // docx-format templates (an uploaded Word file with tags inserted directly
+  // in it, rendered via docxtemplater + Gotenberg's LibreOffice route — see
+  // docs plan "Upload a Word file as template") skip the HTML merge/Chromium
+  // path entirely; everything else about generation (hashing, storage,
+  // generated_documents bookkeeping below) is format-agnostic.
+  const pdf =
+    published.format === "docx"
+      ? await renderDocxTemplateToPdf(
+          await downloadTemplateAssetBytes(supabase, published.docxStoragePath),
+          templateContext,
+          { connection: renderConfig.connection },
+        )
+      : await renderTemplateToPdf(published.body, templateContext, {
+          engine: renderConfig.engine,
+          connection: renderConfig.connection,
+        });
   const templateVersionId = published.versionId;
 
   const contentHash = hashPdf(pdf);
