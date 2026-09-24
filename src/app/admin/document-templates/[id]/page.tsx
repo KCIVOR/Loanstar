@@ -67,7 +67,7 @@ export default function TemplateEditorPage() {
   const [saving, setSaving] = useState(false);
   const [publishing, setPublishing] = useState(false);
   const [savingMeta, setSavingMeta] = useState(false);
-  const [newTemplateFormat, setNewTemplateFormat] = useState<TemplateFormat>("html");
+  const [newTemplateFormat, setNewTemplateFormat] = useState<TemplateFormat | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -92,11 +92,17 @@ export default function TemplateEditorPage() {
   const draft = versions.find((v) => v.status === "draft") ?? null;
   const published = versions.find((v) => v.status === "published") ?? null;
   const editorInitial = draft?.body ?? published?.body ?? STARTER_BODY;
-  // A version's own format wins once one exists (locked in by the DB CHECK
-  // constraint too — a draft can't silently switch format underneath an
-  // admin). Only a brand-new template with no versions yet gets to choose.
-  const existingFormat = draft?.format ?? published?.format ?? null;
-  const effectiveFormat = existingFormat ?? newTemplateFormat;
+  // Only a DRAFT's own format is actually locked (the DB immutability
+  // trigger only freezes format/body/docx_storage_path once a version
+  // leaves 'draft' — a draft row itself can freely switch between them, and
+  // saveDraft/saveDocxDraft both reset the other field to null when it
+  // does). A published HTML version does NOT lock out starting a new docx
+  // draft — that's exactly how an existing HTML template (e.g. blri) is
+  // meant to move onto the upload flow. Defaults to whatever's currently
+  // published, so leaving the toggle alone keeps editing in the same format.
+  const lockedFormat = draft?.format ?? null;
+  const defaultFormat: TemplateFormat = published?.format ?? "html";
+  const effectiveFormat = lockedFormat ?? newTemplateFormat ?? defaultFormat;
   const currentDocxVersion = draft?.format === "docx" ? draft : published?.format === "docx" ? published : null;
 
   async function handleSaveDraft(body: string) {
@@ -267,17 +273,23 @@ export default function TemplateEditorPage() {
         </div>
       ) : null}
 
-      {existingFormat === null ? (
+      {lockedFormat === null ? (
         <div className="mb-3 flex items-center gap-3">
           <span className="text-sm text-ink-600">Template source:</span>
           <SegmentedControl
-            value={newTemplateFormat}
+            value={effectiveFormat}
             onChange={(v) => setNewTemplateFormat(v as TemplateFormat)}
             options={[
               { value: "html", label: "HTML editor" },
               { value: "docx", label: "Upload a Word file" },
             ]}
           />
+          {published ? (
+            <span className="text-xs text-ink-400">
+              Live version is currently {published.format === "docx" ? ".docx" : "HTML"} —
+              switching here only affects the next draft.
+            </span>
+          ) : null}
         </div>
       ) : null}
 
