@@ -13,6 +13,7 @@ import {
   type OriginationDiscount,
 } from "@/lib/csa/computation";
 import type { InputMode, OtherDeductions } from "@/lib/computation/types";
+import { notifyWorkflowEvent } from "@/lib/notifications/workflow-events";
 import { createServiceClient } from "@/lib/supabase/server";
 
 export type NegotiationRecord = {
@@ -116,6 +117,14 @@ export async function postNegotiationMessage(
   if (error) {
     throw new Error(error.message);
   }
+
+  await notifyWorkflowEvent(
+    authorRole === "borrower"
+      ? "negotiation_message_from_borrower"
+      : "negotiation_message_from_committee",
+    applicationId,
+    { actorId: authorId },
+  );
 
   return mapNegotiationMessageRow(data);
 }
@@ -259,6 +268,8 @@ export async function discloseTerms(
     note: statusNote,
   });
 
+  await notifyWorkflowEvent("terms_disclosed", applicationId, { actorId });
+
   return getNegotiation(supabase, applicationId);
 }
 
@@ -310,6 +321,11 @@ export async function recordCounterOffer(
   if (counterBy === "borrower") {
     await logOfferMessage(supabase, applicationId, actorId, "borrower", amount, message);
   }
+
+  await notifyWorkflowEvent("borrower_counter_offer", applicationId, {
+    actorId,
+    detail: `Proposed amount: ₱${amount.toFixed(2)}.`,
+  });
 
   return getNegotiation(supabase, applicationId);
 }
@@ -610,6 +626,8 @@ export async function committeeOverrideAmount(
     message,
   );
 
+  await notifyWorkflowEvent("committee_amount_revised", applicationId, { actorId });
+
   return saved;
 }
 
@@ -672,6 +690,8 @@ export async function queueForLra(
     actorId,
     note,
   });
+
+  await notifyWorkflowEvent("queued_for_lra", applicationId, { actorId });
 }
 
 /**
@@ -844,6 +864,8 @@ export async function committeeAcceptCounterOffer(
     `Committee accepted borrower's counter-offer (₱${saved.computation.netReleased.toFixed(2)}) — queued for LRA, no separate borrower signature`,
   );
 
+  await notifyWorkflowEvent("counter_offer_accepted", applicationId, { actorId });
+
   return saved;
 }
 
@@ -884,6 +906,10 @@ export async function completeRevision(
   await appendStatusHistory(supabase, applicationId, "for_approval", {
     actorId,
     note: "Revision complete — returned to Committee",
+  });
+
+  await notifyWorkflowEvent("revision_completed_for_committee", applicationId, {
+    actorId,
   });
 
   return { status: "for_approval" };

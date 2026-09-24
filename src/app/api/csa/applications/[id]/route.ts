@@ -10,6 +10,11 @@ import {
   getEndorseReadiness,
   isCsaEditableStatus,
 } from "@/lib/csa/application";
+import {
+  isEligibleAgent,
+  listEligibleAgents,
+  resolveAssignedAgentName,
+} from "@/lib/csa/agent-assignment";
 import { getActiveComputation, getSmeRateHistory } from "@/lib/csa/computation";
 import {
   borrowerProfileToRow,
@@ -21,7 +26,7 @@ import { getStageChecklist } from "@/lib/documents/checklist";
 import {
   requireModulePermission,
 } from "@/lib/permissions/server";
-import { createClient } from "@/lib/supabase/server";
+import { createClient, createServiceClient } from "@/lib/supabase/server";
 
 type RouteParams = { params: Promise<{ id: string }> };
 
@@ -58,6 +63,10 @@ const patchSchema = z.object({
       staffNotes: z.string().nullable().optional(),
     })
     .optional(),
+  /** Omitted = unchanged; explicit null clears the assignment. Validated
+   * against the live eligible-agent list before persisting — see
+   * src/lib/csa/agent-assignment.ts. */
+  agentUserId: z.string().uuid().nullable().optional(),
 });
 
 export async function GET(_request: Request, { params }: RouteParams) {
@@ -115,6 +124,20 @@ export async function GET(_request: Request, { params }: RouteParams) {
         (interviewProfile?.full_name as string | null | undefined) ?? null;
     }
 
+    // profiles/user_roles/roles RLS only lets auth_admin/super_admin read
+    // other users' rows, so the eligible-agent list and the assigned name
+    // both require a service client — see src/lib/csa/agent-assignment.ts.
+    // Read-only; the caller is already gated by requireModulePermission
+    // above.
+    const serviceClient = createServiceClient();
+    const [eligibleAgents, assignedAgentName] = await Promise.all([
+      listEligibleAgents(serviceClient),
+      resolveAssignedAgentName(
+        serviceClient,
+        application.agent_user_id as string | null,
+      ),
+    ]);
+
     return jsonOk({
       application: {
         id: application.id,
@@ -154,6 +177,8 @@ export async function GET(_request: Request, { params }: RouteParams) {
             ? application.payment_schedule
             : "monthly",
         isReloan: application.is_reloan,
+        agentUserId: (application.agent_user_id as string | null) ?? null,
+        assignedAgentName,
         endorsedAt: application.endorsed_at,
         privacyOrientationAt:
           (application.privacy_orientation_at as string | null) ?? null,
@@ -179,6 +204,7 @@ export async function GET(_request: Request, { params }: RouteParams) {
             staffNotes: details.staff_notes,
           }
         : null,
+      eligibleAgents,
       checklist,
       computation,
       rateHistory,
@@ -249,13 +275,58 @@ export async function PATCH(request: Request, { params }: RouteParams) {
       }
     }
 
+    const previousAgentUserId =
+      (application.agent_user_id as string | null) ?? null;
+
+    if (body.agentUserId !== undefined) {
+      // A dropdown value is never authority: re-validate the candidate
+      // against the live eligible-agent list right before writing. This is
+      // the check that matters — the Phase 2A DB trigger is a backstop
+      // against bypassing this route, not a substitute for it.
+      if (body.agentUserId !== null) {
+        const eligible = await isEligibleAgent(
+          createServiceClient(),
+          body.agentUserId,
+        );
+        if (!eligible) {
+          return NextResponse.json(
+            { error: "Selected agent is not an active agent" },
+            { status: 400 },
+          );
+        }
+      }
+
+      // Goes through the normal authenticated client so the existing
+      // applications_update RLS policy (status guard, intake:edit) still
+      // applies — never bypassed with the service client here. The Phase 2A
+      // trigger separately re-checks the actor for this specific column.
+      const { error: agentError } = await supabase
+        .from("loan_applications")
+        .update({ agent_user_id: body.agentUserId })
+        .eq("id", id);
+
+      if (agentError) {
+        throw new Error(agentError.message);
+      }
+    }
+
     await writeAuditEvent({
       actorId: user.id,
       moduleSlug: "intake",
       action: "update",
       entityType: "loan_application",
       entityId: id,
-      afterData: body,
+      afterData: {
+        ...body,
+        ...(body.agentUserId !== undefined
+          ? {
+              agentAssignment: {
+                before: previousAgentUserId,
+                after: body.agentUserId,
+              },
+            }
+          : {}),
+      },
     });
 
     return jsonOk({ success: true });

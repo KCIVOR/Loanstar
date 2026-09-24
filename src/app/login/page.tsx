@@ -24,6 +24,16 @@ function safeRedirectPath(raw: string | null): string | null {
   return null;
 }
 
+function authErrorMessage(error: { message: string; code?: string }): string {
+  // GoTrue's raw "User is banned" text leaks internal terminology for what
+  // is, from the account's perspective, a suspension by an admin — show the
+  // wording we actually use elsewhere in the product instead.
+  if (error.code === "user_banned") {
+    return "This account has been suspended. Contact your administrator.";
+  }
+  return error.message;
+}
+
 const SEED_ACCOUNTS = [
   { label: "Super Admin", email: "super_admin@loanstar.local" },
   { label: "Agent", email: "agent@loanstar.local" },
@@ -157,7 +167,7 @@ function LoginForm() {
     });
 
     if (signInError) {
-      setError(signInError.message);
+      setError(authErrorMessage(signInError));
       setLoading(false);
       return;
     }

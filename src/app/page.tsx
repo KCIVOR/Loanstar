@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { LoanStarLogo } from "@/components/ui";
+import { fetchActiveProfile, isActiveProfile } from "@/lib/permissions/active-profile";
 import { createClient } from "@/lib/supabase/server";
 
 function CheckIcon() {
@@ -27,7 +28,14 @@ export default async function HomePage() {
   } = await supabase.auth.getUser();
 
   if (user) {
-    redirect("/dashboard");
+    // Deactivated users must not be bounced into the dashboard just because
+    // their (still valid) Auth token says they're signed in — go through
+    // the same active-profile gate requireAuth() uses, so they fall through
+    // to the public landing page instead.
+    const profile = await fetchActiveProfile(supabase, user.id);
+    if (isActiveProfile(profile)) {
+      redirect("/dashboard");
+    }
   }
 
   return (

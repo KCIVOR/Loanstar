@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { appendStatusHistory } from "@/lib/applications/status";
+import { notifyWorkflowEvent } from "@/lib/notifications/workflow-events";
 import { writeAuditEvent } from "@/lib/audit/writer";
 import { handleApiError, jsonOk } from "@/lib/api/handler";
 import {
@@ -83,6 +84,10 @@ export async function POST(_request: Request, { params }: RouteParams) {
       entityId: application.id,
       beforeData: { status: "draft" },
       afterData: { status: "documents_pending" },
+    });
+
+    await notifyWorkflowEvent("application_submitted_by_borrower", application.id, {
+      actorId: user.id,
     });
 
     return jsonOk({ id: application.id, status: "documents_pending" });

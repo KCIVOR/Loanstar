@@ -87,6 +87,8 @@ type ApplicationWorkspace = {
       | "quarterly_special"
       | "two_monthly_special";
     isReloan: boolean;
+    agentUserId: string | null;
+    assignedAgentName: string | null;
     createdAt: string;
     updatedAt: string;
     privacyOrientationAt: string | null;
@@ -98,6 +100,7 @@ type ApplicationWorkspace = {
     initialInterviewByName: string | null;
   };
   borrower: BorrowerProfile | null;
+  eligibleAgents: Array<{ id: string; fullName: string }>;
   details: { loanTypeId: string | null } | null;
   checklist: ChecklistItem[];
   computation: {
@@ -279,6 +282,7 @@ export default function CsaApplicationPage() {
   const [error, setError] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [savingAgent, setSavingAgent] = useState(false);
   const [witnessSigning, setWitnessSigning] = useState(false);
   const [showApplicationForm, setShowApplicationForm] = useState(false);
   const [confirmOrientation, setConfirmOrientation] = useState(false);
@@ -404,6 +408,27 @@ export default function CsaApplicationPage() {
       setActionError(err instanceof Error ? err.message : "Save failed");
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function handleSaveAgent(nextAgentUserId: string | null) {
+    setSavingAgent(true);
+    setActionError(null);
+    try {
+      const res = await fetch(`/api/csa/applications/${applicationId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ agentUserId: nextAgentUserId }),
+      });
+      if (!res.ok) {
+        const body = (await res.json()) as { error?: string };
+        throw new Error(body.error ?? "Save failed");
+      }
+      await load({ silent: true });
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : "Save failed");
+    } finally {
+      setSavingAgent(false);
     }
   }
 
@@ -941,6 +966,12 @@ export default function CsaApplicationPage() {
                 scanned Credit Application Form. Borrower can also complete
                 this themselves from their own portal.
               </p>
+              <p className="mt-1 text-sm text-ink-500">
+                Agent:{" "}
+                <span className="font-medium text-navy-900">
+                  {data.application.assignedAgentName ?? "Unassigned"}
+                </span>
+              </p>
             </div>
             <Button
               type="button"
@@ -977,6 +1008,14 @@ export default function CsaApplicationPage() {
                 segment={data.application.segment ?? "seafarer"}
                 entityType={data.application.entityType ?? null}
                 onChange={(borrower) => setData({ ...data, borrower })}
+                agent={{
+                  value: data.application.agentUserId,
+                  displayName: data.application.assignedAgentName,
+                  options: data.eligibleAgents,
+                  editable,
+                  saving: savingAgent,
+                  onChange: (next) => void handleSaveAgent(next),
+                }}
               />
             </div>
           </Modal>

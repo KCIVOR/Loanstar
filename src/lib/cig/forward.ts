@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { appendStatusHistory } from "@/lib/applications/status";
+import { notifyWorkflowEvent } from "@/lib/notifications/workflow-events";
 import { notifyBorrowerForApplication } from "@/lib/notifications/write";
 
 import type { FieldVisit, SmeReloanVerification } from "./field-visit";
@@ -100,6 +101,10 @@ export async function forwardToCommittee(
   await appendStatusHistory(supabase, applicationId, "for_approval", {
     actorId,
     note: "CI report submitted — forwarded to Committee",
+  });
+
+  await notifyWorkflowEvent("application_forwarded_to_committee", applicationId, {
+    actorId,
   });
 
   void notifyBorrowerForApplication(applicationId, {

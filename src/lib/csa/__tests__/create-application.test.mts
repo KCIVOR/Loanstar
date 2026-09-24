@@ -1,7 +1,10 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
-import { createApplicationSchema } from "../create-application";
+import {
+  buildApplicationInsertRow,
+  createApplicationSchema,
+} from "../create-application";
 
 const base = {
   email: "borrower@example.com",
@@ -244,5 +247,43 @@ describe("createApplicationSchema collateral locks paymentSchedule to monthly (2
       paymentSchedule: "quarterly",
     });
     assert.equal(parsed.paymentSchedule, "quarterly");
+  });
+});
+
+describe("buildApplicationInsertRow agent_user_id (agent-assignment plan, Phase 0/1)", () => {
+  const parsedBody = createApplicationSchema.parse(base);
+
+  it("omits agent_user_id when options is not supplied", () => {
+    const row = buildApplicationInsertRow(parsedBody, "borrower-1", "actor-1");
+    assert.equal("agent_user_id" in row, false);
+  });
+
+  it("omits agent_user_id when options.agentUserId is undefined", () => {
+    const row = buildApplicationInsertRow(parsedBody, "borrower-1", "actor-1", {});
+    assert.equal("agent_user_id" in row, false);
+  });
+
+  it("includes agent_user_id when an explicit UUID is supplied", () => {
+    const row = buildApplicationInsertRow(parsedBody, "borrower-1", "actor-1", {
+      agentUserId: "agent-uuid",
+    });
+    assert.equal(row.agent_user_id, "agent-uuid");
+  });
+
+  it("persists an explicit null distinctly from omitted", () => {
+    const row = buildApplicationInsertRow(parsedBody, "borrower-1", "actor-1", {
+      agentUserId: null,
+    });
+    assert.equal("agent_user_id" in row, true);
+    assert.equal(row.agent_user_id, null);
+  });
+
+  it("still sets the other required insert fields", () => {
+    const row = buildApplicationInsertRow(parsedBody, "borrower-1", "actor-1", {
+      agentUserId: "agent-uuid",
+    });
+    assert.equal(row.borrower_id, "borrower-1");
+    assert.equal(row.status, "submitted");
+    assert.equal(row.segment, "seafarer");
   });
 });

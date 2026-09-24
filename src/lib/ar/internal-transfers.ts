@@ -3,6 +3,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 export type InternalTransferListItem = {
   id: string;
   sourceLoanApplicationId: string;
+  sourceMasterlistId: string | null;
   sourceApplicationNo: string | null;
   sourceLoanAccountNo: string | null;
   targetMasterlistId: string;
@@ -29,7 +30,7 @@ export async function listPendingInternalTransfers(
     .from("internal_transfers")
     .select(
       `
-      id, source_loan_application_id, target_masterlist_id, transfer_type,
+       id, source_loan_application_id, source_masterlist_id, target_masterlist_id, transfer_type,
       months, amount, discount_amount, discounted_installment_nos, created_at,
       source_application:loan_applications!internal_transfers_source_loan_application_id_fkey ( application_no ),
       source_masterlist:masterlist!internal_transfers_source_masterlist_id_fkey ( loan_account_no ),
@@ -55,6 +56,7 @@ export async function listPendingInternalTransfers(
     return {
       id: row.id as string,
       sourceLoanApplicationId: row.source_loan_application_id as string,
+      sourceMasterlistId: (row.source_masterlist_id as string | null) ?? null,
       sourceApplicationNo: (sourceApp?.application_no as string | null) ?? null,
       sourceLoanAccountNo: (sourceMl?.loan_account_no as string | null) ?? null,
       targetMasterlistId: row.target_masterlist_id as string,

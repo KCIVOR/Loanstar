@@ -7,6 +7,16 @@ import { handleApiError, jsonOk } from "@/lib/api/handler";
 import { getRequestIp } from "@/lib/permissions/server";
 import { createServiceClient } from "@/lib/supabase/server";
 
+/**
+ * Marker for the second place a duplicate registration email surfaces (see
+ * the comment at its throw site below). Kept local to this route rather than
+ * added to the shared error types in @/lib/api/errors — it exists purely to
+ * carry the borrower-insert rollback through the existing try/catch before
+ * being translated to the same friendly response the auth-level duplicate
+ * case below already returns.
+ */
+class DuplicateEmailError extends Error {}
+
 const addressSchema = z.object({
   street: z.string().optional(),
   barangay: z.string().optional(),
@@ -149,6 +159,18 @@ export async function POST(request: Request) {
         .single();
 
       if (borrowerError || !created) {
+        // Supabase Auth deliberately doesn't error signUp() for an email that
+        // already has an unconfirmed account (anti-enumeration behavior) — it
+        // silently re-sends the confirmation email instead. That leaves this
+        // insert as the second place a duplicate email surfaces, via the
+        // borrowers table's own unique constraint. Without this check, the
+        // raw Postgres message ("duplicate key value violates unique
+        // constraint \"borrowers_email_key\"") reaches the registration
+        // form verbatim — same user-facing bug the auth branch above
+        // already guards against, just from the other insert.
+        if (borrowerError?.code === "23505") {
+          throw new DuplicateEmailError();
+        }
         throw new Error(
           borrowerError?.message ?? "Failed to create borrower profile",
         );
@@ -209,6 +231,12 @@ export async function POST(request: Request) {
   } catch (error) {
     if (error instanceof z.ZodError) {
       return NextResponse.json({ error: error.message }, { status: 400 });
+    }
+    if (error instanceof DuplicateEmailError) {
+      return NextResponse.json(
+        { error: "An account with this email already exists." },
+        { status: 409 },
+      );
     }
     return handleApiError(error);
   }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { RepeatingRows } from "@/components/borrowers/RepeatingRows";
 import { Button, Card, Checkbox, FacebookLinkField, Input, Label, PhoneInput, Select } from "@/components/ui";
 import type {
@@ -289,6 +289,106 @@ function computeAge(dateOfBirth: string | null): string {
 }
 
 /**
+ * Type-to-search agent picker — same search-then-pick pattern as
+ * `ConnectBorrowerAccountPanel`'s borrower lookup, but filters the already-
+ * loaded `options` list client-side instead of hitting a search endpoint
+ * (the eligible-agent roster is small and already fetched in full by the
+ * caller's GET route, so a round trip per keystroke would be unnecessary).
+ */
+function AgentPicker({
+  id,
+  value,
+  displayName,
+  options,
+  disabled = false,
+  onChange,
+}: {
+  id?: string;
+  value: string | null;
+  displayName?: string | null;
+  options: Array<{ id: string; fullName: string }>;
+  disabled?: boolean;
+  onChange?: (nextAgentUserId: string | null) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState("");
+  const containerRef = useRef<HTMLDivElement>(null);
+  const selected = options.find((o) => o.id === value) ?? null;
+
+  useEffect(() => {
+    if (!open) return;
+    function handleClickOutside(e: MouseEvent) {
+      if (
+        containerRef.current &&
+        !containerRef.current.contains(e.target as Node)
+      ) {
+        setOpen(false);
+        setQuery("");
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [open]);
+
+  const filtered = query.trim()
+    ? options.filter((o) =>
+        o.fullName.toLowerCase().includes(query.trim().toLowerCase()),
+      )
+    : options;
+
+  function pick(next: string | null) {
+    onChange?.(next);
+    setOpen(false);
+    setQuery("");
+  }
+
+  return (
+    <div ref={containerRef} className="relative">
+      <Input
+        id={id}
+        placeholder="Search agent…"
+        value={open ? query : (selected?.fullName ?? displayName ?? "")}
+        disabled={disabled}
+        onFocus={() => {
+          setOpen(true);
+          setQuery("");
+        }}
+        onChange={(e) => setQuery(e.target.value)}
+      />
+      {open ? (
+        <div className="absolute z-10 mt-1 max-h-56 w-full overflow-y-auto rounded-[var(--r-md)] border border-line-soft bg-white shadow-md">
+          <button
+            type="button"
+            className="block w-full px-3 py-2 text-left text-sm hover:bg-ink-50"
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={() => pick(null)}
+          >
+            Unassigned
+          </button>
+          {filtered.length === 0 ? (
+            <p className="px-3 py-2 text-sm text-ink-400">
+              No matching agents.
+            </p>
+          ) : (
+            filtered.map((option) => (
+              <button
+                key={option.id}
+                type="button"
+                className="block w-full px-3 py-2 text-left text-sm hover:bg-ink-50"
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={() => pick(option.id)}
+              >
+                {option.fullName}
+              </button>
+            ))
+          )}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+/**
  * Digital fields matching the Credit Application Form section-by-section and
  * field-by-field (docs/documents/seafarer_application_form.jpeg) — shared by
  * the borrower portal and the CSA intake page so both write the same shape
@@ -303,6 +403,7 @@ export function ApplicantProfileFields({
   readOnly = false,
   segment = "seafarer",
   entityType = null,
+  agent,
 }: {
   profile: BorrowerProfile;
   onChange?: (profile: BorrowerProfile) => void;
@@ -314,6 +415,24 @@ export function ApplicantProfileFields({
    * matches SME Individual (not SME Corporate) on screen. */
   segment?: "seafarer" | "sme" | "individual";
   entityType?: "individual" | "corporate" | null;
+  /** The relational staff Agent assignment (`loan_applications.agent_user_id`),
+   * shown at the top of the form alongside the legacy free-text Sales Agent
+   * field. Omit this prop entirely to render nothing (existing read-only
+   * consumers — CIG, Committee, LRA, Collector, borrower self-view — are
+   * unaffected until they're wired to pass a resolved display name too). */
+  agent?: {
+    /** Currently assigned agent's UUID, or null if unassigned. */
+    value: string | null;
+    /** Resolved display name for read-only rendering (editable=false) or
+     * while `editable` is true but the caller hasn't loaded options yet. */
+    displayName?: string | null;
+    /** Eligible active agents for the dropdown. Only needed when editable. */
+    options?: Array<{ id: string; fullName: string }>;
+    /** Staff can change the assignment here; false renders a read-only value. */
+    editable?: boolean;
+    saving?: boolean;
+    onChange?: (nextAgentUserId: string | null) => void;
+  };
 }) {
   const onChange = (next: BorrowerProfile) => {
     if (readOnly || !onChangeProp) return;
@@ -376,6 +495,28 @@ export function ApplicantProfileFields({
       disabled={readOnly}
       className="m-0 min-w-0 space-y-6 border-0 p-0"
     >
+      {agent ? (
+        <Card>
+          <Label htmlFor="agentUserId">Agent</Label>
+          {agent.editable ? (
+            <div className="max-w-xs">
+              <AgentPicker
+                id="agentUserId"
+                value={agent.value}
+                displayName={agent.displayName}
+                options={agent.options ?? []}
+                disabled={agent.saving}
+                onChange={agent.onChange}
+              />
+            </div>
+          ) : (
+            <p className="text-sm text-ink-700">
+              {agent.displayName ?? "Unassigned"}
+            </p>
+          )}
+        </Card>
+      ) : null}
+
       {isSme ? (
         <>
       <Card>

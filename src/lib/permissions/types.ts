@@ -28,6 +28,8 @@ export type UserPermissions = {
   isSuperAdmin: boolean;
   modules: ModulePermission[];
   fieldRules: Partial<Record<ModuleSlug, FieldRule>>;
+  /** Slugs of the user's currently active roles (e.g. "agent", "csa"). */
+  roleSlugs: string[];
 };
 
 /** Shape returned by /api/permissions/me — permissions plus the caller's own

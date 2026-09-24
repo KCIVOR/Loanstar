@@ -2,8 +2,10 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { assertCoBorrowerRequirementAllowed } from "@/lib/applications/co-borrower";
 import { appendStatusHistory } from "@/lib/applications/status";
+import { ValidationError } from "@/lib/api/errors";
 import { writeAuditEvent } from "@/lib/audit/writer";
 import { discloseTerms, witnessSignComputation } from "@/lib/negotiation/service";
+import { notifyWorkflowEvent } from "@/lib/notifications/workflow-events";
 import { notifyBorrowerForApplication } from "@/lib/notifications/write";
 
 import { getCommitteeSize } from "./committee-size";
@@ -13,7 +15,7 @@ import {
   type VoteRecord,
 } from "./votes";
 
-export type FinalAction = "approve" | "deny" | "revisit" | "hold";
+export type FinalAction = "approve" | "deny" | "revisit" | "hold" | "clear_hold";
 
 const COMMITTEE_DECISION_STATUSES = ["for_approval", "committee_hold"] as const;
 
@@ -26,6 +28,22 @@ export function assertFinalActionPreconditions(
     !(COMMITTEE_DECISION_STATUSES as readonly string[]).includes(status)
   ) {
     throw new Error("Application is not pending committee decision");
+  }
+
+  // Clearing a hold only re-queues the file for committee review — it never
+  // re-decides it — so it is validated and returns early here rather than
+  // falling through to the approve/deny/revisit/hold checks below. Reason
+  // validation errors map to 400 (ValidationError), unlike the plain Errors
+  // used by the pre-existing checks further down, which this task leaves
+  // untouched.
+  if (action === "clear_hold") {
+    if (status !== "committee_hold") {
+      throw new ValidationError("Application is not on committee hold");
+    }
+    if (!options?.comment?.trim()) {
+      throw new ValidationError("A reason is required to clear a committee hold");
+    }
+    return;
   }
 
   if (action === "hold" && status === "committee_hold") {
@@ -55,6 +73,8 @@ export function resolveFinalActionStatus(action: FinalAction): string {
       return "for_revision";
     case "hold":
       return "committee_hold";
+    case "clear_hold":
+      return "for_approval";
     default: {
       const _exhaustive: never = action;
       throw new Error(`Invalid action: ${_exhaustive}`);
@@ -180,7 +200,16 @@ export async function executeFinalAction(
   const committeeSize = await getCommitteeSize(
     application.segment as string | null,
   );
-  assertAllVotesCast(votes, committeeSize);
+  // clear_hold re-queues the application rather than re-deciding it — the
+  // next approve/deny/revisit/hold from for_approval re-checks votes anyway.
+  // Skipping this here also avoids permanently stranding an application
+  // whose committee size grew while it sat on committee_hold, since there is
+  // no way to cast a missing vote from that status (committee_votes_insert
+  // RLS only allows new rows while status = 'for_approval'). See the plan's
+  // Open Questions section.
+  if (action !== "clear_hold") {
+    assertAllVotesCast(votes, committeeSize);
+  }
   const tally = computeVoteTally(votes, committeeSize);
 
   // Co-Borrower feature: write the advisory flag now — after the vote check
@@ -312,6 +341,26 @@ export async function executeFinalAction(
         : {}),
     },
   });
+
+  // Staff who act next: CSA discloses approved terms; CIG makes the denial
+  // call; a revisit goes to whichever team it was routed to.
+  if (action === "approve") {
+    await notifyWorkflowEvent("committee_approved_disclose_terms", applicationId, {
+      actorId,
+    });
+  } else if (action === "deny") {
+    await notifyWorkflowEvent("committee_denied_call_needed", applicationId, {
+      actorId,
+    });
+  } else if (action === "revisit" && options?.revisitRoute) {
+    await notifyWorkflowEvent(
+      options.revisitRoute === "cig"
+        ? "committee_revisit_cig"
+        : "committee_revisit_csa",
+      applicationId,
+      { actorId, detail: options.comment ? `Reason: ${options.comment}` : undefined },
+    );
+  }
 
   if (action === "approve") {
     void notifyBorrowerForApplication(applicationId, {

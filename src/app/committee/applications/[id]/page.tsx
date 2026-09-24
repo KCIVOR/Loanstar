@@ -61,10 +61,12 @@ import type {
 import {
   RESIDENCE_TYPES,
   assessFieldVisitRequired,
+  assessIndividualFieldVisitRequired,
   assessSmeReloanRequired,
   type FieldVisit,
   type SmeReloanVerification,
 } from "@/lib/cig/field-visit";
+import { individualCiKind } from "@/lib/cig/individual-ci";
 import {
   assessCmInspectionRequired,
   assessRemInspectionRequired,
@@ -105,6 +107,7 @@ type CommitteeDetail = {
     committeeSize: number;
     canOverride: boolean;
     canAdjustPreDecision: boolean;
+    assignedAgentName: string | null;
   };
   borrower: BorrowerProfile | null;
   verification: {
@@ -427,6 +430,14 @@ export default function CommitteeApplicationPage() {
   const [confirmAction, setConfirmAction] = useState<
     "approve" | "deny" | "hold" | null
   >(null);
+  // Clear-hold control (UAT committee hold clear): kept independent of the
+  // approve/deny/hold confirm dialog and its `decisionComment` state so it
+  // can render outside the canDecide-gated "Final action" card below — a
+  // committee-size change while on hold must never hide this control (see
+  // the plan's Open Questions section on the vote-count stranding risk).
+  const [confirmClearHold, setConfirmClearHold] = useState(false);
+  const [clearHoldReason, setClearHoldReason] = useState("");
+  const [clearingHold, setClearingHold] = useState(false);
   const [confirmApproveWithoutSign, setConfirmApproveWithoutSign] =
     useState(false);
   const [approvingWithoutSign, setApprovingWithoutSign] = useState(false);
@@ -542,6 +553,36 @@ export default function CommitteeApplicationPage() {
       setError(err instanceof Error ? err.message : "Action failed");
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function handleClearHold() {
+    if (!clearHoldReason.trim()) return;
+    setClearingHold(true);
+    setMessage(null);
+    setError(null);
+    try {
+      const res = await fetch(
+        `/api/committee/applications/${applicationId}/action`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            action: "clear_hold",
+            comment: clearHoldReason,
+          }),
+        },
+      );
+      const body = (await res.json()) as { error?: string; status?: string };
+      if (!res.ok) throw new Error(body.error ?? "Clear hold failed");
+      setMessage("Hold cleared — returned to committee review.");
+      setClearHoldReason("");
+      setConfirmClearHold(false);
+      await load({ silent: true });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Clear hold failed");
+    } finally {
+      setClearingHold(false);
     }
   }
 
@@ -689,6 +730,11 @@ export default function CommitteeApplicationPage() {
         : null;
   const isSme = data.application.segment === "sme";
   const isIndividual = data.application.segment === "individual";
+  // Individual switched from the CI & References Form to the Field Visit form
+  // (2026-09-22), but 18 pre-switch files hold only PIC/reference data. Decide
+  // by what data the file actually holds, never by segment alone.
+  const individualUsesFieldVisit =
+    isIndividual && individualCiKind(data.verification) === "field_visit";
 
   return (
     <div>
@@ -964,12 +1010,17 @@ export default function CommitteeApplicationPage() {
           onClose={() => setShowApplicationForm(false)}
           className="!max-w-4xl"
         >
-          <div className="max-h-[65vh] overflow-y-auto pr-1">
+          <div className="pr-1 pb-4">
             <ApplicantProfileFields
               profile={data.borrower}
               segment={data.application.segment}
               entityType={data.application.entityType}
               readOnly
+              agent={{
+                value: null,
+                displayName: data.application.assignedAgentName,
+                editable: false,
+              }}
             />
           </div>
         </Modal>
@@ -1038,7 +1089,33 @@ export default function CommitteeApplicationPage() {
               </p>
             </div>
             <div className="flex flex-wrap items-center gap-2">
-              {data.application.segment !== "sme" ? (
+              {individualUsesFieldVisit ? (
+                <>
+                  <Badge
+                    variant={
+                      assessIndividualFieldVisitRequired(
+                        data.verification.fieldVisit,
+                      ).complete
+                        ? "success"
+                        : "warning"
+                    }
+                  >
+                    {assessIndividualFieldVisitRequired(
+                      data.verification.fieldVisit,
+                    ).complete
+                      ? "Complete"
+                      : "In progress"}
+                  </Badge>
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => setShowFieldVisitForm(true)}
+                  >
+                    View full Field Visit Form
+                  </Button>
+                </>
+              ) : data.application.segment !== "sme" ? (
                 <>
                   <Badge variant={ciFormCompletionBadge(data.verification).variant}>
                     {ciFormCompletionBadge(data.verification).label}
@@ -1163,7 +1240,66 @@ export default function CommitteeApplicationPage() {
             </div>
           </div>
 
-          {data.application.segment !== "sme" ? (
+          {individualUsesFieldVisit ? (
+            <div className="mt-4 border-t border-line-soft pt-4">
+              <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+                <div className="text-xs font-semibold uppercase tracking-wide text-ink-500">
+                  Field Visit
+                </div>
+              </div>
+              {data.verification.fieldVisit ? (
+                <div className="mt-2 grid gap-x-4 gap-y-1 text-sm text-ink-700 sm:grid-cols-2">
+                  <p>
+                    <span className="text-ink-400">Date visited:</span>{" "}
+                    {displayText(data.verification.fieldVisit.header?.dateVisited)}
+                  </p>
+                  <p>
+                    <span className="text-ink-400">Visited by:</span>{" "}
+                    {displayText(data.verification.fieldVisit.header?.visitedBy)}
+                  </p>
+                  <p>
+                    <span className="text-ink-400">Client:</span>{" "}
+                    {displayText(data.verification.fieldVisit.header?.clientName)}
+                  </p>
+                  <p>
+                    <span className="text-ink-400">Residence type:</span>{" "}
+                    {data.verification.fieldVisit.residence?.residenceType
+                      ? RESIDENCE_TYPES.find(
+                          (t) =>
+                            t.id ===
+                            data.verification!.fieldVisit!.residence!.residenceType,
+                        )?.label ??
+                        data.verification.fieldVisit.residence.residenceType
+                      : "—"}
+                  </p>
+                  <p>
+                    <span className="text-ink-400">Credit realization risk:</span>{" "}
+                    {displayText(
+                      data.verification.fieldVisit.recommendation?.creditRealizationRisk,
+                    )}
+                  </p>
+                  <p>
+                    <span className="text-ink-400">Recommendation:</span>{" "}
+                    {data.verification.fieldVisit.recommendation?.recommendation ===
+                    "for_approval"
+                      ? "For approval"
+                      : data.verification.fieldVisit.recommendation?.recommendation ===
+                          "for_disapproval"
+                        ? "For disapproval"
+                        : "—"}
+                  </p>
+                  <p>
+                    <span className="text-ink-400">Prepared by:</span>{" "}
+                    {displayText(
+                      data.verification.fieldVisit.recommendation?.preparedBy,
+                    )}
+                  </p>
+                </div>
+              ) : (
+                <p className="mt-1 text-sm text-ink-400">Not recorded.</p>
+              )}
+            </div>
+          ) : data.application.segment !== "sme" ? (
             <>
           {data.application.segment === "seafarer" ? (
           <div className="mt-4 border-t border-line-soft pt-4">
@@ -1742,7 +1878,10 @@ export default function CommitteeApplicationPage() {
         </Card>
       ) : null}
 
-      {data.verification && showCiForm && data.application.segment !== "sme" ? (
+      {data.verification &&
+      showCiForm &&
+      data.application.segment !== "sme" &&
+      !individualUsesFieldVisit ? (
         <CiReferencesFormModal
           open={showCiForm}
           onClose={() => setShowCiForm(false)}
@@ -1755,21 +1894,31 @@ export default function CommitteeApplicationPage() {
         />
       ) : null}
 
-      {data.verification && showFieldVisitForm && data.application.segment === "sme" ? (
+      {data.verification &&
+      showFieldVisitForm &&
+      (isSme || individualUsesFieldVisit) ? (
         <Modal
           open={showFieldVisitForm}
           onClose={() => setShowFieldVisitForm(false)}
           title={
-            data.application.isReloan ? "SME re-loan verification" : "SME Field Visit"
+            !isSme
+              ? "Field Visit"
+              : data.application.isReloan
+                ? "SME re-loan verification"
+                : "SME Field Visit"
           }
           className="!max-w-4xl"
+          footer={
+            <p className="text-xs text-ink-400">
+              View only — edits are locked.
+            </p>
+          }
         >
-          <div className="max-h-[65vh] overflow-y-auto pr-1">
-            {data.application.isReloan ? (
+          <div className="pr-1 pb-4">
+            {isSme && data.application.isReloan ? (
               <SmeReloanVerificationForm
                 value={data.verification.smeReloanVerification}
                 onChange={() => undefined}
-                onSave={() => undefined}
                 verifierName=""
                 readOnly
               />
@@ -1777,8 +1926,8 @@ export default function CommitteeApplicationPage() {
               <FieldVisitForm
                 value={data.verification.fieldVisit}
                 onChange={() => undefined}
-                onSave={() => undefined}
                 verifierName=""
+                variant={isSme ? "sme" : "individual"}
                 readOnly
               />
             )}
@@ -1794,12 +1943,16 @@ export default function CommitteeApplicationPage() {
           onClose={() => setShowCmInspectionForm(false)}
           title="CM Inspection"
           className="!max-w-4xl"
+          footer={
+            <p className="text-xs text-ink-400">
+              View only — edits are locked.
+            </p>
+          }
         >
-          <div className="max-h-[65vh] overflow-y-auto pr-1">
+          <div className="pr-1 pb-4">
             <CmInspectionForm
               value={data.verification.cmInspection}
               onChange={() => undefined}
-              onSave={() => undefined}
               verifierName=""
               readOnly
             />
@@ -1815,12 +1968,16 @@ export default function CommitteeApplicationPage() {
           onClose={() => setShowRemInspectionForm(false)}
           title="REM Inspection"
           className="!max-w-4xl"
+          footer={
+            <p className="text-xs text-ink-400">
+              View only — edits are locked.
+            </p>
+          }
         >
-          <div className="max-h-[65vh] overflow-y-auto pr-1">
+          <div className="pr-1 pb-4">
             <RemInspectionForm
               value={data.verification.remInspection}
               onChange={() => undefined}
-              onSave={() => undefined}
               verifierName=""
               readOnly
             />
@@ -2344,6 +2501,55 @@ export default function CommitteeApplicationPage() {
               </Button>
             </div>
           </form>
+        </Card>
+      ) : null}
+
+      {isCommitteeHold ? (
+        // Deliberately its own block, not nested inside the `canDecide`
+        // card below: canDecide requires votes.length >= committeeSize,
+        // which can go false on committee_hold if committee size grows
+        // after the hold was placed (see actions.ts's clear_hold vote-skip
+        // for the backend half of this). Clearing a hold must stay
+        // reachable even then, or the file gets stranded with no visible
+        // way to re-queue it.
+        <Card className="mb-6">
+          <Button
+            type="button"
+            variant="secondary"
+            loading={clearingHold}
+            onClick={() => setConfirmClearHold(true)}
+          >
+            Clear hold
+          </Button>
+          <ConfirmDialog
+            open={confirmClearHold}
+            title="Clear committee hold?"
+            message="Returns this application to committee review (for_approval). This does not change any vote, and does not approve, deny, or revisit the loan."
+            confirmLabel="Yes, clear hold"
+            cancelLabel="Cancel"
+            variant="primary"
+            loading={clearingHold}
+            confirmDisabled={!clearHoldReason.trim()}
+            onCancel={() => {
+              setConfirmClearHold(false);
+              setClearHoldReason("");
+            }}
+            onConfirm={() => void handleClearHold()}
+          >
+            <Label htmlFor="clearHoldReason">
+              Reason <span className="req">*</span>{" "}
+              <span style={{ fontWeight: 400, color: "var(--ink-400)" }}>
+                (required to clear a hold)
+              </span>
+            </Label>
+            <Textarea
+              id="clearHoldReason"
+              value={clearHoldReason}
+              onChange={(e) => setClearHoldReason(e.target.value)}
+              placeholder="What was resolved…"
+              rows={3}
+            />
+          </ConfirmDialog>
         </Card>
       ) : null}
 

@@ -31,6 +31,7 @@ import { createServiceClient } from "@/lib/supabase/server";
 import { syncApplicationBlocker, mapReleaseFileRow } from "./blockers";
 import { loadBlriContext } from "./blri-data";
 import { loadCollateralDocumentContext } from "./collateral-context";
+import { notifyWorkflowEvent } from "@/lib/notifications/workflow-events";
 import { unsignedGeneratedDocumentIds } from "./mark-all-signed";
 import {
   canRecordRelease,
@@ -1184,6 +1185,12 @@ export async function witnessSignGeneratedDocument(
       "awaiting_briefing",
       { actorId: witnessedById, applicationStatus: "release_briefing" },
     );
+
+    await notifyWorkflowEvent(
+      "release_awaiting_briefing",
+      releaseFile.loan_application_id as string,
+      { actorId: witnessedById },
+    );
   }
 
   return { signedAt, allSigned };
@@ -1406,6 +1413,10 @@ export async function acknowledgeBriefing(
     if (blockerError) {
       throw new Error(blockerError.message);
     }
+
+    await notifyWorkflowEvent("release_ready_for_release", file.loanApplicationId, {
+      actorId: collectorUserId,
+    });
   }
 
   return { status: "ready_release" as const, signedAt };
@@ -1568,6 +1579,8 @@ export async function recordRelease(
     actorId,
     applicationStatus: "released",
   });
+
+  await notifyWorkflowEvent("loan_released", file.loanApplicationId);
 
   // Prefer a close-stage pending message when with_pdc physical collection
   // is still outstanding — does not touch earlier briefing/contract blockers.

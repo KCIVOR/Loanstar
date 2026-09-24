@@ -13,6 +13,7 @@ import {
   sumHouseExpenses,
   type FieldVisit,
   type NeighborhoodClass,
+  type NeighborhoodGrid,
   type NeighborhoodQuality,
   type ResidenceTypeId,
 } from "@/lib/cig/field-visit";
@@ -20,10 +21,10 @@ import {
 type Props = {
   value: FieldVisit | null;
   onChange: (next: FieldVisit) => void;
-  onSave: (next: FieldVisit) => void;
-  saving?: boolean;
   readOnly?: boolean;
   verifierName: string;
+  /** "individual" hides Business checking + the Business Income column. */
+  variant?: "sme" | "individual";
 };
 
 function ensureVisit(value: FieldVisit | null): FieldVisit {
@@ -31,17 +32,27 @@ function ensureVisit(value: FieldVisit | null): FieldVisit {
     header: value?.header ?? {},
     residence: {
       ...value?.residence,
-      informants: value?.residence?.informants?.length
-        ? value.residence.informants
-        : emptyInformants(3),
+      informants: value?.residence?.informants ?? emptyInformants(3),
     },
     business: {
       ...value?.business,
-      informants: value?.business?.informants?.length
-        ? value.business.informants
-        : emptyInformants(3),
+      informants: value?.business?.informants ?? emptyInformants(3),
     },
     recommendation: value?.recommendation ?? {},
+  };
+}
+
+/** The exact payload the Save action submits. Exported so a Modal footer
+ *  can drive the save from outside the scrolling body — the form body no
+ *  longer renders its own button (see the modal-f band in globals.css). */
+export function fieldVisitSavePayload(
+  value: FieldVisit | null,
+  verifierName: string,
+): FieldVisit {
+  const visit = ensureVisit(value);
+  return {
+    ...visit,
+    recommendation: { ...visit.recommendation, preparedBy: verifierName },
   };
 }
 
@@ -97,13 +108,127 @@ function NeighborhoodSelects({
   );
 }
 
+/** The workbook's three fixed neighbourhood area types, in sheet order. */
+const NEIGHBORHOOD_AREAS = [
+  { key: "residential", label: "Residential" },
+  { key: "commercial", label: "Commercial" },
+  { key: "mixed", label: "Mixed" },
+] as const;
+
+/**
+ * Neighborhood — the three workbook area types, each removable and
+ * re-addable (the Field CI form's 3x2 grid; there is no fourth type, so
+ * "Add neighborhood" only ever offers one that was removed).
+ *
+ * An area is hidden ONLY when its key is explicitly `null`. A missing key
+ * still renders, so the 29 existing SME field visits — which store `{}` or
+ * a partial grid — keep showing every row exactly as they do today.
+ */
+function NeighborhoodGroup({
+  value,
+  disabled,
+  onChange,
+}: {
+  value?: NeighborhoodGrid | null;
+  disabled?: boolean;
+  onChange: (next: NeighborhoodGrid) => void;
+}) {
+  const grid: NeighborhoodGrid = value ?? {};
+  const shown = NEIGHBORHOOD_AREAS.filter((area) => grid[area.key] !== null);
+  const removed = NEIGHBORHOOD_AREAS.filter((area) => grid[area.key] === null);
+
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center justify-between">
+        <Label>Neighborhood</Label>
+        {!disabled && removed.length > 0 ? (
+          <Button
+            type="button"
+            variant="secondary"
+            size="sm"
+            onClick={() => onChange({ ...grid, [removed[0].key]: {} })}
+          >
+            Add neighborhood
+          </Button>
+        ) : null}
+      </div>
+
+      {shown.length === 0 ? (
+        <p className="text-sm text-ink-400">No neighborhood recorded.</p>
+      ) : null}
+
+      {shown.map((area) => (
+        <div key={area.key} className="space-y-2">
+          <div className="flex items-center justify-between">
+            <p className="text-xs font-medium text-ink-600">{area.label}</p>
+            {!disabled ? (
+              <Button
+                type="button"
+                variant="danger-soft"
+                size="sm"
+                aria-label={`Remove ${area.label.toLowerCase()} neighborhood`}
+                onClick={() => onChange({ ...grid, [area.key]: null })}
+              >
+                Remove
+              </Button>
+            ) : null}
+          </div>
+          <div className="grid gap-2 sm:grid-cols-2">
+            <div>
+              <Label className="text-xs">Class</Label>
+              <Select
+                disabled={disabled}
+                value={grid[area.key]?.class ?? ""}
+                onChange={(e) =>
+                  onChange({
+                    ...grid,
+                    [area.key]: {
+                      ...grid[area.key],
+                      class: (e.target.value || null) as NeighborhoodClass | null,
+                    },
+                  })
+                }
+              >
+                <option value="">—</option>
+                <option value="low">Low</option>
+                <option value="middle">Middle</option>
+                <option value="upper">Upper</option>
+              </Select>
+            </div>
+            <div>
+              <Label className="text-xs">Quality</Label>
+              <Select
+                disabled={disabled}
+                value={grid[area.key]?.quality ?? ""}
+                onChange={(e) =>
+                  onChange({
+                    ...grid,
+                    [area.key]: {
+                      ...grid[area.key],
+                      quality: (e.target.value || null) as NeighborhoodQuality | null,
+                    },
+                  })
+                }
+              >
+                <option value="">—</option>
+                <option value="poor">Poor</option>
+                <option value="fair">Fair</option>
+                <option value="good">Good</option>
+              </Select>
+            </div>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 export function FieldVisitForm({
   value,
   onChange,
-  onSave,
-  saving,
   readOnly,
   verifierName,
+  variant = "sme",
 }: Props) {
   const visit = ensureVisit(value);
   const houseTotal = sumHouseExpenses(visit.recommendation?.houseExpenses);
@@ -308,116 +433,16 @@ export function FieldVisitForm({
             />
           </div>
         </div>
-        <div className="space-y-3 rounded border border-line-100 p-3">
-          <NeighborhoodSelects
-            label="Neighborhood — Residential"
-            classValue={visit.residence?.neighborhood?.residential?.class}
-            qualityValue={visit.residence?.neighborhood?.residential?.quality}
-            disabled={readOnly}
-            onClass={(v) =>
-              patch({
-                ...visit,
-                residence: {
-                  ...visit.residence,
-                  neighborhood: {
-                    ...visit.residence?.neighborhood,
-                    residential: {
-                      ...visit.residence?.neighborhood?.residential,
-                      class: v,
-                    },
-                  },
-                },
-              })
-            }
-            onQuality={(v) =>
-              patch({
-                ...visit,
-                residence: {
-                  ...visit.residence,
-                  neighborhood: {
-                    ...visit.residence?.neighborhood,
-                    residential: {
-                      ...visit.residence?.neighborhood?.residential,
-                      quality: v,
-                    },
-                  },
-                },
-              })
-            }
-          />
-          <NeighborhoodSelects
-            label="Neighborhood — Commercial"
-            classValue={visit.residence?.neighborhood?.commercial?.class}
-            qualityValue={visit.residence?.neighborhood?.commercial?.quality}
-            disabled={readOnly}
-            onClass={(v) =>
-              patch({
-                ...visit,
-                residence: {
-                  ...visit.residence,
-                  neighborhood: {
-                    ...visit.residence?.neighborhood,
-                    commercial: {
-                      ...visit.residence?.neighborhood?.commercial,
-                      class: v,
-                    },
-                  },
-                },
-              })
-            }
-            onQuality={(v) =>
-              patch({
-                ...visit,
-                residence: {
-                  ...visit.residence,
-                  neighborhood: {
-                    ...visit.residence?.neighborhood,
-                    commercial: {
-                      ...visit.residence?.neighborhood?.commercial,
-                      quality: v,
-                    },
-                  },
-                },
-              })
-            }
-          />
-          <NeighborhoodSelects
-            label="Neighborhood — Mixed"
-            classValue={visit.residence?.neighborhood?.mixed?.class}
-            qualityValue={visit.residence?.neighborhood?.mixed?.quality}
-            disabled={readOnly}
-            onClass={(v) =>
-              patch({
-                ...visit,
-                residence: {
-                  ...visit.residence,
-                  neighborhood: {
-                    ...visit.residence?.neighborhood,
-                    mixed: {
-                      ...visit.residence?.neighborhood?.mixed,
-                      class: v,
-                    },
-                  },
-                },
-              })
-            }
-            onQuality={(v) =>
-              patch({
-                ...visit,
-                residence: {
-                  ...visit.residence,
-                  neighborhood: {
-                    ...visit.residence?.neighborhood,
-                    mixed: {
-                      ...visit.residence?.neighborhood?.mixed,
-                      quality: v,
-                    },
-                  },
-                },
-              })
-            }
-          />
-        </div>
+        <NeighborhoodGroup
+          value={visit.residence?.neighborhood}
+          disabled={readOnly}
+          onChange={(next) =>
+            patch({
+              ...visit,
+              residence: { ...visit.residence, neighborhood: next },
+            })
+          }
+        />
         <div>
           <Label>Findings report</Label>
           <Textarea
@@ -436,17 +461,41 @@ export function FieldVisitForm({
           />
         </div>
         <div className="space-y-2">
-          <Label>Informants (3)</Label>
-          {(visit.residence?.informants ?? emptyInformants(3)).map((row, i) => (
-            <div key={`res-inf-${i}`} className="grid gap-2 sm:grid-cols-2">
+          <div className="flex items-center justify-between">
+            <Label>Informants</Label>
+            {readOnly ? null : (
+              <Button
+                type="button"
+                variant="secondary"
+                size="sm"
+                onClick={() =>
+                  patch({
+                    ...visit,
+                    residence: {
+                      ...visit.residence,
+                      informants: [
+                        ...(visit.residence?.informants ?? []),
+                        { name: "", address: "" },
+                      ],
+                    },
+                  })
+                }
+              >
+                Add informant
+              </Button>
+            )}
+          </div>
+          {(visit.residence?.informants ?? []).map((row, i) => (
+            <div
+              key={`res-inf-${i}`}
+              className="grid gap-2 sm:grid-cols-[1fr_1fr_auto]"
+            >
               <Input
                 placeholder="Name"
                 disabled={readOnly}
                 value={row.name ?? ""}
                 onChange={(e) => {
-                  const informants = [
-                    ...(visit.residence?.informants ?? emptyInformants(3)),
-                  ];
+                  const informants = [...(visit.residence?.informants ?? [])];
                   informants[i] = { ...informants[i], name: e.target.value };
                   patch({
                     ...visit,
@@ -459,9 +508,7 @@ export function FieldVisitForm({
                 disabled={readOnly}
                 value={row.address ?? ""}
                 onChange={(e) => {
-                  const informants = [
-                    ...(visit.residence?.informants ?? emptyInformants(3)),
-                  ];
+                  const informants = [...(visit.residence?.informants ?? [])];
                   informants[i] = { ...informants[i], address: e.target.value };
                   patch({
                     ...visit,
@@ -469,222 +516,244 @@ export function FieldVisitForm({
                   });
                 }}
               />
+              {readOnly ? null : (
+                <Button
+                  type="button"
+                  variant="danger-soft"
+                  size="sm"
+                  className="self-center"
+                  aria-label={`Remove informant ${i + 1}`}
+                  onClick={() => {
+                    const informants = [
+                      ...(visit.residence?.informants ?? []),
+                    ].filter((_, idx) => idx !== i);
+                    patch({
+                      ...visit,
+                      residence: { ...visit.residence, informants },
+                    });
+                  }}
+                >
+                  Remove
+                </Button>
+              )}
             </div>
           ))}
         </div>
       </section>
 
-      <section className="space-y-3">
-        <h3 className="font-display text-base font-semibold text-navy-900">
-          II. Business checking
-        </h3>
-        <div className="grid gap-3 sm:grid-cols-2">
-          <div>
-            <Label>Year of stay</Label>
-            <Input
-              type="number"
-              disabled={readOnly}
-              value={visit.business?.yearOfStay ?? ""}
-              onChange={(e) =>
-                patch({
-                  ...visit,
-                  business: {
-                    ...visit.business,
-                    yearOfStay: e.target.value ? Number(e.target.value) : null,
-                  },
-                })
-              }
-            />
-          </div>
-          <div>
-            <Label>Floor area (sqm)</Label>
-            <Input
-              type="number"
-              disabled={readOnly}
-              value={visit.business?.floorAreaSqm ?? ""}
-              onChange={(e) =>
-                patch({
-                  ...visit,
-                  business: {
-                    ...visit.business,
-                    floorAreaSqm: e.target.value ? Number(e.target.value) : null,
-                  },
-                })
-              }
-            />
-          </div>
-        </div>
-        <div>
-          <Label>Findings report</Label>
-          <Textarea
-            disabled={readOnly}
-            rows={2}
-            value={visit.business?.findingsReport ?? ""}
-            onChange={(e) =>
-              patch({
-                ...visit,
-                business: {
-                  ...visit.business,
-                  findingsReport: e.target.value,
-                },
-              })
-            }
-          />
-        </div>
-        <div className="space-y-3 rounded border border-line-100 p-3">
-          <p className="text-xs font-medium text-ink-600">
-            Neighborhood — main site
-          </p>
-          <NeighborhoodSelects
-            label="Residential"
-            classValue={visit.business?.neighborhood?.residential?.class}
-            qualityValue={visit.business?.neighborhood?.residential?.quality}
-            disabled={readOnly}
-            onClass={(v) =>
-              patch({
-                ...visit,
-                business: {
-                  ...visit.business,
-                  neighborhood: {
-                    ...visit.business?.neighborhood,
-                    residential: {
-                      ...visit.business?.neighborhood?.residential,
-                      class: v,
-                    },
-                  },
-                },
-              })
-            }
-            onQuality={(v) =>
-              patch({
-                ...visit,
-                business: {
-                  ...visit.business,
-                  neighborhood: {
-                    ...visit.business?.neighborhood,
-                    residential: {
-                      ...visit.business?.neighborhood?.residential,
-                      quality: v,
-                    },
-                  },
-                },
-              })
-            }
-          />
-        </div>
-        <div className="space-y-3 rounded border border-line-100 p-3">
-          <p className="text-xs font-medium text-ink-600">
-            Other offices (branch / warehouse) — independent neighborhood grid
-          </p>
-          <div className="flex gap-4 text-sm">
-            <label className="flex items-center gap-2">
-              <input
-                type="checkbox"
+      {variant === "sme" ? (
+        <section className="space-y-3">
+          <h3 className="font-display text-base font-semibold text-navy-900">
+            II. Business checking
+          </h3>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div>
+              <Label>Year of stay</Label>
+              <Input
+                type="number"
                 disabled={readOnly}
-                checked={Boolean(visit.business?.otherOffices?.branch)}
+                value={visit.business?.yearOfStay ?? ""}
                 onChange={(e) =>
                   patch({
                     ...visit,
                     business: {
                       ...visit.business,
-                      otherOffices: {
-                        ...visit.business?.otherOffices,
-                        branch: e.target.checked,
-                      },
+                      yearOfStay: e.target.value ? Number(e.target.value) : null,
                     },
                   })
                 }
               />
-              Branch
-            </label>
-            <label className="flex items-center gap-2">
-              <input
-                type="checkbox"
+            </div>
+            <div>
+              <Label>Floor area (sqm)</Label>
+              <Input
+                type="number"
                 disabled={readOnly}
-                checked={Boolean(visit.business?.otherOffices?.warehouse)}
+                value={visit.business?.floorAreaSqm ?? ""}
                 onChange={(e) =>
                   patch({
                     ...visit,
                     business: {
                       ...visit.business,
-                      otherOffices: {
-                        ...visit.business?.otherOffices,
-                        warehouse: e.target.checked,
-                      },
+                      floorAreaSqm: e.target.value ? Number(e.target.value) : null,
                     },
                   })
                 }
               />
-              Warehouse
-            </label>
+            </div>
           </div>
-          <Input
-            placeholder="Address"
-            disabled={readOnly}
-            value={visit.business?.otherOffices?.address ?? ""}
-            onChange={(e) =>
-              patch({
-                ...visit,
-                business: {
-                  ...visit.business,
-                  otherOffices: {
-                    ...visit.business?.otherOffices,
-                    address: e.target.value,
+          <div>
+            <Label>Findings report</Label>
+            <Textarea
+              disabled={readOnly}
+              rows={2}
+              value={visit.business?.findingsReport ?? ""}
+              onChange={(e) =>
+                patch({
+                  ...visit,
+                  business: {
+                    ...visit.business,
+                    findingsReport: e.target.value,
                   },
-                },
-              })
-            }
-          />
-          <NeighborhoodSelects
-            label="Neighborhood — branch/warehouse"
-            classValue={
-              visit.business?.otherOffices?.neighborhood?.residential?.class
-            }
-            qualityValue={
-              visit.business?.otherOffices?.neighborhood?.residential?.quality
-            }
-            disabled={readOnly}
-            onClass={(v) =>
-              patch({
-                ...visit,
-                business: {
-                  ...visit.business,
-                  otherOffices: {
-                    ...visit.business?.otherOffices,
+                })
+              }
+            />
+          </div>
+          <div className="space-y-3 rounded border border-line-100 p-3">
+            <p className="text-xs font-medium text-ink-600">
+              Neighborhood — main site
+            </p>
+            <NeighborhoodSelects
+              label="Residential"
+              classValue={visit.business?.neighborhood?.residential?.class}
+              qualityValue={visit.business?.neighborhood?.residential?.quality}
+              disabled={readOnly}
+              onClass={(v) =>
+                patch({
+                  ...visit,
+                  business: {
+                    ...visit.business,
                     neighborhood: {
-                      ...visit.business?.otherOffices?.neighborhood,
+                      ...visit.business?.neighborhood,
                       residential: {
-                        ...visit.business?.otherOffices?.neighborhood
-                          ?.residential,
+                        ...visit.business?.neighborhood?.residential,
                         class: v,
                       },
                     },
                   },
-                },
-              })
-            }
-            onQuality={(v) =>
-              patch({
-                ...visit,
-                business: {
-                  ...visit.business,
-                  otherOffices: {
-                    ...visit.business?.otherOffices,
+                })
+              }
+              onQuality={(v) =>
+                patch({
+                  ...visit,
+                  business: {
+                    ...visit.business,
                     neighborhood: {
-                      ...visit.business?.otherOffices?.neighborhood,
+                      ...visit.business?.neighborhood,
                       residential: {
-                        ...visit.business?.otherOffices?.neighborhood
-                          ?.residential,
+                        ...visit.business?.neighborhood?.residential,
                         quality: v,
                       },
                     },
                   },
-                },
-              })
-            }
-          />
-        </div>
-      </section>
+                })
+              }
+            />
+          </div>
+          <div className="space-y-3 rounded border border-line-100 p-3">
+            <p className="text-xs font-medium text-ink-600">
+              Other offices (branch / warehouse) — independent neighborhood grid
+            </p>
+            <div className="flex gap-4 text-sm">
+              <label className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  disabled={readOnly}
+                  checked={Boolean(visit.business?.otherOffices?.branch)}
+                  onChange={(e) =>
+                    patch({
+                      ...visit,
+                      business: {
+                        ...visit.business,
+                        otherOffices: {
+                          ...visit.business?.otherOffices,
+                          branch: e.target.checked,
+                        },
+                      },
+                    })
+                  }
+                />
+                Branch
+              </label>
+              <label className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  disabled={readOnly}
+                  checked={Boolean(visit.business?.otherOffices?.warehouse)}
+                  onChange={(e) =>
+                    patch({
+                      ...visit,
+                      business: {
+                        ...visit.business,
+                        otherOffices: {
+                          ...visit.business?.otherOffices,
+                          warehouse: e.target.checked,
+                        },
+                      },
+                    })
+                  }
+                />
+                Warehouse
+              </label>
+            </div>
+            <Input
+              placeholder="Address"
+              disabled={readOnly}
+              value={visit.business?.otherOffices?.address ?? ""}
+              onChange={(e) =>
+                patch({
+                  ...visit,
+                  business: {
+                    ...visit.business,
+                    otherOffices: {
+                      ...visit.business?.otherOffices,
+                      address: e.target.value,
+                    },
+                  },
+                })
+              }
+            />
+            <NeighborhoodSelects
+              label="Neighborhood — branch/warehouse"
+              classValue={
+                visit.business?.otherOffices?.neighborhood?.residential?.class
+              }
+              qualityValue={
+                visit.business?.otherOffices?.neighborhood?.residential?.quality
+              }
+              disabled={readOnly}
+              onClass={(v) =>
+                patch({
+                  ...visit,
+                  business: {
+                    ...visit.business,
+                    otherOffices: {
+                      ...visit.business?.otherOffices,
+                      neighborhood: {
+                        ...visit.business?.otherOffices?.neighborhood,
+                        residential: {
+                          ...visit.business?.otherOffices?.neighborhood
+                            ?.residential,
+                          class: v,
+                        },
+                      },
+                    },
+                  },
+                })
+              }
+              onQuality={(v) =>
+                patch({
+                  ...visit,
+                  business: {
+                    ...visit.business,
+                    otherOffices: {
+                      ...visit.business?.otherOffices,
+                      neighborhood: {
+                        ...visit.business?.otherOffices?.neighborhood,
+                        residential: {
+                          ...visit.business?.otherOffices?.neighborhood
+                            ?.residential,
+                          quality: v,
+                        },
+                      },
+                    },
+                  },
+                })
+              }
+            />
+          </div>
+        </section>
+      ) : null}
 
       <section className="space-y-3">
         <h3 className="font-display text-base font-semibold text-navy-900">
@@ -797,10 +866,12 @@ export function FieldVisitForm({
           House expenses total (computed):{" "}
           <span className="mono font-medium">₱{houseTotal.toFixed(2)}</span>
         </p>
-        <p className="text-xs text-ink-400">
-          Business income lines are typed fields only — no affordability formula
-          enforced yet (same decision as Phase 3.5.4).
-        </p>
+        {variant === "sme" ? (
+          <p className="text-xs text-ink-400">
+            Business income lines are typed fields only — no affordability
+            formula enforced yet (same decision as Phase 3.5.4).
+          </p>
+        ) : null}
         <div className="grid gap-3 sm:grid-cols-2">
           <div>
             <Label required>Prepared by</Label>
@@ -862,24 +933,6 @@ export function FieldVisitForm({
           </div>
         </div>
       </section>
-
-      {!readOnly ? (
-        <Button
-          type="button"
-          loading={saving}
-          onClick={() =>
-            onSave({
-              ...visit,
-              recommendation: {
-                ...visit.recommendation,
-                preparedBy: verifierName,
-              },
-            })
-          }
-        >
-          Save field visit
-        </Button>
-      ) : null}
     </div>
   );
 }

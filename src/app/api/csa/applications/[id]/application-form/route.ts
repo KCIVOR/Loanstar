@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 
 import { writeAuditEvent } from "@/lib/audit/writer";
 import { handleApiError, jsonOk } from "@/lib/api/handler";
+import { resolveAssignedAgentName } from "@/lib/csa/agent-assignment";
 import { generateApplicationForm } from "@/lib/documents/generators/application-form";
 import { resolveApplicationFormSlug } from "@/lib/documents/generators/application-form-context";
 import {
@@ -9,14 +10,14 @@ import {
   listRenderedDocuments,
 } from "@/lib/documents/render-store";
 import { requireModulePermission } from "@/lib/permissions/server";
-import { createClient } from "@/lib/supabase/server";
+import { createClient, createServiceClient } from "@/lib/supabase/server";
 
 type RouteParams = { params: Promise<{ id: string }> };
 
 async function loadApplicationScope(supabase: Awaited<ReturnType<typeof createClient>>, applicationId: string) {
   const { data, error } = await supabase
     .from("loan_applications")
-    .select("segment, entity_type")
+    .select("segment, entity_type, agent_user_id")
     .eq("id", applicationId)
     .single();
 
@@ -27,6 +28,7 @@ async function loadApplicationScope(supabase: Awaited<ReturnType<typeof createCl
   return {
     segment: data.segment as string | null,
     entityType: data.entity_type as string | null,
+    agentUserId: data.agent_user_id as string | null,
   };
 }
 
@@ -83,7 +85,19 @@ export async function GET(_request: Request, { params }: RouteParams) {
       })),
     );
 
-    return jsonOk({ documents: withUrls, documentSlug: resolved.slug });
+    // profiles RLS requires a service client to resolve another user's name
+    // (see agent-assignment.ts) — read-only, scoped to the one id already on
+    // an application this caller is authorized to view (`intake:view` above).
+    const assignedAgentName = await resolveAssignedAgentName(
+      createServiceClient(),
+      scope.agentUserId,
+    );
+
+    return jsonOk({
+      documents: withUrls,
+      documentSlug: resolved.slug,
+      assignedAgentName,
+    });
   } catch (error) {
     return handleApiError(error);
   }

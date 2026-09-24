@@ -57,7 +57,7 @@ export async function PATCH(request: Request) {
     const patch = parseMarkReadPatch(await request.json());
     if (!patch) {
       return NextResponse.json(
-        { error: "Provide { all: true } or { ids: string[] }" },
+        { error: "Provide { all: true } or { ids: string[], unread?: true }" },
         { status: 400 },
       );
     }
@@ -65,11 +65,12 @@ export async function PATCH(request: Request) {
     const supabase = await createClient();
     const now = new Date().toISOString();
 
+    const markUnread = "ids" in patch && patch.unread === true;
     let query = supabase
       .from("notifications")
-      .update({ read_at: now })
-      .eq("user_id", user.id)
-      .is("read_at", null);
+      .update({ read_at: markUnread ? null : now })
+      .eq("user_id", user.id);
+    query = markUnread ? query.not("read_at", "is", null) : query.is("read_at", null);
 
     if ("ids" in patch) {
       if (patch.ids.length === 0) {

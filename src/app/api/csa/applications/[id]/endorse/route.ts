@@ -7,6 +7,7 @@ import {
   assertCsaCanEdit,
   getEndorseReadiness,
 } from "@/lib/csa/application";
+import { notifyWorkflowEvent } from "@/lib/notifications/workflow-events";
 import { notifyBorrowerForApplication } from "@/lib/notifications/write";
 import { requireModulePermission } from "@/lib/permissions/server";
 import { createClient } from "@/lib/supabase/server";
@@ -57,6 +58,11 @@ export async function POST(_request: Request, { params }: RouteParams) {
       entityType: "loan_application",
       entityId: id,
       afterData: { trigger: "endorse_to_cig", status: "for_verification" },
+    });
+
+    // CIG works a shared queue (no per-application owner) — notify every CIG user.
+    await notifyWorkflowEvent("application_endorsed_to_cig", id, {
+      actorId: user.id,
     });
 
     void notifyBorrowerForApplication(id, {

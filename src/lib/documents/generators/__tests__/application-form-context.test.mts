@@ -368,3 +368,75 @@ test("Individual segment print context uses the same SME Individual keys", () =>
   assert.equal(ctx.salesAgent, "Agent A");
   assert.equal(ctx.typeOfLoan, "");
 });
+
+// --- salesAgent precedence (agent-assignment plan, Phase 0/3) ---
+// assigned active profile name > legacy businessInfo.salesAgent > blank.
+// Applies to all four variants, not just SME (unlike the legacy field).
+
+test("Seafarer: assignedAgentName renders even though the legacy field is SME-only", () => {
+  const ctx = buildApplicationFormContext({
+    segment: "seafarer",
+    profile: baseProfile(),
+    assignedAgentName: "Agent Smith",
+  });
+  assert.equal(ctx.salesAgent, "Agent Smith");
+});
+
+test("Seafarer: blank when no assignment and no legacy field", () => {
+  const ctx = buildApplicationFormContext({
+    segment: "seafarer",
+    profile: baseProfile(),
+  });
+  assert.equal(ctx.salesAgent, "");
+});
+
+test("Individual: assignedAgentName takes precedence over legacy businessInfo.salesAgent", () => {
+  const ctx = buildApplicationFormContext({
+    segment: "individual",
+    profile: baseProfile({
+      businessInfo: { salesAgent: "Legacy Agent" },
+    }),
+    assignedAgentName: "Agent Smith",
+  });
+  assert.equal(ctx.salesAgent, "Agent Smith");
+});
+
+test("Individual: falls back to legacy businessInfo.salesAgent when assignment is null", () => {
+  const ctx = buildApplicationFormContext({
+    segment: "individual",
+    profile: baseProfile({
+      businessInfo: { salesAgent: "Legacy Agent" },
+    }),
+    assignedAgentName: null,
+  });
+  assert.equal(ctx.salesAgent, "Legacy Agent");
+});
+
+test("SME Individual: assignedAgentName takes precedence over legacy businessInfo.salesAgent", () => {
+  const ctx = buildApplicationFormContext({
+    segment: "sme",
+    entityType: "individual",
+    profile: baseProfile({
+      businessInfo: { salesAgent: "Legacy Agent" },
+    }),
+    assignedAgentName: "Agent Smith",
+  });
+  assert.equal(ctx.salesAgent, "Agent Smith");
+});
+
+test("SME Corporate: assignedAgentName renders; blank when neither source is set", () => {
+  const withAssignment = buildApplicationFormContext({
+    segment: "sme",
+    entityType: "corporate",
+    profile: baseProfile({ businessInfo: {} }),
+    assignedAgentName: "Agent Smith",
+  });
+  assert.equal(withAssignment.salesAgent, "Agent Smith");
+
+  const withNeither = buildApplicationFormContext({
+    segment: "sme",
+    entityType: "corporate",
+    profile: baseProfile({ businessInfo: {} }),
+  });
+  assert.equal(withNeither.salesAgent, "");
+});

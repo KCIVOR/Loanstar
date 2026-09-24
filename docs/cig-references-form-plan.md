@@ -1,5 +1,7 @@
 # CI & References Form — Implementation Plan
 
+> ⚠️ **Scope note, 2026-09-22 — this form is now Seafarer-only.** The Individual segment was switched to the Field Visit form (`FieldVisitForm`, `variant="individual"`); SME already used the Field Visit / SME re-loan forms. See `docs/revision-plans/feature-individual-cig-field-visit.md`. Individual applications created before 2026-09-22 keep rendering their existing CI & References data read-only in Committee and the Collector origination packet.
+
 **Status:** All phases complete (2026-07-24), including live interactive verification via the app's own seed-account quick-login. Post-launch UI polish pass done same day (alignment fixes + References changed from a fixed Ref 1/Ref 2 pair to a free add/remove list) — see "Post-launch changes" at the bottom.
 
 ## Background

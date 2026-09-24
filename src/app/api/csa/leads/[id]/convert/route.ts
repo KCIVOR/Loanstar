@@ -37,7 +37,9 @@ export async function POST(request: Request, { params }: RouteParams) {
       throw new ForbiddenError("Lead is already linked or not open");
     }
 
-    const created = await createCsaApplication(supabase, user.id, body);
+    const created = await createCsaApplication(supabase, user.id, body, {
+      agentUserId: lead.agent_user_id as string | null,
+    });
 
     const { data: updatedLead, error: updateError } = await supabase
       .from("leads")

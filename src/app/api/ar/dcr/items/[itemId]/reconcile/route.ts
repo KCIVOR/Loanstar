@@ -4,6 +4,7 @@ import { z } from "zod";
 import { writeAuditEvent } from "@/lib/audit/writer";
 import { handleApiError, jsonOk } from "@/lib/api/handler";
 import { reconcileDcrItem } from "@/lib/ar/posting";
+import { notifyDcrOwner } from "@/lib/notifications/workflow-events";
 import { requireModulePermission } from "@/lib/permissions/server";
 import { createClient } from "@/lib/supabase/server";
 
@@ -32,6 +33,16 @@ export async function POST(request: Request, { params }: RouteParams) {
       entityId: itemId,
       afterData: { trigger: "reconcile_dcr_item", ...result, ...body },
     });
+
+    await notifyDcrOwner(
+      { itemId },
+      {
+        kind: "dcr_item_reconciled",
+        title: "DCRR item reconciled",
+        body: "AR reconciled and posted an item on your DCRR.",
+      },
+      { actorId: user.id },
+    );
 
     return jsonOk(result);
   } catch (error) {

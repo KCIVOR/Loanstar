@@ -8,6 +8,7 @@ import {
   createDcrDraft,
   submitDcr,
 } from "@/lib/ar/posting";
+import { notifyRoles } from "@/lib/notifications/workflow-events";
 import {
   ForbiddenError,
   getUserPermissions,
@@ -193,6 +194,19 @@ export async function POST(request: Request) {
         entityId: submitParsed.data.dcrId,
         afterData: { trigger: "submit_dcr", ...result },
       });
+
+      await notifyRoles(
+        ["ar"],
+        {
+          title: "DCRR submitted for reconciliation",
+          body: "A collection report was submitted and is waiting for AR reconciliation.",
+          link: "/ar/dcr",
+          kind: "dcr_submitted",
+          entityType: "dcr",
+          entityId: submitParsed.data.dcrId,
+        },
+        { actorId: user.id },
+      );
 
       return jsonOk(result);
     }

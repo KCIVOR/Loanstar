@@ -12,7 +12,7 @@ import { createClient } from "@/lib/supabase/server";
 type RouteParams = { params: Promise<{ id: string }> };
 
 const actionSchema = z.object({
-  action: z.enum(["approve", "deny", "revisit", "hold"]),
+  action: z.enum(["approve", "deny", "revisit", "hold", "clear_hold"]),
   comment: z.string().optional(),
   revisitRoute: z.enum(["csa", "cig"]).optional(),
   // Co-Borrower feature (Phase 2): only used with action "approve" — attaches

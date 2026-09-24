@@ -66,6 +66,15 @@ export type BuildApplicationFormContextInput = {
    * on the vast majority of applications, which then render exactly as before
    * (blank name, `hasCoBorrower` false). */
   coBorrowers?: Array<{ fullName: string; address: string }>;
+  /**
+   * Resolved display name of the staff-assigned agent
+   * (`loan_applications.agent_user_id` → active `profiles.full_name`), for
+   * the `{{salesAgent}}` placeholder. Precedence: this value when present;
+   * otherwise the legacy `businessInfo.salesAgent` JSON field (kept as a
+   * read-only fallback for historic data); otherwise blank. Applies to all
+   * four application-form variants — not SME-only, unlike the legacy field.
+   */
+  assignedAgentName?: string | null;
 };
 
 function money(value: number | null | undefined): string {
@@ -140,6 +149,11 @@ export function buildApplicationFormContext(
   const spouse = biz.spouse ?? {};
   const profileData = borrower.profileData ?? {};
 
+  // Precedence: assigned active profile full name; if assignment null/blank,
+  // fall back to the legacy JSON field; otherwise blank. Same value for every
+  // segment — do not copy data between the two stores.
+  const salesAgent = str(input.assignedAgentName) || str(biz.salesAgent);
+
   const businessCompanyName = str(biz.companyName);
   const businessNature = str(biz.natureOfBusiness);
   const businessAddress = [
@@ -151,6 +165,7 @@ export function buildApplicationFormContext(
 
   const base: Record<string, unknown> = {
     companyName: COMPANY_NAME,
+    salesAgent,
     applicationNo: str(input.applicationNo),
     applicationDate: formatDate(input.applicationCreatedAt ?? null),
     borrowerName: [borrower.firstName, borrower.lastName].filter(Boolean).join(" "),
@@ -289,7 +304,6 @@ export function buildApplicationFormContext(
     loanDesired:
       str(profileData.loanDesired) ||
       (computation?.principal != null ? formatMoney(computation.principal) : ""),
-    salesAgent: str(biz.salesAgent),
 
     businessCompanyName,
     businessAcronym: str(biz.acronym),

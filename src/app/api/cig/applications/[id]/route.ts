@@ -24,12 +24,18 @@ import {
 } from "@/lib/cig/verification";
 import { getApplicationForStaff } from "@/lib/csa/application";
 import {
+  isEligibleAgent,
+  listEligibleAgents,
+  resolveAssignedAgentName,
+} from "@/lib/csa/agent-assignment";
+import {
   borrowerProfileToRow,
   mapBorrowerRow,
   type BorrowerRow,
 } from "@/lib/borrowers/types";
 import {
   ForbiddenError,
+  hasModulePermission,
   requireModulePermission,
 } from "@/lib/permissions/server";
 import { validateFieldEdit } from "@/lib/permissions/field-rules";
@@ -226,6 +232,7 @@ const patchSchema = z.object({
       remInspection: z.record(z.string(), z.unknown()).optional(),
     })
     .optional(),
+  agentUserId: z.string().uuid().nullable().optional(),
 });
 
 function verificationScope(application: {
@@ -247,7 +254,7 @@ function verificationScope(application: {
 
 export async function GET(_request: Request, { params }: RouteParams) {
   try {
-    await requireModulePermission("verification", "view");
+    const cigUser = await requireModulePermission("verification", "view");
     const { id } = await params;
     const supabase = await createClient();
 
@@ -286,6 +293,24 @@ export async function GET(_request: Request, { params }: RouteParams) {
     // CIG user's session client can't see who on CSA recorded these — use
     // the service client for this narrow, already-permission-checked read.
     const serviceClient = createServiceClient();
+
+    // Agent assignment is an intake-owned concept (see docs/uat-agent-field-
+    // implementation-plan.md): only `intake:edit` holders can write
+    // `loan_applications.agent_user_id` (enforced by the guard trigger), so
+    // whether CIG can edit it here depends on that permission specifically,
+    // not on `verification:edit` which gates the rest of this form.
+    const canEditAgent = await hasModulePermission(
+      "intake",
+      "edit",
+      cigUser.id,
+    );
+    const assignedAgentName = await resolveAssignedAgentName(
+      serviceClient,
+      application.agent_user_id as string | null,
+    );
+    const eligibleAgents = canEditAgent
+      ? await listEligibleAgents(serviceClient)
+      : [];
 
     let privacyOrientationByName: string | null = null;
     if (application.privacy_orientation_by) {
@@ -384,7 +409,11 @@ export async function GET(_request: Request, { params }: RouteParams) {
           (application.initial_interview_notes as string | null) ?? null,
         initialInterviewByName,
         timeline,
+        agentUserId: (application.agent_user_id as string | null) ?? null,
+        assignedAgentName,
+        canEditAgent,
       },
+      eligibleAgents,
       borrower,
       verification,
       completeness,
@@ -457,6 +486,54 @@ export async function PATCH(request: Request, { params }: RouteParams) {
         entityId: application.borrower_id as string,
         beforeData: mapBorrowerRow(existingBorrower),
         afterData: mapBorrowerRow(updatedBorrower),
+      });
+    }
+
+    if (body.agentUserId !== undefined) {
+      // Agent assignment is intake-owned (docs/uat-agent-field-implementation-
+      // plan.md): only `intake:edit` may write it, regardless of this route's
+      // own `verification:edit` gate above. `applications_cig_borrower_edit`
+      // RLS (intake:edit AND status='for_verification') and the Phase 2A
+      // guard trigger both key off the same permission, so this check must
+      // happen explicitly — an unauthorized write here would otherwise fail
+      // silently under RLS rather than with a clear 403.
+      const canEditAgent = await hasModulePermission(
+        "intake",
+        "edit",
+        user.id,
+      );
+      if (!canEditAgent) {
+        throw new ForbiddenError(
+          "Missing 'edit' permission on module 'intake' to change the assigned agent",
+        );
+      }
+      if (
+        body.agentUserId !== null &&
+        !(await isEligibleAgent(createServiceClient(), body.agentUserId))
+      ) {
+        return NextResponse.json(
+          { error: "Selected agent is not an active agent" },
+          { status: 400 },
+        );
+      }
+
+      const { error: agentUpdateError } = await supabase
+        .from("loan_applications")
+        .update({ agent_user_id: body.agentUserId })
+        .eq("id", id);
+
+      if (agentUpdateError) {
+        throw new Error(agentUpdateError.message);
+      }
+
+      await writeAuditEvent({
+        actorId: user.id,
+        moduleSlug: "intake",
+        action: "update",
+        entityType: "application",
+        entityId: id,
+        beforeData: { agentUserId: application.agent_user_id ?? null },
+        afterData: { agentUserId: body.agentUserId },
       });
     }
 

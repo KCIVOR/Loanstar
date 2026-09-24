@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createHash } from "crypto";
 import { z } from "zod";
 
+import { notifyWorkflowEvent } from "@/lib/notifications/workflow-events";
 import { writeAuditEvent } from "@/lib/audit/writer";
 import { handleApiError, jsonOk } from "@/lib/api/handler";
 import { getActiveComputation } from "@/lib/csa/computation";
@@ -179,6 +180,12 @@ export async function POST(request: Request, { params }: RouteParams) {
         signatureHash,
         trigger: "borrower_sign_computation",
       },
+    });
+
+    // CSA needs to know the borrower approved the computation — at intake
+    // and again after terms are disclosed.
+    await notifyWorkflowEvent("computation_signed_by_borrower", id, {
+      actorId: user.id,
     });
 
     return jsonOk({

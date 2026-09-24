@@ -30,10 +30,10 @@ import {
   type CiFormDraft,
 } from "@/components/cig/CiReferencesFormModal";
 import { EditApplicationFormModal } from "@/components/cig/EditApplicationFormModal";
-import { FieldVisitForm } from "@/components/cig/FieldVisitForm";
-import { SmeReloanVerificationForm } from "@/components/cig/SmeReloanVerificationForm";
-import { CmInspectionForm } from "@/components/cig/CmInspectionForm";
-import { RemInspectionForm } from "@/components/cig/RemInspectionForm";
+import { FieldVisitForm, fieldVisitSavePayload } from "@/components/cig/FieldVisitForm";
+import { SmeReloanVerificationForm, smeReloanSavePayload } from "@/components/cig/SmeReloanVerificationForm";
+import { CmInspectionForm, cmInspectionSavePayload } from "@/components/cig/CmInspectionForm";
+import { RemInspectionForm, remInspectionSavePayload } from "@/components/cig/RemInspectionForm";
 import { usePermissions } from "@/hooks/usePermissions";
 import { formatStatusLabel, statusBadgeVariant } from "@/lib/applications/status";
 import type { BorrowerProfile } from "@/lib/borrowers/types";
@@ -41,6 +41,7 @@ import {
   fakeBorrowerProfile,
   fakeCmInspection,
   fakeFieldVisit,
+  fakeIndividualFieldVisit,
   fakePropertyEntry,
   fakeRemark,
   fakeRemInspection,
@@ -55,6 +56,7 @@ import type {
 } from "@/lib/cig/field-visit";
 import {
   assessFieldVisitRequired,
+  assessIndividualFieldVisitRequired,
   assessSmeReloanRequired,
 } from "@/lib/cig/field-visit";
 import type {
@@ -295,6 +297,15 @@ export default function CigApplicationPage() {
   const [submitOpen, setSubmitOpen] = useState(false);
   const [cancelOpen, setCancelOpen] = useState(false);
   const [cancelReason, setCancelReason] = useState("");
+  const [agentUserId, setAgentUserId] = useState<string | null>(null);
+  const [assignedAgentName, setAssignedAgentName] = useState<string | null>(
+    null,
+  );
+  const [canEditAgent, setCanEditAgent] = useState(false);
+  const [eligibleAgents, setEligibleAgents] = useState<
+    Array<{ id: string; fullName: string }>
+  >([]);
+  const [savingAgent, setSavingAgent] = useState(false);
 
   const load = useCallback(async (opts?: { silent?: boolean }) => {
     if (!opts?.silent) setLoading(true);
@@ -329,7 +340,11 @@ export default function CigApplicationPage() {
             at: string;
             note?: string | null;
           }>;
+          agentUserId?: string | null;
+          assignedAgentName?: string | null;
+          canEditAgent?: boolean;
         };
+        eligibleAgents?: Array<{ id: string; fullName: string }>;
         borrower: (BorrowerProfile & { id?: string }) | null;
         verification: VerificationData;
         completeness: { complete: boolean; missing: string[] };
@@ -378,6 +393,10 @@ export default function CigApplicationPage() {
         timeline: appData.application.timeline ?? [],
       });
       setCsaScreening(appData.csaScreening ?? null);
+      setAgentUserId(appData.application.agentUserId ?? null);
+      setAssignedAgentName(appData.application.assignedAgentName ?? null);
+      setCanEditAgent(Boolean(appData.application.canEditAgent));
+      setEligibleAgents(appData.eligibleAgents ?? []);
 
       if (checksRes.ok) {
         const checksData = (await checksRes.json()) as { checks: CheckItem[] };
@@ -560,6 +579,25 @@ export default function CigApplicationPage() {
     }
   }
 
+  async function handleSaveAgent(nextAgentUserId: string | null) {
+    setSavingAgent(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/cig/applications/${applicationId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ agentUserId: nextAgentUserId }),
+      });
+      const data = (await res.json()) as { error?: string };
+      if (!res.ok) throw new Error(data.error ?? "Save failed");
+      await load({ silent: true });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Save failed");
+    } finally {
+      setSavingAgent(false);
+    }
+  }
+
   async function recordCheck(slug: string, result: "pass" | "fail") {
     if (!sequence.unlocked.external_checks) {
       setError(cigSequenceLockedHint("external_checks"));
@@ -727,11 +765,13 @@ export default function CigApplicationPage() {
     forwarded,
     activeCallbackAt: activeCallback?.scheduledAt ?? null,
     callbackOverdue,
+    segment,
   });
   const workspaceSteps = buildCigWorkspaceSteps({
     status: applicationStatus || "for_verification",
     sequenceCurrent: sequence.current,
     forwarded,
+    segment,
   });
   const waiting = cigWaitingLabel(endorsedAt);
   const checksUnlocked = !editable || sequence.unlocked.external_checks;
@@ -1150,12 +1190,17 @@ export default function CigApplicationPage() {
             onClose={() => setShowApplicationForm(false)}
             className="!max-w-4xl"
           >
-            <div className="max-h-[65vh] overflow-y-auto pr-1">
+            <div className="pr-1 pb-4">
               <ApplicantProfileFields
                 profile={borrower}
                 segment={segment}
                 entityType={entityType}
                 readOnly
+                agent={{
+                  value: agentUserId,
+                  displayName: assignedAgentName,
+                  editable: false,
+                }}
               />
             </div>
           </Modal>
@@ -1166,6 +1211,14 @@ export default function CigApplicationPage() {
               borrower={borrower}
               applicationId={applicationId}
               onSaved={() => load({ silent: true })}
+              agent={{
+                value: agentUserId,
+                displayName: assignedAgentName,
+                options: eligibleAgents,
+                editable: canEditAgent,
+                saving: savingAgent,
+                onChange: (next) => void handleSaveAgent(next),
+              }}
               segment={segment}
               entityType={entityType}
             />
@@ -1336,7 +1389,7 @@ export default function CigApplicationPage() {
                   ? segment === "sme"
                     ? "Complete sections in order: borrower review → checks → Field Visit → finding."
                     : segment === "individual"
-                      ? "Complete sections in order: borrower review → checks → CI & Refs → finding."
+                      ? "Complete sections in order: borrower review → checks → Field Visit → finding."
                       : "Complete sections in order: borrower review → checks → CI & Refs → crewing → finding."
                   : "Submitted to Committee — view only."}
               </p>
@@ -1625,6 +1678,47 @@ export default function CigApplicationPage() {
                         : isReloan
                           ? "View SME re-loan verification"
                           : "View SME Field Visit"}
+                    </Button>
+                  </Card>
+                ) : null}
+              </>
+            ) : segment === "individual" ? (
+              <>
+                {ciUnlocked ? (
+                  <Card>
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <h2 className="mb-1 font-display text-lg font-semibold text-navy-900">
+                          Field Visit
+                        </h2>
+                        <p className="mb-3 text-sm text-ink-500">
+                          {editable
+                            ? "Site visit form — replaces PIC phone verification for Individual."
+                            : "Submitted to Committee — view only."}
+                        </p>
+                      </div>
+                      <Badge
+                        variant={
+                          assessIndividualFieldVisitRequired(
+                            verification.fieldVisit,
+                          ).complete
+                            ? "success"
+                            : "warning"
+                        }
+                      >
+                        {assessIndividualFieldVisitRequired(
+                          verification.fieldVisit,
+                        ).complete
+                          ? "Complete"
+                          : "In progress"}
+                      </Badge>
+                    </div>
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      onClick={() => setShowFieldVisitForm(true)}
+                    >
+                      {editable ? "Open Field Visit" : "View Field Visit"}
                     </Button>
                   </Card>
                 ) : null}
@@ -2019,7 +2113,7 @@ export default function CigApplicationPage() {
               </Card>
             ) : null}
           </div>
-          {showCiForm && segment !== "sme" ? (
+          {showCiForm && segment === "seafarer" ? (
             <CiReferencesFormModal
               key={ciFormKey}
               open={showCiForm}
@@ -2033,17 +2127,84 @@ export default function CigApplicationPage() {
             />
           ) : null}
 
-          {showFieldVisitForm && segment === "sme" ? (
+          {showFieldVisitForm &&
+          (segment === "sme" || segment === "individual") ? (
             <Modal
               open={showFieldVisitForm}
               onClose={() => setShowFieldVisitForm(false)}
               title={
-                isReloan ? "SME re-loan verification" : "SME Field Visit"
+                segment === "individual"
+                  ? "Field Visit"
+                  : isReloan
+                    ? "SME re-loan verification"
+                    : "SME Field Visit"
               }
               className="!max-w-4xl"
+              footer={
+                !editable ? (
+                  <p className="text-xs text-ink-400">
+                    View only — edits are locked.
+                  </p>
+                ) : isReloan && segment !== "individual" ? (
+                  <div className="flex justify-end">
+                    <Button
+                      type="button"
+                      loading={saving}
+                      onClick={() => {
+                        const next = smeReloanSavePayload(
+                          verification.smeReloanVerification,
+                          verifierName,
+                        );
+                        setVerification({
+                          ...verification,
+                          smeReloanVerification: next,
+                        });
+                        void saveVerification({
+                          smeReloanVerification: next,
+                        });
+                      }}
+                    >
+                      Save re-loan verification
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="flex justify-end">
+                    <Button
+                      type="button"
+                      loading={saving}
+                      onClick={() => {
+                        const next = fieldVisitSavePayload(
+                          verification.fieldVisit,
+                          verifierName,
+                        );
+                        setVerification({
+                          ...verification,
+                          fieldVisit: next,
+                        });
+                        void saveVerification({ fieldVisit: next });
+                      }}
+                    >
+                      Save field visit
+                    </Button>
+                  </div>
+                )
+              }
             >
-              <div className="max-h-[65vh] overflow-y-auto pr-1">
-                {isReloan ? (
+              <div className="pr-1 pb-4">
+                {segment === "individual" ? (
+                  <FieldVisitForm
+                    variant="individual"
+                    value={verification.fieldVisit}
+                    onChange={(next) =>
+                      setVerification({
+                        ...verification,
+                        fieldVisit: next,
+                      })
+                    }
+                    readOnly={!editable}
+                    verifierName={verifierName}
+                  />
+                ) : isReloan ? (
                   <SmeReloanVerificationForm
                     value={verification.smeReloanVerification}
                     onChange={(next) =>
@@ -2052,16 +2213,6 @@ export default function CigApplicationPage() {
                         smeReloanVerification: next,
                       })
                     }
-                    onSave={(next) => {
-                      setVerification({
-                        ...verification,
-                        smeReloanVerification: next,
-                      });
-                      void saveVerification({
-                        smeReloanVerification: next,
-                      });
-                    }}
-                    saving={saving}
                     readOnly={!editable}
                     verifierName={verifierName}
                   />
@@ -2074,14 +2225,6 @@ export default function CigApplicationPage() {
                         fieldVisit: next,
                       })
                     }
-                    onSave={(next) => {
-                      setVerification({
-                        ...verification,
-                        fieldVisit: next,
-                      });
-                      void saveVerification({ fieldVisit: next });
-                    }}
-                    saving={saving}
                     readOnly={!editable}
                     verifierName={verifierName}
                   />
@@ -2096,18 +2239,36 @@ export default function CigApplicationPage() {
               onClose={() => setShowCmInspectionForm(false)}
               title="CM Inspection"
               className="!max-w-4xl"
+              footer={
+                !editable ? (
+                  <p className="text-xs text-ink-400">
+                    View only — edits are locked.
+                  </p>
+                ) : (
+                  <div className="flex justify-end">
+                    <Button
+                      type="button"
+                      loading={saving}
+                      onClick={() => {
+                        const next = cmInspectionSavePayload(
+                          verification.cmInspection,
+                        );
+                        setVerification({ ...verification, cmInspection: next });
+                        void saveVerification({ cmInspection: next });
+                      }}
+                    >
+                      Save CM Inspection
+                    </Button>
+                  </div>
+                )
+              }
             >
-              <div className="max-h-[65vh] overflow-y-auto pr-1">
+              <div className="pr-1 pb-4">
                 <CmInspectionForm
                   value={verification.cmInspection}
                   onChange={(next) =>
                     setVerification({ ...verification, cmInspection: next })
                   }
-                  onSave={(next) => {
-                    setVerification({ ...verification, cmInspection: next });
-                    void saveVerification({ cmInspection: next });
-                  }}
-                  saving={saving}
                   readOnly={!editable}
                   verifierName={verifierName}
                 />
@@ -2121,18 +2282,36 @@ export default function CigApplicationPage() {
               onClose={() => setShowRemInspectionForm(false)}
               title="REM Inspection"
               className="!max-w-4xl"
+              footer={
+                !editable ? (
+                  <p className="text-xs text-ink-400">
+                    View only — edits are locked.
+                  </p>
+                ) : (
+                  <div className="flex justify-end">
+                    <Button
+                      type="button"
+                      loading={saving}
+                      onClick={() => {
+                        const next = remInspectionSavePayload(
+                          verification.remInspection,
+                        );
+                        setVerification({ ...verification, remInspection: next });
+                        void saveVerification({ remInspection: next });
+                      }}
+                    >
+                      Save REM Inspection
+                    </Button>
+                  </div>
+                )
+              }
             >
-              <div className="max-h-[65vh] overflow-y-auto pr-1">
+              <div className="pr-1 pb-4">
                 <RemInspectionForm
                   value={verification.remInspection}
                   onChange={(next) =>
                     setVerification({ ...verification, remInspection: next })
                   }
-                  onSave={(next) => {
-                    setVerification({ ...verification, remInspection: next });
-                    void saveVerification({ remInspection: next });
-                  }}
-                  saving={saving}
                   readOnly={!editable}
                   verifierName={verifierName}
                 />
@@ -2431,6 +2610,20 @@ export default function CigApplicationPage() {
                       ...(isReloan
                         ? { smeReloanVerification: fakeSmeReloanVerification() }
                         : { fieldVisit: fakeFieldVisit() }),
+                    }));
+                    setShowFieldVisitForm(true);
+                  },
+                },
+              ]
+            : []),
+          ...(segment === "individual"
+            ? [
+                {
+                  label: "Fill Field Visit",
+                  onClick: () => {
+                    setVerification((prev) => ({
+                      ...(prev as VerificationData),
+                      fieldVisit: fakeIndividualFieldVisit(),
                     }));
                     setShowFieldVisitForm(true);
                   },

@@ -11,6 +11,7 @@ import type {
   CollectionWidgetData,
   CommitteeWidgetData,
   ComputationWidgetData,
+  DashboardScope,
   IntakeWidgetData,
   LeadsWidgetData,
   NegotiationWidgetData,
@@ -220,16 +221,27 @@ export async function buildNegotiationWidget(
 
 export async function buildLeadsWidget(
   supabase: SupabaseClient,
+  scope: DashboardScope,
 ): Promise<LeadsWidgetData> {
-  const [leadsRes, applicationsRes] = await Promise.all([
-    supabase
-      .from("leads")
-      .select("id, borrower_name, status, created_at, application_id")
-      .order("created_at", { ascending: false }),
-    // Exclude 'draft' — a borrower's own pre-submission application isn't
-    // part of the lead-conversion funnel (drafts aren't linked to leads).
-    supabase.from("loan_applications").select("status").neq("status", "draft"),
-  ]);
+  let leadsQuery = supabase
+    .from("leads")
+    .select("id, borrower_name, status, created_at, application_id")
+    .order("created_at", { ascending: false });
+  // Exclude 'draft' — a borrower's own pre-submission application isn't
+  // part of the lead-conversion funnel (drafts aren't linked to leads).
+  let applicationsQuery = supabase
+    .from("loan_applications")
+    .select("status")
+    .neq("status", "draft");
+
+  if (scope.kind === "agent") {
+    // Agent dashboard: scope both the leads and the funnel input to this
+    // agent's own rows so an Agent never sees another agent's totals.
+    leadsQuery = leadsQuery.eq("agent_user_id", scope.userId);
+    applicationsQuery = applicationsQuery.eq("agent_user_id", scope.userId);
+  }
+
+  const [leadsRes, applicationsRes] = await Promise.all([leadsQuery, applicationsQuery]);
   if (leadsRes.error) fail(leadsRes.error.message);
   if (applicationsRes.error) fail(applicationsRes.error.message);
 
@@ -516,7 +528,11 @@ export const WIDGET_BUILDERS: Record<WidgetSlug, WidgetBuilder> = {
   verification: buildVerificationWidget,
   committee: buildCommitteeWidget,
   negotiation: buildNegotiationWidget,
-  leads: buildLeadsWidget,
+  // The route special-cases the `leads` slug and calls `buildLeadsWidget`
+  // directly with a resolved `DashboardScope` — see route.ts. This entry
+  // exists only so `WIDGET_BUILDERS` stays a complete `Record<WidgetSlug, ...>`
+  // and is never actually invoked for `leads`.
+  leads: (supabase) => buildLeadsWidget(supabase, { kind: "aggregate" }),
   release_lra: buildReleaseWidget,
   accounting_ar: buildArWidget,
   collection: buildCollectionWidget,

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
+import { notifyWorkflowEvent } from "@/lib/notifications/workflow-events";
 import { writeAuditEvent } from "@/lib/audit/writer";
 import { handleApiError, jsonOk } from "@/lib/api/handler";
 import { assertCsaCanEdit } from "@/lib/csa/application";
@@ -90,6 +91,12 @@ export async function POST(request: Request, { params }: RouteParams) {
         remarks: body.remarks,
       },
     });
+
+    await notifyWorkflowEvent(
+      "document_revision_requested",
+      before.loan_application_id as string,
+      { actorId: user.id, detail: `Reason: ${body.remarks}` },
+    );
 
     return jsonOk({
       document: {

@@ -16,10 +16,12 @@ import { Alert, Badge, Button, Card, Modal, Spinner } from "@/components/ui";
 import type { OriginationPacket } from "@/lib/collection/origination-packet";
 import {
   assessFieldVisitRequired,
+  assessIndividualFieldVisitRequired,
   assessSmeReloanRequired,
   type FieldVisit,
   type SmeReloanVerification,
 } from "@/lib/cig/field-visit";
+import { individualCiKind } from "@/lib/cig/individual-ci";
 import {
   assessCmInspectionRequired,
   assessRemInspectionRequired,
@@ -322,9 +324,14 @@ function CiReportCard({
     verification.picPaymentPreference as PicPaymentPreference | null;
   const picDemeanor = verification.picDemeanor as PicDemeanorTag[] | null;
   const useReloan = segment === "sme" && smeUsesReloanForm(verification);
+  // Individual switched from the CI & References Form to the Field Visit form
+  // (2026-09-22), but 18 pre-switch files hold only PIC/reference data. Decide
+  // by what data the file actually holds, never by segment alone.
+  const individualUsesFieldVisit =
+    segment === "individual" && individualCiKind(verification) === "field_visit";
 
   const ciBadge =
-    segment !== "sme"
+    segment !== "sme" && !individualUsesFieldVisit
       ? ciFormCompletionBadge({
           picVerification,
           referenceVerifications,
@@ -332,6 +339,11 @@ function CiReportCard({
           picRating: verification.picRating,
         })
       : null;
+
+  const individualFieldVisitComplete = individualUsesFieldVisit
+    ? assessIndividualFieldVisitRequired(asFieldVisit(verification.fieldVisit))
+        .complete
+    : false;
 
   const smeComplete = useReloan
     ? assessSmeReloanRequired(
@@ -356,7 +368,11 @@ function CiReportCard({
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          {segment !== "sme" && ciBadge ? (
+          {individualUsesFieldVisit ? (
+            <Badge variant={individualFieldVisitComplete ? "success" : "warning"}>
+              {individualFieldVisitComplete ? "Complete" : "In progress"}
+            </Badge>
+          ) : segment !== "sme" && ciBadge ? (
             <>
               <Badge variant={ciBadge.variant}>{ciBadge.label}</Badge>
               <Button
@@ -453,7 +469,7 @@ function CiReportCard({
         </div>
       </div>
 
-      {segment !== "sme" ? (
+      {segment !== "sme" && !individualUsesFieldVisit ? (
         <>
           {segment === "seafarer" ? (
           <div className="mt-4 border-t border-line-soft pt-4">
@@ -639,13 +655,16 @@ function CiReportCard({
       ) : (
         <div className="mt-4 border-t border-line-soft pt-4">
           <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-ink-500">
-            {useReloan ? "SME re-loan verification" : "SME Field Visit"}
+            {individualUsesFieldVisit
+              ? "Field Visit"
+              : useReloan
+                ? "SME re-loan verification"
+                : "SME Field Visit"}
           </div>
           {useReloan ? (
             <SmeReloanVerificationForm
               value={asSmeReloanVerification(verification.smeReloanVerification)}
               onChange={() => undefined}
-              onSave={() => undefined}
               verifierName=""
               readOnly
             />
@@ -653,8 +672,8 @@ function CiReportCard({
             <FieldVisitForm
               value={asFieldVisit(verification.fieldVisit)}
               onChange={() => undefined}
-              onSave={() => undefined}
               verifierName=""
+              variant={individualUsesFieldVisit ? "individual" : "sme"}
               readOnly
             />
           )}
@@ -771,7 +790,7 @@ function CiReportCard({
         </div>
       ) : null}
       </Card>
-      {showCiForm && segment !== "sme" ? (
+      {showCiForm && segment !== "sme" && !individualUsesFieldVisit ? (
         <CiReferencesFormModal
           open={showCiForm}
           onClose={() => setShowCiForm(false)}
@@ -804,7 +823,6 @@ function CiReportCard({
             <CmInspectionForm
               value={asCmInspection(verification.cmInspection)}
               onChange={() => undefined}
-              onSave={() => undefined}
               verifierName=""
               readOnly
             />
@@ -822,7 +840,6 @@ function CiReportCard({
             <RemInspectionForm
               value={asRemInspection(verification.remInspection)}
               onChange={() => undefined}
-              onSave={() => undefined}
               verifierName=""
               readOnly
             />
@@ -872,6 +889,11 @@ function ApplicationFormCard({ packet }: { packet: OriginationPacketDto }) {
             segment={packet.application.segment}
             entityType={packet.application.entityType}
             readOnly
+            agent={{
+              value: null,
+              displayName: packet.csaSummary.assignedAgentName,
+              editable: false,
+            }}
           />
         </div>
       </Modal>

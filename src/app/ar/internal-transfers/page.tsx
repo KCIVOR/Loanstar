@@ -22,6 +22,7 @@ import { formatDate, formatMoney } from "@/lib/ar/format";
 type TransferRow = {
   id: string;
   sourceLoanApplicationId: string;
+  sourceMasterlistId: string | null;
   sourceApplicationNo: string | null;
   sourceLoanAccountNo: string | null;
   targetMasterlistId: string;
@@ -228,12 +229,18 @@ export default function ArInternalTransfersPage() {
               {rows.map((row) => (
                 <tr key={row.id}>
                   <Td>
-                    <Link
-                      href={`/lra/applications/${row.sourceLoanApplicationId}`}
-                      className="mono text-sm font-medium text-teal-700 hover:underline"
-                    >
-                      {row.sourceApplicationNo ?? row.sourceLoanAccountNo ?? "—"}
-                    </Link>
+                    {row.sourceMasterlistId ? (
+                      <Link
+                        href={`/ar/masterlist/${row.sourceMasterlistId}`}
+                        className="mono text-sm font-medium text-teal-700 hover:underline"
+                      >
+                        {row.sourceApplicationNo ?? row.sourceLoanAccountNo ?? "—"}
+                      </Link>
+                    ) : (
+                      <span className="mono text-sm font-medium">
+                        {row.sourceApplicationNo ?? row.sourceLoanAccountNo ?? "—"}
+                      </span>
+                    )}
                   </Td>
                   <Td>
                     <Link

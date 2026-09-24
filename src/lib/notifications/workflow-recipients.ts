@@ -75,3 +75,37 @@ export async function getPaymentReviewContext(
     assignment,
   };
 }
+
+/** Distinct recipient ids, dropping empties and the acting user. */
+export function uniqueRecipientsExcluding(
+  ids: Array<string | null | undefined>,
+  excludeUserId?: string | null,
+): string[] {
+  return [
+    ...new Set(
+      ids.filter((id): id is string => Boolean(id) && id !== excludeUserId),
+    ),
+  ];
+}
+
+/**
+ * Users holding any of the given active roles (e.g. `csa`, `cig`). Used for
+ * shared queues that have no per-application owner. Super-admin is never
+ * matched unless asked for by slug. Requires a service-role client (RLS hides
+ * user_roles from staff sessions).
+ */
+export async function getRoleUserIds(
+  supabase: SupabaseClient,
+  roleSlugs: string[],
+): Promise<string[]> {
+  if (roleSlugs.length === 0) return [];
+
+  const { data, error } = await supabase
+    .from("user_roles")
+    .select("user_id, roles!inner ( slug, is_active )")
+    .in("roles.slug", roleSlugs)
+    .eq("roles.is_active", true);
+  if (error || !data) return [];
+
+  return uniqueRecipientsExcluding(data.map((row) => row.user_id as string));
+}

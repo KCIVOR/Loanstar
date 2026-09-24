@@ -372,3 +372,43 @@ export function assessSmeReloanRequired(
 
   return { complete: missing.length === 0, missing };
 }
+
+/**
+ * Required subset to unlock Finding for Individual applications.
+ *
+ * Same seven items as SME's `assessFieldVisitRequired` today, but kept a
+ * separate function so Individual can diverge without touching SME.
+ * Messages keep the "Field visit: " prefix so `workspace.ts`'s next-step
+ * regexes match.
+ */
+export function assessIndividualFieldVisitRequired(
+  visit: FieldVisit | null | undefined,
+): FieldVisitCompleteness {
+  const missing: string[] = [];
+  const header = visit?.header;
+  const residence = visit?.residence;
+  const recommendation = visit?.recommendation;
+
+  if (!filled(header?.dateVisited)) missing.push("Field visit: date visited");
+  if (!filled(header?.visitedBy)) missing.push("Field visit: visited by");
+  if (!filled(header?.clientName)) missing.push("Field visit: client name");
+  if (!residence?.residenceType) missing.push("Field visit: type of residence");
+  if (!recommendation?.creditRealizationRisk) {
+    missing.push("Field visit: credit realization risk");
+  }
+  if (!recommendation?.recommendation) {
+    missing.push("Field visit: recommendation (approval/disapproval)");
+  }
+  if (!filled(recommendation?.preparedBy)) {
+    missing.push("Field visit: prepared by");
+  }
+
+  return { complete: missing.length === 0, missing };
+}
+
+/** Thin wrapper mirroring `isSmeFieldStageComplete`'s call shape. */
+export function isIndividualFieldVisitComplete(
+  visit: FieldVisit | null | undefined,
+): boolean {
+  return assessIndividualFieldVisitRequired(visit).complete;
+}

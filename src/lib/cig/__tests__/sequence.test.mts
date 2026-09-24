@@ -127,6 +127,32 @@ function s3Complete(
   });
 }
 
+/**
+ * Individual's S3 after the 2026-09-22 switch: the Field Visit form, not the
+ * CI & References Form. The minimal visit below satisfies exactly the seven
+ * items `assessIndividualFieldVisitRequired` gates on.
+ */
+function individualS3Complete(
+  overrides: Partial<VerificationRecord> = {},
+): VerificationRecord {
+  return s1Complete({
+    fieldVisit: {
+      header: {
+        dateVisited: "2026-09-20",
+        visitedBy: "CIG Officer",
+        clientName: "Juan Dela Cruz",
+      },
+      residence: { residenceType: "bungalow" },
+      recommendation: {
+        creditRealizationRisk: "low",
+        recommendation: "for_approval",
+        preparedBy: "CIG Officer",
+      },
+    },
+    ...overrides,
+  });
+}
+
 function s4Complete(
   overrides: Partial<VerificationRecord> = {},
 ): VerificationRecord {
@@ -264,8 +290,8 @@ describe("getCigSequenceState", () => {
 });
 
 describe("getCigSequenceState — Individual segment (no Crewing manager step)", () => {
-  it("S1–S3 complete (CI & References only) → jumps straight to S5/finding, crewing auto-completes", () => {
-    const state = getCigSequenceState(s3Complete(), true, {
+  it("S1–S3 complete (Field Visit only) → jumps straight to S5/finding, crewing auto-completes", () => {
+    const state = getCigSequenceState(individualS3Complete(), true, {
       segment: "individual",
     });
     assert.equal(state.completed.ci_references, true);
@@ -275,7 +301,7 @@ describe("getCigSequenceState — Individual segment (no Crewing manager step)",
   });
 
   it("crewing manager fields are never required for Individual completeness", () => {
-    const verification = s3Complete({ finding: "positive" });
+    const verification = individualS3Complete({ finding: "positive" });
     const assessed = assessVerificationCompleteness(verification, true, [], {
       segment: "individual",
     });
@@ -286,13 +312,52 @@ describe("getCigSequenceState — Individual segment (no Crewing manager step)",
     );
   });
 
-  it("Individual still requires CI & References Form fields (unlike SME's Field Visit swap)", () => {
+  it("Individual requires Field Visit fields (2026-09-22 swap)", () => {
     const verification = s1Complete({ finding: "positive" });
     const assessed = assessVerificationCompleteness(verification, true, [], {
       segment: "individual",
     });
     assert.equal(assessed.complete, false);
-    assert.ok(assessed.missing.some((m) => /PIC name/i.test(m)));
+    assert.ok(
+      assessed.missing.some((m) => /Field visit: date visited/.test(m)),
+      `expected a Field Visit gap, got: ${assessed.missing.join(", ")}`,
+    );
+  });
+
+  it("Individual no longer requires PIC/reference fields (2026-09-22 swap)", () => {
+    const verification = individualS3Complete({ finding: "positive" });
+    const assessed = assessVerificationCompleteness(verification, true, [], {
+      segment: "individual",
+    });
+    assert.equal(assessed.complete, true);
+    assert.ok(
+      !assessed.missing.some((m) => /PIC name|reference/i.test(m)),
+      `expected no PIC/reference gaps, got: ${assessed.missing.join(", ")}`,
+    );
+  });
+
+  it("assessVerificationCompleteness and getCigSequenceState agree for Individual", () => {
+    const scope = { segment: "individual" as const };
+
+    const incomplete = s1Complete({ finding: "positive" });
+    assert.equal(
+      assessVerificationCompleteness(incomplete, true, [], scope).complete,
+      false,
+    );
+    assert.equal(
+      getCigSequenceState(incomplete, true, scope).unlocked.forward,
+      false,
+    );
+
+    const complete = individualS3Complete({ finding: "positive" });
+    assert.equal(
+      assessVerificationCompleteness(complete, true, [], scope).complete,
+      true,
+    );
+    assert.equal(
+      getCigSequenceState(complete, true, scope).unlocked.forward,
+      true,
+    );
   });
 
   it("Seafarer still requires crewing manager fields (regression guard)", () => {

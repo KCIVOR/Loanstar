@@ -3,6 +3,7 @@ import { describe, it } from "node:test";
 
 import {
   assessFieldVisitRequired,
+  assessIndividualFieldVisitRequired,
   assessSmeReloanRequired,
   computeReloanTotalNetIncome,
   RESIDENCE_TYPES,
@@ -208,5 +209,41 @@ describe("SME completeness replaces PIC/CM (6.0.a / 6.7)", () => {
     assert.equal(state.completed.ci_references, true);
     assert.equal(state.completed.crewing_manager, true);
     assert.equal(state.unlocked.finding, true);
+  });
+});
+
+describe("assessIndividualFieldVisitRequired", () => {
+  it("lists all seven items for an empty visit", () => {
+    const result = assessIndividualFieldVisitRequired(null);
+    assert.equal(result.complete, false);
+    assert.equal(result.missing.length, 7);
+    assert.ok(result.missing.every((m) => m.startsWith("Field visit: ")));
+  });
+
+  it("still reports the remaining items for a partial visit", () => {
+    const result = assessIndividualFieldVisitRequired({
+      header: { dateVisited: "2026-09-22", visitedBy: "CIG", clientName: "Ana" },
+      residence: { residenceType: "town_house" },
+    });
+    assert.equal(result.complete, false);
+    assert.deepEqual(result.missing, [
+      "Field visit: credit realization risk",
+      "Field visit: recommendation (approval/disapproval)",
+      "Field visit: prepared by",
+    ]);
+  });
+
+  it("is complete once the seven items are answered", () => {
+    const result = assessIndividualFieldVisitRequired({
+      header: { dateVisited: "2026-09-22", visitedBy: "CIG", clientName: "Ana" },
+      residence: { residenceType: "town_house" },
+      recommendation: {
+        creditRealizationRisk: "medium",
+        recommendation: "for_approval",
+        preparedBy: "CIG",
+      },
+    });
+    assert.equal(result.complete, true);
+    assert.deepEqual(result.missing, []);
   });
 });

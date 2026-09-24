@@ -1,6 +1,10 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { appendStatusHistory } from "@/lib/applications/status";
+import {
+  notifyMasterlistUser,
+  notifyWorkflowEvent,
+} from "@/lib/notifications/workflow-events";
 import type { BusinessInfo } from "@/lib/borrowers/business-info";
 import { mapBorrowerRow } from "@/lib/borrowers/types";
 import { getActiveComputation } from "@/lib/csa/computation";
@@ -363,6 +367,9 @@ export async function initializeArAccount(
     note: "Loan active — AR masterlist created",
   });
 
+  await notifyWorkflowEvent("loan_active", loanApplicationId);
+  await notifyWorkflowEvent("release_closed_to_ar", loanApplicationId, { actorId });
+
   return { masterlistId: masterlist.id as string, created: true };
 }
 
@@ -425,6 +432,12 @@ export async function assignMasterlist(
   }
 
   if (input.collectorUserId !== undefined) {
+    const { data: previous } = await supabase
+      .from("assignments")
+      .select("collector_user_id")
+      .eq("masterlist_id", masterlistId)
+      .maybeSingle();
+
     const { error } = await supabase
       .from("assignments")
       .update({
@@ -435,6 +448,20 @@ export async function assignMasterlist(
       .eq("masterlist_id", masterlistId);
 
     if (error) throw new Error(error.message);
+
+    if (input.collectorUserId && input.collectorUserId !== previous?.collector_user_id) {
+      await notifyMasterlistUser(
+        masterlistId,
+        input.collectorUserId,
+        {
+          kind: "account_assigned_collector",
+          title: "New account assigned to you",
+          body: (label) => `${label} was assigned to you for collection.`,
+          link: `/collector/accounts/${masterlistId}`,
+        },
+        { actorId: input.assignedBy },
+      );
+    }
   }
 }
 
@@ -506,6 +533,7 @@ export async function markPaidOff(
     actorId,
     note: "AR confirmed paid off",
   });
+  await notifyWorkflowEvent("loan_paid_off", applicationId);
 
   return { applicationId, status: "paid_off" as const };
 }
@@ -547,6 +575,29 @@ export async function assignRemedial(
     confirmed_at: new Date().toISOString(),
     turnover_reason: "aging_91_plus",
   });
+
+  await notifyMasterlistUser(
+    masterlistId,
+    remedialUserId,
+    {
+      kind: "account_turned_over_remedial",
+      title: "Account turned over to you",
+      body: (label) => `${label} was turned over to you for remedial handling.`,
+      link: `/remedial/accounts/${masterlistId}`,
+    },
+    { actorId: confirmedBy },
+  );
+  await notifyMasterlistUser(
+    masterlistId,
+    assignment?.collector_user_id as string | null | undefined,
+    {
+      kind: "account_removed_from_collector",
+      title: "Account turned over to remedial",
+      body: (label) => `${label} was turned over to a remedial officer and is no longer on your desk.`,
+      link: `/collector`,
+    },
+    { actorId: confirmedBy },
+  );
 }
 
 export function masterlistToExportRow(row: Record<string, unknown>) {

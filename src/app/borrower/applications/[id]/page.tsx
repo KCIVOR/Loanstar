@@ -75,6 +75,9 @@ type ApplicationDetail = {
   timeline: TimelineEntry[];
   segment: "seafarer" | "sme" | "individual";
   entityType: "individual" | "corporate" | null;
+  agentUserId: string | null;
+  assignedAgentName: string | null;
+  agentEditable: boolean;
 };
 
 type DocsSummary = {
@@ -159,6 +162,11 @@ export default function BorrowerApplicationPage() {
   const [error, setError] = useState<string | null>(null);
   const [showSubmitConfirm, setShowSubmitConfirm] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [eligibleAgents, setEligibleAgents] = useState<
+    Array<{ id: string; fullName: string }>
+  >([]);
+  const [savingAgent, setSavingAgent] = useState(false);
+  const [agentError, setAgentError] = useState<string | null>(null);
 
   const load = useCallback(
     async (opts?: { silent?: boolean }) => {
@@ -181,6 +189,7 @@ export default function BorrowerApplicationPage() {
         if (!profileRes.ok) throw new Error("Failed to load profile");
         const appData = (await appRes.json()) as {
           application: ApplicationDetail;
+          eligibleAgents?: Array<{ id: string; fullName: string }>;
         };
         const profileData = (await profileRes.json()) as {
           profile: BorrowerProfile;
@@ -227,6 +236,7 @@ export default function BorrowerApplicationPage() {
           setDocsSummary(null);
         }
         setApplication(appData.application);
+        setEligibleAgents(appData.eligibleAgents ?? []);
         setBorrowerId(profileData.profile.id);
         setProfile(profileData.profile);
       } catch (err) {
@@ -288,6 +298,29 @@ export default function BorrowerApplicationPage() {
       );
     } finally {
       setSavingProfile(false);
+    }
+  }
+
+  async function handleSaveAgent(nextAgentUserId: string | null) {
+    setSavingAgent(true);
+    setAgentError(null);
+    try {
+      const res = await fetch(`/api/borrower/applications/${applicationId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ agentUserId: nextAgentUserId }),
+      });
+      if (!res.ok) {
+        const body = (await res.json().catch(() => null)) as {
+          error?: string;
+        } | null;
+        throw new Error(body?.error ?? "Failed to save agent");
+      }
+      await load({ silent: true });
+    } catch (err) {
+      setAgentError(err instanceof Error ? err.message : "Failed to save agent");
+    } finally {
+      setSavingAgent(false);
     }
   }
 
@@ -408,12 +441,29 @@ export default function BorrowerApplicationPage() {
               <Alert>{profileError}</Alert>
             </div>
           ) : null}
+          {agentError ? (
+            <div className="mb-4">
+              <Alert>{agentError}</Alert>
+            </div>
+          ) : null}
           <div className="max-h-[65vh] overflow-y-auto pr-1">
             <ApplicantProfileFields
               profile={profile}
               onChange={setProfile}
               segment={application?.segment}
               entityType={application?.entityType}
+              agent={
+                application
+                  ? {
+                      value: application.agentUserId,
+                      displayName: application.assignedAgentName,
+                      options: eligibleAgents,
+                      editable: application.agentEditable,
+                      saving: savingAgent,
+                      onChange: (next) => void handleSaveAgent(next),
+                    }
+                  : undefined
+              }
             />
           </div>
         </Modal>

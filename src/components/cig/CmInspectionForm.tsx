@@ -15,8 +15,6 @@ import {
 type Props = {
   value: CmInspection | null;
   onChange: (next: CmInspection) => void;
-  onSave: (next: CmInspection) => void;
-  saving?: boolean;
   readOnly?: boolean;
   verifierName: string;
 };
@@ -24,6 +22,13 @@ type Props = {
 function ensure(value: CmInspection | null): CmInspection {
   const n = normalizeCmInspection(value);
   return { account: n.account ?? {}, vehicles: n.vehicles ?? [], verifiedBy: n.verifiedBy ?? null };
+}
+
+/** The exact payload the Save action submits. Exported so a Modal footer
+ *  can drive the save from outside the scrolling body — the form body no
+ *  longer renders its own button (see the modal-f band in globals.css). */
+export function cmInspectionSavePayload(value: CmInspection | null): CmInspection {
+  return ensure(value);
 }
 
 function emptyVehicle(): CmVehicleEntry {
@@ -665,8 +670,6 @@ function VehicleCard({
 export function CmInspectionForm({
   value,
   onChange,
-  onSave,
-  saving,
   readOnly,
   verifierName,
 }: Props) {
@@ -788,12 +791,6 @@ export function CmInspectionForm({
           </Button>
         ) : null}
       </section>
-
-      {!readOnly ? (
-        <Button type="button" loading={saving} onClick={() => onSave(cm)}>
-          Save CM Inspection
-        </Button>
-      ) : null}
     </div>
   );
 }

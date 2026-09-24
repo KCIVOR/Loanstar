@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { appendStatusHistory } from "@/lib/applications/status";
+import { notifyWorkflowEvent } from "@/lib/notifications/workflow-events";
 
 /**
  * Shared cancel side effects: companion-table row + status history.
@@ -32,6 +33,12 @@ export async function cancelApplication(
     actorId: input.actorId,
     note: input.reason,
   });
+
+  await notifyWorkflowEvent("application_cancelled_staff", input.applicationId, {
+    actorId: input.actorId,
+    detail: `Reason: ${input.reason}`,
+  });
+  await notifyWorkflowEvent("application_cancelled_borrower", input.applicationId);
 
   return { cancellationId: cancellation.id as string };
 }

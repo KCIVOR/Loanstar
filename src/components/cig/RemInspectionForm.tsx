@@ -12,8 +12,6 @@ import {
 type Props = {
   value: RemInspection | null;
   onChange: (next: RemInspection) => void;
-  onSave: (next: RemInspection) => void;
-  saving?: boolean;
   readOnly?: boolean;
   verifierName: string;
 };
@@ -26,6 +24,13 @@ function ensure(value: RemInspection | null): RemInspection {
     others: n.others?.length ? n.others : ["", "", "", "", ""],
     verifiedBy: n.verifiedBy ?? null,
   };
+}
+
+/** The exact payload the Save action submits. Exported so a Modal footer
+ *  can drive the save from outside the scrolling body — the form body no
+ *  longer renders its own button (see the modal-f band in globals.css). */
+export function remInspectionSavePayload(value: RemInspection | null): RemInspection {
+  return ensure(value);
 }
 
 function emptyProperty(): RemPropertyEntry {
@@ -453,8 +458,6 @@ function PropertyCard({
 export function RemInspectionForm({
   value,
   onChange,
-  onSave,
-  saving,
   readOnly,
   verifierName,
 }: Props) {
@@ -595,12 +598,6 @@ export function RemInspectionForm({
           </Button>
         ) : null}
       </section>
-
-      {!readOnly ? (
-        <Button type="button" loading={saving} onClick={() => onSave(rem)}>
-          Save REM Inspection
-        </Button>
-      ) : null}
     </div>
   );
 }
