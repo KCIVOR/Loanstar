@@ -1,8 +1,8 @@
 /** Render source evidence for both LSLGC consent-form variants, with env loaded first. */
 import { resolve } from "node:path";
 
-import { loadRuntimeEnvironment } from "./render-generated-evidence";
-import { renderSourceEvidence } from "./render-source-evidence";
+import { loadRuntimeEnvironment } from "./render-generated-evidence.mts";
+import { renderSourceEvidence } from "./render-source-evidence.mts";
 
 const envFile = resolve("C:/Users/Rovick/Desktop/Loanstar System/loanstar/.env.local");
 await loadRuntimeEnvironment(envFile);

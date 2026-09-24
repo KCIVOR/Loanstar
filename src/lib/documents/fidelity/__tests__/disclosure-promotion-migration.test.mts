@@ -8,10 +8,10 @@ import { SOURCE_FAITHFUL_DISCLOSURE_PREVIEW } from "../disclosure-preview";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const root = join(here, "..", "..", "..", "..", "..");
-const migrationPath = join(root, "supabase", "migrations", "20260924100000_promote_sf_disclosure_schema_safe.sql");
+const migrationPath = join(root, "supabase", "migrations", "20260925100000_fix_disclosure_statement_source_accuracy.sql");
 
 function extractBody(sql: string): string {
-  const match = sql.match(/\$disclosure\$([\s\S]*?)\$disclosure\$/);
+  const match = sql.match(/\$disc2\$([\s\S]*?)\$disc2\$/);
   assert.ok(match, "migration must include a dollar-quoted Disclosure body");
   return match[1].trim();
 }

@@ -13,8 +13,8 @@
 export const SOURCE_FAITHFUL_DISCLOSURE_PREVIEW = String.raw`
 <div data-accurate data-document-footer="none">
 <div data-align="right"><img class="doc-logo" src="logo.png" alt="Loan Star Lending Group Corp." width="160"></div>
-<h2 data-align="center">DISCLOSURE STATEMENT OF LOAN/CREDIT TRANSACTION</h2>
-<p data-align="center">(As required under R.A. 3765, Truth in Lending Act)</p>
+<h2>DISCLOSURE STATEMENT OF LOAN/CREDIT TRANSACTION</h2>
+<p>(As required under R.A. 3765, Truth in Lending Act)</p>
 
 <table data-plain><tbody>
 <tr><td>Name of Borrower</td><td>:</td><td data-underline>{{borrowerName}}<span data-if="coBorrowerName"> and {{coBorrowerName}}</span></td></tr>
@@ -42,7 +42,9 @@ export const SOURCE_FAITHFUL_DISCLOSURE_PREVIEW = String.raw`
 <tr><td>6. Finance Charges</td><td></td><td></td></tr>
 <tr><td>&nbsp;&nbsp;&nbsp;a. Interest: <u>{{interestRate}}</u> p.m. From <u>{{disclosureFromDate}}</u> to <u>{{disclosureToDate}}</u> ({{installmentCount}} months)</td><td data-align="center">Php</td><td data-align="right" data-underline>{{financeChargeInterest}}</td></tr>
 <tr><td>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;( ) Simple &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;( ) 6 months+</td><td></td><td></td></tr>
-<tr><td>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;( ) Compound &nbsp;&nbsp;&nbsp;( ) 9 months &nbsp;&nbsp;&nbsp;( ) 12 months &nbsp;&nbsp;&nbsp;( ) Others ____________</td><td></td><td></td></tr>
+<tr><td>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;( ) Compound &nbsp;&nbsp;&nbsp;( ) 9 months</td><td></td><td></td></tr>
+<tr><td>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;( ) 12 months</td><td></td><td></td></tr>
+<tr><td>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;( ) Others ____________</td><td></td><td></td></tr>
 <tr><td>&nbsp;&nbsp;&nbsp;b. Discounts</td><td></td><td data-underline>&nbsp;</td></tr>
 <tr><td>&nbsp;&nbsp;&nbsp;c. Service/handling charges</td><td></td><td data-underline>&nbsp;</td></tr>
 <tr><td>&nbsp;&nbsp;&nbsp;d. Collection Charges</td><td></td><td data-underline>&nbsp;</td></tr>
@@ -75,5 +77,5 @@ export const SOURCE_FAITHFUL_DISCLOSURE_PREVIEW = String.raw`
 <tr><td data-align="center">____________________________<br/><b>{{coBorrowerName}}</b><br/>Co-Borrower Signature Over Printed Name</td><td data-align="center">____________________________<br/><b>{{todayDate}}</b><br/>Date</td></tr>
 </tbody></table>
 
-<p data-align="center">NOTICE TO BORROWER: YOU ARE ENTITLED TO A COPY OF THIS PAPER WHICH YOU WILL SIGN</p>
+<p>NOTICE TO BORROWER: YOU ARE ENTITLED TO A COPY OF THIS PAPER WHICH YOU WILL SIGN</p>
 </div>`;
