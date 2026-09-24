@@ -86,6 +86,19 @@ test("mergeDocxTemplate resolves a {{#flag}}...{{/flag}} conditional (docxtempla
   );
 });
 
+test("mergeDocxTemplate throws naming the tag when it resolves to nothing, instead of silently rendering the literal text \"undefined\" (docxtemplater's own default) — caught via a live pilot: Word's Find & Replace case-matched a tag against an ALL-CAPS source field, producing {{BUSINESSCOMPANYNAME}} instead of {{businessCompanyName}}", () => {
+  const docx = buildMinimalDocx(
+    "<w:p><w:r><w:t>Name of Company: {{BUSINESSCOMPANYNAME}}</w:t></w:r></w:p>",
+  );
+  assert.throws(
+    () => mergeDocxTemplate(docx, { businessCompanyName: "Acme Trading Corp." }),
+    (err: unknown) =>
+      err instanceof DocxTemplateMergeError &&
+      /BUSINESSCOMPANYNAME/.test(err.message) &&
+      !/\bundefined\b/i.test(err.message),
+  );
+});
+
 test("mergeDocxTemplate throws DocxTemplateMergeError with a readable message when a file isn't a real zip/docx", () => {
   assert.throws(
     () => mergeDocxTemplate(Buffer.from("not a docx"), {}),

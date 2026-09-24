@@ -58,6 +58,21 @@ export function mergeDocxTemplate(
       // merge.ts's TOKEN regex) — docxtemplater's own default is single-brace
       // `{`/`}`, which would parse `{{field}}` as a nested/duplicate tag.
       delimiters: { start: "{{", end: "}}" },
+      // docxtemplater's own default for an unresolved tag is to silently
+      // render the literal text "undefined" — found via a live pilot test:
+      // Word's Find & Replace auto-matched the case of the text it replaced
+      // (an ALL-CAPS source field), turning a pasted `{{businessCompanyName}}`
+      // into `{{BUSINESSCOMPANYNAME}}`, which then silently rendered as the
+      // word "undefined" in the generated PDF instead of failing anywhere.
+      // Throwing here instead means upload-time validation (mergeDocxTemplate
+      // against buildSampleContext, see the docx-draft route) actually catches
+      // a mistyped/mis-cased/nonexistent tag, and real generation can never
+      // silently ship a document with a literal "undefined" in it.
+      nullGetter(part) {
+        throw new Error(
+          `Tag "{{${part.value}}}" does not match any known field name (check spelling and case — merge fields are case-sensitive).`,
+        );
+      },
     });
   } catch (error) {
     throw new DocxTemplateMergeError(
