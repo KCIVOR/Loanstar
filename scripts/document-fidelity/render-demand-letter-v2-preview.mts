@@ -11,7 +11,7 @@ import { buildSampleContext } from "../../src/lib/documents/templates/fields";
 const envFile = resolve("C:/Users/Rovick/Desktop/Loanstar System/loanstar/.env.local");
 
 async function loadMainRuntimeEnvironment(): Promise<void> {
-  const { loadRuntimeEnvironment } = await import("./render-generated-evidence.mts");
+  const { loadRuntimeEnvironment } = await import("./render-generated-evidence");
   await loadRuntimeEnvironment(envFile);
 }
 

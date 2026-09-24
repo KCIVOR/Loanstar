@@ -23,7 +23,7 @@ const outputDirectory = resolve("tmp/document-fidelity/vehicle-collateral-previe
 const envFile = resolve("..", "..", ".env.local");
 
 async function loadMainRuntimeEnvironment(): Promise<void> {
-  const { loadRuntimeEnvironment } = await import("./render-generated-evidence.mts");
+  const { loadRuntimeEnvironment } = await import("./render-generated-evidence");
   await loadRuntimeEnvironment(envFile);
 }
 
