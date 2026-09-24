@@ -264,30 +264,35 @@ test("applyMoveOfPayment: size-1 group (Monthly) moves the row and appends one f
     // function reads gross, not net (F10-style regression guard).
     grossTotalInterest: 17013,
     totalInterest: 10000,
-    releaseDate: "2026-08-31",
-    firstPaymentDate: "2026-09-30",
+    // Dates kept ~2 years ahead of when this was written so "deadline must be
+    // after today" stays true for a good while — see PAST/FUTURE_DEADLINE
+    // above for the pattern used where the exact date doesn't matter; here it
+    // does (deadline is 5 days before the due date), so a fixed future
+    // scenario is used instead.
+    releaseDate: "2028-08-31",
+    firstPaymentDate: "2028-09-30",
     dueDay: 30,
     openRows: [
-      { id: "s1", installment_no: 1, due_date: "2026-09-30", status: "pending", line_type: "standard", amount_due: 20000 },
-      { id: "s2", installment_no: 2, due_date: "2026-10-30", status: "pending", line_type: "standard", amount_due: 20000 },
+      { id: "s1", installment_no: 1, due_date: "2028-09-30", status: "pending", line_type: "standard", amount_due: 20000 },
+      { id: "s2", installment_no: 2, due_date: "2028-10-30", status: "pending", line_type: "standard", amount_due: 20000 },
     ],
-    lastRow: { installment_no: 6, due_date: "2027-02-28" },
+    lastRow: { installment_no: 6, due_date: "2029-02-28" },
   });
 
   const result = await applyMoveOfPayment(
     stub.supabase,
     "ml-1",
     "actor-1",
-    "2026-09-25",
-    "2026-09-30",
+    "2028-09-25",
+    "2028-09-30",
   );
 
   assert.deepEqual(result.groupInstallmentIds, ["s1"]);
-  assert.equal(result.deadlineDate, "2026-09-25");
+  assert.equal(result.deadlineDate, "2028-09-25");
   // 17013 gross interest / 6 terms = 2835.50 per month.
   assert.equal(result.surchargeAmount, 2835.5);
-  // 2027-02-28 + 1 month, anchored on the last row's own day (28) -> 2027-03-28.
-  assert.equal(result.extensionDueDate, "2027-03-28");
+  // 2029-02-28 + 1 month, anchored on the last row's own day (28) -> 2029-03-28.
+  assert.equal(result.extensionDueDate, "2029-03-28");
   assert.deepEqual(result.extensionInstallmentNos, [7]);
 
   // The moved row.
@@ -301,7 +306,7 @@ test("applyMoveOfPayment: size-1 group (Monthly) moves the row and appends one f
   assert.equal(stub.getScheduleInserts().length, 1);
   const ext = stub.getScheduleInserts()[0]!;
   assert.equal(ext.installment_no, 7);
-  assert.equal(ext.due_date, "2027-03-28");
+  assert.equal(ext.due_date, "2029-03-28");
   assert.equal(ext.amount_due, 20000);
   assert.equal(ext.status, "pending");
   assert.equal(ext.line_type, "standard");
@@ -326,14 +331,14 @@ test("applyMoveOfPayment: puts the moved installment's PDC check on hold (Fixes 
     principal: 100000,
     grossTotalInterest: 17013,
     totalInterest: 10000,
-    releaseDate: "2026-08-31",
-    firstPaymentDate: "2026-09-30",
+    releaseDate: "2028-08-31",
+    firstPaymentDate: "2028-09-30",
     dueDay: 30,
     openRows: [
-      { id: "s1", installment_no: 1, due_date: "2026-09-30", status: "pending", line_type: "standard", amount_due: 20000 },
-      { id: "s2", installment_no: 2, due_date: "2026-10-30", status: "pending", line_type: "standard", amount_due: 20000 },
+      { id: "s1", installment_no: 1, due_date: "2028-09-30", status: "pending", line_type: "standard", amount_due: 20000 },
+      { id: "s2", installment_no: 2, due_date: "2028-10-30", status: "pending", line_type: "standard", amount_due: 20000 },
     ],
-    lastRow: { installment_no: 6, due_date: "2027-02-28" },
+    lastRow: { installment_no: 6, due_date: "2029-02-28" },
     releaseFileId: "rf-1",
   });
 
@@ -341,8 +346,8 @@ test("applyMoveOfPayment: puts the moved installment's PDC check on hold (Fixes 
     stub.supabase,
     "ml-1",
     "actor-1",
-    "2026-09-25",
-    "2026-09-30",
+    "2028-09-25",
+    "2028-09-30",
   );
 
   const pdc = stub.getPdcUpdates();
