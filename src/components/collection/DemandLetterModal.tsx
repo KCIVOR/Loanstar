@@ -16,7 +16,8 @@ type RenderedDoc = {
 type DemandLetterModalProps = {
   open: boolean;
   borrowerName: string;
-  masterlistId: string;
+  /** Role-prefixed API base, e.g. `/api/collector/accounts/${id}/demand-letter`. */
+  apiBase: string;
   onClose: () => void;
 };
 
@@ -29,7 +30,7 @@ const STAGE_OPTIONS: Array<{ value: DemandStage; label: string }> = [
 export function DemandLetterModal({
   open,
   borrowerName,
-  masterlistId,
+  apiBase,
   onClose,
 }: DemandLetterModalProps) {
   const [stage, setStage] = useState<DemandStage>("first_reminder");
@@ -41,9 +42,7 @@ export function DemandLetterModal({
   const loadDocs = useCallback(async () => {
     setLoadingDocs(true);
     try {
-      const res = await fetch(
-        `/api/collector/accounts/${masterlistId}/demand-letter`,
-      );
+      const res = await fetch(apiBase);
       if (!res.ok) throw new Error("Failed to load demand letters");
       const data = (await res.json()) as { documents: RenderedDoc[] };
       setDocs(data.documents);
@@ -52,7 +51,7 @@ export function DemandLetterModal({
     } finally {
       setLoadingDocs(false);
     }
-  }, [masterlistId]);
+  }, [apiBase]);
 
   useEffect(() => {
     if (open) void loadDocs();
@@ -62,14 +61,11 @@ export function DemandLetterModal({
     setGenerating(true);
     setError(null);
     try {
-      const res = await fetch(
-        `/api/collector/accounts/${masterlistId}/demand-letter`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ demandStage: stage }),
-        },
-      );
+      const res = await fetch(apiBase, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ demandStage: stage }),
+      });
       if (!res.ok) {
         const body = (await res.json().catch(() => null)) as {
           error?: string;

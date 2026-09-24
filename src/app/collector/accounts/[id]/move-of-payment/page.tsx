@@ -18,7 +18,10 @@ import {
   Select,
   Spinner,
 } from "@/components/ui";
-import { type LedgerPdcCheck } from "@/lib/ledger/build-account-ledger-rows";
+import {
+  type LedgerBouncedItem,
+  type LedgerPdcCheck,
+} from "@/lib/ledger/build-account-ledger-rows";
 import {
   buildDeskLedgerRows,
   type DeskLedgerPosting,
@@ -73,6 +76,7 @@ type AccountPayload = {
   payments?: PaymentRow[];
   postings?: DeskLedgerPosting[];
   pdcChecks?: LedgerPdcCheck[];
+  bouncedItems?: LedgerBouncedItem[];
   moveOfPayment: MoveOfPaymentPreview;
 };
 
@@ -246,6 +250,7 @@ export default function CollectorMoveOfPaymentPage() {
       schedules: data.schedules,
       postings: data.postings ?? [],
       pdcChecks: data.pdcChecks ?? [],
+      bouncedItems: data.bouncedItems ?? [],
     });
   }, [data]);
 

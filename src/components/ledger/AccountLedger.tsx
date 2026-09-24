@@ -92,36 +92,40 @@ function statusVariant(
   if (status === "moved") return "warning";
   // Fixes Plan Phase 4 — a collected Move of Payment surcharge line.
   if (status === "surcharge") return "navy";
+  // Bounced check (2026-09-24) — visually distinct from a normal payment.
+  if (status === "bounced") return "danger";
   return "neutral";
 }
 
-/** Consecutive "payment" rows sharing the same installment collapse into one
- * group when there's more than one — e.g. an installment paid in two
- * partials. Everything else (single payments, installment placeholders,
- * opening/totals) renders exactly as before. */
+/** Consecutive "payment" (and, since 2026-09-24, "bounced_check") rows
+ * sharing the same installment collapse into one group when there's more
+ * than one — e.g. an installment paid in two partials, or a bounced check
+ * alongside a real payment on the same due date. Everything else (single
+ * entries, installment placeholders, opening/totals) renders exactly as
+ * before. */
 type DisplayItem =
   | { type: "row"; row: AccountLedgerRow }
   | { type: "group"; scheduleId: string; rows: AccountLedgerRow[] };
+
+function isGroupable(row: AccountLedgerRow): boolean {
+  return (row.kind === "payment" || row.kind === "bounced_check") && Boolean(row.scheduleId);
+}
 
 function groupRows(rows: AccountLedgerRow[]): DisplayItem[] {
   const items: DisplayItem[] = [];
   let i = 0;
   while (i < rows.length) {
     const row = rows[i]!;
-    if (row.kind === "payment" && row.scheduleId) {
+    if (isGroupable(row)) {
       const group: AccountLedgerRow[] = [row];
       let j = i + 1;
-      while (
-        j < rows.length &&
-        rows[j]!.kind === "payment" &&
-        rows[j]!.scheduleId === row.scheduleId
-      ) {
+      while (j < rows.length && isGroupable(rows[j]!) && rows[j]!.scheduleId === row.scheduleId) {
         group.push(rows[j]!);
         j += 1;
       }
       items.push(
         group.length > 1
-          ? { type: "group", scheduleId: row.scheduleId, rows: group }
+          ? { type: "group", scheduleId: row.scheduleId!, rows: group }
           : { type: "row", row },
       );
       i = j;
@@ -292,6 +296,25 @@ export function AccountLedger({
               (sum, r) => sum + (r.credit ?? 0),
               0,
             );
+            // A bounce is never a real payment — "N payments" would be
+            // misleading if one of them bounced.
+            const hasBounce = item.rows.some((r) => r.kind === "bounced_check");
+            const groupLabel = hasBounce ? "entries" : "payments";
+            // Header status: prefer the installment's real, schedule-derived
+            // status (identical on every non-bounce row here, since it comes
+            // straight from `schedule.status`) over the bounce row's own
+            // hardcoded "bounced". pushBounce() always runs after pushCredit()
+            // for the same schedule, so a naive `last.status` would keep
+            // showing "bounced" forever even after a later real payment fully
+            // resolves the installment — a bounce is history, not the
+            // installment's current state (2026-09-25 follow-up, reported
+            // live: "after i paid, the overall status remain bounced"). Only
+            // a bounce-only group (nothing has resolved it yet) falls back to
+            // the bounce row's own "bounced" status.
+            const realStatusRow = [...item.rows]
+              .reverse()
+              .find((r) => r.kind !== "bounced_check");
+            const headerStatusRow = realStatusRow ?? last;
 
             return (
               <Fragment key={`group:${item.scheduleId}`}>
@@ -315,7 +338,7 @@ export function AccountLedger({
                   <Td className="mono">
                     <span className="inline-flex items-center gap-1.5 text-teal-600">
                       <span aria-hidden>{isOpen ? "▾" : "▸"}</span>
-                      {item.rows.length} payments
+                      {item.rows.length} {groupLabel}
                     </span>
                   </Td>
                   <Td className="mono">—</Td>
@@ -336,9 +359,9 @@ export function AccountLedger({
                   </Td>
                   {pendingCell(item.scheduleId)}
                   <Td>
-                    {last.status ? (
-                      <Badge variant={statusVariant(last.status)} dot>
-                        {last.status}
+                    {headerStatusRow.status ? (
+                      <Badge variant={statusVariant(headerStatusRow.status)} dot>
+                        {headerStatusRow.status}
                       </Badge>
                     ) : (
                       "—"
@@ -387,7 +410,15 @@ export function AccountLedger({
                             —
                           </Td>
                         ) : null}
-                        <Td>—</Td>
+                        <Td>
+                          {r.kind === "bounced_check" ? (
+                            <Badge variant={statusVariant("bounced")} dot>
+                              bounced
+                            </Badge>
+                          ) : (
+                            "—"
+                          )}
+                        </Td>
                         {selection ? <Td num className="mono">—</Td> : null}
                       </tr>
                     ))

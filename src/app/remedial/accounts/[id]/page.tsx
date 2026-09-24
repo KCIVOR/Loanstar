@@ -4,12 +4,14 @@ import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 
+import { DemandLetterModal } from "@/components/collection/DemandLetterModal";
 import { OriginationPacketPanel } from "@/components/collection/OriginationPacketPanel";
 import { AccountLedger } from "@/components/ledger/AccountLedger";
 import {
   Alert,
   Badge,
   Breadcrumbs,
+  Button,
   EmptyState,
   PageHeader,
   Spinner,
@@ -21,7 +23,10 @@ import {
   masterlistEmploymentLabels,
   masterlistSecondaryIdentity,
 } from "@/lib/ar/masterlist-display";
-import { type LedgerPdcCheck } from "@/lib/ledger/build-account-ledger-rows";
+import {
+  type LedgerBouncedItem,
+  type LedgerPdcCheck,
+} from "@/lib/ledger/build-account-ledger-rows";
 import {
   buildDeskLedgerRows,
   type DeskLedgerPosting,
@@ -119,8 +124,10 @@ export default function RemedialAccountPage() {
   const [payments, setPayments] = useState<PaymentRow[]>([]);
   const [postings, setPostings] = useState<DeskLedgerPosting[]>([]);
   const [pdcChecks, setPdcChecks] = useState<LedgerPdcCheck[]>([]);
+  const [bouncedItems, setBouncedItems] = useState<LedgerBouncedItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [demandModalOpen, setDemandModalOpen] = useState(false);
   // Task 4b — posted vs. effective (posted minus everything already
   // recorded but not yet posted) balance. `account.outstandingBalance`
   // above stays the authoritative posted figure regardless.
@@ -142,6 +149,7 @@ export default function RemedialAccountPage() {
         payments: PaymentRow[];
         postings?: DeskLedgerPosting[];
         pdcChecks?: LedgerPdcCheck[];
+        bouncedItems?: LedgerBouncedItem[];
         effectiveBalance?: {
           effectiveTotal: number;
           pendingAllocatedTotal: number;
@@ -153,6 +161,7 @@ export default function RemedialAccountPage() {
       setPayments(data.payments ?? []);
       setPostings(data.postings ?? []);
       setPdcChecks(data.pdcChecks ?? []);
+      setBouncedItems(data.bouncedItems ?? []);
       setEffectiveBalance(data.effectiveBalance ?? null);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load");
@@ -193,6 +202,7 @@ export default function RemedialAccountPage() {
     schedules,
     postings,
     pdcChecks,
+    bouncedItems,
   });
 
   return (
@@ -394,6 +404,25 @@ export default function RemedialAccountPage() {
             masterlistId={account.id}
             caseFileApiBase={`/api/remedial/accounts/${account.id}/case-file`}
             mode="fetch"
+          />
+        </section>
+      ) : null}
+
+      {account ? (
+        <section className="mb-8">
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+            <h2 className="font-display text-lg font-semibold text-navy-900">
+              Demand letters
+            </h2>
+            <Button variant="secondary" onClick={() => setDemandModalOpen(true)}>
+              Demand letter
+            </Button>
+          </div>
+          <DemandLetterModal
+            open={demandModalOpen}
+            borrowerName={account.borrowerName}
+            apiBase={`/api/remedial/accounts/${account.id}/demand-letter`}
+            onClose={() => setDemandModalOpen(false)}
           />
         </section>
       ) : null}

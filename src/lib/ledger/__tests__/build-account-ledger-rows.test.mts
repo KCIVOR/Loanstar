@@ -945,6 +945,245 @@ describe("buildAccountLedgerRows — Move of Payment", () => {
   });
 });
 
+describe("buildAccountLedgerRows — bounced check (2026-09-24, nested under its installment 2026-09-24 follow-up)", () => {
+  it("nests a bounce under its allocated installment, adjacent to a real payment on the same schedule", () => {
+    const rows = buildAccountLedgerRows({
+      openingDebit: 2000,
+      schedules: [
+        {
+          id: "s1",
+          dueDate: "2026-12-10",
+          target: 1000,
+          penalty: 0,
+          installmentNo: 4,
+          status: "pending",
+        },
+      ],
+      payments: [
+        payment({ id: "p1", paymentDate: "2026-09-20", amount: 400, scheduleId: "s1" }),
+      ],
+      bouncedItems: [
+        {
+          id: "bounce-1",
+          amount: 58000,
+          referenceNo: "DAIF",
+          date: "2026-09-24",
+          scheduleId: "s1",
+        },
+      ],
+    });
+
+    const bounceRow = rows.find((r) => r.kind === "bounced_check");
+    assert.ok(bounceRow, "expected a bounced_check row");
+    // Posted as 0/0, not the bounced amount — no real money moved, and the
+    // row still reads as a real event because date/reference/status render
+    // regardless of the amount (2026-09-24 design correction).
+    assert.equal(bounceRow?.debit, 0);
+    assert.equal(bounceRow?.credit, 0);
+    assert.equal(bounceRow?.referenceNo, "DAIF");
+    assert.equal(bounceRow?.status, "bounced");
+    // Nested under its installment: same scheduleId and dueDate as the
+    // real payment on the same schedule, and it's the very next row after
+    // it — grouping (AccountLedger.tsx) collapses consecutive same-schedule
+    // payment/bounced_check rows, which requires array adjacency.
+    assert.equal(bounceRow?.scheduleId, "s1");
+    assert.equal(bounceRow?.dueDate, "2026-12-10");
+    const paymentRowIndex = rows.findIndex((r) => r.kind === "payment");
+    const bounceRowIndex = rows.findIndex((r) => r.kind === "bounced_check");
+    assert.equal(bounceRowIndex, paymentRowIndex + 1);
+    // Balance carries through unchanged from the real payment's balance —
+    // the bounce itself never reduces it further.
+    const paymentRow = rows[paymentRowIndex]!;
+    assert.equal(bounceRow?.balance, paymentRow.balance);
+  });
+
+  it("nests a lone bounce (no other payment on that installment) under its schedule too", () => {
+    const rows = buildAccountLedgerRows({
+      openingDebit: 2000,
+      schedules: [
+        {
+          id: "s1",
+          dueDate: "2026-12-10",
+          target: 1000,
+          penalty: 0,
+          installmentNo: 4,
+          status: "pending",
+        },
+      ],
+      payments: [],
+      bouncedItems: [
+        {
+          id: "bounce-1",
+          amount: 58000,
+          referenceNo: "DAIF",
+          date: "2026-09-24",
+          scheduleId: "s1",
+        },
+      ],
+    });
+
+    const bounceRow = rows.find((r) => r.kind === "bounced_check");
+    assert.ok(bounceRow, "expected a bounced_check row");
+    assert.equal(bounceRow?.scheduleId, "s1");
+    assert.equal(bounceRow?.dueDate, "2026-12-10");
+    // No separate "installment" placeholder row is also emitted for s1 —
+    // the bounce takes its place, same as a real payment would.
+    assert.equal(
+      rows.some((r) => r.kind === "installment" && r.scheduleId === "s1"),
+      false,
+    );
+  });
+
+  it("still reports the installment's still-owed monthRemaining/penaltyRemaining on a bounce-only row, and rolls it into the Report Total (2026-09-24 follow-up, caught from a live screenshot showing a blank 'This Month' cell)", () => {
+    const rows = buildAccountLedgerRows({
+      openingDebit: 2000,
+      schedules: [
+        {
+          id: "s1",
+          dueDate: "2026-12-10",
+          target: 1000,
+          penalty: 200,
+          installmentNo: 4,
+          status: "pending",
+        },
+      ],
+      payments: [],
+      bouncedItems: [
+        {
+          id: "bounce-1",
+          amount: 58000,
+          referenceNo: "DAIF",
+          date: "2026-09-24",
+          scheduleId: "s1",
+        },
+      ],
+    });
+
+    const bounceRow = rows.find((r) => r.kind === "bounced_check");
+    // A bounce never actually collects the installment, so the full amount
+    // is still owed — same as it would show on the plain placeholder row
+    // this bounce replaced.
+    assert.equal(bounceRow?.monthRemaining, 1000);
+    assert.equal(bounceRow?.penaltyRemaining, 200);
+
+    const total = rows.find((r) => r.kind === "totals");
+    assert.equal(total?.monthRemaining, 1000);
+    assert.equal(total?.penaltyRemaining, 200);
+  });
+
+  it("reflects a real payment's effect in a bounce that follows it on the same installment", () => {
+    const rows = buildAccountLedgerRows({
+      openingDebit: 2000,
+      schedules: [
+        {
+          id: "s1",
+          dueDate: "2026-12-10",
+          target: 1000,
+          penalty: 0,
+          installmentNo: 4,
+          status: "pending",
+        },
+      ],
+      payments: [
+        payment({ id: "p1", paymentDate: "2026-09-20", amount: 400, scheduleId: "s1" }),
+      ],
+      bouncedItems: [
+        {
+          id: "bounce-1",
+          amount: 58000,
+          referenceNo: "DAIF",
+          date: "2026-09-24",
+          scheduleId: "s1",
+        },
+      ],
+    });
+
+    const bounceRow = rows.find((r) => r.kind === "bounced_check");
+    // 1000 target minus the 400 real payment already applied — the bounce
+    // (0/0, no real money) must not reset this back to the full 1000.
+    assert.equal(bounceRow?.monthRemaining, 600);
+  });
+
+  it("omits the row entirely when no bounced items are given (existing accounts unaffected)", () => {
+    const rows = buildAccountLedgerRows({
+      openingDebit: 2000,
+      schedules: [
+        {
+          id: "s1",
+          dueDate: "2026-09-30",
+          target: 1000,
+          penalty: 0,
+          installmentNo: 1,
+          status: "pending",
+        },
+      ],
+      payments: [],
+    });
+    assert.equal(
+      rows.some((r) => r.kind === "bounced_check"),
+      false,
+    );
+  });
+
+  it("renders standalone (no scheduleId) when the item had no schedule allocation on file", () => {
+    const rows = buildAccountLedgerRows({
+      openingDebit: 2000,
+      schedules: [
+        {
+          id: "s1",
+          dueDate: "2026-09-30",
+          target: 1000,
+          penalty: 0,
+          installmentNo: 1,
+          status: "pending",
+        },
+      ],
+      payments: [],
+      bouncedItems: [
+        {
+          id: "bounce-2",
+          amount: 5000,
+          referenceNo: "DAIF",
+          date: "2026-09-24",
+          scheduleId: null,
+        },
+      ],
+    });
+    const bounceRow = rows.find((r) => r.kind === "bounced_check");
+    assert.equal(bounceRow?.dueDate, null);
+    assert.equal(bounceRow?.scheduleId, null);
+  });
+
+  it("renders standalone when the allocated scheduleId doesn't match any schedule on this account (defensive)", () => {
+    const rows = buildAccountLedgerRows({
+      openingDebit: 2000,
+      schedules: [
+        {
+          id: "s1",
+          dueDate: "2026-09-30",
+          target: 1000,
+          penalty: 0,
+          installmentNo: 1,
+          status: "pending",
+        },
+      ],
+      payments: [],
+      bouncedItems: [
+        {
+          id: "bounce-3",
+          amount: 5000,
+          referenceNo: "DAIF",
+          date: "2026-09-24",
+          scheduleId: "does-not-exist",
+        },
+      ],
+    });
+    const bounceRow = rows.find((r) => r.kind === "bounced_check");
+    assert.ok(bounceRow, "expected the bounce to still render, standalone");
+    assert.equal(bounceRow?.scheduleId, null);
+  });
+});
+
 describe("checkNumbersByInstallmentNo", () => {
   // 4 real (non-$0) rows, installment_no 1-4 — the shape every schedule
   // except Quarterly/Two-Monthly Special has always had, where check count

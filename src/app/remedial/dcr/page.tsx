@@ -113,6 +113,10 @@ type AllocationModalState = {
   paymentAmount: number;
   borrowerName: string;
   rows: AllocationRow[];
+  /** Receipt zero-out (2026-09-24) — Move of Payment surcharges are
+   * deliberately 100% unapplied by design; parsed here so the leftover-
+   * capacity guard below can exempt them, matching the Collector page. */
+  isSurcharge: boolean;
   interestEligible: InterestEligibleInstallment[];
   penaltyEligible: PenaltyEligibleInstallment[];
 };
@@ -373,6 +377,25 @@ export default function RemedialDcrPage() {
 
   const allocationMismatch = allocationLeftover < 0;
 
+  // Receipt zero-out (UAT #60/#63, 2026-09-24) — mirrors the server-side
+  // capacity check in validateAllocationLines: sum how much free capacity
+  // (installmentFreeToAllocate, net of what's already checked here) remains
+  // unused across every open installment. A nonzero leftover is only
+  // blocked when there's somewhere it could have gone instead. Surcharge
+  // payments are deliberately 100% unapplied by design — exempt.
+  const allocationUnusedCapacity = useMemo(() => {
+    if (!allocationModal || allocationModal.isSurcharge) return 0;
+    return halfUp(
+      allocationModal.rows.reduce((sum, row) => {
+        const free = installmentFreeToAllocate(row);
+        const used = row.checked ? row.amount : 0;
+        return sum + Math.max(0, halfUp(free - used));
+      }, 0),
+    );
+  }, [allocationModal]);
+
+  const allocationBlocked = allocationLeftover > 0 && allocationUnusedCapacity > 0;
+
   async function startDcr() {
     setActing(true);
     setError(null);
@@ -435,6 +458,7 @@ export default function RemedialDcrPage() {
           amortizationScheduleId: string | null;
           amount: number;
         }[];
+        isSurcharge?: boolean;
         interestEligible?: InterestEligibleInstallment[];
         penaltyEligible?: PenaltyEligibleInstallment[];
         pendingByInstallment?: Record<
@@ -472,6 +496,7 @@ export default function RemedialDcrPage() {
         paymentAmount: Number(pay?.amount ?? 0),
         borrowerName: firstJoin(pay?.masterlist)?.borrower_name ?? "—",
         rows,
+        isSurcharge: Boolean(preview.isSurcharge),
         interestEligible: preview.interestEligible ?? [],
         penaltyEligible: preview.penaltyEligible ?? [],
       });
@@ -515,6 +540,7 @@ export default function RemedialDcrPage() {
 
   async function confirmAddToDcr() {
     if (!draftDcrId || !allocationModal) return;
+    if (allocationBlocked) return;
 
     const checkedRows = allocationModal.rows.filter((row) => row.checked);
     const checkedTotal = halfUp(
@@ -898,7 +924,7 @@ export default function RemedialDcrPage() {
             <Button
               onClick={() => void confirmAddToDcr()}
               loading={acting}
-              disabled={allocationMismatch || discountReasonMissing}
+              disabled={allocationMismatch || allocationBlocked || discountReasonMissing}
             >
               Add to DCRR
             </Button>
@@ -931,7 +957,7 @@ export default function RemedialDcrPage() {
                   {allocationLeftover >= 0 ? "Advance (leftover)" : "Over-applied"}
                 </p>
                 <p
-                  className={`mono mt-1 text-lg font-semibold ${allocationMismatch ? "text-red-600" : "text-navy-900"}`}
+                  className={`mono mt-1 text-lg font-semibold ${allocationMismatch || allocationBlocked ? "text-red-600" : "text-navy-900"}`}
                 >
                   ₱{formatMoney(Math.abs(allocationLeftover))}
                 </p>
@@ -943,6 +969,15 @@ export default function RemedialDcrPage() {
                 Checked amounts exceed the payment by ₱
                 {formatMoney(Math.abs(allocationLeftover))}. Reduce applied
                 amounts before confirming.
+              </Alert>
+            ) : null}
+
+            {allocationBlocked ? (
+              <Alert variant="danger">
+                ₱{formatMoney(allocationLeftover)} is still unapplied while ₱
+                {formatMoney(allocationUnusedCapacity)} of open installment
+                capacity is still available on this account. Check or top up
+                another installment row before confirming.
               </Alert>
             ) : null}
 

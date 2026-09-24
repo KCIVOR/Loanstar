@@ -1,7 +1,10 @@
 import { handleApiError, jsonOk } from "@/lib/api/handler";
 import { summarizeUnpostedForAccount } from "@/lib/ar/duplicate-dcr";
 import { getAccountEffectiveBalance } from "@/lib/ar/effective-balance";
-import { fetchAccountPostings } from "@/lib/collection/account-postings";
+import {
+  fetchAccountBouncedItems,
+  fetchAccountPostings,
+} from "@/lib/collection/account-postings";
 import { nextOpenInstallment, type ScheduleLite } from "@/lib/collector/desk";
 import { AMORTIZATION_SCHEDULE_LEDGER_COLUMNS } from "@/lib/ledger/build-account-ledger-rows";
 import {
@@ -189,6 +192,7 @@ export async function GET(_request: Request, { params }: RouteParams) {
     });
 
     const postings = await fetchAccountPostings(id);
+    const bouncedItems = await fetchAccountBouncedItems(id);
     // Task 4b — see docs/revision-plans/task-04b-effective-balance-plan.md.
     // Additive only; `outstandingBalance` above is untouched.
     const effectiveBalance = await getAccountEffectiveBalance(
@@ -272,6 +276,7 @@ export async function GET(_request: Request, { params }: RouteParams) {
       ),
       postings,
       pdcChecks,
+      bouncedItems,
       effectiveBalance: {
         postedTotal: effectiveBalance.postedTotal,
         effectiveTotal: effectiveBalance.effectiveTotal,

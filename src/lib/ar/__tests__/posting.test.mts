@@ -4,6 +4,7 @@ import { describe, it } from "node:test";
 import { netInstallmentDue } from "../../computation/money";
 import {
   addPaymentToDcr,
+  bounceDcrItem,
   computeAutoAllocation,
   isAccountFullySettled,
   reconcileAndPostDcr,
@@ -321,6 +322,9 @@ describe("addPaymentToDcr", () => {
   type AddStubOpts = {
     paymentAmount?: number;
     masterlistId?: string;
+    /** Receipt zero-out (2026-09-24) — set to mark this payment a Move of
+     * Payment surcharge, which exempts it from the leftover-capacity guard. */
+    moveOfPaymentBatchId?: string | null;
     schedules?: Array<{
       id: string;
       masterlist_id: string;
@@ -335,6 +339,7 @@ describe("addPaymentToDcr", () => {
   function makeAddStub(opts: AddStubOpts = {}) {
     const paymentAmount = opts.paymentAmount ?? 1000;
     const masterlistId = opts.masterlistId ?? "ml-1";
+    const moveOfPaymentBatchId = opts.moveOfPaymentBatchId ?? null;
     const schedules =
       opts.schedules ??
       [
@@ -371,6 +376,7 @@ describe("addPaymentToDcr", () => {
               amount: paymentAmount,
               status: "confirmed",
               masterlist_id: masterlistId,
+              move_of_payment_batch_id: moveOfPaymentBatchId,
             },
             error: null,
           });
@@ -569,6 +575,167 @@ describe("addPaymentToDcr", () => {
     assert.deepEqual(getInsertedAllocations(), expected);
   });
 
+  describe("receipt zero-out (UAT #60/#63, 2026-09-24)", () => {
+    it("blocks a manual allocation that leaves money unapplied while another open installment still has capacity", async () => {
+      const { supabase } = makeAddStub({
+        paymentAmount: 58000,
+        schedules: [
+          {
+            id: "s1",
+            masterlist_id: "ml-1",
+            status: "pending",
+            installment_no: 1,
+            amount_due: 20000,
+            penalty_amount: 0,
+            amount_paid: 0,
+          },
+          {
+            id: "s2",
+            masterlist_id: "ml-1",
+            status: "pending",
+            installment_no: 2,
+            amount_due: 20000,
+            penalty_amount: 0,
+            amount_paid: 0,
+          },
+          {
+            id: "s3",
+            masterlist_id: "ml-1",
+            status: "pending",
+            installment_no: 3,
+            amount_due: 18000,
+            penalty_amount: 0,
+            amount_paid: 0,
+          },
+        ],
+      });
+      await assert.rejects(
+        () =>
+          addPaymentToDcr(
+            supabase,
+            "dcr-1",
+            "pay-1",
+            "collector-1",
+            [
+              { amortizationScheduleId: "s1", amount: 20000 },
+              { amortizationScheduleId: null, amount: 38000 },
+            ],
+            undefined,
+            makeDupServiceStub(),
+          ),
+        /unapplied while ₱38000\.00 of open installment capacity/,
+      );
+    });
+
+    it("allows a leftover line when every open installment is already fully allocated (legitimate prepayment)", async () => {
+      const { supabase, getInsertedAllocations } = makeAddStub({
+        paymentAmount: 25000,
+        schedules: [
+          {
+            id: "s1",
+            masterlist_id: "ml-1",
+            status: "pending",
+            installment_no: 1,
+            amount_due: 20000,
+            penalty_amount: 0,
+            amount_paid: 0,
+          },
+        ],
+      });
+      await addPaymentToDcr(
+        supabase,
+        "dcr-1",
+        "pay-1",
+        "collector-1",
+        [
+          { amortizationScheduleId: "s1", amount: 20000 },
+          { amortizationScheduleId: null, amount: 5000 },
+        ],
+        undefined,
+        makeDupServiceStub(),
+      );
+      assert.deepEqual(getInsertedAllocations(), [
+        { amortizationScheduleId: "s1", amount: 20000 },
+        { amortizationScheduleId: null, amount: 5000 },
+      ]);
+    });
+
+    it("exempts a Move of Payment surcharge from the capacity check even when other open installments have room", async () => {
+      const { supabase, getInsertedAllocations } = makeAddStub({
+        paymentAmount: 5000,
+        moveOfPaymentBatchId: "batch-1",
+        schedules: [
+          {
+            id: "s1",
+            masterlist_id: "ml-1",
+            status: "pending",
+            installment_no: 1,
+            amount_due: 20000,
+            penalty_amount: 0,
+            amount_paid: 0,
+          },
+        ],
+      });
+      await addPaymentToDcr(
+        supabase,
+        "dcr-1",
+        "pay-1",
+        "collector-1",
+        [{ amortizationScheduleId: null, amount: 5000 }],
+        undefined,
+        makeDupServiceStub(),
+      );
+      assert.deepEqual(getInsertedAllocations(), [
+        { amortizationScheduleId: null, amount: 5000 },
+      ]);
+    });
+
+    it("nets out capacity already claimed by another unposted DCRR before deciding whether to block", async () => {
+      const { supabase, getInsertedAllocations } = makeAddStub({
+        paymentAmount: 20000,
+        schedules: [
+          {
+            id: "s1",
+            masterlist_id: "ml-1",
+            status: "pending",
+            installment_no: 1,
+            amount_due: 15000,
+            penalty_amount: 0,
+            amount_paid: 0,
+          },
+          {
+            id: "s2",
+            masterlist_id: "ml-1",
+            status: "pending",
+            installment_no: 2,
+            amount_due: 15000,
+            penalty_amount: 0,
+            amount_paid: 0,
+          },
+        ],
+      });
+      await addPaymentToDcr(
+        supabase,
+        "dcr-1",
+        "pay-1",
+        "collector-1",
+        [
+          { amortizationScheduleId: "s1", amount: 15000 },
+          { amortizationScheduleId: null, amount: 5000 },
+        ],
+        undefined,
+        // s2's entire 15000 is already claimed by another unposted DCRR, so
+        // it contributes 0 free capacity — the 5000 leftover has nowhere
+        // else to go and must be allowed.
+        makeDupServiceStub({ s2: 15000 }),
+      );
+      assert.deepEqual(getInsertedAllocations(), [
+        { amortizationScheduleId: "s1", amount: 15000 },
+        { amortizationScheduleId: null, amount: 5000 },
+      ]);
+    });
+  });
+
   it("Task 4 — blocks when the new allocation would OVER-fill an installment another unposted DCRR already covers", async () => {
     const { supabase } = makeAddStub({
       paymentAmount: 1000,
@@ -735,6 +902,209 @@ describe("addPaymentToDcr", () => {
     assert.deepEqual(getInsertedAllocations(), [
       { amortizationScheduleId: "s1", amount: 1000 },
     ]);
+  });
+});
+
+describe("bounceDcrItem", () => {
+  type BounceStubOpts = {
+    itemStatus?: string;
+    dcrStatus?: string;
+    itemAmount?: number;
+    otherItemStatuses?: string[];
+  };
+
+  function makeBounceStub(opts: BounceStubOpts = {}) {
+    const itemStatus = opts.itemStatus ?? "pending";
+    const dcrStatus = opts.dcrStatus ?? "submitted";
+    const itemAmount = opts.itemAmount ?? 58000;
+    const otherItemStatuses = opts.otherItemStatuses ?? [];
+
+    let updatedItem: Record<string, unknown> | null = null;
+    let updatedPayment: Record<string, unknown> | null = null;
+    let updatedDcr: Record<string, unknown> | null = null;
+
+    const supabase = {
+      from(table: string) {
+        if (table === "dcr_items") {
+          return {
+            select: () => ({
+              eq: () => ({
+                single: async () => ({
+                  data: {
+                    id: "item-1",
+                    dcr_id: "dcr-1",
+                    payment_id: "pay-1",
+                    amount: itemAmount,
+                    status: itemStatus,
+                    payments: {
+                      masterlist_id: "ml-1",
+                      loan_application_id: "app-1",
+                    },
+                  },
+                  error: null,
+                }),
+              }),
+            }),
+          };
+        }
+        if (table === "dcr") {
+          return {
+            select: () => ({
+              eq: () => ({
+                single: async () => ({
+                  data: {
+                    id: "dcr-1",
+                    status: dcrStatus,
+                    collector_user_id: "collector-1",
+                  },
+                  error: null,
+                }),
+              }),
+            }),
+          };
+        }
+        throw new Error(`unexpected table ${table} on session client`);
+      },
+    };
+
+    const admin = {
+      from(table: string) {
+        if (table === "dcr_items") {
+          return {
+            update: (payload: Record<string, unknown>) => ({
+              eq: async () => {
+                updatedItem = payload;
+                return { error: null };
+              },
+            }),
+            select: () => ({
+              eq: async () => ({
+                data: [
+                  { status: "bounced" },
+                  ...otherItemStatuses.map((status) => ({ status })),
+                ],
+                error: null,
+              }),
+            }),
+          };
+        }
+        if (table === "payments") {
+          return {
+            update: (payload: Record<string, unknown>) => ({
+              eq: async () => {
+                updatedPayment = payload;
+                return { error: null };
+              },
+            }),
+          };
+        }
+        if (table === "dcr") {
+          return {
+            update: (payload: Record<string, unknown>) => ({
+              eq: async () => {
+                updatedDcr = payload;
+                return { error: null };
+              },
+            }),
+          };
+        }
+        // The whole point of never posting a bounce: it must not touch
+        // `postings` or `dcr_item_allocations` at all.
+        throw new Error(
+          `bounceDcrItem must never touch table "${table}" — this is the mechanism by which the balance stays unaffected`,
+        );
+      },
+    };
+
+    return {
+      supabase: supabase as never,
+      admin: admin as never,
+      getUpdatedItem: () => updatedItem,
+      getUpdatedPayment: () => updatedPayment,
+      getUpdatedDcr: () => updatedDcr,
+    };
+  }
+
+  it("records the bounce (status, reference, amount) and never touches postings", async () => {
+    const { supabase, admin, getUpdatedItem, getUpdatedPayment } =
+      makeBounceStub({ itemAmount: 58000 });
+    const result = await bounceDcrItem(
+      supabase,
+      "item-1",
+      "actor-1",
+      { depositReference: "DAIF", depositAmount: 58000 },
+      admin,
+    );
+    assert.equal(result.status, "bounced");
+    assert.equal(result.collectorUserId, "collector-1");
+    assert.equal(result.loanApplicationId, "app-1");
+    assert.deepEqual(getUpdatedItem(), {
+      status: "bounced",
+      deposit_reference: "DAIF",
+      deposit_amount: 58000,
+      posted_by: "actor-1",
+      posted_at: getUpdatedItem()!.posted_at,
+    });
+    assert.match(String(getUpdatedPayment()!.flagged_reason), /DAIF/);
+  });
+
+  it("rejects an item that was already processed", async () => {
+    const { supabase, admin } = makeBounceStub({ itemStatus: "posted" });
+    await assert.rejects(
+      () =>
+        bounceDcrItem(
+          supabase,
+          "item-1",
+          "actor-1",
+          { depositReference: "DAIF", depositAmount: 58000 },
+          admin,
+        ),
+      /already processed/,
+    );
+  });
+
+  it("rejects when the deposit amount does not match the item's amount", async () => {
+    const { supabase, admin } = makeBounceStub({ itemAmount: 58000 });
+    await assert.rejects(
+      () =>
+        bounceDcrItem(
+          supabase,
+          "item-1",
+          "actor-1",
+          { depositReference: "DAIF", depositAmount: 20000 },
+          admin,
+        ),
+      /does not match this line item's amount/,
+    );
+  });
+
+  it("rejects when the parent DCRR is not submitted", async () => {
+    const { supabase, admin } = makeBounceStub({ dcrStatus: "draft" });
+    await assert.rejects(
+      () =>
+        bounceDcrItem(
+          supabase,
+          "item-1",
+          "actor-1",
+          { depositReference: "DAIF", depositAmount: 58000 },
+          admin,
+        ),
+      /must be submitted/,
+    );
+  });
+
+  it("marks the DCRR reconciled (not rejected) when every item bounced and none posted", async () => {
+    const { supabase, admin, getUpdatedDcr } = makeBounceStub({
+      otherItemStatuses: [],
+    });
+    await bounceDcrItem(
+      supabase,
+      "item-1",
+      "actor-1",
+      { depositReference: "DAIF", depositAmount: 58000 },
+      admin,
+    );
+    assert.equal(getUpdatedDcr()!.status, "reconciled");
   });
 });
 

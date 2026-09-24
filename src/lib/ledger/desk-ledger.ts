@@ -3,6 +3,7 @@ import {
   checkNumbersByInstallmentNo,
   ledgerEntriesFromPostings,
   type AccountLedgerRow,
+  type LedgerBouncedItem,
   type LedgerPdcCheck,
 } from "./build-account-ledger-rows";
 
@@ -37,6 +38,7 @@ export type BuildDeskLedgerInput = {
   schedules: DeskLedgerSchedule[];
   postings: DeskLedgerPosting[];
   pdcChecks: LedgerPdcCheck[];
+  bouncedItems?: LedgerBouncedItem[];
 };
 
 /**
@@ -49,6 +51,7 @@ export function buildDeskLedgerRows({
   schedules,
   postings,
   pdcChecks,
+  bouncedItems,
 }: BuildDeskLedgerInput): AccountLedgerRow[] {
   const checkNoByInstallment = checkNumbersByInstallmentNo(
     pdcChecks,
@@ -81,5 +84,6 @@ export function buildDeskLedgerRows({
         row.deferredFromMoveOfPaymentBatchId ?? null,
     })),
     payments: ledgerEntriesFromPostings(postings),
+    bouncedItems,
   });
 }

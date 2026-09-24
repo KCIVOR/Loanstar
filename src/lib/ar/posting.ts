@@ -266,6 +266,11 @@ async function validateAllocationLines(
   masterlistId: string,
   paymentAmount: number,
   allocations: AllocationLine[],
+  isSurcharge: boolean,
+  /** Service-role client for the capacity check's duplicate-allocation
+   * lookup. Defaults to `createServiceClient()`; injectable so unit tests
+   * can stub it, mirroring `addPaymentToDcr`'s own `serviceClient` param. */
+  serviceClient?: SupabaseClient,
 ): Promise<void> {
   const total = halfUp(
     allocations.reduce((sum, line) => sum + line.amount, 0),
@@ -275,6 +280,49 @@ async function validateAllocationLines(
     throw new Error(
       `Allocation total ${total.toFixed(2)} does not match the payment amount ${expected.toFixed(2)} — adjust the installment split before adding to the DCRR`,
     );
+  }
+
+  // Receipt zero-out (UAT #60/#63, 2026-09-23) — a leftover/advance line is
+  // only legitimate when no still-open installment on this account could
+  // have absorbed it instead. A Move of Payment surcharge is exempt: it is
+  // deliberately always 100% unapplied by design (Fixes Plan Phase 3, Issue
+  // 5), not the "collector forgot to check a row" bug this guards against.
+  const leftoverLine = allocations.find(
+    (line) => line.amortizationScheduleId === null,
+  );
+  if (leftoverLine && leftoverLine.amount > 0 && !isSurcharge) {
+    const [openInstallments, pendingRaw] = await Promise.all([
+      fetchOpenInstallments(supabase, masterlistId),
+      loadPendingAllocationsForAccount(
+        serviceClient ?? createServiceClient(),
+        masterlistId,
+      ),
+    ]);
+    const claimedByThisSubmission = new Map(
+      allocations
+        .filter((line) => line.amortizationScheduleId !== null)
+        .map((line) => [line.amortizationScheduleId as string, line.amount]),
+    );
+    let unusedCapacity = 0;
+    for (const inst of openInstallments) {
+      const remainingDue = netInstallmentDue({
+        amountDue: inst.amountDue,
+        discountAmount: inst.discountAmount,
+        penaltyAmount: inst.penaltyAmount,
+        amountPaid: inst.amountPaid,
+      });
+      const pendingElsewhere = pendingRaw[inst.id]?.amount ?? 0;
+      const freeCapacity = Math.max(0, halfUp(remainingDue - pendingElsewhere));
+      const usedByThisSubmission = claimedByThisSubmission.get(inst.id) ?? 0;
+      unusedCapacity = halfUp(
+        unusedCapacity + Math.max(0, halfUp(freeCapacity - usedByThisSubmission)),
+      );
+    }
+    if (unusedCapacity > 0) {
+      throw new Error(
+        `Allocation leaves ₱${leftoverLine.amount.toFixed(2)} unapplied while ₱${unusedCapacity.toFixed(2)} of open installment capacity is still available on this account — apply it to an open installment before adding to the DCRR.`,
+      );
+    }
   }
 
   const scheduleIds = allocations
@@ -1225,6 +1273,120 @@ export async function rejectDcrItem(
 }
 
 /**
+ * Records a bounced/returned check on a submitted DCRR's line item (UAT
+ * #65, 2026-09-23 — see docs/ar-bounced-check-recording-implementation-plan.md).
+ * Unlike Reject, the `dcr_items` row is kept (status 'bounced', never
+ * deleted) — a bounce is a permanent, closed-out fact about this specific
+ * payment attempt, not a mis-entered line waiting to be resubmitted. Unlike
+ * Post, this NEVER calls `postSingleDcrItem` or writes to `postings` — that
+ * is the entire mechanism by which the account balance stays unaffected,
+ * since every existing write to `postings` is read by the ledger as money
+ * in and there is no native way to post a debit through that table. The
+ * bank's return code (e.g. "DAIF") reuses the same `deposit_reference`
+ * field Post already uses — the client was explicit no separate remarks
+ * field is needed.
+ */
+export async function bounceDcrItem(
+  supabase: SupabaseClient,
+  dcrItemId: string,
+  actorId: string,
+  input: {
+    depositReference: string;
+    depositAmount: number;
+    depositProofPath?: string | null;
+  },
+  /** Service-role client for the admin-privileged writes below. Defaults to
+   * `createServiceClient()`; injectable so unit tests can stub it, mirroring
+   * `addPaymentToDcr`'s own `serviceClient` param. */
+  serviceClient?: SupabaseClient,
+) {
+  const { data: item, error: itemFetchError } = await supabase
+    .from("dcr_items")
+    .select(
+      `
+      id,
+      dcr_id,
+      payment_id,
+      amount,
+      status,
+      payments ( masterlist_id, loan_application_id )
+    `,
+    )
+    .eq("id", dcrItemId)
+    .single();
+
+  if (itemFetchError || !item) {
+    throw new Error("DCRR line item not found");
+  }
+  if (item.status !== "pending") {
+    throw new Error("This line item was already processed");
+  }
+
+  const { data: dcr } = await supabase
+    .from("dcr")
+    .select("id, status, collector_user_id")
+    .eq("id", item.dcr_id)
+    .single();
+
+  if (!dcr || dcr.status !== "submitted") {
+    throw new Error("DCRR must be submitted before it can be marked bounced");
+  }
+
+  // Same sanity check reconcileDcrItem already performs — a bounce isn't
+  // exempt from confirming the reported amount matches this specific item
+  // just because no money ultimately moves.
+  const itemAmount = halfUp(Number(item.amount));
+  if (halfUp(input.depositAmount) !== itemAmount) {
+    throw new Error(
+      `Deposit amount ${input.depositAmount.toFixed(2)} does not match this line item's amount ${itemAmount.toFixed(2)} — verify the bank deposit before marking it bounced`,
+    );
+  }
+
+  const now = new Date().toISOString();
+  const admin = serviceClient ?? createServiceClient();
+
+  const { error: itemError } = await admin
+    .from("dcr_items")
+    .update({
+      status: "bounced",
+      deposit_reference: input.depositReference,
+      deposit_amount: itemAmount,
+      posted_by: actorId,
+      posted_at: now,
+    })
+    .eq("id", dcrItemId);
+  if (itemError) {
+    throw new Error(itemError.message);
+  }
+
+  const { error: flagError } = await admin
+    .from("payments")
+    .update({
+      flagged_reason: `Bounced: ${input.depositReference}`,
+      flagged_at: now,
+    })
+    .eq("id", item.payment_id);
+  if (flagError) {
+    throw new Error(flagError.message);
+  }
+
+  await settleDcrStatusIfComplete(admin, item.dcr_id as string, actorId, now);
+
+  const paymentRow = item.payments as
+    | { masterlist_id?: string | null; loan_application_id?: string | null }
+    | { masterlist_id?: string | null; loan_application_id?: string | null }[]
+    | null;
+  const payment = Array.isArray(paymentRow) ? paymentRow[0] : paymentRow;
+
+  return {
+    status: "bounced" as const,
+    collectorUserId: dcr.collector_user_id as string,
+    loanApplicationId: (payment?.loan_application_id as string) ?? null,
+    masterlistId: (payment?.masterlist_id as string) ?? null,
+  };
+}
+
+/**
  * Once every remaining dcr_item on a DCR has left "pending" (each was
  * individually posted or rejected), roll the parent dcr.status forward so
  * it drops out of AR's active queue: "reconciled" if anything posted,
@@ -1247,12 +1409,18 @@ async function settleDcrStatusIfComplete(
     return;
   }
 
-  const anyPosted = rows.some((row) => row.status === "posted");
+  // A bounced item is a processed outcome, not a rejection of the whole
+  // batch — a DCR containing only bounced items (no posted ones) must still
+  // resolve to "reconciled", never "rejected" (2026-09-24, receipt
+  // zero-out/bounce work).
+  const anyProcessed = rows.some(
+    (row) => row.status === "posted" || row.status === "bounced",
+  );
 
   await admin
     .from("dcr")
     .update(
-      anyPosted
+      anyProcessed
         ? { status: "reconciled", reconciled_by: actorId, reconciled_at: now }
         : { status: "rejected", rejected_by: actorId, rejected_at: now },
     )
@@ -1594,7 +1762,7 @@ export async function addPaymentToDcr(
 
   const { data: payment } = await supabase
     .from("payments")
-    .select("id, amount, status, masterlist_id")
+    .select("id, amount, status, masterlist_id, move_of_payment_batch_id")
     .eq("id", paymentId)
     .single();
 
@@ -1640,6 +1808,8 @@ export async function addPaymentToDcr(
       masterlistId,
       Number(payment.amount),
       allocations,
+      Boolean(payment.move_of_payment_batch_id),
+      serviceClient,
     );
     resolvedAllocations = allocations;
   } else {

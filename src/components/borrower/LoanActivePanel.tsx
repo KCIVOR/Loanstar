@@ -21,6 +21,7 @@ import {
   checkNumbersByInstallmentNo,
   ledgerEntriesFromPostings,
   mapScheduleRowForLedger,
+  type LedgerBouncedItem,
   type LedgerPdcCheck,
 } from "@/lib/ledger/build-account-ledger-rows";
 import {
@@ -138,6 +139,7 @@ export function LoanActivePanel({
     InternalTransferCreditRow[]
   >([]);
   const [pdcChecks, setPdcChecks] = useState<LedgerPdcCheck[]>([]);
+  const [bouncedItems, setBouncedItems] = useState<LedgerBouncedItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [amount, setAmount] = useState("");
   const [paymentDate, setPaymentDate] = useState("");
@@ -170,12 +172,14 @@ export function LoanActivePanel({
         payments: PaymentRow[];
         postings?: PostingRow[];
         pdcChecks?: LedgerPdcCheck[];
+        bouncedItems?: LedgerBouncedItem[];
         internalTransferCredits?: InternalTransferCreditRow[];
       };
       setLoan(data.loan);
       setPayments(data.payments);
       setPostings(data.postings ?? []);
       setPdcChecks(data.pdcChecks ?? []);
+      setBouncedItems(data.bouncedItems ?? []);
       setInternalTransferCredits(data.internalTransferCredits ?? []);
     } finally {
       setLoading(false);
@@ -342,6 +346,7 @@ export function LoanActivePanel({
         scheduleId: row.amortization_schedule_id,
       })),
     ],
+    bouncedItems,
   });
 
   return (

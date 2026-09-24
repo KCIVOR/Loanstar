@@ -13,7 +13,10 @@ import {
   PageHeader,
   Spinner,
 } from "@/components/ui";
-import { type LedgerPdcCheck } from "@/lib/ledger/build-account-ledger-rows";
+import {
+  type LedgerBouncedItem,
+  type LedgerPdcCheck,
+} from "@/lib/ledger/build-account-ledger-rows";
 import {
   buildDeskLedgerRows,
   type DeskLedgerPosting,
@@ -62,6 +65,7 @@ type AccountPayload = {
   payments: PaymentRow[];
   postings?: DeskLedgerPosting[];
   pdcChecks?: LedgerPdcCheck[];
+  bouncedItems?: LedgerBouncedItem[];
   /** Task 4 — recorded-but-unposted payments on this account (informational
    * heads-up before recording another). Absent on desks not yet wired. */
   unpostedOnAccount?: {
@@ -148,6 +152,7 @@ export function RecordPaymentPage({
       schedules: data.schedules,
       postings: data.postings ?? [],
       pdcChecks: data.pdcChecks ?? [],
+      bouncedItems: data.bouncedItems ?? [],
     });
   }, [data]);
 

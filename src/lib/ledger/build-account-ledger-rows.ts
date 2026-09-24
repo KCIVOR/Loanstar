@@ -132,10 +132,31 @@ export type LedgerPaymentEntry = {
   moveOfPaymentBatchId?: string | null;
 };
 
+/** A bounced/returned check (2026-09-24, see
+ * docs/ar-bounced-check-recording-implementation-plan.md) — rendered as a
+ * zero-amount row nested under the installment it was allocated toward
+ * (2026-09-24 follow-up — grouped the same way multiple real payments on
+ * one installment already collapse into an expandable "N payments" row),
+ * or as its own standalone row when it has no schedule allocation on file. */
+export type LedgerBouncedItem = {
+  id: string;
+  amount: number;
+  referenceNo: string;
+  date: string;
+  /** The installment this item was allocated toward at "Add to DCR" time
+   * (from `dcr_item_allocations`, recorded before Post/Reject/Bounce ever
+   * happens) — so the ledger can still group/place it under the right
+   * schedule even though the bounce itself never posts against it. Null
+   * when the item had no schedule allocation on file (e.g. a
+   * fully-unapplied line) — that renders as its own standalone row. */
+  scheduleId: string | null;
+};
+
 export type BuildAccountLedgerInput = {
   openingDebit: number;
   schedules: LedgerSchedule[];
   payments: LedgerPaymentEntry[];
+  bouncedItems?: LedgerBouncedItem[];
 };
 
 export type AccountLedgerRowKind =
@@ -144,6 +165,7 @@ export type AccountLedgerRowKind =
   | "payment"
   | "move_of_payment"
   | "surcharge_payment"
+  | "bounced_check"
   | "totals";
 
 export type AccountLedgerRow = {
@@ -279,6 +301,24 @@ export function buildAccountLedgerRows(
       continue;
     }
     unappliedCredits.push(payment);
+  }
+
+  // Bounced checks (2026-09-24, moved under their target installment
+  // 2026-09-24 follow-up) — grouped the same way real credits are, so a
+  // bounce sits alongside/among the real payments on the same due date
+  // instead of trailing the whole report as an unrelated line. An item
+  // with no schedule allocation on file renders standalone, same place
+  // unapplied credits do.
+  const bouncedByScheduleId = new Map<string, LedgerBouncedItem[]>();
+  const unassignedBounced: LedgerBouncedItem[] = [];
+  for (const bounced of input.bouncedItems ?? []) {
+    if (bounced.scheduleId && scheduleById.has(bounced.scheduleId)) {
+      const list = bouncedByScheduleId.get(bounced.scheduleId) ?? [];
+      list.push(bounced);
+      bouncedByScheduleId.set(bounced.scheduleId, list);
+      continue;
+    }
+    unassignedBounced.push(bounced);
   }
 
   const rows: AccountLedgerRow[] = [
@@ -418,6 +458,49 @@ export function buildAccountLedgerRows(
     });
   }
 
+  /** A bounced/returned check (2026-09-24, moved under its target
+   * installment 2026-09-24 follow-up) — shares the "payment" row's
+   * schedule-derived fields (checkNo/dueDate/target/penalty/discount) so a
+   * group header still reads correctly if this happens to sort first, but
+   * posts 0/0 and deliberately skips both the balance/creditTotal mutation
+   * pushCredit does AND applyCreditToRemaining — no real money moved, so
+   * nothing about what's still owed changes.
+   *
+   * `monthRemaining`/`penaltyRemaining` are the one exception to "no real
+   * money moved": they must still reflect what's actually still owed on
+   * this installment (via `schedRemaining`, not `NO_REMAIN`) — otherwise a
+   * bounce-only schedule never seeds/tracks its remaining amount at all,
+   * so the row (and, since the group header reads `last`, the whole
+   * expandable group) shows a blank "This Month" cell, and the Report
+   * Total footer silently drops that installment's still-owed amount
+   * entirely (2026-09-24 follow-up, caught from a live screenshot). Safe to
+   * call unconditionally: `schedRemaining` only seeds once and never
+   * mutates, so it just reports whatever a prior real credit already left
+   * remaining, or the full original amount if none did. */
+  function pushBounce(bounced: LedgerBouncedItem, schedule: LedgerSchedule | null) {
+    rows.push({
+      kind: "bounced_check",
+      key: `bounced_check:${bounced.id}`,
+      checkNo: schedule?.checkNo?.trim() || null,
+      dueDate: schedule?.dueDate ?? null,
+      target: schedule ? netTarget(schedule.target, schedule.discount) : null,
+      penalty: schedule
+        ? netPenalty(schedule.penalty, schedule.penaltyDiscount)
+        : null,
+      discount: schedule ? discountOrNull(schedule.discount) : null,
+      discountSource: schedule?.discountSource ?? null,
+      date: bounced.date,
+      referenceNo: bounced.referenceNo,
+      status: "bounced",
+      debit: 0,
+      credit: 0,
+      balance,
+      scheduleId: schedule?.id ?? null,
+      ...carryFields(schedule),
+      ...schedRemaining(schedule),
+    });
+  }
+
   /** A collected Move of Payment surcharge — shown as a credit line but
    * deliberately excluded from `balance` and `creditTotal` (D2 = B): the
    * loan obligation is unchanged, the surcharge is separate. */
@@ -466,6 +549,7 @@ export function buildAccountLedgerRows(
     const credits = (creditsByScheduleId.get(schedule.id) ?? []).sort(
       byPaymentDateThenId,
     );
+    const bounces = (bouncedByScheduleId.get(schedule.id) ?? []).slice();
 
     // Fold this installment's accrued late fee into the running balance before
     // its own credits are applied against it (no-op for 0 / rolled / moved).
@@ -477,6 +561,7 @@ export function buildAccountLedgerRows(
       // moved, that payment's history must still show, never silently
       // hidden by collapsing into the batch summary row below.
       for (const payment of credits) pushCredit(payment, schedule);
+      for (const bounced of bounces) pushBounce(bounced, schedule);
 
       if (!renderedBatchIds.has(schedule.moveOfPaymentBatchId)) {
         renderedBatchIds.add(schedule.moveOfPaymentBatchId);
@@ -516,7 +601,15 @@ export function buildAccountLedgerRows(
       continue;
     }
 
-    if (credits.length === 0) {
+    // A bounce is "real activity" on this installment, exactly like a real
+    // payment — so a schedule with a bounce but no credits must skip the
+    // bare placeholder row below and go straight to pushBounce(), the same
+    // way a schedule with credits already skips it via pushCredit(). Two
+    // separate rows for the same installment (a placeholder + a bounce)
+    // would never group in the UI (grouping only collapses consecutive
+    // "payment"/"bounced_check" rows) and would just duplicate the same
+    // target/penalty/checkNo/dueDate on two lines (2026-09-24 follow-up).
+    if (credits.length === 0 && bounces.length === 0) {
       // Quarterly/Two-Monthly Special loans persist a $0 "principal"
       // placeholder row alongside every non-final period's real interest
       // row (see docs/quarterly-bimonthly-special-schedule-implementation-plan.md)
@@ -566,6 +659,7 @@ export function buildAccountLedgerRows(
       continue;
     }
     for (const payment of credits) pushCredit(payment, schedule);
+    for (const bounced of bounces) pushBounce(bounced, schedule);
   }
 
   for (const payment of [...unappliedCredits].sort(byPaymentDateThenId)) {
@@ -605,6 +699,17 @@ export function buildAccountLedgerRows(
     for (const payment of [...pays].sort(byPaymentDateThenId)) {
       pushSurcharge(payment);
     }
+  }
+
+  // Bounced checks with no schedule allocation on file (e.g. a
+  // fully-unapplied line) — every bounce that WAS allocated to an
+  // installment was already pushed via pushBounce() inside the schedule
+  // loop above, nested under that installment the same way a real payment
+  // is. This is only the leftover, unassignable case.
+  for (const bounced of [...unassignedBounced].sort((a, b) =>
+    a.date.localeCompare(b.date),
+  )) {
+    pushBounce(bounced, null);
   }
 
   let monthRemainingTotal = 0;

@@ -268,6 +268,25 @@ export default function CollectorDcrPage() {
 
   const allocationMismatch = allocationLeftover < 0;
 
+  // Receipt zero-out (UAT #60/#63, 2026-09-24) — mirrors the server-side
+  // capacity check in validateAllocationLines: sum how much free capacity
+  // (installmentFreeToAllocate, net of what's already checked here) remains
+  // unused across every open installment. A nonzero leftover is only
+  // blocked when there's somewhere it could have gone instead. Surcharge
+  // payments are deliberately 100% unapplied by design — exempt.
+  const allocationUnusedCapacity = useMemo(() => {
+    if (!allocationModal || allocationModal.isSurcharge) return 0;
+    return halfUp(
+      allocationModal.rows.reduce((sum, row) => {
+        const free = installmentFreeToAllocate(row);
+        const used = row.checked ? row.amount : 0;
+        return sum + Math.max(0, halfUp(free - used));
+      }, 0),
+    );
+  }, [allocationModal]);
+
+  const allocationBlocked = allocationLeftover > 0 && allocationUnusedCapacity > 0;
+
   // Collector Discount (Phase 4) — live, client-side totals using Phase 3's
   // math, same UX pattern as the existing Offset discount modal in
   // ComputationPanel.tsx. Purely for display here; nothing is applied to a
@@ -541,6 +560,7 @@ export default function CollectorDcrPage() {
 
   async function confirmAddToDcr() {
     if (!draftDcrId || !allocationModal) return;
+    if (allocationBlocked) return;
 
     const checkedRows = allocationModal.rows.filter((row) => row.checked);
     const checkedTotal = halfUp(
@@ -933,7 +953,7 @@ export default function CollectorDcrPage() {
             <Button
               onClick={() => void confirmAddToDcr()}
               loading={acting}
-              disabled={allocationMismatch || discountReasonMissing}
+              disabled={allocationMismatch || allocationBlocked || discountReasonMissing}
             >
               Add to DCRR
             </Button>
@@ -976,7 +996,7 @@ export default function CollectorDcrPage() {
                   {allocationLeftover >= 0 ? "Advance (leftover)" : "Over-applied"}
                 </p>
                 <p
-                  className={`mono mt-1 text-lg font-semibold ${allocationMismatch ? "text-red-600" : "text-navy-900"}`}
+                  className={`mono mt-1 text-lg font-semibold ${allocationMismatch || allocationBlocked ? "text-red-600" : "text-navy-900"}`}
                 >
                   ₱{formatMoney(Math.abs(allocationLeftover))}
                 </p>
@@ -988,6 +1008,15 @@ export default function CollectorDcrPage() {
                 Checked amounts exceed the payment by ₱
                 {formatMoney(Math.abs(allocationLeftover))}. Reduce applied
                 amounts before confirming.
+              </Alert>
+            ) : null}
+
+            {allocationBlocked ? (
+              <Alert variant="danger">
+                ₱{formatMoney(allocationLeftover)} is still unapplied while ₱
+                {formatMoney(allocationUnusedCapacity)} of open installment
+                capacity is still available on this account. Check or top up
+                another installment row before confirming.
               </Alert>
             ) : null}
 

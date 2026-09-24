@@ -236,6 +236,9 @@ export default function ArDcrPage() {
   const [rejectId, setRejectId] = useState<string | null>(null);
   const [rejectReason, setRejectReason] = useState("");
   const [rejecting, setRejecting] = useState(false);
+  const [bounceId, setBounceId] = useState<string | null>(null);
+  const [bounceReference, setBounceReference] = useState("");
+  const [bouncing, setBouncing] = useState(false);
 
   const load = useCallback(
     async (opts?: { silent?: boolean; status?: "submitted" | "rejected" }) => {
@@ -286,6 +289,35 @@ export default function ArDcrPage() {
       setError(err instanceof Error ? err.message : "Reject failed");
     } finally {
       setRejecting(false);
+    }
+  }
+
+  async function bounce(itemId: string, amount: number) {
+    const ref = bounceReference.trim();
+    if (!ref) return;
+    setBouncing(true);
+    setError(null);
+    setMessage(null);
+    try {
+      const res = await fetch(`/api/ar/dcr/items/${itemId}/bounce`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ depositReference: ref, depositAmount: amount }),
+      });
+      if (!res.ok) {
+        const body = (await res.json().catch(() => null)) as {
+          error?: string;
+        } | null;
+        throw new Error(body?.error ?? "Bounce failed");
+      }
+      setBounceId(null);
+      setBounceReference("");
+      setMessage("Check marked bounced — recorded on the account ledger with no effect on the balance. The collector was notified.");
+      await load({ silent: true });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Bounce failed");
+    } finally {
+      setBouncing(false);
     }
   }
 
@@ -401,6 +433,15 @@ export default function ArDcrPage() {
   const confirmBorrowerName =
     confirmItem?.payments?.masterlist?.borrower_name ?? "this borrower";
   const confirmAmount = Number(confirmItem?.amount ?? 0);
+
+  const bounceItem = bounceId
+    ? (queue
+        .flatMap((d) => d.dcr_items ?? [])
+        .find((item) => item.id === bounceId) ?? null)
+    : null;
+  const bounceBorrowerName =
+    bounceItem?.payments?.masterlist?.borrower_name ?? "this borrower";
+  const bounceAmount = Number(bounceItem?.amount ?? 0);
 
   return (
     <div>
@@ -889,6 +930,17 @@ export default function ArDcrPage() {
                                           >
                                             Reject
                                           </Button>
+                                          <Button
+                                            type="button"
+                                            size="sm"
+                                            variant="danger-soft"
+                                            onClick={() => {
+                                              setBounceReference(depositRef[itemId] ?? "");
+                                              setBounceId(itemId);
+                                            }}
+                                          >
+                                            Bounce
+                                          </Button>
                                         </div>
                                         {amountMismatch ? (
                                           <p className="text-xs text-warning">
@@ -1006,6 +1058,57 @@ export default function ArDcrPage() {
           onChange={(e) => setRejectReason(e.target.value)}
           rows={3}
           placeholder="What's wrong with this payment?"
+        />
+      </Modal>
+
+      <Modal
+        open={bounceId !== null}
+        title="Mark this check bounced?"
+        onClose={() => {
+          if (bouncing) return;
+          setBounceId(null);
+          setBounceReference("");
+        }}
+        footer={
+          <>
+            <Button
+              variant="secondary"
+              disabled={bouncing}
+              onClick={() => {
+                setBounceId(null);
+                setBounceReference("");
+              }}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="danger-soft"
+              loading={bouncing}
+              disabled={bounceReference.trim().length < 1}
+              onClick={() => {
+                if (bounceId) void bounce(bounceId, bounceAmount);
+              }}
+            >
+              Yes, mark bounced
+            </Button>
+          </>
+        }
+      >
+        <p className="mb-3 text-sm text-ink-600">
+          Records ₱{formatMoney(bounceAmount)} for {bounceBorrowerName} as a
+          bounced check — it appears on the account ledger with no effect on
+          the balance. The collector will be notified. This cannot be undone
+          from this screen.
+        </p>
+        <Label htmlFor="bounceReference" required>
+          Bank return reference
+        </Label>
+        <Input
+          id="bounceReference"
+          value={bounceReference}
+          onChange={(e) => setBounceReference(e.target.value)}
+          className="mono"
+          placeholder="e.g. DAIF — returned, insufficient funds"
         />
       </Modal>
       <AutofillOverlay

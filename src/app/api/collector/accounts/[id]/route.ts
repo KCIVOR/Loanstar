@@ -1,7 +1,10 @@
 import { handleApiError, jsonOk } from "@/lib/api/handler";
 import { summarizeUnpostedForAccount } from "@/lib/ar/duplicate-dcr";
 import { getAccountEffectiveBalance } from "@/lib/ar/effective-balance";
-import { fetchAccountPostings } from "@/lib/collection/account-postings";
+import {
+  fetchAccountBouncedItems,
+  fetchAccountPostings,
+} from "@/lib/collection/account-postings";
 import { COLLECTOR_QUEUE_ACCOUNT_STATUS } from "@/lib/collector/queue";
 import { AMORTIZATION_SCHEDULE_LEDGER_COLUMNS } from "@/lib/ledger/build-account-ledger-rows";
 import { listMoveOfPaymentCandidates } from "@/lib/ar/move-of-payment";
@@ -95,6 +98,7 @@ export async function GET(_request: Request, { params }: RouteParams) {
       loanApplicationId: (data.loan_application_id as string | null) ?? null,
     });
     const postings = await fetchAccountPostings(id);
+    const bouncedItems = await fetchAccountBouncedItems(id);
     // Move of Payment (Phase 5, see
     // docs/revision-plans/feature-move-of-payment-implementation-plan.md,
     // extended with manual installment selection) — read-only eligibility +
@@ -176,6 +180,7 @@ export async function GET(_request: Request, { params }: RouteParams) {
       ),
       postings,
       pdcChecks,
+      bouncedItems,
       moveOfPayment,
       effectiveBalance: {
         postedTotal: effectiveBalance.postedTotal,

@@ -10,6 +10,7 @@ import {
 } from "@/lib/ar/masterlist";
 import { getRoundingWriteoffThreshold } from "@/lib/ar/posting";
 import { PaidOffEligibilityError } from "@/lib/ar/paid-off";
+import { fetchAccountBouncedItems } from "@/lib/collection/account-postings";
 import { AMORTIZATION_SCHEDULE_LEDGER_COLUMNS } from "@/lib/ledger/build-account-ledger-rows";
 import { requireModulePermission } from "@/lib/permissions/server";
 import { createClient, createServiceClient } from "@/lib/supabase/server";
@@ -127,6 +128,8 @@ export async function GET(_request: Request, { params }: RouteParams) {
       .eq("masterlist_id", id)
       .order("posted_at", { ascending: true });
 
+    const bouncedItems = await fetchAccountBouncedItems(id);
+
     // AR has no RLS grant on pdc_checks, so scope a service-role read to this
     // account's own release file to surface LRA-encoded check numbers.
     const pdcChecks = await fetchPdcChecks({
@@ -238,6 +241,7 @@ export async function GET(_request: Request, { params }: RouteParams) {
       payments: paymentsWithUploaderNames,
       postings: postings ?? [],
       pdcChecks,
+      bouncedItems,
       roundingWriteoffThreshold,
       roundingWriteoffs,
       internalTransferCredits,

@@ -3,6 +3,7 @@ import { z } from "zod";
 
 import { writeAuditEvent } from "@/lib/audit/writer";
 import { handleApiError, jsonOk } from "@/lib/api/handler";
+import { fetchAccountBouncedItems } from "@/lib/collection/account-postings";
 import { DOCUMENT_BUCKET } from "@/lib/constants";
 import { AMORTIZATION_SCHEDULE_LEDGER_COLUMNS } from "@/lib/ledger/build-account-ledger-rows";
 import {
@@ -132,6 +133,8 @@ export async function GET(_request: Request, ctx: { params: Promise<{ id: string
       .eq("masterlist_id", ctxData.masterlistId)
       .order("posted_at", { ascending: true });
 
+    const bouncedItems = await fetchAccountBouncedItems(ctxData.masterlistId);
+
     // Borrowers may read their own release file and its LRA-encoded checks.
     const { data: releaseFile } = await supabase
       .from("release_files")
@@ -184,6 +187,7 @@ export async function GET(_request: Request, ctx: { params: Promise<{ id: string
       payments: borrowerSafePayments,
       postings: postings ?? [],
       pdcChecks: pdcChecks ?? [],
+      bouncedItems,
       internalTransferCredits,
     });
   } catch (error) {

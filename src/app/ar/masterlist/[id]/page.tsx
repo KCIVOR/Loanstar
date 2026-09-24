@@ -32,6 +32,7 @@ import {
   checkNumbersByInstallmentNo,
   ledgerEntriesFromPostings,
   mapScheduleRowForLedger,
+  type LedgerBouncedItem,
   type LedgerPaymentEntry,
   type LedgerPdcCheck,
 } from "@/lib/ledger/build-account-ledger-rows";
@@ -191,6 +192,7 @@ export default function ArMasterlistDetailPage() {
     InternalTransferCreditRow[]
   >([]);
   const [pdcChecks, setPdcChecks] = useState<LedgerPdcCheck[]>([]);
+  const [bouncedItems, setBouncedItems] = useState<LedgerBouncedItem[]>([]);
   const [roundingWriteoffThreshold, setRoundingWriteoffThreshold] =
     useState(1);
   const [lookups, setLookups] = useState<Lookup | null>(null);
@@ -228,6 +230,7 @@ export default function ArMasterlistDetailPage() {
         payments?: PaymentRow[];
         postings?: PostingRow[];
         pdcChecks?: LedgerPdcCheck[];
+        bouncedItems?: LedgerBouncedItem[];
         roundingWriteoffThreshold?: number;
         roundingWriteoffs?: RoundingWriteoffRow[];
         internalTransferCredits?: InternalTransferCreditRow[];
@@ -236,6 +239,7 @@ export default function ArMasterlistDetailPage() {
       setPayments(recData.payments ?? []);
       setPostings(recData.postings ?? []);
       setPdcChecks(recData.pdcChecks ?? []);
+      setBouncedItems(recData.bouncedItems ?? []);
       setRoundingWriteoffThreshold(
         Number(recData.roundingWriteoffThreshold ?? 1),
       );
@@ -601,6 +605,7 @@ export default function ArMasterlistDetailPage() {
       ...writeOffEntries,
       ...internalTransferEntries,
     ],
+    bouncedItems,
   });
   const writeOffCandidates = schedules.flatMap((row) => {
     const statusLower = String(row.status ?? "").toLowerCase();

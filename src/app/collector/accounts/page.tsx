@@ -8,7 +8,7 @@ import {
   collectorIconProps,
 } from "@/components/collector/CollectorKpi";
 import { ContactLogModal } from "@/components/collector/ContactLogModal";
-import { DemandLetterModal } from "@/components/collector/DemandLetterModal";
+import { DemandLetterModal } from "@/components/collection/DemandLetterModal";
 import {
   DateRangeFilter,
   ViewModeToggle,
@@ -801,7 +801,7 @@ export default function CollectorAccountsPage() {
         <DemandLetterModal
           open={demandModalFor !== null}
           borrowerName={demandModalFor.borrowerName}
-          masterlistId={demandModalFor.id}
+          apiBase={`/api/collector/accounts/${demandModalFor.id}/demand-letter`}
           onClose={() => setDemandModalFor(null)}
         />
       ) : null}
