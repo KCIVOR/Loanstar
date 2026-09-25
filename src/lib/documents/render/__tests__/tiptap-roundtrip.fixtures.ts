@@ -9,6 +9,7 @@ import { SOURCE_FAITHFUL_DEED_OF_CHATTEL_MORTGAGE_PREVIEW } from "@/lib/document
 import { SOURCE_FAITHFUL_CANCELLATION_OF_CHATTEL_MORTGAGE_PREVIEW } from "@/lib/documents/fidelity/cancellation-of-chattel-mortgage-preview";
 import { SOURCE_FAITHFUL_VOLUNTARY_SURRENDER_DEED_AUTO_PREVIEW } from "@/lib/documents/fidelity/voluntary-surrender-deed-auto-preview";
 import { SOURCE_FAITHFUL_SPA_MORTGAGE_CANCELLATION_PREVIEW } from "@/lib/documents/fidelity/spa-mortgage-cancellation-preview";
+import { SOURCE_FAITHFUL_DEMAND_LETTER_SME_PREVIEW } from "@/lib/documents/fidelity/demand-letter-sme-preview";
 
 /**
  * Representative template-HTML patterns drawn from the 29 published templates —
@@ -84,6 +85,7 @@ export const FIXTURES: Record<string, string> = {
   cancellation_of_chattel_mortgage_source_faithful: SOURCE_FAITHFUL_CANCELLATION_OF_CHATTEL_MORTGAGE_PREVIEW,
   voluntary_surrender_deed_auto_source_faithful: SOURCE_FAITHFUL_VOLUNTARY_SURRENDER_DEED_AUTO_PREVIEW,
   spa_mortgage_cancellation_source_faithful: SOURCE_FAITHFUL_SPA_MORTGAGE_CANCELLATION_PREVIEW,
+  demand_letter_sme_source_faithful: SOURCE_FAITHFUL_DEMAND_LETTER_SME_PREVIEW,
 
   // Repeated per-vehicle key/value block, exercised with 2 vehicles (the
   // Phase 4 vehicle-collateral fix: `<div data-repeat="vehicles">` wrapping
