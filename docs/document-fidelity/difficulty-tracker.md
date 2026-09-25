@@ -71,6 +71,38 @@ Multi-page, multiple real variants, or segment-conditional structure.
 | 31 | `application_form_sme_individual` | intake | v1 | |
 | 32 | `application_form` | intake | v1 | **draft pending** (unrelated to this project, check before touching) |
 
+## Business importance ranking
+
+Separate from the difficulty tiers above — this orders templates by how central
+each is to actually releasing or collecting on a loan, not by how hard it is to
+verify. Use this to prioritize which "No source" entries to unblock first if a
+retained client source turns up.
+
+### Tier 1 — Core release documents (used on nearly every loan)
+- `promissory_note` — the loan contract itself
+- `disclosure_statement` — legally required disclosure
+- `deed_of_chattel_mortgage` / `real_estate_mortgage` — the collateral security instrument
+- `ar_atm_voucher` / `ar_cash_voucher` / `ar_check_voucher` — how loan proceeds are actually disbursed
+
+### Tier 2 — Release-path support documents (frequent, conditional on collateral/path)
+- `blri`
+- `agreement_for_consolidation` / `agreement_check_replacement`
+- `consent_form`
+- `loan_agreement` / `loan_agreement_vienovo`
+- `voluntary_surrender_deed_auto` / `voluntary_surrender_deed_rem`
+- `spa_mortgage_cancellation` / `cancellation_of_chattel_mortgage` / `cancellation_of_real_estate_mortgage`
+
+### Tier 3 — Collections (lower volume, high stakes when used)
+- `demand_letter_dishonored_check`
+- `demand_letter_second_notice`
+- `demand_letter_v2`
+- `demand_letter`
+- `demand_letter_sme`
+
+### Tier 4 — Intake / administrative (high volume, lower legal sensitivity)
+- `application_form`, `application_form_sme_corporate`, `application_form_sme_individual`
+- `payment_receipt`, `acknowledgement_receipt`, `cash_voucher`, `check_voucher`, `endorsement_letter`, `letter_of_intent`, `final_computation_sheet`
+
 ## Not ranked
 
 - Everything under **"No source"** above stays blocked per the design doc's rule: a source-without-a-mapping entry must not silently inherit a similar template. Would need real source material from the client to proceed.
