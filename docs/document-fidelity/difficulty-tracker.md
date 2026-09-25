@@ -26,10 +26,10 @@ Single-page letter/voucher, few scalar fields, at most one repeat block.
 | 6 | `demand_letter_dishonored_check` | collection | v2 | |
 | 7 | `demand_letter_v2` | lra | v1 | Fixed |
 | 8 | `demand_letter_second_notice` | collection | v3 | Fixed |
-| 9 | `cash_voucher` | release | v1 | No source |
-| 10 | `check_voucher` | release | v1 | No source |
-| 11 | `ar_cash_voucher` | release | v1 | No source |
-| 12 | `ar_check_voucher` | release | v1 | No source |
+| 9 | `cash_voucher` | release | v2 (docx, **live — needs check**) | Same situation as `blri` below: user-uploaded real sample reached `published` on 2026-09-25 with no tagging pass and no record here — not yet inspected, unknown whether it still has hardcoded real client data live |
+| 10 | `check_voucher` | release | v2 (docx, **live — needs check**) | Same as above — not yet inspected |
+| 11 | `ar_cash_voucher` | release | v2 (docx, **live — needs check**) | Same as above — not yet inspected |
+| 12 | `ar_check_voucher` | release | v2 (docx, **live — needs check**) | Same as above — not yet inspected |
 | — | `demand_letter_sme` | lra | *(draft v1, unpublished)* | Fixed — new template, source was `Demand Letter - SME.doc` |
 
 ## Tier 2 — Moderate
@@ -42,7 +42,7 @@ A real table + repeat block, or several distinct sections.
 | 15 | `consent_form` | release | v2 | Fixed |
 | 16 | `agreement_check_replacement` | release | v2 | Confirmed OK |
 | 17 | `agreement_for_consolidation` | release | v2 | Confirmed OK |
-| 18 | `blri` | release | v1 | |
+| 18 | `blri` | release | v2 (docx, **live — see caveat below**) | **Needs urgent attention** — a real filled sample (`blri.docx`, borrower BN303401) was uploaded directly as a draft with **zero merge tags** (real client name/address/loan data hardcoded) and somehow reached `published` status on 2026-09-25 without ever going through the docx-template-tagging skill or being recorded here or in `source-registry.json`. Every BLRI generated since then shows that one real borrower's data instead of the actual borrower's — recommend reverting to v1 in Admin immediately. A properly tagged replacement draft has been prepared from that same source (not yet uploaded — no Storage/service-role access from this session) and needs the user to upload it as a new draft via Admin, then verify and publish. Tagging added three new context fields (`dateReleasedFormatted`, `dateReleasedLong`, `totalDeductions`) and a `no` index on `pdcSchedule` rows — additive only, no existing template's output changes. Known gaps carried over as designed: `checkNumber`/`checkDate`/`bankName` render blank in production today (no data source wired yet, per existing `template-context.ts` convention) even though the sample shows real values for them |
 
 ## Tier 3 — Complex
 Legal instrument: notarization block, witness/acknowledgment tables, precise

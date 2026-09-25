@@ -196,6 +196,9 @@ export const FIELD_GROUPS: FieldGroup[] = [
       { key: "netLoanAmount", label: "Net loan amount", sample: "90,000.00" },
       { key: "amountInWords", label: "Amount in words", sample: "Ninety Thousand Pesos" },
       { key: "dateReleased", label: "Date released", sample: "06/11/2026" },
+      { key: "dateReleasedFormatted", label: "Date released (MM/DD/YYYY)", sample: "06/11/2026" },
+      { key: "dateReleasedLong", label: "Date released (long form)", sample: "June 11, 2026" },
+      { key: "totalDeductions", label: "Total deductions (sum of particulars)", sample: "12,502.45" },
       { key: "firstPaymentDate", label: "First payment date", sample: "08/10/2026" },
       { key: "installmentDayOrdinal", label: "Installment day (ordinal)", sample: "10th" },
       { key: "paymentEnds", label: "Payment ends", sample: "02/10/2027" },
@@ -597,6 +600,7 @@ export function buildSampleContext(): Record<string, unknown> {
     { label: "Security Fee", amount: "2,154.71", accountCode: "2100002" },
   ];
   ctx.pdcSchedule = Array.from({ length: 3 }, (_, i) => ({
+    no: String(i + 1),
     checkDate: `0${8 + i}/10/26`,
     checkNumber: `10290${i + 1}`,
     amount: "17,428.20",

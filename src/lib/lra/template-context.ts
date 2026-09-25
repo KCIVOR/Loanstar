@@ -106,6 +106,27 @@ export function pctInWords(rate: number | null | undefined): string {
     : `${head} percent (${figure})`;
 }
 
+const MONTH_NAMES = [
+  "January", "February", "March", "April", "May", "June",
+  "July", "August", "September", "October", "November", "December",
+];
+
+/** "YYYY-MM-DD" (the raw DB column shape) -> "MM/DD/YYYY". Empty input stays empty. */
+function formatDateSlash(isoDate: string): string {
+  const d = isoDate ? new Date(`${isoDate}T00:00:00`) : null;
+  if (!d || Number.isNaN(d.getTime())) return "";
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  const dd = String(d.getDate()).padStart(2, "0");
+  return `${mm}/${dd}/${d.getFullYear()}`;
+}
+
+/** "YYYY-MM-DD" -> "Month D, YYYY". Empty input stays empty. */
+function formatDateLong(isoDate: string): string {
+  const d = isoDate ? new Date(`${isoDate}T00:00:00`) : null;
+  if (!d || Number.isNaN(d.getTime())) return "";
+  return `${MONTH_NAMES[d.getMonth()]} ${d.getDate()}, ${d.getFullYear()}`;
+}
+
 function joinAddress(a: BorrowerProfile["presentAddress"]): string {
   return [a.street, a.barangay, a.city, a.province, a.zipCode]
     .filter(Boolean)
@@ -265,6 +286,14 @@ export function buildReleaseTemplateContext(
     amountInWords: pesosInWords(computation.netReleased),
     dateReleased: computation.releaseDate ?? "",
     todayDate: computation.releaseDate ?? "",
+    // `dateReleased` above is deliberately left as the raw "YYYY-MM-DD" DB
+    // value (other already-verified templates bind it as-is, so it isn't
+    // reformatted here to avoid changing their output). BLRI's real source
+    // prints this same date in two different display formats in two spots
+    // (`07/20/2026` and `July 20, 2026`), which needs actual formatting —
+    // these are new, additive fields so no existing template is affected.
+    dateReleasedFormatted: formatDateSlash(computation.releaseDate ?? ""),
+    dateReleasedLong: formatDateLong(computation.releaseDate ?? ""),
 
     processingFee: money(computation.processingFee),
     securityFee: money(computation.securityFee),
@@ -489,7 +518,14 @@ export function buildReleaseTemplateContext(
       amount: formatMoney(p.amount),
       accountCode: p.accountCode,
     })),
-    pdcSchedule: blri.pdcSchedule.map((r) => ({
+    // BLRI's printed "Less: Fees, Charges and Loan Balance Deducted" subtotal
+    // — the sum of the same `particulars` rows printed just below it, not a
+    // separately-tracked figure.
+    totalDeductions: formatMoney(blri.particulars.reduce((sum, p) => sum + p.amount, 0)),
+    pdcSchedule: blri.pdcSchedule.map((r, i) => ({
+      // 1-based row number for BLRI's "No." column — presentational only,
+      // not part of `BlriPdcRow`.
+      no: String(i + 1),
       checkDate: r.checkDate,
       checkNumber: r.checkNumber ?? "",
       amount: formatMoney(r.amount),
