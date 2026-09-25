@@ -100,6 +100,24 @@
     "sourcePath": "C:/Users/Rovick/Downloads/LSLGC Calculator and Docs/Demand Letter - without PDC - Individual - No Address.doc"
   },
   {
+    "id": "lslgc-demand-letter-sme-with-address",
+    "family": "lslgc-demand-letter-sme",
+    "requiredVariantDimensions": {
+      "hasAddress": true
+    },
+    "templateSlug": "demand_letter_sme",
+    "sourcePath": "user-uploaded (see chat) — Demand Letter - SME.docx"
+  },
+  {
+    "id": "lslgc-demand-letter-sme-no-address",
+    "family": "lslgc-demand-letter-sme",
+    "requiredVariantDimensions": {
+      "hasAddress": false
+    },
+    "templateSlug": "demand_letter_sme",
+    "sourcePath": "user-uploaded (see chat) — Demand Letter - SME No Address.docx"
+  },
+  {
     "id": "vienovo-loan-agreement",
     "family": "vienovo-loan-agreement",
     "requiredVariantDimensions": {},
