@@ -51,7 +51,7 @@ formatting (e.g. Disclosure's checkbox-grid tab-stops).
 | # | Slug | Category | Published | Status |
 |---|------|----------|-----------|--------|
 | 19 | `disclosure_statement` | release | v9 | Fixed (redone 2026-09-25 against a true visual comparison, not just text) |
-| 20 | `promissory_note` | release | v4 | Fixed — **draft pending** (unrelated to this project, check before touching) |
+| 20 | `promissory_note` | release | v9 (docx) | Fixed — rebuilt via the real `.docx` upload path (docx-template-tagging skill), verified 100% against the client source `PN - MPL.pdf` |
 | 21 | `spa_mortgage_cancellation` | release | v3 | Fixed |
 | 22 | `cancellation_of_chattel_mortgage` | release | v3 | Fixed |
 | 23 | `cancellation_of_real_estate_mortgage` | release | v2 | No source |
@@ -110,5 +110,6 @@ retained client source turns up.
 ## Notes for whoever picks this up next
 
 - "Fixed" entries were verified with a real visual comparison (source `.doc`/`.docx` rendered to an image via Word, compared against the actual rendered PDF) as of the 2026-09-25 redo pass — earlier passes in this project (before that date) relied on text-only comparison and may still have undetected layout differences. Disclosure Statement is the one confirmed example of this gap (see its migration `20260925100000_fix_disclosure_statement_source_accuracy.sql`); the other "Fixed" rows have not been re-verified visually yet.
-- `application_form` and `promissory_note` each have an unpublished draft that predates this project — inspect before assuming it's related to fidelity work.
-- The "Upload a Word file" feature (real `.docx` uploaded, `{{field}}`/`{{#field}}...{{/field}}` tags inserted directly in Word, rendered via docxtemplater + Gotenberg's LibreOffice route) is the more accurate alternative to hand-rebuilding a document as HTML — see `src/lib/documents/render/docx-merge.ts`, `src/lib/documents/render/gotenberg-office.ts`, and `src/components/admin/DocxTemplateEditor.tsx`. Prefer it over further HTML rebuilds when a real source file is available; the demand_letter_sme entry above is the one document actually built as HTML after that upload path was tried first and set aside by request, not because the feature failed.
+- `application_form` has an unpublished draft that predates this project — inspect before assuming it's related to fidelity work.
+- The "Upload a Word file" feature (real `.docx` uploaded, `{{field}}`/`{{#field}}...{{/field}}` tags inserted directly in the OOXML, rendered via docxtemplater + Gotenberg's LibreOffice route) is now the **default, preferred workflow** whenever a real source file is available — confirmed 100% accurate on `promissory_note` (2026-09-25), after HTML rebuilds kept hitting the TipTap schema's ceiling (no real tab-stops, limited table semantics). Use the `docx-template-tagging` skill for this. HTML rebuilding is now the fallback only when no real source file exists — `demand_letter_sme` is the one document built as HTML after the upload path was tried first and set aside by request that day, not because the feature failed.
+- For a document with a variable-length repeating section (mortgage collateral, PDC schedules, multiple co-borrowers), the skill covers what to upload and how the loop gets tagged — see its "Reusable templates" section.
