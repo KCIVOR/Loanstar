@@ -50,12 +50,12 @@ formatting (e.g. Disclosure's checkbox-grid tab-stops).
 
 | # | Slug | Category | Published | Status |
 |---|------|----------|-----------|--------|
-| 19 | `disclosure_statement` | release | v9 | Fixed (redone 2026-09-25 against a true visual comparison, not just text) |
+| 19 | `disclosure_statement` | release | v11 (docx, draft pending) | Fixed — rebuilt via the docx-template-tagging skill against a real filled sample (Vienovo Philippines, Inc.), 0 hardcoded values remaining |
 | 20 | `promissory_note` | release | v9 (docx) | Fixed — rebuilt via the real `.docx` upload path (docx-template-tagging skill), verified 100% against the client source `PN - MPL.pdf` |
 | 21 | `spa_mortgage_cancellation` | release | v3 | Fixed |
 | 22 | `cancellation_of_chattel_mortgage` | release | v3 | Fixed |
 | 23 | `cancellation_of_real_estate_mortgage` | release | v2 | No source |
-| 24 | `deed_of_chattel_mortgage` | release | v4 | Fixed |
+| 24 | `deed_of_chattel_mortgage` | release | v5 (docx, draft pending) | Fixed — rebuilt via docx-template-tagging skill against `CHATTEL MORTGAGE - 3 units.doc`; vehicles collapsed into a real `{{#vehicles}}` loop, verified against a 3-item test context. One known cosmetic issue: a stray rendering artifact in the page-1 margin near the rotated name label (see skill notes) — doesn't affect any contract content, flagged for the user to inspect before/after publishing |
 | 25 | `real_estate_mortgage` | release | v3 | No source |
 | 26 | `voluntary_surrender_deed_auto` | release | v2 | Fixed |
 | 27 | `voluntary_surrender_deed_rem` | release | v1 | No source |

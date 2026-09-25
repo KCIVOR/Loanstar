@@ -86,7 +86,25 @@ cost of needing tags inserted directly in the file's XML.
    it's dead weight pointing at a source Excel file that doesn't exist on
    the server anyway.
 
-6. **Repeat structures (see "Reusable templates" below) before assuming a
+6. **Collapsing a repeating section can expose a stray-glyph artifact in
+   unrelated absolute-positioned text boxes** (e.g. a rotated margin name
+   label, seen on `deed_of_chattel_mortgage`). Deleting real content to
+   collapse 3 sample vehicle tables into 1 loop row shortens the page,
+   which can shift where a `position:absolute` VML text box (`<w:pict>` /
+   `<v:shape>`) lands relative to page boundaries in LibreOffice's
+   conversion — producing a small stray mark (observed: an "X") that
+   wasn't there in the original, unedited render. This is NOT caused by
+   the field/tag content itself (confirmed by isolating: swapping text
+   alone doesn't trigger it, only removing bulk content does), and no
+   full fix was found in the time spent on it — the practical options are
+   (a) ship it and flag the cosmetic issue to the user (their call whether
+   it matters), since it doesn't touch any real contract text, or (b)
+   delete the decorative margin text box(es) entirely if the user doesn't
+   need them. Don't sink excessive effort chasing this class of artifact —
+   confirm real content is correct and unaffected first, then decide with
+   the user rather than debugging indefinitely.
+
+7. **Repeat structures (see "Reusable templates" below) before assuming a
    value is scalar** — count how many times a value-looking block repeats
    in the sample; if more than one, it's very likely a collateral/PDC/
    co-borrower loop, not several independent fields.
