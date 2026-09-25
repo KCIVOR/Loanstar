@@ -185,6 +185,7 @@ export const FIELD_GROUPS: FieldGroup[] = [
       { key: "loanAccountNo", label: "Loan account no.", sample: "LA303342" },
       { key: "loanType", label: "Loan type", sample: "RELOAN ONO SILVER" },
       { key: "loanAmount", label: "Loan amount", sample: "102,605.05" },
+      { key: "principal", label: "Principal", sample: "102,605.05" },
       { key: "terms", label: "Terms (months)", sample: "7" },
       { key: "addonMonths", label: "Add-on months", sample: "2" },
       { key: "interestRate", label: "Interest rate", sample: "2.10%" },
