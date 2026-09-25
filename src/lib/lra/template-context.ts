@@ -360,6 +360,10 @@ export function buildReleaseTemplateContext(
     boardResolutionNo: "",
     corporateSecretary: "",
     borrowerTin: isSme ? (borrower.businessInfo?.tin ?? "") : "",
+    // ID-issuance date has no source anywhere in the system yet (no field on
+    // BorrowerProfile) — stays blank for manual fill-in, same established
+    // convention as notaryDocNo/PageNo/BookNo/Series below.
+    borrowerIdIssuedOn: "",
 
     notaryDocNo: "",
     notaryPageNo: "",

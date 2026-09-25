@@ -46,6 +46,7 @@ test("SF promissory note preview binds the real computed loan fields", () => {
     "{{notaryPageNo}}",
     "{{notaryBookNo}}",
     "{{notarySeries}}",
+    "{{borrowerIdIssuedOn}}",
   ]) {
     assert.ok(
       SOURCE_FAITHFUL_PROMISSORY_NOTE_PREVIEW.includes(token),
@@ -62,9 +63,15 @@ test("SF promissory note preview's installment clause uses the real computed day
   assert.doesNotMatch(SOURCE_FAITHFUL_PROMISSORY_NOTE_PREVIEW, /the same day of every month thereafter/);
 });
 
-test("SF promissory note preview's signature and notary blocks are real <table> elements, not underline placeholders", () => {
-  assert.match(SOURCE_FAITHFUL_PROMISSORY_NOTE_PREVIEW, /<table><tbody>/);
-  assert.doesNotMatch(SOURCE_FAITHFUL_PROMISSORY_NOTE_PREVIEW, /data-underline/);
+test("SF promissory note preview's signature and notary blocks are borderless <table data-plain>, matching the source's plain two-column layout (no grid lines)", () => {
+  assert.match(SOURCE_FAITHFUL_PROMISSORY_NOTE_PREVIEW, /<table data-plain><tbody>/);
+  assert.doesNotMatch(SOURCE_FAITHFUL_PROMISSORY_NOTE_PREVIEW, /<table><tbody>/);
+});
+
+test("SF promissory note preview includes the ID-issuance date the original states, with the original's 'ID. No.' label (not a bare 'TIN:')", () => {
+  assert.match(SOURCE_FAITHFUL_PROMISSORY_NOTE_PREVIEW, /ID\. No\. TIN \{\{borrowerTin\}\}/);
+  assert.match(SOURCE_FAITHFUL_PROMISSORY_NOTE_PREVIEW, /Issued on: \{\{borrowerIdIssuedOn\}\}/);
+  assert.doesNotMatch(SOURCE_FAITHFUL_PROMISSORY_NOTE_PREVIEW, /TIN: \{\{borrowerTin\}\}/);
 });
 
 test("SF promissory note preview has all 15 numbered clauses", () => {

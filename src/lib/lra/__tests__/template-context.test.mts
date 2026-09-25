@@ -81,6 +81,7 @@ test("with_pdc context disburses via Bank (check)", () => {
   assert.equal(ctx.netLoanAmount, "90,000.00");
   assert.equal(ctx.amountInWords, "Ninety Thousand Pesos");
   assert.equal(ctx.installmentDayOrdinal, "10th");
+  assert.equal(ctx.borrowerIdIssuedOn, "");
   const entries = ctx.accountingEntries as Array<{ accountCode: string; credit: string }>;
   const bankLine = entries.find((e) => e.accountCode === "1100115");
   assert.ok(bankLine, "expected a Bank (1100115) credit line");

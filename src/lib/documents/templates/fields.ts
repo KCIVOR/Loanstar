@@ -289,6 +289,7 @@ export const FIELD_GROUPS: FieldGroup[] = [
       { key: "boardResolutionNo", label: "Board Resolution No.", sample: "2026-30" },
       { key: "corporateSecretary", label: "Corporate Secretary", sample: "Christian Espiritu Barleta" },
       { key: "borrowerTin", label: "Borrower TIN", sample: "008-249-450-000" },
+      { key: "borrowerIdIssuedOn", label: "Borrower ID issued on", sample: "03/16/2005" },
       { key: "executionPlace", label: "Place of execution", sample: "Makati City" },
       { key: "executionDate", label: "Date of execution", sample: "June 11, 2026" },
       { key: "notaryDocNo", label: "Notary — Doc. No.", sample: "" },

@@ -1,23 +1,29 @@
 /**
- * The real `promissory_note` draft v3 body (source of truth as of 2026-09-25 —
- * the previously-published v4 is a stale, unrelated rewrite that does not match
- * the actual template LSLGC uses; this fixture tracks the draft, not the
- * published row). Verified against a real client scan (Alfredo Sabater Tiu,
+ * The real `promissory_note` template body (source of truth as of 2026-09-25 —
+ * draft v5, built on top of the now-published v3; the old v4 was a stale,
+ * unrelated rewrite that never matched the actual LSLGC template and is now
+ * archived). Verified against a real client scan (Alfredo Sabater Tiu,
  * "original look") and the system's own admin-preview render (Jonathan
  * Hipolito Del Poso sample data) — both compared paragraph-by-paragraph.
  *
- * One real bug found and fixed here (not just a formatting rebuild): the
- * opening paragraph's installment-date clause was hardcoded to "the same day
- * of every month thereafter", losing the actual day-of-month the original
- * document states explicitly (e.g. "the 3rd day of every month thereafter").
- * Fixed by adding a real computed field, `installmentDayOrdinal` (see
- * `src/lib/lra/blri-data.ts`'s `ordinalDay()`, wired through
- * `src/lib/lra/template-context.ts`), instead of inventing static text.
+ * Two real bugs found and fixed here (not a formatting rebuild):
+ *  1. The opening paragraph's installment-date clause was hardcoded to "the
+ *     same day of every month thereafter", losing the actual day-of-month
+ *     the original document states explicitly ("the 3rd day..."). Fixed
+ *     with a real computed field, `installmentDayOrdinal` (see
+ *     `src/lib/lra/blri-data.ts`'s `ordinalDay()`).
+ *  2. The signature block was missing the "Issued on" ID-issuance-date line
+ *     present in the original, and mislabeled the ID field "TIN:" instead of
+ *     "ID. No. TIN ..." (the original's actual label). Fixed by adding
+ *     `borrowerIdIssuedOn` (no source yet — stays blank, same convention as
+ *     notaryDocNo/PageNo/BookNo/Series) and correcting the label text.
  *
- * Signature/notary blocks intentionally use a real `<table>`, not
- * `data-underline`/`<u>` — that's how this template actually renders in the
- * admin preview (a bordered two-column signature table, a bordered Name/ID/
- * Validity table), not a stylistic choice to revert.
+ * The signature/notary tables use `data-plain` (borderless layout table) —
+ * the original source has no visible grid lines around these blocks, just
+ * plain two-column text; the system had been rendering them as a bordered
+ * grid, which `data-plain` corrects without abandoning the table structure
+ * (needed for the two-column layout itself, which `data-underline`-only
+ * paragraphs can't reproduce).
  */
 export const SOURCE_FAITHFUL_PROMISSORY_NOTE_PREVIEW = String.raw`
 <h2 style="text-align:center">PROMISSORY NOTE</h2>
@@ -60,13 +66,13 @@ export const SOURCE_FAITHFUL_PROMISSORY_NOTE_PREVIEW = String.raw`
 
 <p>IN WITNESS WHEREOF, the parties hereto have signed this Note at {{executionPlace}} on {{executionDate}}.</p>
 
-<table><tbody><tr>
-<td>____________________________<br><b>{{borrowerName}}</b><br>Signature Over Borrower's Name<br>Address: {{address}}<br>TIN: {{borrowerTin}}</td>
-<td>____________________________<br><b>{{coBorrowerName}}</b><br>Signature Over Co-Borrower's Name<br>Address:<br>TIN:</td>
+<table data-plain><tbody><tr>
+<td>____________________________<br><b>{{borrowerName}}</b><br>Signature Over Borrower's Name<br>Address: {{address}}<br>ID. No. TIN {{borrowerTin}}<br>Issued on: {{borrowerIdIssuedOn}}</td>
+<td>____________________________<br><b>{{coBorrowerName}}</b><br>Signature Over Co-Borrower's Name<br>Address:<br>ID. No.:<br>Issued on:</td>
 </tr></tbody></table>
 
 <p>SUBSCRIBED AND SWORN to before me this {{executionDate}}, in {{executionPlace}}; affiant/s exhibiting to me the following:</p>
-<table><tbody>
+<table data-plain><tbody>
 <tr><th>Name</th><th>Identification Card No.</th><th>Validity</th></tr>
 <tr><td>{{borrowerName}}</td><td>TIN {{borrowerTin}}</td><td></td></tr>
 </tbody></table>
