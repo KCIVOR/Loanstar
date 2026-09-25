@@ -57,7 +57,7 @@ test("SF promissory note preview binds the real computed loan fields", () => {
 test("SF promissory note preview's installment clause uses the real computed day-of-month, not a hardcoded placeholder", () => {
   assert.match(
     SOURCE_FAITHFUL_PROMISSORY_NOTE_PREVIEW,
-    /the \{\{installmentDayOrdinal\}\} day of every month thereafter/,
+    /the <u>\{\{installmentDayOrdinal\}\}<\/u> day of every month thereafter/,
   );
   assert.doesNotMatch(SOURCE_FAITHFUL_PROMISSORY_NOTE_PREVIEW, /the same day of every month thereafter/);
 });
@@ -90,6 +90,28 @@ test("SF promissory note preview has all 15 numbered clauses", () => {
       `expected clause ${n} to be present`,
     );
   }
+});
+
+test("SF promissory note preview bold-underlines every filled-in value in the opening paragraph and the interest-rate reference in clause 5, matching the source's fill-in-the-blank emphasis", () => {
+  for (const field of [
+    "{{borrowerName}}",
+    "{{address}}",
+    "{{companyName}}",
+    "{{principalAndCentavosInWords}}",
+    "{{termsInWords}}",
+    "{{monthlyAmortizationAndCentavosInWords}}",
+    "{{firstPaymentDate}}",
+  ]) {
+    assert.match(
+      SOURCE_FAITHFUL_PROMISSORY_NOTE_PREVIEW,
+      new RegExp(`<b><u>${field.replace(/[{}]/g, "\\$&")}`),
+      `expected ${field} to be bold-underlined`,
+    );
+  }
+  // clause 5's interest-rate reference reuses the same field, bold-underlined there too
+  const occurrences = SOURCE_FAITHFUL_PROMISSORY_NOTE_PREVIEW.match(/<b><u>\{\{interestRateInWords\}\}<\/u><\/b>/g);
+  assert.equal(occurrences?.length, 2, "expected interestRateInWords bold-underlined in both the opening paragraph and clause 5");
+  assert.match(SOURCE_FAITHFUL_PROMISSORY_NOTE_PREVIEW, /<b><u>\{\{borrowerName\}\}<\/u><\/b>\s*<br>Signature Over Borrower's Name/);
 });
 
 test("SF promissory note preview reproduces the source's own internal typos verbatim, per the project's record-don't-reinterpret convention", () => {
