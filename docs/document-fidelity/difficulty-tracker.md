@@ -37,7 +37,7 @@ A real table + repeat block, or several distinct sections.
 
 | # | Slug | Category | Published | Status |
 |---|------|----------|-----------|--------|
-| 13 | `ar_atm_voucher` | release | v7 | Fixed |
+| 13 | `ar_atm_voucher` | release | v8 (docx, draft pending) | Fixed — content replaced entirely: the real source (`SF Calculator.docx`) is a **"CHECK VOUCHER"** disbursement ledger, not the v7 HTML's "SURRENDER OF BANK ATM CARD" content (per explicit user instruction, despite the naming mismatch — flagged before proceeding). Rebuilt via docx-template-tagging skill; the DEBIT/CREDIT ledger (7 sample rows) collapsed into the real `{{#accountingEntries}}` loop already produced by `template-context.ts` (`description`/`accountCode`/`debit`/`credit`), not individual scalar fee fields — verified this is the actual production shape before tagging. Added missing `spouseName`/`hasSpouse` sample fields (real production fields, just missing from the admin-preview catalog). `ar_check_voucher`/`check_voucher` remain "No source" — this file was originally offered for those but the user chose to apply it to `ar_atm_voucher` instead |
 | 14 | `final_computation_sheet` | computation | v1 | No source |
 | 15 | `consent_form` | release | v2 | Fixed |
 | 16 | `agreement_check_replacement` | release | v2 | Confirmed OK |
