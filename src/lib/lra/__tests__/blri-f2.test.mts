@@ -107,6 +107,7 @@ test("F2 BLRI data — Del Poso field values match sample", () => {
   approxEqual(blri.monthlyAmortization, 17_428.20);
   assert.equal(blri.terms, 7);
   assert.equal(blri.firstPaymentDate, "08/10/26");
+  assert.equal(blri.installmentDayOrdinal, "10th");
 
   const admin = blri.particulars.find((p) => p.label === "Admin Cost");
   assert.ok(admin);
@@ -208,4 +209,5 @@ test("BLRI fallback PDC schedule clamps to Feb 28 instead of overflowing to Marc
   assert.equal(blri.pdcSchedule[3].checkDate, "12/30/26");
   assert.equal(blri.pdcSchedule[4].checkDate, "01/30/27");
   assert.equal(blri.pdcSchedule[5].checkDate, "02/28/27"); // not 03/02/27
+  assert.equal(blri.installmentDayOrdinal, "30th");
 });

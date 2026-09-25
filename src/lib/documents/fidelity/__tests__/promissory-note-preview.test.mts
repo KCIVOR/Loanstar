@@ -3,28 +3,20 @@ import test from "node:test";
 
 import { SOURCE_FAITHFUL_PROMISSORY_NOTE_PREVIEW } from "../promissory-note-preview";
 
-test("SF promissory note preview is schema-safe: no <style>, no CSS Grid, no raw inline style=", () => {
+test("SF promissory note preview is schema-safe: no <style> block, no CSS Grid", () => {
   assert.doesNotMatch(SOURCE_FAITHFUL_PROMISSORY_NOTE_PREVIEW, /<style/i);
   assert.doesNotMatch(SOURCE_FAITHFUL_PROMISSORY_NOTE_PREVIEW, /display:\s*grid/i);
-  assert.doesNotMatch(SOURCE_FAITHFUL_PROMISSORY_NOTE_PREVIEW, / style="/);
-});
-
-test("SF promissory note preview opts out of the house page-number footer", () => {
-  assert.match(SOURCE_FAITHFUL_PROMISSORY_NOTE_PREVIEW, /data-document-footer="none"/);
-  assert.match(SOURCE_FAITHFUL_PROMISSORY_NOTE_PREVIEW, /data-accurate/);
 });
 
 test("SF promissory note preview preserves the source's key section labels", () => {
   for (const label of [
-    "PN Number:",
     "PROMISSORY NOTE",
-    "BORROWER",
-    "CO-BORROWER",
-    "SUBSCRIBED AND SWORN TO BEFORE ME",
-    "NAME",
-    "VALID ID",
-    "Place and Date of Issue",
-    "NOTARY PUBLIC",
+    "Signature Over Borrower's Name",
+    "Signature Over Co-Borrower's Name",
+    "SUBSCRIBED AND SWORN",
+    "Identification Card No.",
+    "Doc. No.",
+    "Series of",
   ]) {
     assert.ok(
       SOURCE_FAITHFUL_PROMISSORY_NOTE_PREVIEW.includes(label),
@@ -35,23 +27,21 @@ test("SF promissory note preview preserves the source's key section labels", () 
 
 test("SF promissory note preview binds the real computed loan fields", () => {
   for (const token of [
-    "{{promissoryNoteNo}}",
+    "{{borrowerName}}",
+    "{{address}}",
+    "{{companyName}}",
     "{{principalAndCentavosInWords}}",
     "{{principal}}",
-    "{{interestRateInWords}}",
-    "{{addonMonthsInWords}}",
-    "{{disclosureFromDate}}",
-    "{{disclosureToDate}}",
-    "{{totalLoanAndCentavosInWords}}",
-    "{{totalLoan}}",
     "{{termsInWords}}",
     "{{monthlyAmortizationAndCentavosInWords}}",
     "{{monthlyAmortization}}",
     "{{firstPaymentDate}}",
-    "{{loanMaturityDate}}",
+    "{{interestRateInWords}}",
+    "{{installmentDayOrdinal}}",
+    "{{executionPlace}}",
     "{{executionDate}}",
-    "{{borrowerName}}",
     "{{coBorrowerName}}",
+    "{{borrowerTin}}",
     "{{notaryDocNo}}",
     "{{notaryPageNo}}",
     "{{notaryBookNo}}",
@@ -64,7 +54,25 @@ test("SF promissory note preview binds the real computed loan fields", () => {
   }
 });
 
-test("SF promissory note preview underline fields use the data-underline attribute or native <u>, not inline borders", () => {
-  assert.match(SOURCE_FAITHFUL_PROMISSORY_NOTE_PREVIEW, /data-underline/);
-  assert.doesNotMatch(SOURCE_FAITHFUL_PROMISSORY_NOTE_PREVIEW, /border-bottom/);
+test("SF promissory note preview's installment clause uses the real computed day-of-month, not a hardcoded placeholder", () => {
+  assert.match(
+    SOURCE_FAITHFUL_PROMISSORY_NOTE_PREVIEW,
+    /the \{\{installmentDayOrdinal\}\} day of every month thereafter/,
+  );
+  assert.doesNotMatch(SOURCE_FAITHFUL_PROMISSORY_NOTE_PREVIEW, /the same day of every month thereafter/);
+});
+
+test("SF promissory note preview's signature and notary blocks are real <table> elements, not underline placeholders", () => {
+  assert.match(SOURCE_FAITHFUL_PROMISSORY_NOTE_PREVIEW, /<table><tbody>/);
+  assert.doesNotMatch(SOURCE_FAITHFUL_PROMISSORY_NOTE_PREVIEW, /data-underline/);
+});
+
+test("SF promissory note preview has all 15 numbered clauses", () => {
+  for (let n = 1; n <= 15; n += 1) {
+    assert.match(
+      SOURCE_FAITHFUL_PROMISSORY_NOTE_PREVIEW,
+      new RegExp(`<p>${n}\\. `),
+      `expected clause ${n} to be present`,
+    );
+  }
 });

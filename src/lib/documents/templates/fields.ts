@@ -195,6 +195,7 @@ export const FIELD_GROUPS: FieldGroup[] = [
       { key: "amountInWords", label: "Amount in words", sample: "Ninety Thousand Pesos" },
       { key: "dateReleased", label: "Date released", sample: "06/11/2026" },
       { key: "firstPaymentDate", label: "First payment date", sample: "08/10/2026" },
+      { key: "installmentDayOrdinal", label: "Installment day (ordinal)", sample: "10th" },
       { key: "paymentEnds", label: "Payment ends", sample: "02/10/2027" },
     ],
   },

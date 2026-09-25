@@ -29,6 +29,8 @@ export type BlriData = {
   monthlyAmortization: number;
   terms: number;
   firstPaymentDate: string;
+  /** Day-of-month of the first (and every recurring) installment, e.g. "3rd", "10th". */
+  installmentDayOrdinal: string;
   particulars: BlriParticular[];
   pdcSchedule: BlriPdcRow[];
 };
@@ -49,6 +51,15 @@ function formatDate(d: Date): string {
   const dd = String(d.getDate()).padStart(2, "0");
   const yy = String(d.getFullYear()).slice(-2);
   return `${mm}/${dd}/${yy}`;
+}
+
+/** Day-of-month in ordinal form, e.g. 1 → "1st", 3 → "3rd", 22 → "22nd". */
+function ordinalDay(day: number): string {
+  const rem100 = day % 100;
+  if (rem100 >= 11 && rem100 <= 13) return `${day}th`;
+  const rem10 = day % 10;
+  const suffix = rem10 === 1 ? "st" : rem10 === 2 ? "nd" : rem10 === 3 ? "rd" : "th";
+  return `${day}${suffix}`;
 }
 
 export function buildBlriData(input: {
@@ -172,6 +183,7 @@ export function buildBlriData(input: {
     monthlyAmortization: input.computation.monthlyAmortization,
     terms: input.computation.terms,
     firstPaymentDate: formatDate(firstPayment),
+    installmentDayOrdinal: ordinalDay(firstPayment.getDate()),
     particulars,
     pdcSchedule,
   };

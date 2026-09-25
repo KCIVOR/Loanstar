@@ -259,6 +259,7 @@ export function buildReleaseTemplateContext(
     addonMonths: computation.addonMonths != null ? String(computation.addonMonths) : "",
     interestRate: pct(computation.interestRate),
     firstPaymentDate: blri.firstPaymentDate,
+    installmentDayOrdinal: blri.installmentDayOrdinal,
     paymentEnds: blri.pdcSchedule.at(-1)?.checkDate ?? "",
     netLoanAmount: formatMoney(computation.netReleased),
     amountInWords: pesosInWords(computation.netReleased),

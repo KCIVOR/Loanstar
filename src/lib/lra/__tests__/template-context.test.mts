@@ -53,6 +53,7 @@ const BLRI: BlriData = {
   monthlyAmortization: 17428.2,
   terms: 7,
   firstPaymentDate: "08/10/26",
+  installmentDayOrdinal: "10th",
   particulars: [
     { label: "Processing Fee", amount: 6156.3, accountCode: "5003010" },
     { label: "Security Fee", amount: 2154.71, accountCode: "2100002" },
@@ -79,6 +80,7 @@ test("with_pdc context disburses via Bank (check)", () => {
   assert.equal(ctx.borrowerName, "Jonathan Del Poso");
   assert.equal(ctx.netLoanAmount, "90,000.00");
   assert.equal(ctx.amountInWords, "Ninety Thousand Pesos");
+  assert.equal(ctx.installmentDayOrdinal, "10th");
   const entries = ctx.accountingEntries as Array<{ accountCode: string; credit: string }>;
   const bankLine = entries.find((e) => e.accountCode === "1100115");
   assert.ok(bankLine, "expected a Bank (1100115) credit line");
