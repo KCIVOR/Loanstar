@@ -56,7 +56,7 @@ formatting (e.g. Disclosure's checkbox-grid tab-stops).
 | 22 | `cancellation_of_chattel_mortgage` | release | v3 | Fixed |
 | 23 | `cancellation_of_real_estate_mortgage` | release | v2 | No source |
 | 24 | `deed_of_chattel_mortgage` | release | v5 (docx) | Fixed — rebuilt via docx-template-tagging skill against `CHATTEL MORTGAGE - 3 units.doc`; vehicles collapsed into a real `{{#vehicles}}` loop, verified against a 3-item test context and confirmed generating correctly for real car-refinancing loans in LRA. One known cosmetic issue: a stray rendering artifact in the page-1 margin near the rotated name label (see skill notes) — doesn't affect any contract content |
-| 25 | `real_estate_mortgage` | release | v3 | No source |
+| 25 | `real_estate_mortgage` | release | v4 (docx, draft pending) | Fixed — rebuilt via docx-template-tagging skill against `REAL ESTATE MORTGAGE - 2 Properties.doc`; properties collapsed into a real `{{#properties}}` loop, verified against a 3-item test context. No stray-artifact issue seen (unlike the chattel mortgage's known sidebar glitch) despite the same block-deletion pattern. Notary table's "Validity" column and the notarization/execution date blanks were left as hand-fill, matching the source exactly (same convention as promissory_note) |
 | 26 | `voluntary_surrender_deed_auto` | release | v2 | Fixed |
 | 27 | `voluntary_surrender_deed_rem` | release | v1 | No source |
 | 28 | `loan_agreement` | release | v4 | No source (only the Vienovo variant below has one) |
