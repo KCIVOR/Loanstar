@@ -265,6 +265,7 @@ export const FIELD_GROUPS: FieldGroup[] = [
       { key: "loanMaturityDate", label: "Loan schedule maturity date", sample: "02/10/2027" },
       { key: "lenderRepresentativeTitle", label: "Lender representative title", sample: "President" },
       { key: "amountFinanced", label: "Disclosure — amount to be financed", sample: "102,605.05" },
+      { key: "nonFinanceCharges", label: "Disclosure — total non-finance charges", sample: "6,156.30" },
       { key: "financeChargeInterest", label: "Disclosure — finance charge (interest)", sample: "19,392.36" },
       { key: "totalInstallmentPayments", label: "Disclosure — total installment payments", sample: "121,997.41" },
       { key: "installmentCount", label: "Disclosure — number of installments", sample: "7" },
