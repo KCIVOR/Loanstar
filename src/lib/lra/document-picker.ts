@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
+import { getActiveComputation } from "@/lib/csa/computation";
 import { createSignedDownloadUrl } from "@/lib/documents/storage";
 
 import type { ReleasePath } from "./constants";
@@ -51,8 +52,9 @@ export async function buildReleaseDocumentPicker(
     (p): p is ReleasePath => p === "with_pdc" || p === "without_pdc",
   );
 
-  const [catalog, generatedRes] = await Promise.all([
+  const [catalog, computation, generatedRes] = await Promise.all([
     loadReleaseTemplateCatalog(supabase),
+    getActiveComputation(supabase, applicationId),
     supabase
       .from("generated_documents")
       .select("id, document_slug, storage_path, generated_at, signed_at, is_finalized")
@@ -68,6 +70,7 @@ export async function buildReleaseDocumentPicker(
     catalog,
     releasePaths,
     (app?.collateral_type as CollateralType) ?? null,
+    computation?.paymentFrequency ?? null,
   );
 
   const items: PickerItem[] = await Promise.all(

@@ -565,6 +565,7 @@ type ReleaseGenerationContext = {
   releasePaths: ReleasePath[];
   segment: "seafarer" | "sme" | "individual";
   collateralType: CollateralType;
+  paymentFrequency: string | null;
   borrowerId: string;
   catalog: ReleaseTemplateRow[];
   contextByPath: Map<ReleasePath, ReturnType<typeof buildReleaseTemplateContext>>;
@@ -740,6 +741,7 @@ async function loadReleaseGenerationContext(
     releasePaths,
     segment,
     collateralType,
+    paymentFrequency: computation.paymentFrequency ?? null,
     borrowerId: app.borrower_id as string,
     catalog,
     contextByPath,
@@ -892,6 +894,7 @@ export async function generateReleaseDocuments(
     ctx.catalog,
     ctx.releasePaths,
     ctx.collateralType,
+    ctx.paymentFrequency,
   );
 
   for (const slug of slugs) {
@@ -938,6 +941,7 @@ export async function generateReleaseDocumentBySlug(
     ctx.catalog,
     ctx.releasePaths,
     ctx.collateralType,
+    ctx.paymentFrequency,
   ).some((c) => c.slug === slug && c.canGenerate);
   if (!allowed) {
     throw new ValidationError(

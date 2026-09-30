@@ -67,6 +67,29 @@ export const SF_RELEASE_SLUGS: readonly string[] = [
   "payment_details_sf",
 ];
 
+/**
+ * The client has one loan agreement per payment arrangement. Exactly one of
+ * these applies to a loan, chosen by the computation's payment frequency:
+ * the standard agreement for everything not listed here.
+ */
+const LOAN_AGREEMENT_BY_FREQUENCY: Record<string, string> = {
+  bi_monthly: "loan_agreement_bi_monthly",
+  daily: "loan_agreement_per_day",
+  quarterly: "loan_agreement_vienovo",
+  quarterly_special: "loan_agreement_vienovo",
+  two_monthly: "loan_agreement_vienovo",
+  two_monthly_special: "loan_agreement_vienovo",
+};
+const LOAN_AGREEMENT_SLUGS: ReadonlySet<string> = new Set([
+  "loan_agreement",
+  ...Object.values(LOAN_AGREEMENT_BY_FREQUENCY),
+]);
+
+/** The loan agreement template that applies to a loan with this payment frequency. */
+export function loanAgreementSlugFor(paymentFrequency: string | null | undefined): string {
+  return LOAN_AGREEMENT_BY_FREQUENCY[paymentFrequency ?? ""] ?? "loan_agreement";
+}
+
 const COLLATERAL_SLUG: Record<"car_refinancing" | "real_estate", string> = {
   car_refinancing: "deed_of_chattel_mortgage",
   real_estate: "real_estate_mortgage",
@@ -93,6 +116,7 @@ export const RELEASE_DOCUMENT_SLUGS: ReadonlySet<string> = new Set<string>([
   "ar_cash_voucher",
   "endorsement_letter",
   ...SF_RELEASE_SLUGS,
+  ...Object.values(LOAN_AGREEMENT_BY_FREQUENCY),
 ]);
 
 export function segmentGroup(
@@ -110,7 +134,11 @@ export function templateConditionMatches(
   slug: string,
   releasePaths: ReleasePath[],
   collateralType: CollateralType,
+  paymentFrequency?: string | null,
 ): boolean {
+  if (LOAN_AGREEMENT_SLUGS.has(slug)) {
+    return slug === loanAgreementSlugFor(paymentFrequency);
+  }
   if (PATH_SPECIFIC_SLUGS.with_pdc.includes(slug)) {
     return releasePaths.includes("with_pdc");
   }
@@ -148,6 +176,9 @@ const PICKER_ORDER: readonly string[] = [
   "disclosure_statement_sf",
   "letter_of_intent",
   "loan_agreement",
+  "loan_agreement_bi_monthly",
+  "loan_agreement_per_day",
+  "loan_agreement_vienovo",
   "check_voucher",
   "check_voucher_sf",
   "ar_check_voucher",
@@ -181,13 +212,14 @@ export function releaseDocumentCandidates(
   catalog: ReleaseTemplateRow[],
   releasePaths: ReleasePath[],
   collateralType: CollateralType,
+  paymentFrequency?: string | null,
 ): ReleaseDocumentCandidate[] {
   const out: ReleaseDocumentCandidate[] = [];
   for (const row of catalog) {
     const eligibility =
       group === "seafarer" ? row.seafarerGeneration : row.smeGeneration;
     if (eligibility === "hidden") continue;
-    if (!templateConditionMatches(row.slug, releasePaths, collateralType)) {
+    if (!templateConditionMatches(row.slug, releasePaths, collateralType, paymentFrequency)) {
       continue;
     }
     out.push({
@@ -213,8 +245,9 @@ export function autoGenerateSlugs(
   catalog: ReleaseTemplateRow[],
   releasePaths: ReleasePath[],
   collateralType: CollateralType,
+  paymentFrequency?: string | null,
 ): string[] {
-  return releaseDocumentCandidates(group, catalog, releasePaths, collateralType)
+  return releaseDocumentCandidates(group, catalog, releasePaths, collateralType, paymentFrequency)
     .filter((c) => c.eligibility === "always" && c.canGenerate)
     .map((c) => c.slug);
 }

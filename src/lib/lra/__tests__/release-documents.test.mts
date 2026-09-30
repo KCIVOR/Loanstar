@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 
 import {
   autoGenerateSlugs,
+  loanAgreementSlugFor,
   PATH_SPECIFIC_SLUGS,
   queryPickerItems,
   RELEASE_DOCUMENT_SLUGS,
@@ -235,7 +236,10 @@ test("RELEASE_DOCUMENT_SLUGS — old union plus the three never-auto slugs", () 
   for (const slug of SF_RELEASE_SLUGS) {
     assert.ok(RELEASE_DOCUMENT_SLUGS.has(slug), `missing ${slug}`);
   }
-  assert.equal(RELEASE_DOCUMENT_SLUGS.size, 14 + SF_RELEASE_SLUGS.length);
+  for (const slug of ["loan_agreement_bi_monthly", "loan_agreement_per_day", "loan_agreement_vienovo"]) {
+    assert.ok(RELEASE_DOCUMENT_SLUGS.has(slug), `missing ${slug}`);
+  }
+  assert.equal(RELEASE_DOCUMENT_SLUGS.size, 14 + SF_RELEASE_SLUGS.length + 3);
   assert.ok(!RELEASE_DOCUMENT_SLUGS.has("application_form"));
 });
 
@@ -399,4 +403,35 @@ test("queryPickerItems — filters combine, unknown values fall back to all", ()
 test("queryPickerItems — pageSize is clamped to [1, 50]", () => {
   assert.equal(queryPickerItems(pickerFixture(), { pageSize: 0 }).pageSize, 1);
   assert.equal(queryPickerItems(pickerFixture(), { pageSize: 999 }).pageSize, 50);
+});
+
+test("exactly one loan agreement applies to a loan, chosen by payment frequency", () => {
+  assert.equal(loanAgreementSlugFor(undefined), "loan_agreement");
+  assert.equal(loanAgreementSlugFor("monthly"), "loan_agreement");
+  assert.equal(loanAgreementSlugFor("semi_monthly"), "loan_agreement");
+  assert.equal(loanAgreementSlugFor("bi_monthly"), "loan_agreement_bi_monthly");
+  assert.equal(loanAgreementSlugFor("daily"), "loan_agreement_per_day");
+  assert.equal(loanAgreementSlugFor("quarterly_special"), "loan_agreement_vienovo");
+  assert.equal(loanAgreementSlugFor("two_monthly"), "loan_agreement_vienovo");
+
+  const catalog: ReleaseTemplateRow[] = [
+    "loan_agreement",
+    "loan_agreement_bi_monthly",
+    "loan_agreement_per_day",
+    "loan_agreement_vienovo",
+  ].map((slug) => ({
+    slug,
+    name: slug,
+    publishedVersionNo: 1,
+    seafarerGeneration: slug === "loan_agreement" ? "always" : "hidden",
+    smeGeneration: "always",
+  }));
+  const forFrequency = (frequency?: string) =>
+    autoGenerateSlugs("sme", catalog, ["with_pdc"], "none", frequency);
+  assert.deepEqual(forFrequency(), ["loan_agreement"]);
+  assert.deepEqual(forFrequency("bi_monthly"), ["loan_agreement_bi_monthly"]);
+  assert.deepEqual(forFrequency("daily"), ["loan_agreement_per_day"]);
+  assert.deepEqual(forFrequency("two_monthly_special"), ["loan_agreement_vienovo"]);
+  // Seafarer loans are always monthly, so they only ever see the standard one.
+  assert.deepEqual(autoGenerateSlugs("seafarer", catalog, ["with_pdc"], "none"), ["loan_agreement"]);
 });
