@@ -549,6 +549,20 @@ export function buildReleaseTemplateContext(
       blri.terms + Number(computation.addonMonths ?? 0),
     ),
 
+    // SME / Individual source documents (Calculator SME.xlsm BLRI, CV,
+    // CashVoucher, AR tabs) print the client as "NAME / REPRESENTATIVE /
+    // ADDRESS": the company and its office address for an SME loan, the
+    // borrower and home address for an Individual one (no representative).
+    // Defined for every segment so one template serves both without an
+    // unresolved-tag error — `businessCompanyName` only exists for SME.
+    clientName: isSme ? (sme?.companyName || blri.borrowerName) : blri.borrowerName,
+    // "Business Loan LA201270" on the SME vouchers' Details of Payment line —
+    // the segment's own label, same wording the calculators print.
+    segmentLoanLabel: isSme ? "Business Loan" : isIndividual ? "Individual Loan" : "Seafarer Loan",
+    clientAddress: isSme
+      ? (sme?.businessAddress || joinAddress(borrower.presentAddress))
+      : joinAddress(borrower.presentAddress),
+
     // SF "Loan Information" sheet (SF Calculator 'SEAMAN (offset)' print area).
     // Interest is split between the paying terms and the add-on months
     // (AN15 = total interest x terms / (terms + add-on), AN16 = the rest);
