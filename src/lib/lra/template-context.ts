@@ -223,7 +223,17 @@ function loanInformationSlots(
       sumWhere((l) => l.startsWith("Offset") || l === "Previous Loan Balance"),
     ),
     advancePaymentDeduction: blankIfZero(sumWhere((l) => l === "Advance Payment")),
+    // Calculator SME.xlsm "SME" Loan Information block: AO19 = Processing
+    // Fee / Principal Loan, AO20 = Admin Cost / Principal Loan (both "0.000%"),
+    // BA20 = the chattel mortgage fee.
+    processingFeeRate: percentOfPrincipal(computation.processingFee, blri.principal),
+    adminCostRate: percentOfPrincipal(computation.adminCost, blri.principal),
+    chattelMortgageFeeDeduction: blankIfZero(sumWhere((l) => l === "Chattel Mortgage Fee")),
   };
+}
+
+function percentOfPrincipal(amount: number | null | undefined, principal: number): string {
+  return principal > 0 ? `${(((amount ?? 0) / principal) * 100).toFixed(3)}%` : "";
 }
 
 function joinAddress(a: BorrowerProfile["presentAddress"]): string {

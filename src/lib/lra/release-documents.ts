@@ -90,6 +90,20 @@ export function loanAgreementSlugFor(paymentFrequency: string | null | undefined
   return LOAN_AGREEMENT_BY_FREQUENCY[paymentFrequency ?? ""] ?? "loan_agreement";
 }
 
+/**
+ * The client's calculator has one BLRI tab per schedule size (Calculator
+ * SME.xlsm: "BLRI (Regular)" 13 rows, "(18)", "(24)", "(36)"). Our `blri`
+ * template's schedule is a loop that fits 24 payments on one page; past that
+ * the 36-row layout (`blri_long`) takes over, matching the client's 24 → 36
+ * tab split. An unknown payment count keeps the regular BLRI.
+ */
+export const BLRI_LONG_MIN_PAYMENTS = 25;
+
+/** The BLRI template for a loan with this many scheduled payments. */
+export function blriSlugFor(paymentCount: number | null | undefined): "blri" | "blri_long" {
+  return (paymentCount ?? 0) >= BLRI_LONG_MIN_PAYMENTS ? "blri_long" : "blri";
+}
+
 const COLLATERAL_SLUG: Record<"car_refinancing" | "real_estate", string> = {
   car_refinancing: "deed_of_chattel_mortgage",
   real_estate: "real_estate_mortgage",
@@ -135,7 +149,11 @@ export function templateConditionMatches(
   releasePaths: ReleasePath[],
   collateralType: CollateralType,
   paymentFrequency?: string | null,
+  paymentCount?: number | null,
 ): boolean {
+  if (slug === "blri" || slug === "blri_long") {
+    return slug === blriSlugFor(paymentCount);
+  }
   if (LOAN_AGREEMENT_SLUGS.has(slug)) {
     return slug === loanAgreementSlugFor(paymentFrequency);
   }
@@ -169,6 +187,7 @@ export type ReleaseDocumentCandidate = {
 const PICKER_ORDER: readonly string[] = [
   "loan_information_sf",
   "blri",
+  "blri_long",
   "blri_sf",
   "promissory_note",
   "promissory_note_sf",
@@ -213,13 +232,16 @@ export function releaseDocumentCandidates(
   releasePaths: ReleasePath[],
   collateralType: CollateralType,
   paymentFrequency?: string | null,
+  paymentCount?: number | null,
 ): ReleaseDocumentCandidate[] {
   const out: ReleaseDocumentCandidate[] = [];
   for (const row of catalog) {
     const eligibility =
       group === "seafarer" ? row.seafarerGeneration : row.smeGeneration;
     if (eligibility === "hidden") continue;
-    if (!templateConditionMatches(row.slug, releasePaths, collateralType, paymentFrequency)) {
+    if (
+      !templateConditionMatches(row.slug, releasePaths, collateralType, paymentFrequency, paymentCount)
+    ) {
       continue;
     }
     out.push({
@@ -246,8 +268,16 @@ export function autoGenerateSlugs(
   releasePaths: ReleasePath[],
   collateralType: CollateralType,
   paymentFrequency?: string | null,
+  paymentCount?: number | null,
 ): string[] {
-  return releaseDocumentCandidates(group, catalog, releasePaths, collateralType, paymentFrequency)
+  return releaseDocumentCandidates(
+    group,
+    catalog,
+    releasePaths,
+    collateralType,
+    paymentFrequency,
+    paymentCount,
+  )
     .filter((c) => c.eligibility === "always" && c.canGenerate)
     .map((c) => c.slug);
 }

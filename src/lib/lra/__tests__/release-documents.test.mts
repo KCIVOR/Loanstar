@@ -4,6 +4,7 @@ import assert from "node:assert/strict";
 import {
   autoGenerateSlugs,
   loanAgreementSlugFor,
+  blriSlugFor,
   PATH_SPECIFIC_SLUGS,
   queryPickerItems,
   RELEASE_DOCUMENT_SLUGS,
@@ -434,4 +435,24 @@ test("exactly one loan agreement applies to a loan, chosen by payment frequency"
   assert.deepEqual(forFrequency("two_monthly_special"), ["loan_agreement_vienovo"]);
   // Seafarer loans are always monthly, so they only ever see the standard one.
   assert.deepEqual(autoGenerateSlugs("seafarer", catalog, ["with_pdc"], "none"), ["loan_agreement"]);
+});
+
+test("the 36-row BLRI replaces the regular one past 24 payments (client's BLRI tab split)", () => {
+  assert.equal(blriSlugFor(undefined), "blri");
+  assert.equal(blriSlugFor(12), "blri");
+  assert.equal(blriSlugFor(24), "blri");
+  assert.equal(blriSlugFor(25), "blri_long");
+  assert.equal(blriSlugFor(36), "blri_long");
+
+  const catalog: ReleaseTemplateRow[] = ["blri", "blri_long"].map((slug) => ({
+    slug,
+    name: slug,
+    publishedVersionNo: 1,
+    seafarerGeneration: "hidden",
+    smeGeneration: "always",
+  }));
+  const forCount = (n?: number) => autoGenerateSlugs("sme", catalog, ["with_pdc"], "none", "monthly", n);
+  assert.deepEqual(forCount(), ["blri"]);
+  assert.deepEqual(forCount(24), ["blri"]);
+  assert.deepEqual(forCount(36), ["blri_long"]);
 });

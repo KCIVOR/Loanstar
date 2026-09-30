@@ -566,6 +566,8 @@ type ReleaseGenerationContext = {
   segment: "seafarer" | "sme" | "individual";
   collateralType: CollateralType;
   paymentFrequency: string | null;
+  /** Rows on the BLRI schedule — picks the regular or 36-row BLRI. */
+  paymentCount: number;
   borrowerId: string;
   catalog: ReleaseTemplateRow[];
   contextByPath: Map<ReleasePath, ReturnType<typeof buildReleaseTemplateContext>>;
@@ -742,6 +744,7 @@ async function loadReleaseGenerationContext(
     segment,
     collateralType,
     paymentFrequency: computation.paymentFrequency ?? null,
+    paymentCount: blri.pdcSchedule.length,
     borrowerId: app.borrower_id as string,
     catalog,
     contextByPath,
@@ -895,6 +898,7 @@ export async function generateReleaseDocuments(
     ctx.releasePaths,
     ctx.collateralType,
     ctx.paymentFrequency,
+    ctx.paymentCount,
   );
 
   for (const slug of slugs) {
@@ -942,6 +946,7 @@ export async function generateReleaseDocumentBySlug(
     ctx.releasePaths,
     ctx.collateralType,
     ctx.paymentFrequency,
+    ctx.paymentCount,
   ).some((c) => c.slug === slug && c.canGenerate);
   if (!allowed) {
     throw new ValidationError(

@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { getActiveComputation } from "@/lib/csa/computation";
+import { loadBlriContext } from "./blri-data";
 import { createSignedDownloadUrl } from "@/lib/documents/storage";
 
 import type { ReleasePath } from "./constants";
@@ -52,9 +53,12 @@ export async function buildReleaseDocumentPicker(
     (p): p is ReleasePath => p === "with_pdc" || p === "without_pdc",
   );
 
-  const [catalog, computation, generatedRes] = await Promise.all([
+  const [catalog, computation, blri, generatedRes] = await Promise.all([
     loadReleaseTemplateCatalog(supabase),
     getActiveComputation(supabase, applicationId),
+    // Only the BLRI schedule length is needed (regular vs 36-row BLRI); a
+    // missing computation just leaves the regular BLRI in the list.
+    loadBlriContext(supabase, applicationId, releaseRow.id as string).catch(() => null),
     supabase
       .from("generated_documents")
       .select("id, document_slug, storage_path, generated_at, signed_at, is_finalized")
@@ -71,6 +75,7 @@ export async function buildReleaseDocumentPicker(
     releasePaths,
     (app?.collateral_type as CollateralType) ?? null,
     computation?.paymentFrequency ?? null,
+    blri?.pdcSchedule.length ?? null,
   );
 
   const items: PickerItem[] = await Promise.all(

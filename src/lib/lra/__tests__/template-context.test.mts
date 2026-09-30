@@ -460,3 +460,22 @@ test("bank authorization accounts: application-form bank list first, else the fi
   const none = buildReleaseTemplateContext(BLRI, COMPUTATION, { ...BORROWER, financial: {} }, "with_pdc");
   assert.deepEqual(none.bankAuthorizationAccounts, []);
 });
+
+test("Loan Information rates follow the calculator: fee / principal loan, three decimals", () => {
+  const ctx = buildReleaseTemplateContext(
+    { ...BLRI, principal: 100000 },
+    { ...COMPUTATION, processingFee: 6000, adminCost: 3335 },
+    BORROWER,
+    "with_pdc",
+  );
+  assert.equal(ctx.processingFeeRate, "6.000%");
+  assert.equal(ctx.adminCostRate, "3.335%");
+
+  const zero = buildReleaseTemplateContext(
+    { ...BLRI, principal: 100000 },
+    { ...COMPUTATION, adminCost: 0 },
+    BORROWER,
+    "with_pdc",
+  );
+  assert.equal(zero.adminCostRate, "0.000%");
+});
