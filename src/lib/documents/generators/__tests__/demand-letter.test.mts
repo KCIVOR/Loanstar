@@ -102,3 +102,48 @@ test("pickDemandLetterSlug routes only seafarer accounts, and only to published 
   assert.equal(pick({ segment: "sme", hasBouncedChecks: true }), "demand_letter");
   assert.equal(pick({ publishedSlugs: new Set(["demand_letter"]) }), "demand_letter");
 });
+
+test("pickDemandLetterSlug gives SME and Individual accounts the client's own letters", () => {
+  const all = new Set([
+    "demand_letter",
+    "demand_letter_no_pdc_sme",
+    "demand_letter_dishonored_check_sme",
+    "demand_letter_dishonored_check_coborrower_sme",
+    "demand_letter_no_pdc_sf",
+    "demand_letter_dishonored_check_sf",
+  ]);
+  const pick = (over: Partial<Parameters<typeof pickDemandLetterSlug>[0]>) =>
+    pickDemandLetterSlug({
+      segment: "sme",
+      demandStage: "second_demand",
+      hasBouncedChecks: false,
+      publishedSlugs: all,
+      ...over,
+    });
+  assert.equal(pick({}), "demand_letter_no_pdc_sme");
+  assert.equal(pick({ segment: "individual", demandStage: "final_demand" }), "demand_letter_no_pdc_sme");
+  assert.equal(pick({ demandStage: "first_reminder" }), "demand_letter");
+  assert.equal(pick({ hasBouncedChecks: true }), "demand_letter_dishonored_check_sme");
+  assert.equal(
+    pick({ hasBouncedChecks: true, forCoBorrower: true }),
+    "demand_letter_dishonored_check_coborrower_sme",
+  );
+  // No co-borrower copy without a returned check, and none for seafarers.
+  assert.equal(pick({ forCoBorrower: true }), "demand_letter_no_pdc_sme");
+  assert.equal(
+    pick({ segment: "seafarer", hasBouncedChecks: true, forCoBorrower: true }),
+    "demand_letter_dishonored_check_sf",
+  );
+  assert.equal(pick({ segment: null, hasBouncedChecks: true }), "demand_letter");
+});
+
+test("attention and co-borrower keys default to empty so every demand template merges", () => {
+  const ctx = buildDemandLetterContext(BASE);
+  assert.equal(ctx.attentionName, "");
+  assert.equal(ctx.attentionTitle, "");
+  assert.equal(ctx.coBorrowerName, "");
+  assert.equal(ctx.coBorrowerAddress, "");
+  const co = buildDemandLetterContext({ ...BASE, coBorrowerName: "Maria Santos", attentionName: "Juan Cruz", attentionTitle: "President" });
+  assert.equal(co.coBorrowerName, "Maria Santos");
+  assert.equal(co.attentionTitle, "President");
+});

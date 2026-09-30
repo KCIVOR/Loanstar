@@ -54,6 +54,12 @@ export type DemandLetterInput = {
   demandChecks?: DemandCheckRow[];
   /** Account the returned checks were drawn against, when the PDC record has it. */
   demandCheckAccountNo?: string;
+  /** Company officer the letter is marked for the attention of (SME accounts). */
+  attentionName?: string;
+  attentionTitle?: string;
+  /** Set when this copy of the letter is addressed to a co-borrower. */
+  coBorrowerName?: string;
+  coBorrowerAddress?: string;
 };
 
 export type DemandCheckRow = {
@@ -68,33 +74,43 @@ export const DEMAND_LETTER_SLUGS = [
   "demand_letter",
   "demand_letter_no_pdc_sf",
   "demand_letter_dishonored_check_sf",
+  "demand_letter_no_pdc_sme",
+  "demand_letter_dishonored_check_sme",
+  "demand_letter_dishonored_check_coborrower_sme",
 ] as const;
 
 /**
- * Which template a demand uses. Seafarer accounts have their own client
- * letters (SFCalculator/DL2 + SC - NO PDC): a returned check gets the
- * dishonored-check notice, otherwise the second / final demand gets the
- * two-notice letter. Everything else — and any seafarer letter whose template
- * is not published — stays on the shared `demand_letter`.
+ * Which template a demand uses. Each segment group has the client's own
+ * letters (seafarer: SFCalculator/DL2 + SC - NO PDC; SME / Individual: the
+ * "Demand Letter" set): a returned check gets the dishonored-check notice —
+ * the co-borrower's copy of it when that is who the letter is for — otherwise
+ * the second / final demand gets the two-notice letter. A first reminder with
+ * no returned check, and any letter whose template is not published, stays on
+ * the shared `demand_letter`.
  */
 export function pickDemandLetterSlug(input: {
   segment: string | null;
   demandStage: DemandStage;
   hasBouncedChecks: boolean;
   publishedSlugs: ReadonlySet<string>;
+  /** True for the extra copy addressed to a co-borrower. */
+  forCoBorrower?: boolean;
 }): (typeof DEMAND_LETTER_SLUGS)[number] {
-  if (input.segment !== "seafarer") return "demand_letter";
-  if (
-    input.hasBouncedChecks &&
-    input.publishedSlugs.has("demand_letter_dishonored_check_sf")
-  ) {
-    return "demand_letter_dishonored_check_sf";
+  const suffix = input.segment === "seafarer" ? "sf" : "sme";
+  if (input.segment !== "seafarer" && input.segment !== "sme" && input.segment !== "individual") {
+    return "demand_letter";
   }
-  if (
-    input.demandStage !== "first_reminder" &&
-    input.publishedSlugs.has("demand_letter_no_pdc_sf")
-  ) {
-    return "demand_letter_no_pdc_sf";
+  if (input.hasBouncedChecks) {
+    const coBorrowerSlug = "demand_letter_dishonored_check_coborrower_sme";
+    if (input.forCoBorrower && suffix === "sme" && input.publishedSlugs.has(coBorrowerSlug)) {
+      return coBorrowerSlug;
+    }
+    const dishonored = `demand_letter_dishonored_check_${suffix}` as const;
+    if (input.publishedSlugs.has(dishonored)) return dishonored;
+  }
+  const noPdc = `demand_letter_no_pdc_${suffix}` as const;
+  if (input.demandStage !== "first_reminder" && input.publishedSlugs.has(noPdc)) {
+    return noPdc;
   }
   return "demand_letter";
 }
@@ -135,6 +151,10 @@ export function buildDemandLetterContext(
     demandChecks: input.demandChecks ?? [],
     demandCheckAccountNo: input.demandCheckAccountNo ?? "",
     demandReason: "",
+    attentionName: input.attentionName ?? "",
+    attentionTitle: input.attentionTitle ?? "",
+    coBorrowerName: input.coBorrowerName ?? "",
+    coBorrowerAddress: input.coBorrowerAddress ?? "",
   };
 }
 
@@ -182,7 +202,16 @@ export async function generateDemandLetter(
   const borrowerRow = (Array.isArray(borrowerRaw) ? borrowerRaw[0] : borrowerRaw) as
     | BorrowerRow
     | null;
-  const address = borrowerRow ? joinAddress(mapBorrowerRow(borrowerRow).presentAddress) : "";
+  const profile = borrowerRow ? mapBorrowerRow(borrowerRow) : null;
+  const segment = (account.segment as string | null) ?? null;
+  // An SME letter goes to the company at its office, marked for the attention
+  // of its officer — the account row itself only carries the person's name.
+  const business = segment === "sme" ? profile?.businessInfo : undefined;
+  const addressee = business?.companyName?.trim() || (account.borrower_name as string);
+  const address =
+    (business?.officeAddress ?? business?.companyAddress ?? "").trim() ||
+    (profile ? joinAddress(profile.presentAddress) : "");
+  const officer = business?.companyOfficers?.[0];
 
   const schedules = (
     Array.isArray(account.amortization_schedules) ? account.amortization_schedules : []
@@ -208,7 +237,7 @@ export async function generateDemandLetter(
     if (await getPublishedTemplate(supabase, candidate)) publishedSlugs.add(candidate);
   }
   const slug = pickDemandLetterSlug({
-    segment: (account.segment as string | null) ?? null,
+    segment,
     demandStage,
     hasBouncedChecks: bounced.checks.length > 0,
     publishedSlugs,
@@ -223,8 +252,8 @@ export async function generateDemandLetter(
     .limit(1)
     .maybeSingle();
 
-  const context = buildDemandLetterContext({
-    borrowerName: account.borrower_name as string,
+  const letterInput: DemandLetterInput = {
+    borrowerName: addressee,
     address,
     loanAccountNo: (account.loan_account_no as string) ?? "",
     outstandingBalance: Number(account.outstanding_balance ?? 0),
@@ -239,15 +268,54 @@ export async function generateDemandLetter(
       : "",
     demandChecks: bounced.checks,
     demandCheckAccountNo: bounced.accountNo,
-  });
+    attentionName: officer?.name?.trim() ?? "",
+    attentionTitle: (officer?.position ?? business?.position ?? "").trim(),
+  };
 
-  return renderAndStore(supabase, {
+  const result = await renderAndStore(supabase, {
     slug,
     module: "collection",
     applicationId,
-    context,
+    context: buildDemandLetterContext(letterInput),
     actorId,
   });
+
+  // A returned check is also demanded from each co-borrower, in a copy of the
+  // letter addressed to them (client source: "Demand Letter - Co-borrower").
+  const coBorrowerSlug = pickDemandLetterSlug({
+    segment,
+    demandStage,
+    hasBouncedChecks: bounced.checks.length > 0,
+    publishedSlugs,
+    forCoBorrower: true,
+  });
+  if (coBorrowerSlug === "demand_letter_dishonored_check_coborrower_sme") {
+    const { data: app } = await supabase
+      .from("loan_applications")
+      .select("co_borrowers")
+      .eq("id", applicationId)
+      .maybeSingle();
+    const coBorrowers = (Array.isArray(app?.co_borrowers) ? app.co_borrowers : []) as Array<{
+      fullName?: string;
+      address?: string;
+    }>;
+    for (const coBorrower of coBorrowers) {
+      if (!coBorrower.fullName?.trim()) continue;
+      await renderAndStore(supabase, {
+        slug: coBorrowerSlug,
+        module: "collection",
+        applicationId,
+        context: buildDemandLetterContext({
+          ...letterInput,
+          coBorrowerName: coBorrower.fullName.trim(),
+          coBorrowerAddress: (coBorrower.address ?? "").trim(),
+        }),
+        actorId,
+      });
+    }
+  }
+
+  return result;
 }
 
 /**

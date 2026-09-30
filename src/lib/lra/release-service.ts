@@ -707,6 +707,7 @@ async function loadReleaseGenerationContext(
     addonMonths: computation.addonMonths,
     interestRate: computation.interestRate,
     loanTypeName: computation.loanTypeName,
+    paymentFrequency: computation.paymentFrequency,
     processingFee: computation.processingFee,
     securityFee: computation.securityFee,
     docStamp: computation.docStamp,
@@ -719,7 +720,7 @@ async function loadReleaseGenerationContext(
       ? (performerNames.get(computation.signedBy) ?? "")
       : "",
   };
-  const segmentScope = { segment };
+  const segmentScope = { segment, collateralType };
   const contextByPath = new Map(
     releasePaths.map((p) => [
       p,

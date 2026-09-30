@@ -9,6 +9,8 @@ import type { ReleasePath } from "./constants";
 /** Additive scope — omit or pass seafarer to keep Seafarer merge context unchanged. */
 export type ReleaseTemplateScope = {
   segment?: "seafarer" | "sme" | "individual" | null;
+  /** The application's collateral, when it has one — selects the mortgage wording. */
+  collateralType?: string | null;
 };
 
 function smeBusinessSlots(businessInfo: BusinessInfo | undefined): {
@@ -147,6 +149,28 @@ export function looseDateLong(value: string | null | undefined): string {
   return d ? `${MONTH_NAMES[d.getMonth()]} ${d.getDate()}, ${d.getFullYear()}` : "";
 }
 
+/** Either date shape -> day-of-month ordinal ("5th", "20th"). Unparseable input stays empty. */
+export function looseDayOrdinal(value: string | null | undefined): string {
+  const d = value ? parseLooseDate(value) : null;
+  if (!d) return "";
+  const day = d.getDate();
+  const rem100 = day % 100;
+  if (rem100 >= 11 && rem100 <= 13) return `${day}th`;
+  const suffix = day % 10 === 1 ? "st" : day % 10 === 2 ? "nd" : day % 10 === 3 ? "rd" : "th";
+  return `${day}${suffix}`;
+}
+
+/** Whole days from one date to another (either shape). Null when either is unparseable. */
+function daysBetweenLoose(
+  from: string | null | undefined,
+  to: string | null | undefined,
+): number | null {
+  const a = from ? parseLooseDate(from) : null;
+  const b = to ? parseLooseDate(to) : null;
+  if (!a || !b) return null;
+  return Math.max(Math.round((b.getTime() - a.getTime()) / 86_400_000), 0);
+}
+
 /** Either date shape -> "Month YYYY". Unparseable input stays empty. */
 export function looseDateMonthYear(value: string | null | undefined): string {
   const d = value ? parseLooseDate(value) : null;
@@ -192,6 +216,8 @@ export type ReleaseComputation = {
   addonMonths?: number | null;
   interestRate?: number | null;
   loanTypeName?: string | null;
+  /** `computations.payment_frequency` — selects the schedule-specific loan agreement. */
+  paymentFrequency?: string | null;
   processingFee?: number | null;
   securityFee?: number | null;
   docStamp?: number | null;
@@ -307,9 +333,18 @@ export function buildReleaseTemplateContext(
   // data-if/data-unless doesn't survive the editor round-trip — see
   // docs/revision-plans/document-fidelity-audit.md Phase 2) always follows
   // them correctly once they're wired, without a second fix to remember.
-  const isBiMonthly = false;
-  const isPerDayInterest = false;
+  const frequency = computation.paymentFrequency ?? "monthly";
+  const isBiMonthly = frequency === "bi_monthly";
+  const isPerDayInterest = frequency === "daily";
   const hasInvoiceAnnex = false;
+  const isQuarterly = frequency === "quarterly" || frequency === "quarterly_special";
+  const isEvery2Months = frequency === "two_monthly" || frequency === "two_monthly_special";
+  const hasMortgage =
+    scope?.collateralType === "car_refinancing" || scope?.collateralType === "real_estate";
+  const firstCheck = blri.pdcSchedule[0];
+  const secondCheck = blri.pdcSchedule[1];
+  const lastCheck = blri.pdcSchedule.at(-1);
+  const termDays = daysBetweenLoose(computation.releaseDate, lastCheck?.checkDate);
 
   const base: Record<string, unknown> = {
     companyName: "Loan Star Lending Group Corp.",
@@ -598,6 +633,30 @@ export function buildReleaseTemplateContext(
     // 2). This lets the template pick the standard Clause 2/3 text with one
     // flag instead of a triple negation.
     isStandardSchedule: !isBiMonthly && !isPerDayInterest && !hasInvoiceAnnex,
+
+    // Schedule-specific loan agreements (LOAN AGREEMENT - Bi-Monthly / - Per Day
+    // Interest Single / Vienovo quarter2months) and the secured-loan wording of
+    // clause 7. All read from the computation's own payment frequency, the
+    // application's collateral type and the check schedule already on hand.
+    isQuarterly,
+    isEvery2Months,
+    hasMortgage,
+    paymentPeriodLabel: isQuarterly ? "quarterly" : isEvery2Months ? "2-month" : "",
+    // Bi-monthly: the month's amortization is split across two checks.
+    biMonthlyFirstDueDateLong: looseDateLong(firstCheck?.checkDate),
+    biMonthlySecondDueDateLong: looseDateLong(secondCheck?.checkDate),
+    biMonthlyFirstDayOrdinal: looseDayOrdinal(firstCheck?.checkDate),
+    biMonthlySecondDayOrdinal: looseDayOrdinal(secondCheck?.checkDate),
+    // Per-day interest: one payment after a term counted in days.
+    termDays: termDays == null ? "" : String(termDays),
+    termDaysInWords: countInWords(termDays),
+    // Quarterly / every-2-months: interest-only checks, then one final check.
+    interestCheckCount: String(Math.max(blri.pdcSchedule.length - 1, 0)),
+    interestCheckCountInWords: countInWords(Math.max(blri.pdcSchedule.length - 1, 0)),
+    interestCheckAmount: formatMoney(firstCheck?.amount ?? 0),
+    interestCheckAmountInWords: pesosAndCentavosInWords(firstCheck?.amount ?? 0),
+    finalCheckAmount: formatMoney(lastCheck?.amount ?? 0),
+    finalCheckAmountInWords: pesosAndCentavosInWords(lastCheck?.amount ?? 0),
     isNonPdc: !isCheck,
     invoices: [] as unknown[],
 

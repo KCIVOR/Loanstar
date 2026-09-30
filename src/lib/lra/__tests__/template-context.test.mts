@@ -375,3 +375,54 @@ test("SF Loan Information keys: interest split, fee rate, other-deduction cells"
   assert.equal(ctx.previousLoanDeduction, "");
   assert.equal(ctx.accountOpeningDeduction, "");
 });
+
+test("schedule flags follow the computation's payment frequency; mortgage flag follows the collateral", () => {
+  const make = (paymentFrequency: string | undefined, collateralType?: string) =>
+    buildReleaseTemplateContext(
+      BLRI,
+      { ...COMPUTATION, paymentFrequency },
+      BORROWER,
+      "with_pdc",
+      { segment: "sme", collateralType },
+    );
+  const monthly = make(undefined);
+  assert.equal(monthly.isStandardSchedule, true);
+  assert.equal(monthly.isBiMonthly, false);
+  assert.equal(monthly.hasMortgage, false);
+  assert.equal(monthly.paymentPeriodLabel, "");
+
+  assert.equal(make("bi_monthly").isBiMonthly, true);
+  assert.equal(make("bi_monthly").isStandardSchedule, false);
+  assert.equal(make("daily").isPerDayInterest, true);
+  assert.equal(make("quarterly_special").isQuarterly, true);
+  assert.equal(make("quarterly").paymentPeriodLabel, "quarterly");
+  assert.equal(make("two_monthly").isEvery2Months, true);
+  assert.equal(make("two_monthly_special").paymentPeriodLabel, "2-month");
+  assert.equal(make(undefined, "car_refinancing").hasMortgage, true);
+  assert.equal(make(undefined, "real_estate").hasMortgage, true);
+  assert.equal(make(undefined, "none").hasMortgage, false);
+});
+
+test("schedule-specific agreement fields come from the check schedule", () => {
+  const ctx = buildReleaseTemplateContext(
+    {
+      ...BLRI,
+      pdcSchedule: [
+        { checkNumber: null, checkDate: "08/20/26", amount: 300000, bankName: "" },
+        { checkNumber: null, checkDate: "2026-09-05", amount: 300000, bankName: "" },
+        { checkNumber: null, checkDate: "10/20/26", amount: 10300000, bankName: "" },
+      ],
+    },
+    { netReleased: 90000, releaseDate: "2026-08-05", paymentFrequency: "two_monthly_special" },
+    BORROWER,
+    "with_pdc",
+  );
+  assert.equal(ctx.biMonthlyFirstDayOrdinal, "20th");
+  assert.equal(ctx.biMonthlySecondDayOrdinal, "5th");
+  assert.equal(ctx.biMonthlySecondDueDateLong, "September 5, 2026");
+  assert.equal(ctx.interestCheckCountInWords, "Two (2)");
+  assert.equal(ctx.interestCheckAmount, "300,000.00");
+  assert.equal(ctx.finalCheckAmount, "10,300,000.00");
+  assert.equal(ctx.termDays, "76");
+  assert.equal(ctx.termDaysInWords, "Seventy Six (76)");
+});
