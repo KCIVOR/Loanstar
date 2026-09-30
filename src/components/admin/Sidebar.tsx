@@ -190,6 +190,7 @@ const NAV_ITEMS: Array<{
   icon: string;
   exact?: boolean;
   module?: ModuleSlug;
+  superAdminOnly?: boolean;
 }> = [
   { href: "/dashboard", label: "Dashboard", icon: "dashboard", exact: true },
   { href: "/admin/roles", label: "Roles", icon: "roles", module: "auth_admin" },
@@ -203,6 +204,7 @@ const NAV_ITEMS: Array<{
   { href: "/reports", label: "Reports", icon: "reports", module: "reports" },
   { href: "/admin/email-test", label: "Email Test", icon: "emailTest", module: "system_config" },
   { href: "/admin/email-templates", label: "Decision Emails", icon: "emailTest", module: "system_config" },
+  { href: "/admin/legacy-import", label: "Legacy Import", icon: "config", superAdminOnly: true },
 ];
 
 type PortalNavChild = NavChildMatch & {
@@ -447,6 +449,7 @@ function SidebarContent({
   const visibleItems = NAV_ITEMS.filter(
     (item) =>
       (!item.module || can(item.module, "view")) &&
+      (!item.superAdminOnly || permissions?.isSuperAdmin === true) &&
       !(item.href === "/dashboard" && resolveHomePath(permissions) === "/borrower"),
   );
 
