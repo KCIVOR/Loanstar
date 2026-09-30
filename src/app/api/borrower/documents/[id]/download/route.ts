@@ -4,7 +4,7 @@ import {
   ForbiddenError,
   requireModulePermission,
 } from "@/lib/permissions/server";
-import { createClient } from "@/lib/supabase/server";
+import { createClient, createServiceClient } from "@/lib/supabase/server";
 
 type RouteParams = { params: Promise<{ id: string }> };
 
@@ -51,11 +51,14 @@ export async function GET(_request: Request, { params }: RouteParams) {
   try {
     const user = await requireModulePermission("borrower_portal", "view");
     const { id } = await params;
-    const supabase = await createClient();
     const document = await getOwnDocument(user.id, id);
 
+    // Ownership is already enforced above (RLS read + explicit user_id match).
+    // Sign with the service client: files uploaded before the application was
+    // connected/moved to this borrower live under the previous borrower's
+    // storage folder, which storage RLS would otherwise refuse.
     const signedUrl = await createSignedDownloadUrl(
-      supabase,
+      createServiceClient(),
       document.storage_path as string,
     );
 

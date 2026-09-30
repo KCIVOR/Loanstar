@@ -25,6 +25,8 @@ import {
   type ComputationPanelHandle,
 } from "@/components/csa/ComputationPanel";
 import { ConnectBorrowerAccountPanel } from "@/components/csa/ConnectBorrowerAccountPanel";
+import { ChangeOwnerPanel } from "@/components/csa/ChangeOwnerPanel";
+import { canChangeOwner } from "@/lib/csa/change-owner-stages";
 import { NegotiationPanel } from "@/components/csa/NegotiationPanel";
 import { ApplicantProfileFields } from "@/components/borrowers/ApplicantProfileFields";
 import { CoBorrowerSection } from "@/components/applications/CoBorrowerSection";
@@ -1345,6 +1347,17 @@ export default function CsaApplicationPage() {
           <ConnectBorrowerAccountPanel
             applicationId={applicationId}
             onConnected={() => void load({ silent: true })}
+          />
+        ) : null}
+
+        {data.borrower?.userId && canChangeOwner(data.application.status) ? (
+          <ChangeOwnerPanel
+            applicationId={applicationId}
+            currentBorrowerId={data.borrower.id}
+            currentBorrowerName={[data.borrower.firstName, data.borrower.lastName]
+              .filter(Boolean)
+              .join(" ")}
+            onChanged={() => void load({ silent: true })}
           />
         ) : null}
 

@@ -88,3 +88,53 @@ export async function connectApplicationToBorrowerAccount(
     borrowerUserId: row.borrower_user_id as string,
   };
 }
+
+/**
+ * Moves an application that already belongs to one portal-linked borrower to
+ * another portal-linked borrower ("Change owner"). Same atomic-RPC approach
+ * as `connectApplicationToBorrowerAccount`; the RPC also enforces the allowed
+ * stages and the required reason.
+ */
+export async function reassignApplicationBorrowerAccount(
+  applicationId: string,
+  targetBorrowerId: string,
+  actorId: string,
+  reason: string,
+): Promise<{
+  borrowerId: string;
+  borrowerUserId: string;
+  previousBorrowerId: string;
+  previousUserId: string;
+}> {
+  const admin = createServiceClient();
+  const { data, error } = await admin.rpc(
+    "reassign_application_borrower_account",
+    {
+      p_application_id: applicationId,
+      p_target_borrower_id: targetBorrowerId,
+      p_actor_id: actorId,
+      p_reason: reason,
+    },
+  );
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  const row = Array.isArray(data) ? data[0] : data;
+  if (
+    !row?.borrower_id ||
+    !row?.borrower_user_id ||
+    !row?.previous_borrower_id ||
+    !row?.previous_user_id
+  ) {
+    throw new Error("Failed to change application owner");
+  }
+
+  return {
+    borrowerId: row.borrower_id as string,
+    borrowerUserId: row.borrower_user_id as string,
+    previousBorrowerId: row.previous_borrower_id as string,
+    previousUserId: row.previous_user_id as string,
+  };
+}
