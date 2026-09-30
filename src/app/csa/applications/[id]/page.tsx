@@ -54,6 +54,7 @@ import {
   csaNextStep,
 } from "@/lib/csa/workspace";
 import type { BorrowerProfile } from "@/lib/borrowers/types";
+import { GeneratedDocPanel } from "@/components/documents/GeneratedDocPanel";
 
 type EndorseReadiness = {
   ready: boolean;
@@ -1039,6 +1040,16 @@ export default function CsaApplicationPage() {
               onSaved={() => void load({ silent: true })}
             />
           </Card>
+        ) : null}
+
+        {data.application.segment === "sme" ||
+        data.application.segment === "individual" ? (
+          <GeneratedDocPanel
+            title="Bank Authorization"
+            description="For the client to sign: lets LSLGC verify their bank account and ADB. Lists the bank accounts on the application form."
+            endpoint={`/api/csa/applications/${data.application.id}/bank-authorization`}
+            generateLabel="Print bank authorization"
+          />
         ) : null}
 
         <Card>

@@ -26,7 +26,7 @@ function smeBusinessSlots(businessInfo: BusinessInfo | undefined): {
   };
 }
 
-function bankAuthorizationAccounts(borrower: BorrowerProfile): Array<{
+export function bankAuthorizationAccounts(borrower: BorrowerProfile): Array<{
   bankNameAndBranch: string;
   accountType: string;
   accountNo: string;
