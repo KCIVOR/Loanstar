@@ -12,7 +12,7 @@ const route = read(
   "../../../app/api/csa/applications/[id]/change-owner/route.ts",
 );
 const migration = read(
-  "../../../../supabase/migrations/20261001090000_reassign_application_owner.sql",
+  "../../../../supabase/migrations/20260930223826_reassign_application_owner.sql",
 );
 const download = read(
   "../../../app/api/borrower/documents/[id]/download/route.ts",

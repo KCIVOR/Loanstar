@@ -98,8 +98,8 @@ Read-only queries on project `acopcwlhkovssjnrqygk`; no data changed.
 
 | File | Change | Responsibility |
 | --- | --- | --- |
-| `supabase/migrations/20261001090000_reassign_application_owner.sql` | new | RPC + borrower_id guard trigger |
-| `../supabase/migrations/20261001090000_reassign_application_owner.sql` | new (mirror, untracked by git) | two-folder convention |
+| `supabase/migrations/20260930223826_reassign_application_owner.sql` | new | RPC + borrower_id guard trigger |
+| `../supabase/migrations/20260930223826_reassign_application_owner.sql` | new (mirror, untracked by git) | two-folder convention |
 | `src/lib/csa/connect-borrower.ts` | edit | add `reassignApplicationBorrowerAccount()` |
 | `src/app/api/csa/applications/[id]/change-owner/route.ts` | new | endpoint, audit, two notices |
 | `src/components/csa/ChangeOwnerPanel.tsx` | new | search + reason + confirm UI |
@@ -253,7 +253,7 @@ Inside a SECURITY DEFINER function `current_user` is the function owner (`postgr
 
 On `main`:
 ```bash
-git add supabase/migrations/20261001090000_reassign_application_owner.sql src/lib/csa/connect-borrower.ts "src/app/api/csa/applications/[id]/change-owner/route.ts" src/components/csa/ChangeOwnerPanel.tsx "src/app/csa/applications/[id]/page.tsx" "src/app/api/borrower/documents/[id]/download/route.ts" src/lib/csa/change-owner-stages.ts src/lib/csa/__tests__/change-owner-contract.test.mts
+git add supabase/migrations/20260930223826_reassign_application_owner.sql src/lib/csa/connect-borrower.ts "src/app/api/csa/applications/[id]/change-owner/route.ts" src/components/csa/ChangeOwnerPanel.tsx "src/app/csa/applications/[id]/page.tsx" "src/app/api/borrower/documents/[id]/download/route.ts" src/lib/csa/change-owner-stages.ts src/lib/csa/__tests__/change-owner-contract.test.mts
 ```
 Message: `CSA change application owner (account→account) + borrower_id guard + portal download fix`. The `../supabase/migrations` mirror is still created (two-folder CLI convention) but is **not** in any git repository (verified: `git -C ../supabase` → not a repository), so it is not part of the commit.
 
