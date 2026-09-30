@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
+import { formatZodError } from "@/lib/api/zod-error";
 
 import { writeAuditEvent } from "@/lib/audit/writer";
 import { handleApiError, jsonOk } from "@/lib/api/handler";
@@ -105,7 +106,7 @@ export async function POST(request: Request, { params }: RouteParams) {
     return jsonOk({ document: updated });
   } catch (error) {
     if (error instanceof z.ZodError) {
-      return NextResponse.json({ error: error.message }, { status: 400 });
+      return NextResponse.json({ error: formatZodError(error) }, { status: 400 });
     }
     return handleApiError(error);
   }

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
+import { formatZodError } from "@/lib/api/zod-error";
 
 import { writeAuditEvent } from "@/lib/audit/writer";
 import {
@@ -38,7 +39,8 @@ const manningAgencySchema = z.object({
   address: z.string().optional(),
   contactPerson: z.string().optional(),
   phone: z.string().optional(),
-  email: z.string().email().optional(),
+  // Blank is allowed — the form sends "" when the optional field is left empty.
+  email: z.union([z.literal(""), z.string().email()]).optional(),
   crewingManager: z.string().optional(),
   crewingManagerContact: z.string().optional(),
   yearsOfStay: z.string().optional(),
@@ -65,7 +67,8 @@ const allotteeSchema = z.object({
   relationship: z.string().optional(),
   address: addressSchema.optional(),
   phone: z.string().optional(),
-  email: z.string().email().optional(),
+  // Blank is allowed — the form sends "" when the optional field is left empty.
+  email: z.union([z.literal(""), z.string().email()]).optional(),
   facebook: z.string().optional(),
   allotmentPercent: z.string().optional(),
   companyName: z.string().optional(),
@@ -232,7 +235,7 @@ export async function PATCH(request: Request) {
     return jsonOk({ profile: mapBorrowerRow(updated) });
   } catch (error) {
     if (error instanceof z.ZodError) {
-      return NextResponse.json({ error: error.message }, { status: 400 });
+      return NextResponse.json({ error: formatZodError(error) }, { status: 400 });
     }
     return handleApiError(error);
   }

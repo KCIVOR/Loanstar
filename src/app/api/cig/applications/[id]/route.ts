@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
+import { formatZodError } from "@/lib/api/zod-error";
 
 import { resolveDisplayName } from "@/lib/account/display-name";
 import {
@@ -596,7 +597,7 @@ export async function PATCH(request: Request, { params }: RouteParams) {
     });
   } catch (error) {
     if (error instanceof z.ZodError) {
-      return NextResponse.json({ error: error.message }, { status: 400 });
+      return NextResponse.json({ error: formatZodError(error) }, { status: 400 });
     }
     if (error instanceof CigSequenceError) {
       return NextResponse.json({ error: error.message }, { status: 400 });

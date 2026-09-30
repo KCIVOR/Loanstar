@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createHash } from "crypto";
 import { z } from "zod";
+import { formatZodError } from "@/lib/api/zod-error";
 
 import { notifyWorkflowEvent } from "@/lib/notifications/workflow-events";
 import { writeAuditEvent } from "@/lib/audit/writer";
@@ -194,7 +195,7 @@ export async function POST(request: Request, { params }: RouteParams) {
     });
   } catch (error) {
     if (error instanceof z.ZodError) {
-      return NextResponse.json({ error: error.message }, { status: 400 });
+      return NextResponse.json({ error: formatZodError(error) }, { status: 400 });
     }
     return handleApiError(error);
   }

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
+import { formatZodError } from "@/lib/api/zod-error";
 
 import { handleApiError, jsonOk } from "@/lib/api/handler";
 import { attemptApplicationApprovedEmail } from "@/lib/committee/approval-email";
@@ -46,7 +47,7 @@ export async function POST(request: Request, { params }: RouteParams) {
     return jsonOk(result);
   } catch (error) {
     if (error instanceof z.ZodError) {
-      return NextResponse.json({ error: error.message }, { status: 400 });
+      return NextResponse.json({ error: formatZodError(error) }, { status: 400 });
     }
     return handleApiError(error);
   }

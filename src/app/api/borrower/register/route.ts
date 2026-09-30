@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient as createSupabaseClient } from "@supabase/supabase-js";
 import { z } from "zod";
+import { formatZodError } from "@/lib/api/zod-error";
 
 import { mapBorrowerRow, type Address } from "@/lib/borrowers/types";
 import { handleApiError, jsonOk } from "@/lib/api/handler";
@@ -230,7 +231,7 @@ export async function POST(request: Request) {
     );
   } catch (error) {
     if (error instanceof z.ZodError) {
-      return NextResponse.json({ error: error.message }, { status: 400 });
+      return NextResponse.json({ error: formatZodError(error) }, { status: 400 });
     }
     if (error instanceof DuplicateEmailError) {
       return NextResponse.json(

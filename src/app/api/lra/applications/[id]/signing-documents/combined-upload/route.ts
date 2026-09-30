@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
+import { formatZodError } from "@/lib/api/zod-error";
 import type { User } from "@supabase/supabase-js";
 
 import { resolveDisplayName } from "@/lib/account/display-name";
@@ -258,7 +259,7 @@ export async function POST(request: Request, { params }: RouteParams) {
     });
   } catch (error) {
     if (error instanceof z.ZodError) {
-      return NextResponse.json({ error: error.message }, { status: 400 });
+      return NextResponse.json({ error: formatZodError(error) }, { status: 400 });
     }
     return handleApiError(error);
   }

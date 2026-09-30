@@ -93,8 +93,8 @@ export default function RegisterPage() {
             <h3>Check your email</h3>
             <p className="s">
               {confirmationSent
-                ? "We sent a confirmation link to your inbox (via Supabase Auth). Open it to confirm your email — you will be signed in automatically."
-                : "Your account was created. If you did not receive a confirmation email, Confirm email may be disabled in Supabase Auth settings — you can try logging in, or ask an admin to enable email confirmations."}
+                ? "We sent a confirmation link to your inbox. Open it to confirm your email — you will be signed in automatically."
+                : "Your account has been created. If you don't see a confirmation email in a few minutes, please check your spam folder, or try logging in. If you still need help, contact our office."}
             </p>
             <Button
               type="button"
