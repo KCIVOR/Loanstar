@@ -6,6 +6,8 @@ import type { BlriData } from "../blri-data";
 import {
   buildReleaseTemplateContext,
   countInWords,
+  looseDateLong,
+  looseDateMonthYear,
   pctInWords,
   pesosAndCentavosInWords,
   pesosInWords,
@@ -310,4 +312,33 @@ test("collateral gap fix: vehicles/properties come from the CI inspection, not h
   );
   assert.deepEqual(withoutCollateral.vehicles, []);
   assert.deepEqual(withoutCollateral.properties, []);
+});
+
+test("SF source-document keys: long-form payment dates and the terms + add-on interest period", () => {
+  // SF Calculator sample (LA303401): released 07/20/2026, 6 terms + 2 add-on
+  // months, paid 09/15/2026 -> 02/15/2027 — PN.doc/DISC.doc print "for Eight
+  // (8) months from July 2026 to February 2027".
+  const ctx = buildReleaseTemplateContext(
+    {
+      ...BLRI,
+      terms: 6,
+      firstPaymentDate: "09/15/26",
+      pdcSchedule: [
+        { checkNumber: null, checkDate: "09/15/26", amount: 11229.76, bankName: "" },
+        { checkNumber: null, checkDate: "2027-02-15", amount: 11229.76, bankName: "" },
+      ],
+    },
+    { netReleased: 50000, releaseDate: "2026-07-20", addonMonths: 2 },
+    BORROWER,
+    "without_pdc",
+  );
+  assert.equal(ctx.firstPaymentDateLong, "September 15, 2026");
+  assert.equal(ctx.paymentEndsLong, "February 15, 2027");
+  assert.equal(ctx.interestFromMonthYear, "July 2026");
+  assert.equal(ctx.interestToMonthYear, "February 2027");
+  assert.equal(ctx.interestMonths, "8");
+  assert.equal(ctx.interestMonthsInWords, "Eight (8)");
+
+  assert.equal(looseDateLong(""), "");
+  assert.equal(looseDateMonthYear("not a date"), "");
 });

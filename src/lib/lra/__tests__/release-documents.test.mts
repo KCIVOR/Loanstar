@@ -6,6 +6,7 @@ import {
   PATH_SPECIFIC_SLUGS,
   queryPickerItems,
   RELEASE_DOCUMENT_SLUGS,
+  SF_RELEASE_SLUGS,
   releaseDocumentCandidates,
   segmentGroup,
   templateConditionMatches,
@@ -231,13 +232,51 @@ test("RELEASE_DOCUMENT_SLUGS — old union plus the three never-auto slugs", () 
   ]) {
     assert.ok(RELEASE_DOCUMENT_SLUGS.has(slug), `missing ${slug}`);
   }
-  assert.equal(RELEASE_DOCUMENT_SLUGS.size, 14);
+  for (const slug of SF_RELEASE_SLUGS) {
+    assert.ok(RELEASE_DOCUMENT_SLUGS.has(slug), `missing ${slug}`);
+  }
+  assert.equal(RELEASE_DOCUMENT_SLUGS.size, 14 + SF_RELEASE_SLUGS.length);
   assert.ok(!RELEASE_DOCUMENT_SLUGS.has("application_form"));
 });
 
-test("PATH_SPECIFIC_SLUGS — verbatim voucher pairs", () => {
-  assert.deepEqual(PATH_SPECIFIC_SLUGS.with_pdc, ["check_voucher", "ar_check_voucher"]);
-  assert.deepEqual(PATH_SPECIFIC_SLUGS.without_pdc, ["cash_voucher", "ar_atm_voucher"]);
+test("PATH_SPECIFIC_SLUGS — voucher pairs, shared and seafarer-only", () => {
+  assert.deepEqual(PATH_SPECIFIC_SLUGS.with_pdc, [
+    "check_voucher",
+    "ar_check_voucher",
+    "check_voucher_sf",
+    "ar_check_voucher_sf",
+  ]);
+  assert.deepEqual(PATH_SPECIFIC_SLUGS.without_pdc, [
+    "cash_voucher",
+    "ar_atm_voucher",
+    "cash_voucher_sf",
+    "ar_atm_voucher_sf",
+  ]);
+});
+
+test("seafarer-only templates follow the same path condition as the shared ones", () => {
+  const catalog: ReleaseTemplateRow[] = SF_RELEASE_SLUGS.map((slug) => ({
+    slug,
+    name: slug,
+    publishedVersionNo: 1,
+    seafarerGeneration: "always",
+    smeGeneration: "hidden",
+  }));
+  assert.deepEqual(autoGenerateSlugs("seafarer", catalog, ["with_pdc"], "none"), [
+    "blri_sf",
+    "promissory_note_sf",
+    "disclosure_statement_sf",
+    "check_voucher_sf",
+    "ar_check_voucher_sf",
+  ]);
+  assert.deepEqual(autoGenerateSlugs("seafarer", catalog, ["without_pdc"], "none"), [
+    "blri_sf",
+    "promissory_note_sf",
+    "disclosure_statement_sf",
+    "cash_voucher_sf",
+    "ar_atm_voucher_sf",
+  ]);
+  assert.deepEqual(autoGenerateSlugs("sme", catalog, ["with_pdc"], "none"), []);
 });
 
 // --- queryPickerItems: server-side search / filter / pagination -------------

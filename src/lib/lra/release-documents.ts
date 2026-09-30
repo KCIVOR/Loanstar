@@ -31,9 +31,35 @@ export type ReleaseTemplateRow = {
  * not an admin preference).
  */
 export const PATH_SPECIFIC_SLUGS: Record<ReleasePath, readonly string[]> = {
-  with_pdc: ["check_voucher", "ar_check_voucher"],
-  without_pdc: ["cash_voucher", "ar_atm_voucher"],
+  with_pdc: [
+    "check_voucher",
+    "ar_check_voucher",
+    "check_voucher_sf",
+    "ar_check_voucher_sf",
+  ],
+  without_pdc: [
+    "cash_voucher",
+    "ar_atm_voucher",
+    "cash_voucher_sf",
+    "ar_atm_voucher_sf",
+  ],
 };
+
+/**
+ * Seafarer-only copies of the release documents whose client source differs
+ * from the SME one (SF Calculator.xlsm tabs + SFCalculator Word files — see
+ * docs/document-fidelity/sf-template-tracker.md). Each is its own template row
+ * with `sme_generation = 'hidden'`; the un-suffixed slug stays the SME version.
+ */
+export const SF_RELEASE_SLUGS: readonly string[] = [
+  "blri_sf",
+  "promissory_note_sf",
+  "disclosure_statement_sf",
+  "check_voucher_sf",
+  "ar_check_voucher_sf",
+  "cash_voucher_sf",
+  "ar_atm_voucher_sf",
+];
 
 const COLLATERAL_SLUG: Record<"car_refinancing" | "real_estate", string> = {
   car_refinancing: "deed_of_chattel_mortgage",
@@ -60,6 +86,7 @@ export const RELEASE_DOCUMENT_SLUGS: ReadonlySet<string> = new Set<string>([
   "acknowledgement_receipt",
   "ar_cash_voucher",
   "endorsement_letter",
+  ...SF_RELEASE_SLUGS,
 ]);
 
 export function segmentGroup(
@@ -107,14 +134,21 @@ export type ReleaseDocumentCandidate = {
  */
 const PICKER_ORDER: readonly string[] = [
   "blri",
+  "blri_sf",
   "promissory_note",
+  "promissory_note_sf",
   "disclosure_statement",
+  "disclosure_statement_sf",
   "letter_of_intent",
   "loan_agreement",
   "check_voucher",
+  "check_voucher_sf",
   "ar_check_voucher",
+  "ar_check_voucher_sf",
   "cash_voucher",
+  "cash_voucher_sf",
   "ar_atm_voucher",
+  "ar_atm_voucher_sf",
   "ar_cash_voucher",
   "deed_of_chattel_mortgage",
   "real_estate_mortgage",

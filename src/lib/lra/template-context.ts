@@ -127,6 +127,32 @@ function formatDateLong(isoDate: string): string {
   return `${MONTH_NAMES[d.getMonth()]} ${d.getDate()}, ${d.getFullYear()}`;
 }
 
+/**
+ * Parse the two date shapes that reach this file — "MM/DD/YY" (what
+ * `buildBlriData` formats) and "YYYY-MM-DD" (a raw `pdc_checks.check_date`).
+ * Returns null for anything else so callers resolve to "".
+ */
+function parseLooseDate(value: string): Date | null {
+  const iso = /^(\d{4})-(\d{2})-(\d{2})/.exec(value);
+  if (iso) return new Date(Number(iso[1]), Number(iso[2]) - 1, Number(iso[3]));
+  const slash = /^(\d{1,2})\/(\d{1,2})\/(\d{2}|\d{4})$/.exec(value.trim());
+  if (!slash) return null;
+  const year = slash[3].length === 2 ? 2000 + Number(slash[3]) : Number(slash[3]);
+  return new Date(year, Number(slash[1]) - 1, Number(slash[2]));
+}
+
+/** Either date shape -> "Month D, YYYY". Unparseable input stays empty. */
+export function looseDateLong(value: string | null | undefined): string {
+  const d = value ? parseLooseDate(value) : null;
+  return d ? `${MONTH_NAMES[d.getMonth()]} ${d.getDate()}, ${d.getFullYear()}` : "";
+}
+
+/** Either date shape -> "Month YYYY". Unparseable input stays empty. */
+export function looseDateMonthYear(value: string | null | undefined): string {
+  const d = value ? parseLooseDate(value) : null;
+  return d ? `${MONTH_NAMES[d.getMonth()]} ${d.getFullYear()}` : "";
+}
+
 function joinAddress(a: BorrowerProfile["presentAddress"]): string {
   return [a.street, a.barangay, a.city, a.province, a.zipCode]
     .filter(Boolean)
@@ -479,6 +505,21 @@ export function buildReleaseTemplateContext(
     // captured on `ReleaseComputation`, never invented.
     addonMonthsInWords: countInWords(
       computation.addonMonths != null ? Number(computation.addonMonths) : null,
+    ),
+
+    // SF source documents (PN.doc / DISC.doc / AR ATM.doc) print the payment
+    // dates long-form and state the interest period as "for Eight (8) months
+    // from July 2026 to February 2027" — release month through the last
+    // installment month, i.e. terms + add-on months (SF Calculator sample:
+    // 57,100.45 x 2.25% x 8 = 10,278.08). All derived from data already on
+    // hand; no existing key carried these formats.
+    firstPaymentDateLong: looseDateLong(blri.firstPaymentDate),
+    paymentEndsLong: looseDateLong(blri.pdcSchedule.at(-1)?.checkDate),
+    interestFromMonthYear: looseDateMonthYear(computation.releaseDate),
+    interestToMonthYear: looseDateMonthYear(blri.pdcSchedule.at(-1)?.checkDate),
+    interestMonths: String(blri.terms + Number(computation.addonMonths ?? 0)),
+    interestMonthsInWords: countInWords(
+      blri.terms + Number(computation.addonMonths ?? 0),
     ),
 
     // SF ATM Acknowledgement Receipt "with spouse" variant. `hasSpouse` is

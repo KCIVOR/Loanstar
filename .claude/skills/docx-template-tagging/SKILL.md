@@ -16,6 +16,72 @@ the TipTap admin editor: a real `.docx` gets pixel-perfect fidelity for
 free (no schema ceiling, no reproducing tab-stops/fonts by hand), at the
 cost of needing tags inserted directly in the file's XML.
 
+## Client print rules (signed off by the client 2026-09-25) — apply to every template
+
+**Paper size** — set it in the last `<w:sectPr>`'s `<w:pgSz>` (twips) and
+confirm it in the rendered PDF:
+- **A4** (`w:w="11906" w:h="16838"`): Acknowledgement Receipts (all AR
+  variants), Demand Letters, Check Voucher, Cash Voucher.
+- **Long 8.5 × 13 in** (`w:w="12240" w:h="18720"`): **everything else**,
+  including the BLRI. The client does NOT use Legal (8.5 × 14) — never
+  pick Legal even if a source file says so.
+
+**Text**
+- All text black. Strip blue/colored run colors (`<w:color>`) left over
+  from the client's editing — only the logo keeps its colors.
+- No overlapping text anywhere (check the rendered image, not the XML).
+- Short values stay on one line — e.g. "Amount in Words" on vouchers and
+  "the amount of ₱…" on ARs. If a tag wraps, fix the cell width/tab stops.
+
+**Layout**
+- Must match the client's own source (Excel calculator tab or Word file).
+- BLRI: Manning Agency and Principal sit below the address, aligned.
+- Check Voucher uses the same format as the Cash Voucher, including the
+  account breakdown table (Account Description / Account Code / Debit /
+  Credit → `{{#accountingEntries}}`).
+- Cash Voucher keeps the bank-details line at the bottom (filled later
+  with the bounced-check details).
+
+**Signatures & IDs**
+- Where the signature line already sits over the printed name, remove any
+  extra side signature line.
+- TIN is the primary ID; show the ID validity date only when the ID has one.
+- A field with no data source in the system is removed from the template,
+  not left blank-with-label.
+
+**Data**
+- Every value is a merge tag from the real loan (loan number, borrower
+  name, amortization, …) — zero hardcoded sample values.
+- Payment Details is **SF only** and has no pictures.
+
+## SF vs SME — never share one template across both
+
+The client runs two separate document sets. The same document type often
+has **different wording/layout** per segment (confirmed: Promissory Note,
+Disclosure, BLRI, Check/Cash Voucher, Acknowledgement Receipts). Always tag
+from the source of the **same segment** the template serves:
+- **SF sources:** `C:\Users\Rovick\Downloads\SFCalculator\` —
+  `SF Calculator.xlsm` tabs (BLRI, CheckV, CashV, ARcash, ARcheck,
+  Multiple Check, PAYMENT DETAILS) + Word files (PN.doc, DISC.doc,
+  AR ATM*.doc = Surrender of Bank ATM Card, DL2 = Dishonored Check letter).
+- **SME sources:** `C:\Users\Rovick\Downloads\LSLGC Calculator and Docs\` —
+  `Calculator SME.xlsm` tabs (BLRI (Regular)/(24)/(36), CV, CashVoucher,
+  AR Check, AR cash, Fund Trans, Single Check, Multiple Check; Vienovo
+  tabs hidden) + the Word files there (PN - MPL, DISCLOSURE, Loan
+  Agreements, mortgages, cancellations, consent forms, demand letters).
+- Real signed packets for visual comparison:
+  `C:\Users\Rovick\Downloads\SYSTEM DEV\` (Step 4 - Accounting LRA).
+
+If a template is currently used for both segments and the sources differ,
+stop and tell the user it needs an SF and an SME version — don't pick one.
+
+## Never publish an untagged filled sample
+
+Uploading the client's filled sample straight as a draft and publishing it
+prints **one real borrower's data on every loan** (happened on 2026-09-25
+with the cash/check/AR vouchers and BLRI). Before any draft is handed over
+for publishing, the literal-value sweep in Verification must be clean.
+
 ## The workflow
 
 1. **Get the raw bytes.** If the file is already uploaded as a
@@ -169,7 +235,8 @@ the sample showed.
    page** with the Read tool. Compare against the original source
    visually, not just by re-reading the XML text — formatting bugs (like
    the MERGEFORMAT artifact above) only show up in the rendered image.
-4. Do a final case-insensitive sweep of the tagged XML for every literal
+4. Check the rendered PDF's page size and every rule in "Client print rules" above.
+5. Do a final case-insensitive sweep of the tagged XML for every literal
    value from the source sample (name, address, amounts, dates, ID
    numbers) to confirm zero hardcoded leftovers anywhere in the document.
 
