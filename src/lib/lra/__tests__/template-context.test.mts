@@ -342,3 +342,36 @@ test("SF source-document keys: long-form payment dates and the terms + add-on in
   assert.equal(looseDateLong(""), "");
   assert.equal(looseDateMonthYear("not a date"), "");
 });
+
+test("SF Loan Information keys: interest split, fee rate, other-deduction cells", () => {
+  // SF Calculator sample (LA303401): 20,041.20 interest over 6 terms + 2 add-on
+  // months prints Interest 15,030.90 / Add-on Interest 5,010.30, and the four
+  // fees over a 111,340.00 principal print 10.19%.
+  const blri: BlriData = {
+    ...BLRI,
+    principal: 111340,
+    totalInterest: 20041.2,
+    terms: 6,
+    particulars: [
+      { label: "Processing Fee", amount: 6680.4, accountCode: "5003010" },
+      { label: "Admin Cost", amount: 4067.82, accountCode: "5003012" },
+      { label: "Doc Stamp", amount: 480.44, accountCode: "5003014" },
+      { label: "Security Fee", amount: 1284.76, accountCode: "2100002" },
+      { label: "Notary Fee", amount: 111.34, accountCode: "5003011" },
+      { label: "Advance Payment", amount: 500, accountCode: "" },
+    ],
+  };
+  const ctx = buildReleaseTemplateContext(
+    blri,
+    { netReleased: 98215.24, releaseDate: "2026-07-20", addonMonths: 2 },
+    BORROWER,
+    "with_pdc",
+  );
+  assert.equal(ctx.interestOnTerms, "15,030.90");
+  assert.equal(ctx.addonInterest, "5,010.30");
+  assert.equal(ctx.processingAndOtherFeesRate, "10.19%");
+  assert.equal(ctx.advancePaymentDeduction, "500.00");
+  assert.equal(ctx.otherLoanDeduction, "");
+  assert.equal(ctx.previousLoanDeduction, "");
+  assert.equal(ctx.accountOpeningDeduction, "");
+});

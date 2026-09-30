@@ -3,6 +3,7 @@ import { z } from "zod";
 import { writeAuditEvent } from "@/lib/audit/writer";
 import { handleApiError, jsonOk } from "@/lib/api/handler";
 import {
+  DEMAND_LETTER_SLUGS,
   generateDemandLetter,
   isDemandStage,
 } from "@/lib/documents/generators/demand-letter";
@@ -69,7 +70,7 @@ export async function GET(_request: Request, { params }: RouteParams) {
     const docs = await listRenderedDocuments(
       supabase,
       account.loan_application_id as string,
-      { slug: "demand_letter" },
+      { slugs: DEMAND_LETTER_SLUGS },
     );
 
     const withUrls = await Promise.all(

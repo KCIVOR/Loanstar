@@ -4,6 +4,7 @@ import assert from "node:assert/strict";
 import {
   buildDemandLetterContext,
   isDemandStage,
+  pickDemandLetterSlug,
   type DemandLetterInput,
 } from "../demand-letter";
 
@@ -61,4 +62,43 @@ test("zero penalty still totals correctly", () => {
   const ctx = buildDemandLetterContext({ ...BASE, penaltyAmount: 0 });
   assert.equal(ctx.penaltyAmount, "0.00");
   assert.equal(ctx.totalAmountDue, "34,856.40");
+});
+
+test("seafarer-letter keys: figures in words with centavos, months past due, optional first notice", () => {
+  const ctx = buildDemandLetterContext({ ...BASE, daysPastDue: 62 });
+  assert.equal(ctx.todayDateLong, "July 11, 2026");
+  assert.equal(
+    ctx.outstandingBalanceInWords,
+    "Thirty Four Thousand Eight Hundred Fifty Six Pesos & Forty Cents",
+  );
+  assert.equal(
+    ctx.totalAmountDueInWords,
+    "Thirty Six Thousand Five Hundred Ninety Nine Pesos & Twenty Two Cents",
+  );
+  assert.equal(ctx.monthsPastDue, "Two (2)");
+  assert.equal(ctx.firstNoticeDate, "");
+  assert.deepEqual(ctx.demandChecks, []);
+  assert.equal(buildDemandLetterContext({ ...BASE, daysPastDue: 3 }).monthsPastDue, "One (1)");
+});
+
+test("pickDemandLetterSlug routes only seafarer accounts, and only to published templates", () => {
+  const all = new Set(["demand_letter", "demand_letter_no_pdc_sf", "demand_letter_dishonored_check_sf"]);
+  const pick = (over: Partial<Parameters<typeof pickDemandLetterSlug>[0]>) =>
+    pickDemandLetterSlug({
+      segment: "seafarer",
+      demandStage: "second_demand",
+      hasBouncedChecks: false,
+      publishedSlugs: all,
+      ...over,
+    });
+  assert.equal(pick({}), "demand_letter_no_pdc_sf");
+  assert.equal(pick({ demandStage: "final_demand" }), "demand_letter_no_pdc_sf");
+  assert.equal(pick({ demandStage: "first_reminder" }), "demand_letter");
+  assert.equal(pick({ hasBouncedChecks: true }), "demand_letter_dishonored_check_sf");
+  assert.equal(
+    pick({ hasBouncedChecks: true, demandStage: "first_reminder" }),
+    "demand_letter_dishonored_check_sf",
+  );
+  assert.equal(pick({ segment: "sme", hasBouncedChecks: true }), "demand_letter");
+  assert.equal(pick({ publishedSlugs: new Set(["demand_letter"]) }), "demand_letter");
 });

@@ -245,12 +245,14 @@ test("PATH_SPECIFIC_SLUGS — voucher pairs, shared and seafarer-only", () => {
     "ar_check_voucher",
     "check_voucher_sf",
     "ar_check_voucher_sf",
+    "ar_multiple_check_sf",
   ]);
   assert.deepEqual(PATH_SPECIFIC_SLUGS.without_pdc, [
     "cash_voucher",
     "ar_atm_voucher",
     "cash_voucher_sf",
     "ar_atm_voucher_sf",
+    "ar_cash_voucher_sf",
   ]);
 });
 
@@ -259,23 +261,32 @@ test("seafarer-only templates follow the same path condition as the shared ones"
     slug,
     name: slug,
     publishedVersionNo: 1,
-    seafarerGeneration: "always",
+    // Multiple Check is the LRA's pick (a release split across several checks).
+    seafarerGeneration: slug === "ar_multiple_check_sf" ? "optional" : "always",
     smeGeneration: "hidden",
   }));
   assert.deepEqual(autoGenerateSlugs("seafarer", catalog, ["with_pdc"], "none"), [
+    "loan_information_sf",
     "blri_sf",
     "promissory_note_sf",
     "disclosure_statement_sf",
     "check_voucher_sf",
     "ar_check_voucher_sf",
+    "payment_details_sf",
   ]);
   assert.deepEqual(autoGenerateSlugs("seafarer", catalog, ["without_pdc"], "none"), [
+    "loan_information_sf",
     "blri_sf",
     "promissory_note_sf",
     "disclosure_statement_sf",
     "cash_voucher_sf",
     "ar_atm_voucher_sf",
+    "ar_cash_voucher_sf",
+    "payment_details_sf",
   ]);
+  const withPdc = releaseDocumentCandidates("seafarer", catalog, ["with_pdc"], "none").map((c) => c.slug);
+  assert.ok(withPdc.includes("ar_multiple_check_sf"));
+  assert.ok(!withPdc.includes("ar_cash_voucher_sf"));
   assert.deepEqual(autoGenerateSlugs("sme", catalog, ["with_pdc"], "none"), []);
 });
 

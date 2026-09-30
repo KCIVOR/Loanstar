@@ -189,7 +189,7 @@ function mapRenderedDocument(row: RenderedDocumentRow): RenderedDocument {
 export async function listRenderedDocuments(
   supabase: SupabaseClient,
   applicationId: string,
-  options?: { slug?: string },
+  options?: { slug?: string; slugs?: readonly string[] },
 ): Promise<RenderedDocument[]> {
   let query = supabase
     .from("rendered_documents")
@@ -199,6 +199,9 @@ export async function listRenderedDocuments(
 
   if (options?.slug) {
     query = query.eq("document_slug", options.slug);
+  }
+  if (options?.slugs && options.slugs.length > 0) {
+    query = query.in("document_slug", [...options.slugs]);
   }
 
   const { data, error } = await query;

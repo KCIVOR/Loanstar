@@ -153,6 +153,33 @@ export function looseDateMonthYear(value: string | null | undefined): string {
   return d ? `${MONTH_NAMES[d.getMonth()]} ${d.getFullYear()}` : "";
 }
 
+const FEE_LABELS = ["Processing Fee", "Admin Cost", "Doc Stamp", "Notary Fee", "Chattel Mortgage Fee"];
+
+function loanInformationSlots(
+  blri: BlriData,
+  computation: ReleaseComputation,
+): Record<string, string> {
+  const months = blri.terms + Number(computation.addonMonths ?? 0);
+  const interestOnTerms =
+    months > 0 ? Math.round(((blri.totalInterest * blri.terms) / months) * 100) / 100 : 0;
+  const sumWhere = (match: (label: string) => boolean) =>
+    blri.particulars.reduce((sum, p) => (match(p.label) ? sum + p.amount : sum), 0);
+  const blankIfZero = (value: number) => (value > 0 ? formatMoney(value) : "");
+  const fees = sumWhere((label) => FEE_LABELS.includes(label));
+  return {
+    interestOnTerms: formatMoney(interestOnTerms),
+    addonInterest: formatMoney(blri.totalInterest - interestOnTerms),
+    processingAndOtherFeesRate:
+      blri.principal > 0 ? `${((fees / blri.principal) * 100).toFixed(2)}%` : "",
+    otherLoanDeduction: blankIfZero(sumWhere((l) => l.startsWith("Other Loan"))),
+    accountOpeningDeduction: blankIfZero(sumWhere((l) => l === "Account Opening")),
+    previousLoanDeduction: blankIfZero(
+      sumWhere((l) => l.startsWith("Offset") || l === "Previous Loan Balance"),
+    ),
+    advancePaymentDeduction: blankIfZero(sumWhere((l) => l === "Advance Payment")),
+  };
+}
+
 function joinAddress(a: BorrowerProfile["presentAddress"]): string {
   return [a.street, a.barangay, a.city, a.province, a.zipCode]
     .filter(Boolean)
@@ -521,6 +548,15 @@ export function buildReleaseTemplateContext(
     interestMonthsInWords: countInWords(
       blri.terms + Number(computation.addonMonths ?? 0),
     ),
+
+    // SF "Loan Information" sheet (SF Calculator 'SEAMAN (offset)' print area).
+    // Interest is split between the paying terms and the add-on months
+    // (AN15 = total interest x terms / (terms + add-on), AN16 = the rest);
+    // "Processing & Other Fees" is every fee except the refundable security
+    // fee and the other-deduction rows, over the principal (AO19). The four
+    // other-deduction cells are the matching `particulars` rows, blank when
+    // the loan has none.
+    ...loanInformationSlots(blri, computation),
 
     // SF ATM Acknowledgement Receipt "with spouse" variant. `hasSpouse` is
     // derived from the borrower's own captured `civilStatus` (real data);

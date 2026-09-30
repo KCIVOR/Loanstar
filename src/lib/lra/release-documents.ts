@@ -36,12 +36,14 @@ export const PATH_SPECIFIC_SLUGS: Record<ReleasePath, readonly string[]> = {
     "ar_check_voucher",
     "check_voucher_sf",
     "ar_check_voucher_sf",
+    "ar_multiple_check_sf",
   ],
   without_pdc: [
     "cash_voucher",
     "ar_atm_voucher",
     "cash_voucher_sf",
     "ar_atm_voucher_sf",
+    "ar_cash_voucher_sf",
   ],
 };
 
@@ -59,6 +61,10 @@ export const SF_RELEASE_SLUGS: readonly string[] = [
   "ar_check_voucher_sf",
   "cash_voucher_sf",
   "ar_atm_voucher_sf",
+  "ar_cash_voucher_sf",
+  "ar_multiple_check_sf",
+  "loan_information_sf",
+  "payment_details_sf",
 ];
 
 const COLLATERAL_SLUG: Record<"car_refinancing" | "real_estate", string> = {
@@ -133,6 +139,7 @@ export type ReleaseDocumentCandidate = {
  * signing order), then the path vouchers, then everything else alphabetically.
  */
 const PICKER_ORDER: readonly string[] = [
+  "loan_information_sf",
   "blri",
   "blri_sf",
   "promissory_note",
@@ -150,6 +157,9 @@ const PICKER_ORDER: readonly string[] = [
   "ar_atm_voucher",
   "ar_atm_voucher_sf",
   "ar_cash_voucher",
+  "ar_cash_voucher_sf",
+  "ar_multiple_check_sf",
+  "payment_details_sf",
   "deed_of_chattel_mortgage",
   "real_estate_mortgage",
   "acknowledgement_receipt",
