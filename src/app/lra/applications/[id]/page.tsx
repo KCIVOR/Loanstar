@@ -2022,13 +2022,6 @@ export default function LraApplicationPage() {
           ) : null}
 
           <GeneratedDocPanel
-            title="Acknowledgement Receipt"
-            description="Borrower's confirmation of funds received (check/cash aware)."
-            endpoint={`/api/lra/applications/${applicationId}/acknowledgement-receipt`}
-            generateLabel="Generate receipt"
-          />
-
-          <GeneratedDocPanel
             title="Final Computation Sheet"
             description="Original-vs-renegotiated computation summary."
             endpoint={`/api/lra/applications/${applicationId}/final-computation-sheet`}
