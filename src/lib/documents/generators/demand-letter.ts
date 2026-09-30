@@ -79,6 +79,35 @@ export const DEMAND_LETTER_SLUGS = [
   "demand_letter_dishonored_check_coborrower_sme",
 ] as const;
 
+export type DemandLetterSlug = (typeof DEMAND_LETTER_SLUGS)[number];
+
+/** Picker labels — every letter is offered for every loan type. */
+export const DEMAND_LETTER_LABELS: Record<DemandLetterSlug, string> = {
+  demand_letter: "General demand letter",
+  demand_letter_no_pdc_sf: "Seafarer — No PDC",
+  demand_letter_dishonored_check_sf: "Seafarer — Dishonored check",
+  demand_letter_no_pdc_sme: "SME / Individual — No PDC",
+  demand_letter_dishonored_check_sme: "SME / Individual — Dishonored check",
+  demand_letter_dishonored_check_coborrower_sme: "Co-borrower — Dishonored check",
+};
+
+export function isDemandLetterSlug(value: string): value is DemandLetterSlug {
+  return (DEMAND_LETTER_SLUGS as readonly string[]).includes(value);
+}
+
+/** The demand letters that currently have a published template, in picker order. */
+export async function listPublishedDemandLetters(
+  supabase: SupabaseClient,
+): Promise<Array<{ slug: DemandLetterSlug; label: string }>> {
+  const out: Array<{ slug: DemandLetterSlug; label: string }> = [];
+  for (const slug of DEMAND_LETTER_SLUGS) {
+    if (await getPublishedTemplate(supabase, slug)) {
+      out.push({ slug, label: DEMAND_LETTER_LABELS[slug] });
+    }
+  }
+  return out;
+}
+
 /**
  * Which template a demand uses. Each segment group has the client's own
  * letters (seafarer: SFCalculator/DL2 + SC - NO PDC; SME / Individual: the
@@ -173,9 +202,14 @@ export async function generateDemandLetter(
     actorId: string;
     /** Days the borrower is given to settle (deadline = today + this). */
     deadlineDays?: number;
+    /**
+     * A letter the collector chose by hand, for any loan type. Omit to let
+     * `pickDemandLetterSlug` choose from the segment and returned checks.
+     */
+    templateSlug?: DemandLetterSlug;
   },
 ): Promise<RenderedDocumentResult> {
-  const { masterlistId, demandStage, actorId, deadlineDays = 15 } = params;
+  const { masterlistId, demandStage, actorId, deadlineDays = 15, templateSlug } = params;
 
   const { data: account, error } = await supabase
     .from("masterlist")
@@ -236,12 +270,18 @@ export async function generateDemandLetter(
   for (const candidate of DEMAND_LETTER_SLUGS) {
     if (await getPublishedTemplate(supabase, candidate)) publishedSlugs.add(candidate);
   }
-  const slug = pickDemandLetterSlug({
-    segment,
-    demandStage,
-    hasBouncedChecks: bounced.checks.length > 0,
-    publishedSlugs,
-  });
+  if (templateSlug && !publishedSlugs.has(templateSlug)) {
+    throw new Error(`${DEMAND_LETTER_LABELS[templateSlug]} has no published template`);
+  }
+  const coBorrowerSlug = "demand_letter_dishonored_check_coborrower_sme";
+  const slug =
+    templateSlug ??
+    pickDemandLetterSlug({
+      segment,
+      demandStage,
+      hasBouncedChecks: bounced.checks.length > 0,
+      publishedSlugs,
+    });
 
   const { data: firstDemand } = await supabase
     .from("rendered_documents")
@@ -272,6 +312,45 @@ export async function generateDemandLetter(
     attentionTitle: (officer?.position ?? business?.position ?? "").trim(),
   };
 
+  const loadCoBorrowers = async () => {
+    const { data: app } = await supabase
+      .from("loan_applications")
+      .select("co_borrowers")
+      .eq("id", applicationId)
+      .maybeSingle();
+    return ((Array.isArray(app?.co_borrowers) ? app.co_borrowers : []) as Array<{
+      fullName?: string;
+      address?: string;
+    }>).filter((c) => c.fullName?.trim());
+  };
+  const renderForCoBorrower = (coBorrower: { fullName?: string; address?: string }) =>
+    renderAndStore(supabase, {
+      slug: coBorrowerSlug,
+      module: "collection",
+      applicationId,
+      context: buildDemandLetterContext({
+        ...letterInput,
+        coBorrowerName: (coBorrower.fullName ?? "").trim(),
+        coBorrowerAddress: (coBorrower.address ?? "").trim(),
+      }),
+      actorId,
+    });
+
+  // Chosen by hand: the co-borrower letter is one copy per co-borrower;
+  // anything else is exactly the one letter picked.
+  if (templateSlug === coBorrowerSlug) {
+    const coBorrowers = await loadCoBorrowers();
+    if (coBorrowers.length === 0) {
+      throw new Error("This loan has no co-borrower to address the letter to");
+    }
+    let first: RenderedDocumentResult | null = null;
+    for (const coBorrower of coBorrowers) {
+      const r = await renderForCoBorrower(coBorrower);
+      first ??= r;
+    }
+    return first as RenderedDocumentResult;
+  }
+
   const result = await renderAndStore(supabase, {
     slug,
     module: "collection",
@@ -279,39 +358,20 @@ export async function generateDemandLetter(
     context: buildDemandLetterContext(letterInput),
     actorId,
   });
+  if (templateSlug) return result;
 
   // A returned check is also demanded from each co-borrower, in a copy of the
   // letter addressed to them (client source: "Demand Letter - Co-borrower").
-  const coBorrowerSlug = pickDemandLetterSlug({
+  const autoCoBorrowerSlug = pickDemandLetterSlug({
     segment,
     demandStage,
     hasBouncedChecks: bounced.checks.length > 0,
     publishedSlugs,
     forCoBorrower: true,
   });
-  if (coBorrowerSlug === "demand_letter_dishonored_check_coborrower_sme") {
-    const { data: app } = await supabase
-      .from("loan_applications")
-      .select("co_borrowers")
-      .eq("id", applicationId)
-      .maybeSingle();
-    const coBorrowers = (Array.isArray(app?.co_borrowers) ? app.co_borrowers : []) as Array<{
-      fullName?: string;
-      address?: string;
-    }>;
-    for (const coBorrower of coBorrowers) {
-      if (!coBorrower.fullName?.trim()) continue;
-      await renderAndStore(supabase, {
-        slug: coBorrowerSlug,
-        module: "collection",
-        applicationId,
-        context: buildDemandLetterContext({
-          ...letterInput,
-          coBorrowerName: coBorrower.fullName.trim(),
-          coBorrowerAddress: (coBorrower.address ?? "").trim(),
-        }),
-        actorId,
-      });
+  if (autoCoBorrowerSlug === coBorrowerSlug) {
+    for (const coBorrower of await loadCoBorrowers()) {
+      await renderForCoBorrower(coBorrower);
     }
   }
 

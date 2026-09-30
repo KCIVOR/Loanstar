@@ -3,9 +3,13 @@ import { z } from "zod";
 import { writeAuditEvent } from "@/lib/audit/writer";
 import { handleApiError, jsonOk } from "@/lib/api/handler";
 import {
+  DEMAND_LETTER_LABELS,
   DEMAND_LETTER_SLUGS,
   generateDemandLetter,
+  isDemandLetterSlug,
   isDemandStage,
+  listPublishedDemandLetters,
+  type DemandLetterSlug,
 } from "@/lib/documents/generators/demand-letter";
 import {
   getRenderedDocumentDownloadUrl,
@@ -21,6 +25,8 @@ const bodySchema = z.object({
     .string()
     .refine(isDemandStage, "demandStage must be first_reminder | second_demand | final_demand"),
   deadlineDays: z.number().int().min(1).max(90).optional(),
+  /** A letter chosen by hand; omit for the automatic pick. */
+  templateSlug: z.string().refine(isDemandLetterSlug, "Unknown demand letter").optional(),
 });
 
 export async function POST(request: Request, { params }: RouteParams) {
@@ -35,6 +41,7 @@ export async function POST(request: Request, { params }: RouteParams) {
       demandStage: input.demandStage,
       actorId: user.id,
       deadlineDays: input.deadlineDays,
+      templateSlug: input.templateSlug as DemandLetterSlug | undefined,
     });
 
     await writeAuditEvent({
@@ -43,7 +50,12 @@ export async function POST(request: Request, { params }: RouteParams) {
       action: "execute_trigger",
       entityType: "rendered_document",
       entityId: result.documentId,
-      afterData: { trigger: "generate_demand_letter", masterlistId, demandStage: input.demandStage },
+      afterData: {
+        trigger: "generate_demand_letter",
+        masterlistId,
+        demandStage: input.demandStage,
+        templateSlug: input.templateSlug ?? null,
+      },
     });
 
     return jsonOk(result);
@@ -76,11 +88,17 @@ export async function GET(_request: Request, { params }: RouteParams) {
     const withUrls = await Promise.all(
       docs.map(async (doc) => ({
         ...doc,
+        letterLabel: isDemandLetterSlug(doc.documentSlug)
+          ? DEMAND_LETTER_LABELS[doc.documentSlug]
+          : doc.documentSlug,
         downloadUrl: await getRenderedDocumentDownloadUrl(supabase, doc.id),
       })),
     );
 
-    return jsonOk({ documents: withUrls });
+    return jsonOk({
+      documents: withUrls,
+      letters: await listPublishedDemandLetters(supabase),
+    });
   } catch (error) {
     return handleApiError(error);
   }

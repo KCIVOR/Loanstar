@@ -2,6 +2,9 @@ import test from "node:test";
 import assert from "node:assert/strict";
 
 import {
+  DEMAND_LETTER_LABELS,
+  DEMAND_LETTER_SLUGS,
+  isDemandLetterSlug,
   buildDemandLetterContext,
   isDemandStage,
   pickDemandLetterSlug,
@@ -146,4 +149,13 @@ test("attention and co-borrower keys default to empty so every demand template m
   const co = buildDemandLetterContext({ ...BASE, coBorrowerName: "Maria Santos", attentionName: "Juan Cruz", attentionTitle: "President" });
   assert.equal(co.coBorrowerName, "Maria Santos");
   assert.equal(co.attentionTitle, "President");
+});
+
+test("every demand letter can be chosen by hand, and only those", () => {
+  for (const slug of DEMAND_LETTER_SLUGS) {
+    assert.equal(isDemandLetterSlug(slug), true);
+    assert.ok(DEMAND_LETTER_LABELS[slug]);
+  }
+  assert.equal(isDemandLetterSlug("promissory_note"), false);
+  assert.equal(isDemandLetterSlug(""), false);
 });

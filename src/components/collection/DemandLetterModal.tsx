@@ -11,7 +11,13 @@ type RenderedDoc = {
   id: string;
   generatedAt: string;
   downloadUrl: string;
+  letterLabel?: string;
 };
+
+type LetterOption = { slug: string; label: string };
+
+/** Empty value = let the system pick from the loan type and returned checks. */
+const AUTO_LETTER = "";
 
 type DemandLetterModalProps = {
   open: boolean;
@@ -37,6 +43,8 @@ export function DemandLetterModal({
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [docs, setDocs] = useState<RenderedDoc[]>([]);
+  const [letters, setLetters] = useState<LetterOption[]>([]);
+  const [letter, setLetter] = useState<string>(AUTO_LETTER);
   const [loadingDocs, setLoadingDocs] = useState(false);
 
   const loadDocs = useCallback(async () => {
@@ -44,8 +52,12 @@ export function DemandLetterModal({
     try {
       const res = await fetch(apiBase);
       if (!res.ok) throw new Error("Failed to load demand letters");
-      const data = (await res.json()) as { documents: RenderedDoc[] };
+      const data = (await res.json()) as {
+        documents: RenderedDoc[];
+        letters?: LetterOption[];
+      };
       setDocs(data.documents);
+      setLetters(data.letters ?? []);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load");
     } finally {
@@ -64,7 +76,10 @@ export function DemandLetterModal({
       const res = await fetch(apiBase, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ demandStage: stage }),
+        body: JSON.stringify({
+          demandStage: stage,
+          ...(letter ? { templateSlug: letter } : {}),
+        }),
       });
       if (!res.ok) {
         const body = (await res.json().catch(() => null)) as {
@@ -111,6 +126,17 @@ export function DemandLetterModal({
           </Select>
         </div>
         <div>
+          <Label>Letter</Label>
+          <Select value={letter} onChange={(e) => setLetter(e.target.value)}>
+            <option value={AUTO_LETTER}>Automatic (matches the loan type)</option>
+            {letters.map((opt) => (
+              <option key={opt.slug} value={opt.slug}>
+                {opt.label}
+              </option>
+            ))}
+          </Select>
+        </div>
+        <div>
           <Button loading={generating} onClick={() => void generate()}>
             Generate demand letter
           </Button>
@@ -129,8 +155,9 @@ export function DemandLetterModal({
                   key={doc.id}
                   className="flex items-center justify-between text-sm"
                 >
-                  <span className="mono text-ink-500">
-                    {formatDate(doc.generatedAt)}
+                  <span className="text-ink-500">
+                    <span className="mono">{formatDate(doc.generatedAt)}</span>
+                    {doc.letterLabel ? ` · ${doc.letterLabel}` : ""}
                   </span>
                   <a
                     className="text-teal-600 underline"
