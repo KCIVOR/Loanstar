@@ -530,6 +530,15 @@ export const FIELD_COLLECTIONS: MergeCollection[] = [
     ],
   },
   {
+    key: "bankAuthorizationAccounts",
+    label: "Bank Authorization — borrower's bank accounts",
+    fields: [
+      { key: "bankNameAndBranch", label: "Bank name and branch", sample: "BDO - Makati Ave" },
+      { key: "accountType", label: "Account type", sample: "Savings" },
+      { key: "accountNo", label: "Account no.", sample: "1234567890" },
+    ],
+  },
+  {
     key: "vehicles",
     label: "Mortgaged / surrendered vehicles",
     fields: [
@@ -694,6 +703,10 @@ export function buildSampleContext(): Record<string, unknown> {
       accountType: "Checking",
       contactNo: "02-8888-0000",
     },
+  ];
+  ctx.bankAuthorizationAccounts = [
+    { bankNameAndBranch: "BDO - Makati Ave", accountType: "Savings", accountNo: "1234567890" },
+    { bankNameAndBranch: "BPI - Ayala", accountType: "Checking", accountNo: "9876543210" },
   ];
   ctx.vehicles = [
     {

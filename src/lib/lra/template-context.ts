@@ -26,6 +26,28 @@ function smeBusinessSlots(businessInfo: BusinessInfo | undefined): {
   };
 }
 
+function bankAuthorizationAccounts(borrower: BorrowerProfile): Array<{
+  bankNameAndBranch: string;
+  accountType: string;
+  accountNo: string;
+}> {
+  const listed = (borrower.businessInfo?.bankAccounts ?? [])
+    .map((a) => ({
+      bankNameAndBranch: [a.bankName, a.branch].map((s) => (s ?? "").trim()).filter(Boolean).join(" - "),
+      accountType: (a.accountType ?? "").trim(),
+      accountNo: (a.accountNo ?? "").trim(),
+    }))
+    .filter((a) => a.bankNameAndBranch || a.accountNo);
+  if (listed.length > 0) return listed;
+  const f = borrower.financial;
+  if (!f?.bankName && !f?.accountNumber) return [];
+  return [{
+    bankNameAndBranch: (f.bankName ?? "").trim(),
+    accountType: (f.accountType ?? "").trim(),
+    accountNo: (f.accountNumber ?? "").trim(),
+  }];
+}
+
 const ONES = [
   "", "One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight", "Nine",
   "Ten", "Eleven", "Twelve", "Thirteen", "Fourteen", "Fifteen", "Sixteen",
@@ -402,6 +424,10 @@ export function buildReleaseTemplateContext(
 
     bankName: borrower.financial?.bankName ?? "",
     bankAccountNo: borrower.financial?.accountNumber ?? "",
+    // Bank Authorization (SME/Individual) table: Bank Name and Branch /
+    // Account Type / Account Number. The application form's bank-accounts
+    // list first; the single financial-info account when that list is empty.
+    bankAuthorizationAccounts: bankAuthorizationAccounts(borrower),
     checkAmount: formatMoney(computation.netReleased),
     // Audit fix: the BLRI "CHEQUE INFORMATION" block's own check number/date
     // (the disbursement check itself, distinct from the borrower's security

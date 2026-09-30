@@ -426,3 +426,37 @@ test("schedule-specific agreement fields come from the check schedule", () => {
   assert.equal(ctx.termDays, "76");
   assert.equal(ctx.termDaysInWords, "Seventy Six (76)");
 });
+
+test("bank authorization accounts: application-form bank list first, else the financial-info account", () => {
+  const listed = buildReleaseTemplateContext(
+    BLRI,
+    COMPUTATION,
+    {
+      ...BORROWER,
+      businessInfo: {
+        bankAccounts: [
+          { bankName: "BDO", branch: "Makati Ave", accountType: "Savings", accountNo: "123" },
+          { bankName: "", branch: "", accountNo: "" },
+        ],
+      },
+    },
+    "with_pdc",
+    { segment: "individual" },
+  );
+  assert.deepEqual(listed.bankAuthorizationAccounts, [
+    { bankNameAndBranch: "BDO - Makati Ave", accountType: "Savings", accountNo: "123" },
+  ]);
+
+  const fallback = buildReleaseTemplateContext(
+    BLRI,
+    COMPUTATION,
+    { ...BORROWER, financial: { bankName: "BPI", accountNumber: "999", accountType: "Checking" } },
+    "with_pdc",
+  );
+  assert.deepEqual(fallback.bankAuthorizationAccounts, [
+    { bankNameAndBranch: "BPI", accountType: "Checking", accountNo: "999" },
+  ]);
+
+  const none = buildReleaseTemplateContext(BLRI, COMPUTATION, { ...BORROWER, financial: {} }, "with_pdc");
+  assert.deepEqual(none.bankAuthorizationAccounts, []);
+});
