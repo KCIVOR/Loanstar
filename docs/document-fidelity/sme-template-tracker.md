@@ -35,38 +35,58 @@ Tagged files and a preview: `C:\Users\Rovick\Desktop\Loan Star Document\SME Tagg
 
 - `ar_atm_voucher` prints for every SME release without PDC, but it holds a Check Voucher layout and the SME folder has no ATM-surrender document. Recommended: hide it for SME.
 
-## Batch 2 — other calculator prints (not started)
+## Batch 2 — other calculator prints
 
-| Document | Source file(s) | Situation |
-|---|---|---|
-| BLRI variants | BLRI (18 / 24 / 36 Payments), BLRI (CWT 12 / 24 Payments), BLRI (Invoice) | 18 / 24 / 36 differ only in row count — covered by the looped schedule. CWT adds Amortization / CWT / Check Amount columns; Invoice has different fee labels and weekly terms. Both need their own template and data |
-| AR Fund Transfer | Acknowledgement Receipt - Fund Transfer.docx | No template |
-| AR Single Check | Acknowledgement Receipt - Single Check.docx | No template |
-| AR Multiple Check | Acknowledgement Receipt - Multiple Check.docx | No template; source row 2 is a broken "#VALUE!" |
-| Loan Information | Loan Information.docx | No template |
-| Consolidation - Restructure | Consolidation - Restructure.docx | 3 pages, no template |
-| Vienovo set | Vienovo - BLRI Page 1–3, Cash / Check Voucher, AR Cash / Check / Single Check, Vienovo Sheet | No templates |
-| Briefing | NEW BRIEFING SME LSLG.docx | No template |
+All uploaded as drafts (new templates are hidden for both segments).
 
-## Batch 3 — legal documents (existing templates to verify against source)
+| Document | Template | Paper | Status | What prints blank / open points |
+|---|---|---|---|---|
+| AR Fund Transfer | `ar_fund_transfer` | A4 | Draft ready (v1) | — |
+| AR Single Check | `ar_single_check` | A4 | Draft ready (v1) | Check number (not stored) |
+| AR Multiple Check | `ar_multiple_check` | A4 | Draft ready (v1) | Check row hand-filled. Source rows are broken ("NO PESOS", "#VALUE!") |
+| Loan Information | `loan_information` | 8.5 × 13 | Draft ready (v1) | Processing Fee Rate, Admin Cost Rate, Chattel Mortgage Fee, Individual co-borrower |
+| BLRI, 25–36 payments | `blri_long` | 8.5 × 13 | Draft ready (v1) | Standard `blri` holds one page up to 24 payments; this one to 36 |
+| BLRI (CWT) | `blri_cwt` | 8.5 × 13 | Draft ready (v1) — incomplete | CWT and Check Amount columns blank: the system has no withholding-tax computation (sheet: total interest × 2% ÷ payments) |
+| BLRI (Invoice) | `blri_invoice` | 8.5 × 13 | Draft ready (v1) — needs decisions | "Terms (weekly)" mapped to number of checks (unconfirmed); sheet's Amount is a running payoff; sheet lists fees the invoice rules say do not exist |
+| Consolidation - Restructure | `consolidation_restructure` | 8.5 × 13 | Draft ready (v1) — mostly blank | No consolidation / restructure computation in the system; only names, date, signatories filled |
+| Briefing | `briefing_sme` | 8.5 × 13 | Draft ready (v1) | — |
+| Disclosure (Vienovo) | `vienovo_disclosure_statement` | 8.5 × 13 | Draft ready (v1) — incomplete | Item 9b payment lines blank. Source has a signature image pasted over the lender's name — confirm with client |
+| Vienovo BLRI / vouchers / receipts / sheet | — | — | No template needed | Same forms as the standard SME ones fed from another calculator tab; only small wording differences ("LSLG", no Borrower No.) |
 
-| Template | Source file(s) | Current format |
-|---|---|---|
-| `loan_agreement` | LOAN AGREEMENT + 8 variants (Auto and Individual, Bi-Monthly, DTI, Invoice, Invoice (DTI), multiple invoices, No Security check, Per Day Interest Single) | HTML, one template with conditions |
-| `loan_agreement_vienovo` | Vienovo Loan Agreement (3 dated versions) | HTML |
-| `deed_of_chattel_mortgage` | CHATTEL MORTGAGE - 1 to 4 units | docx |
-| `real_estate_mortgage` | REAL ESTATE MORTGAGE - 1 / 2 properties | docx |
-| `cancellation_of_chattel_mortgage` | CANCELLATION OF CHATTEL (8 files) | HTML |
-| `cancellation_of_real_estate_mortgage` | CANCELLATION OF REM (2 files) | HTML |
-| `voluntary_surrender_deed_auto` / `_rem` | Voluntary and Deed Auto (4) / REM (2) | HTML |
-| `spa_mortgage_cancellation` | SPECIAL POWER OF ATTORNEY Cancellation of Mortgage | HTML |
-| `agreement_check_replacement` | Additional Agreement 1.23.23 - check replacement | HTML |
-| `agreement_for_consolidation` | AGREEMENT FOR CONSOLIDATION | HTML |
-| `consent_form` | LSLGC CONSENT FORM 2025 (3 files) | HTML |
-| `demand_letter_sme`, `demand_letter_v2`, `demand_letter_dishonored_check` | Demand Letter (10 files) | docx / HTML; only `demand_letter` is actually generated |
-| Disclosure (Vienovo) | DISCLOSURE - vienovo quarter2months | No template |
+## Batch 3 — legal documents
+
+Every live template was audited against the client's source and none was faithful, so each was rebuilt as a Word template from the source. All are drafts; the live versions keep printing until published.
+
+| Template | Draft | Paper | Main problems in the live version | Open points on the draft |
+|---|---|---|---|---|
+| `loan_agreement` | v5 | 8.5 × 13, 3 pp | Names the person instead of the company for SME; legal wording rewritten; raw dates; pre-filled witness / notary lines; DTI, bi-monthly, per-day, invoice and no-security variants can never print | Covers standard, Individual, DTI, no-security. DTI / no-security need flags wired. Bi-monthly, per-day, invoice need their own templates + data |
+| `deed_of_chattel_mortgage` | v6 | 8.5 × 13, 2 pp | Principal and total loan swapped; hardcoded sample TIN; coloured text; stray "X" in the margin | Prints "vehicle/s" |
+| `real_estate_mortgage` | v5 | 8.5 × 13, 2 pp | 3 pages for one property; blank signature name for Individual; missing closing sentence | — |
+| `cancellation_of_chattel_mortgage` | v4 | 8.5 × 13, 1 p | Not the client layout; raw dates; blank page count; pre-filled place / date | Witness names kept as printed in the source |
+| `cancellation_of_real_estate_mortgage` | v3 | 8.5 × 13, 2 pp | Same as above; missing sentences | Corp/DTI paragraph borrowed from the chattel cancellation — confirm |
+| `voluntary_surrender_deed_auto` | v3 | 8.5 × 13, 3 pp per vehicle | All vehicles in one document; vendee pre-filled as Loan Star; wording edited | One full set per vehicle (4 vehicles = 12 pages) |
+| `voluntary_surrender_deed_rem` | v2 | 8.5 × 13, 4 pp per property | Same as the vehicle version | One full set per property |
+| `spa_mortgage_cancellation` | v4 | 8.5 × 13, 2 pp | Vehicle block not the source's layout; pre-filled dates | Year Model / Transmission lines dropped (no field) |
+| `agreement_check_replacement` | v3 | 8.5 × 13, 2 pp | Blank bank details (source has fixed BDO text); wording changed; raw dates | Replacement checks and date hand-filled |
+| `agreement_for_consolidation` | v3 | 8.5 × 13, 2 pp | Person instead of company; clause 2 table instead of running text; raw dates | Prior loans hand-filled. Individual wording is not from the client — confirm or limit to SME |
+| `consent_form` | v3 | 8.5 × 13, 1 p | Person instead of company; second signer uses a field that does not exist | Source says "two (5) years" — kept |
+| `demand_letter_dishonored_check_sme` | v1 (new) | A4 | Live SME demand templates are unrouted and would fail | Needs routing in `pickDemandLetterSlug`. "Attention:" line and co-borrower letter need new data |
+| `demand_letter_no_pdc_sme` | v1 (new) | A4 | Same | Same |
+| Loan Agreement (Vienovo) | — | — | Always prints "quarterly"; omits the principal check | Not rebuilt: needs payment-frequency flags first |
+
+Combined preview of every draft: `C:\Users\Rovick\Desktop\Loan Star Document\SME Tagged\SME all drafts - preview.pdf`
+
+## Work that is not template work
+
+- Route SME / Individual accounts to the two new demand letters; confirm whether the account name on an SME loan is the company or the person.
+- Pass the lender's paying account to documents (receipts and vouchers print the borrower's bank where the sheet prints Loan Star's).
+- Pass payment frequency to documents (Vienovo quarterly / every 2 months).
+- Withholding tax (CWT), invoice payoff column, consolidation / restructure computation.
+- Flags for DTI, no security check, bi-monthly, per-day interest, invoice; Board Resolution No., Corporate Secretary, representative ID, co-borrower.
 
 ## Log
 
 - 2026-09-30 — Tracker created. Found that the live SME BLRI, Check Voucher, Cash Voucher and AR Check were all built from the seafarer sample, not the SME originals.
 - 2026-09-30 — Batch 1 tagged from the SME calculator prints and uploaded as drafts. Verified on the production PDF service with an SME loan, an Individual loan, the admin sample and a long-data stress case: all 1 page, correct paper size, no leftover sample values. New merge fields: `clientName`, `clientAddress`, `segmentLoanLabel`.
+- 2026-09-30 — Batch 1 receipts fixed: the "BORROWER:" / "REPRESENTATIVE:" labels shared a paragraph with the text before them.
+- 2026-09-30 — Batches 2 and 3 done by six sub-agents, then every file re-checked on the production PDF service (admin sample, SME, Individual; demand letters second / final): all merge, correct paper size, expected page counts. 29 drafts uploaded; 12 new templates created hidden.
