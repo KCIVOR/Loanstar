@@ -20,6 +20,8 @@ type NegotiationPanelProps = {
     currentAmount: number | null;
     disclosedAt: string | null;
   } | null;
+  /** Open Committee revisit notice, when CSA can read it (csa-routed). */
+  revisit?: { routeTo: "csa" | "cig"; comment: string } | null;
   onUpdated: () => void;
 };
 
@@ -34,6 +36,7 @@ export function NegotiationPanel({
   applicationId,
   status,
   negotiation,
+  revisit,
   onUpdated,
 }: NegotiationPanelProps) {
   const [saving, setSaving] = useState(false);
@@ -42,7 +45,9 @@ export function NegotiationPanel({
   const [witnessSigning, setWitnessSigning] = useState(false);
   const [confirmWitnessSign, setConfirmWitnessSign] = useState(false);
 
-  if (!negotiation && status !== "approved") {
+  // A Committee revisit creates no negotiations row (only approve does), so
+  // for_revision must still render — it holds CSA's Revision complete button.
+  if (!negotiation && status !== "approved" && status !== "for_revision") {
     return null;
   }
 
@@ -133,6 +138,12 @@ export function NegotiationPanel({
             Committee requested revisions. Complete your updates and return the
             file to Committee.
           </p>
+          {revisit?.routeTo === "csa" ? (
+            <p className="mb-3 max-w-full break-words text-sm text-ink-900">
+              <span className="font-medium">Committee&apos;s reason:</span>{" "}
+              {revisit.comment}
+            </p>
+          ) : null}
           <Button loading={saving} onClick={() => void handleRevisionComplete()}>
             Revision complete
           </Button>

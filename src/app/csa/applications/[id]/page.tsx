@@ -49,11 +49,13 @@ import {
   INITIAL_INTERVIEW_COMPUTATION_ERROR,
   listInterviewRecordPrerequisites,
 } from "@/lib/csa/initial-interview";
-import { daysInQueue, formatBlockerLabel } from "@/lib/csa/queue";
+import { daysInQueue } from "@/lib/csa/queue";
+import type { OpenRevisitNotice } from "@/lib/committee/revisit-notices";
 import {
   buildCsaWorkspaceSteps,
   csaDocsSummary,
   csaNextStep,
+  csaReasonLabel,
 } from "@/lib/csa/workspace";
 import type { BorrowerProfile } from "@/lib/borrowers/types";
 import { GeneratedDocPanel } from "@/components/documents/GeneratedDocPanel";
@@ -73,6 +75,7 @@ type ApplicationWorkspace = {
     status: string;
     statusLabel: string;
     blocker: string | null;
+    revisit: OpenRevisitNotice | null;
     coBorrowerRequired: boolean;
     coBorrowers: CoBorrower[];
     segment: "seafarer" | "sme" | "individual";
@@ -638,10 +641,14 @@ export default function CsaApplicationPage() {
   const waiting = daysInQueue(
     data.application.updatedAt ?? data.application.createdAt,
   );
-  const blockerLabel = formatBlockerLabel(data.application.blocker);
+  const reasonLabel = csaReasonLabel({
+    blocker: data.application.blocker,
+    revisit: data.application.revisit,
+  });
   const guidance = csaNextStep({
     status: data.application.status,
     blocker: data.application.blocker,
+    revisit: data.application.revisit,
     docsRequired: docs.required,
     docsUploaded: docs.uploaded,
     nclResult: screening.result,
@@ -733,10 +740,12 @@ export default function CsaApplicationPage() {
               {formatDate(data.application.updatedAt)}
             </p>
           </div>
-          {blockerLabel ? (
+          {reasonLabel ? (
             <p className="mt-2 max-w-full break-words text-sm leading-snug text-navy-100">
-              <span className="font-medium text-warning">Hold reason:</span>{" "}
-              {blockerLabel}
+              <span className="font-medium text-warning">
+                {reasonLabel.label}:
+              </span>{" "}
+              {reasonLabel.text}
             </p>
           ) : null}
         </div>
@@ -1546,6 +1555,7 @@ export default function CsaApplicationPage() {
         <NegotiationPanel
           applicationId={applicationId}
           status={data.application.status}
+          revisit={data.application.revisit}
           negotiation={data.negotiation}
           onUpdated={() => void load({ silent: true })}
         />

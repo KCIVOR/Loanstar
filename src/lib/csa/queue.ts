@@ -1,5 +1,10 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
+import {
+  getOpenRevisitNoticesByApplication,
+  type OpenRevisitNotice,
+} from "../committee/revisit-notices";
+
 export type CsaWorkFilter =
   | "all"
   | "attention"
@@ -18,6 +23,8 @@ export type CsaQueueItem = {
   applicationNo: string | null;
   status: string;
   blocker: string | null;
+  /** Open Committee revisit notice (for_revision rows only), RLS-scoped. */
+  revisit: OpenRevisitNotice | null;
   isReloan: boolean;
   segment: "sme" | "seafarer" | "individual" | null;
   createdAt: string;
@@ -117,6 +124,19 @@ export function formatBlockerLabel(
   if (!blocker?.trim()) return null;
   const plain = blocker.replaceAll("_", " ").trim();
   return plain.charAt(0).toUpperCase() + plain.slice(1);
+}
+
+/** Queue "reason" cell: Committee revisit reason first, else the blocker. */
+export function csaQueueReasonLabel(input: {
+  blocker: string | null | undefined;
+  revisit: OpenRevisitNotice | null | undefined;
+}): string | null {
+  if (input.revisit) {
+    return input.revisit.routeTo === "csa"
+      ? `Committee revisit: ${input.revisit.comment}`
+      : `With CIG: ${input.revisit.comment}`;
+  }
+  return formatBlockerLabel(input.blocker);
 }
 
 /** Pure work-filter → query-builder spec (testable without Supabase). */
@@ -300,6 +320,7 @@ export async function getCsaQueue(
       applicationNo: (row.application_no as string | null) ?? null,
       status: row.status as string,
       blocker: (row.blocker as string | null) ?? null,
+      revisit: null,
       isReloan: Boolean(row.is_reloan),
       segment,
       createdAt: row.created_at as string,
@@ -315,6 +336,19 @@ export async function getCsaQueue(
         : null,
     };
   });
+
+  const revisionIds = rows
+    .filter((row) => row.status === "for_revision")
+    .map((row) => row.id);
+  if (revisionIds.length) {
+    const notices = await getOpenRevisitNoticesByApplication(
+      supabase,
+      revisionIds,
+    );
+    for (const row of rows) {
+      row.revisit = notices.get(row.id) ?? null;
+    }
+  }
 
   return { rows, totalCount: count ?? 0 };
 }

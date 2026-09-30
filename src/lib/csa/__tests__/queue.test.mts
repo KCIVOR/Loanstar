@@ -8,6 +8,7 @@ import {
   NEGOTIATION_STATUSES,
   csaNeedsAttention,
   csaMatchesWorkFilter,
+  csaQueueReasonLabel,
   daysInQueue,
   formatBlockerLabel,
   workFilterSpec,
@@ -117,5 +118,38 @@ describe("daysInQueue", () => {
 describe("formatBlockerLabel", () => {
   it("humanizes slugs", () => {
     assert.equal(formatBlockerLabel("awaiting_documents"), "Awaiting documents");
+  });
+});
+
+describe("csaQueueReasonLabel", () => {
+  it("shows the committee revisit reason for csa-routed revisits", () => {
+    assert.equal(
+      csaQueueReasonLabel({
+        blocker: null,
+        revisit: { routeTo: "csa", comment: "fix docs", createdAt: "t" },
+      }),
+      "Committee revisit: fix docs",
+    );
+  });
+
+  it("labels cig-routed revisits", () => {
+    assert.equal(
+      csaQueueReasonLabel({
+        blocker: null,
+        revisit: { routeTo: "cig", comment: "re-verify", createdAt: "t" },
+      }),
+      "With CIG: re-verify",
+    );
+  });
+
+  it("falls back to the blocker", () => {
+    assert.equal(
+      csaQueueReasonLabel({ blocker: "Returned by CIG: missing ID", revisit: null }),
+      "Returned by CIG: missing ID",
+    );
+  });
+
+  it("returns null when there is nothing to show", () => {
+    assert.equal(csaQueueReasonLabel({ blocker: null, revisit: null }), null);
   });
 });

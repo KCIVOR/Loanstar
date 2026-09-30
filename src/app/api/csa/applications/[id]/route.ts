@@ -23,6 +23,7 @@ import {
   type BorrowerRow,
 } from "@/lib/borrowers/types";
 import { getNegotiation } from "@/lib/negotiation/service";
+import { getOpenRevisitNotice } from "@/lib/committee/revisit-notices";
 import { getStageChecklist } from "@/lib/documents/checklist";
 import {
   requireModulePermission,
@@ -102,6 +103,10 @@ export async function GET(_request: Request, { params }: RouteParams) {
     const rateHistory = await getSmeRateHistory(supabase, id);
     const endorseReadiness = await getEndorseReadiness(supabase, id);
     const negotiation = await getNegotiation(supabase, id);
+    const revisit =
+      application.status === "for_revision"
+        ? await getOpenRevisitNotice(supabase, id)
+        : null;
 
     let privacyOrientationByName: string | null = null;
     if (application.privacy_orientation_by) {
@@ -147,6 +152,7 @@ export async function GET(_request: Request, { params }: RouteParams) {
         statusLabel: formatStatusLabel(application.status),
         statusHistory: application.status_history,
         blocker: application.blocker,
+        revisit,
         coBorrowerRequired: application.co_borrower_required === true,
         coBorrowers: Array.isArray(application.co_borrowers)
           ? (application.co_borrowers as Array<{ fullName: string; address: string }>)

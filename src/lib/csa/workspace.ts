@@ -3,6 +3,7 @@ import {
   getCompletionSummary,
   type ChecklistItem,
 } from "../documents/checklist";
+import type { OpenRevisitNotice } from "../committee/revisit-notices";
 import { formatBlockerLabel } from "./queue";
 
 export type CsaWorkspaceStageId =
@@ -115,6 +116,32 @@ export function buildCsaWorkspaceSteps(input: {
   }));
 }
 
+/** Prefix written by `returnToCsa` (src/lib/cig/receipt.ts). */
+const CIG_RETURN_PREFIX = "Returned by CIG:";
+
+/** The CIG return note as typed (underscores kept), or null. */
+function cigReturnNoteFromBlocker(
+  blocker: string | null | undefined,
+): string | null {
+  if (!blocker?.startsWith(CIG_RETURN_PREFIX)) return null;
+  const note = blocker.slice(CIG_RETURN_PREFIX.length).trim();
+  return note || null;
+}
+
+/** Header line on the CSA workspace: which kind of reason, and its text. */
+export function csaReasonLabel(input: {
+  blocker: string | null | undefined;
+  revisit: OpenRevisitNotice | null | undefined;
+}): { label: string; text: string } | null {
+  if (input.revisit?.routeTo === "csa") {
+    return { label: "Committee revisit", text: input.revisit.comment };
+  }
+  const cigNote = cigReturnNoteFromBlocker(input.blocker);
+  if (cigNote) return { label: "Returned by CIG", text: cigNote };
+  const hold = formatBlockerLabel(input.blocker);
+  return hold ? { label: "Hold reason", text: hold } : null;
+}
+
 export function csaNextStep(input: {
   status: string;
   blocker?: string | null;
@@ -124,9 +151,11 @@ export function csaNextStep(input: {
   hasComputation: boolean;
   endorseReady: boolean;
   segment?: string | null;
+  revisit?: OpenRevisitNotice | null;
 }): CsaNextStep {
   const blocker = formatBlockerLabel(input.blocker);
   const missingDocs = Math.max(input.docsRequired - input.docsUploaded, 0);
+  const cigReturnNote = cigReturnNoteFromBlocker(input.blocker);
 
   if (input.status === "on_hold") {
     return {
@@ -136,12 +165,24 @@ export function csaNextStep(input: {
         : "Resolve the hold reason, then continue intake.",
     };
   }
+  if (input.status === "for_revision" && input.revisit?.routeTo === "csa") {
+    return {
+      title: "Committee sent this back",
+      body: `${input.revisit.comment}. Update the file, then click Revision complete.`,
+    };
+  }
   if (input.status === "for_revision") {
     return {
       title: "Revision required",
       body: blocker
         ? `${blocker}. Update documents and re-check the file.`
         : "Borrower documents need updates before you can endorse.",
+    };
+  }
+  if (input.status === "submitted" && cigReturnNote) {
+    return {
+      title: "Returned by CIG",
+      body: `${cigReturnNote}. Fix the file, then endorse it to CIG again.`,
     };
   }
   if (

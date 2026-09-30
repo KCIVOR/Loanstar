@@ -31,15 +31,17 @@ import { formatDate } from "@/lib/csa/format";
 import {
   csaNeedsAttention,
   daysInQueue,
-  formatBlockerLabel,
+  csaQueueReasonLabel,
   type CsaWorkFilter,
 } from "@/lib/csa/queue";
+import type { OpenRevisitNotice } from "@/lib/committee/revisit-notices";
 
 type QueueItem = {
   id: string;
   applicationNo: string | null;
   status: string;
   blocker: string | null;
+  revisit?: OpenRevisitNotice | null;
   isReloan: boolean;
   segment: "sme" | "seafarer" | null;
   createdAt: string;
@@ -671,7 +673,10 @@ export default function CsaDashboardPage() {
       ) : viewMode === "grid" ? (
         <div className="grid-view mb-4">
           {displayRows.map((app) => {
-            const blocker = formatBlockerLabel(app.blocker);
+            const blocker = csaQueueReasonLabel({
+              blocker: app.blocker,
+              revisit: app.revisit ?? null,
+            });
             const waiting = daysInQueue(app.updatedAt ?? app.createdAt);
             return (
               <div key={app.id} className="gcard">
@@ -758,7 +763,10 @@ export default function CsaDashboardPage() {
                   status: app.status,
                   blocker: app.blocker,
                 });
-                const blocker = formatBlockerLabel(app.blocker);
+                const blocker = csaQueueReasonLabel({
+              blocker: app.blocker,
+              revisit: app.revisit ?? null,
+            });
                 const waiting = daysInQueue(app.updatedAt ?? app.createdAt);
                 return (
                   <tr

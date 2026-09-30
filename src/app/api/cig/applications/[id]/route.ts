@@ -10,6 +10,7 @@ import {
 import { writeAuditEvent } from "@/lib/audit/writer";
 import { handleApiError, jsonOk } from "@/lib/api/handler";
 import { assertCigVerificationStage } from "@/lib/cig/queue-guards";
+import { getOpenRevisitNotice } from "@/lib/committee/revisit-notices";
 import { saveVerificationPatch } from "@/lib/cig/forward";
 import { getReceiptReadiness } from "@/lib/cig/receipt";
 import { csaScreeningCheckSlug } from "@/lib/csa/sme-duplication";
@@ -392,6 +393,10 @@ export async function GET(_request: Request, { params }: RouteParams) {
         endorsedAt: application.endorsed_at,
         endorsedByName,
         blocker: application.blocker,
+        revisit:
+          application.status === "for_revision"
+            ? await getOpenRevisitNotice(supabase, id)
+            : null,
         editable: application.status === "for_verification",
         segment: scope.segment,
         entityType:

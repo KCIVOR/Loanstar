@@ -250,6 +250,7 @@ export default function CigApplicationPage() {
   });
   const [sequence, setSequence] = useState<CigSequenceState>(FALLBACK_SEQUENCE);
   const [applicationStatus, setApplicationStatus] = useState("");
+  const [revisitComment, setRevisitComment] = useState<string | null>(null);
   const [applicationNo, setApplicationNo] = useState<string | null>(null);
   const [segment, setSegment] = useState<"seafarer" | "sme" | "individual">(
     "seafarer",
@@ -329,6 +330,7 @@ export default function CigApplicationPage() {
           collateralType?: "none" | "car_refinancing" | "real_estate";
           isReloan?: boolean;
           blocker?: string | null;
+          revisit?: { routeTo: "csa" | "cig"; comment: string } | null;
           privacyOrientationAt?: string | null;
           privacyOrientationByName?: string | null;
           initialInterviewAt?: string | null;
@@ -361,6 +363,11 @@ export default function CigApplicationPage() {
       };
       setEditable(appData.application.editable);
       setApplicationStatus(appData.application.status);
+      setRevisitComment(
+        appData.application.revisit?.routeTo === "cig"
+          ? appData.application.revisit.comment
+          : null,
+      );
       setApplicationNo(appData.application.applicationNo);
       setSegment(
         appData.application.segment === "sme" ||
@@ -1235,6 +1242,12 @@ export default function CigApplicationPage() {
             Committee requested verification revisions. Complete updates and
             return the file to Committee.
           </p>
+          {revisitComment ? (
+            <p className="mb-3 max-w-full break-words text-sm text-ink-900">
+              <span className="font-medium">Committee&apos;s reason:</span>{" "}
+              {revisitComment}
+            </p>
+          ) : null}
           <Button loading={saving} onClick={() => void handleRevisionComplete()}>
             Revision complete
           </Button>
