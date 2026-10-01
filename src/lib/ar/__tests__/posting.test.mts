@@ -1046,6 +1046,7 @@ describe("bounceDcrItem", () => {
       posted_at: getUpdatedItem()!.posted_at,
     });
     assert.match(String(getUpdatedPayment()!.flagged_reason), /DAIF/);
+    assert.equal(getUpdatedPayment()!.status, "rejected");
   });
 
   it("rejects an item that was already processed", async () => {

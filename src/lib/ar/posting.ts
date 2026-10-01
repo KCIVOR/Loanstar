@@ -1362,6 +1362,7 @@ export async function bounceDcrItem(
   const { error: flagError } = await admin
     .from("payments")
     .update({
+      status: "rejected",
       flagged_reason: `Bounced: ${input.depositReference}`,
       flagged_at: now,
     })
