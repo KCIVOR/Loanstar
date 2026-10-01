@@ -225,7 +225,7 @@ export const WORKFLOW_EVENTS: Record<WorkflowEventKey, WorkflowEventDef> = {
     title: "New account needs a collector",
     body: (label) =>
       `${label} was released and transmitted. The account is active — assign a collector.`,
-    link: () => `/ar/masterlist`,
+    link: (id) => `/ar/masterlist/application/${id}`,
   },
   loan_active: {
     audience: { borrower: true },
