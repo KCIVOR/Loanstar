@@ -7,6 +7,7 @@ import { averageDays, bucketByDay, bucketByMonth, bucketByWeek, daysAgoIso } fro
 import type {
   ArWidgetData,
   AuditWidgetData,
+  BriefingsWidgetData,
   AuthAdminWidgetData,
   CollectionWidgetData,
   CommitteeWidgetData,
@@ -520,6 +521,65 @@ export async function buildAuditWidget(
   };
 }
 
+/** Briefings dashboard: shared queue health plus the viewing briefer's own
+ * sign-offs (`acknowledged_by`). `userId` is server-resolved, never request input. */
+export async function buildBriefingsWidget(
+  supabase: SupabaseClient,
+  userId: string,
+): Promise<BriefingsWidgetData> {
+  const [queueRes, recentRes, mineRes] = await Promise.all([
+    supabase.from("release_files").select("updated_at").eq("status", "awaiting_briefing"),
+    supabase
+      .from("briefings")
+      .select("acknowledged_at, acknowledged_by")
+      .gte("acknowledged_at", daysAgoIso(Math.max(WEEK_CUTOFF_DAYS, 31))),
+    supabase
+      .from("briefings")
+      .select("id", { count: "exact", head: true })
+      .eq("acknowledged_by", userId)
+      .not("acknowledged_at", "is", null),
+  ]);
+  if (queueRes.error) fail(queueRes.error.message);
+  if (recentRes.error) fail(recentRes.error.message);
+  if (mineRes.error) fail(mineRes.error.message);
+
+  const now = Date.now();
+  let oldestWaitingDays = 0;
+  for (const row of queueRes.data ?? []) {
+    const days = Math.floor((now - new Date(row.updated_at as string).getTime()) / 86_400_000);
+    if (days > oldestWaitingDays) oldestWaitingDays = days;
+  }
+
+  const recent = recentRes.data ?? [];
+  const mine = recent.filter((r) => r.acknowledged_by === userId);
+  const monthStart = new Date();
+  monthStart.setDate(1);
+  monthStart.setHours(0, 0, 0, 0);
+
+  const teamWeeks = bucketByWeek(
+    recent.map((r) => ({ at: r.acknowledged_at as string })),
+    WEEKS,
+  );
+  const mineWeeks = bucketByWeek(
+    mine.map((r) => ({ at: r.acknowledged_at as string })),
+    WEEKS,
+  );
+
+  return {
+    awaiting: (queueRes.data ?? []).length,
+    oldestWaitingDays,
+    briefedByMeThisMonth: mine.filter(
+      (r) => new Date(r.acknowledged_at as string) >= monthStart,
+    ).length,
+    briefedByMeTotal: mineRes.count ?? 0,
+    weekly: teamWeeks.map((p, i) => ({
+      label: p.label,
+      team: p.count,
+      mine: mineWeeks[i]?.count ?? 0,
+    })),
+  };
+}
+
 type WidgetBuilder = (supabase: SupabaseClient) => Promise<WidgetDataMap[WidgetSlug]>;
 
 export const WIDGET_BUILDERS: Record<WidgetSlug, WidgetBuilder> = {
@@ -537,6 +597,9 @@ export const WIDGET_BUILDERS: Record<WidgetSlug, WidgetBuilder> = {
   accounting_ar: buildArWidget,
   collection: buildCollectionWidget,
   remedial: buildRemedialWidget,
+  // Identity-scoped like `leads`: the route calls `buildBriefingsWidget`
+  // directly with the authenticated user's id.
+  briefings: async () => fail("briefings widget requires a user id"),
   reports: buildExecutiveSummary,
   auth_admin: buildAuthAdminWidget,
   audit_log: buildAuditWidget,

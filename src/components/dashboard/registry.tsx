@@ -5,7 +5,7 @@ import type { ComponentType } from "react";
 import type { ModuleSlug } from "@/lib/constants";
 import type { WidgetDataMap, WidgetSlug } from "@/lib/dashboard/types";
 
-import { ArWidget, CollectionWidget, ReleaseWidget, RemedialWidget } from "./widgets/money";
+import { ArWidget, BriefingsWidget, CollectionWidget, ReleaseWidget, RemedialWidget } from "./widgets/money";
 import {
   CommitteeWidget,
   ComputationWidget,
@@ -33,6 +33,7 @@ export const DASHBOARD_WIDGETS: Registry = {
   accounting_ar: ArWidget,
   collection: CollectionWidget,
   remedial: RemedialWidget,
+  briefings: BriefingsWidget,
   reports: ReportsWidget,
   auth_admin: AuthAdminWidget,
   audit_log: AuditWidget,
@@ -57,6 +58,7 @@ export const WIDGET_SKELETON: Record<WidgetSlug, SkeletonShape> = {
   accounting_ar: { kpis: 2, charts: ["half", "half"] },
   collection: { kpis: 4, charts: ["full"] },
   remedial: { kpis: 2, charts: ["full"] },
+  briefings: { kpis: 4, charts: ["full"] },
   reports: { kpis: 4, charts: ["full"] },
   auth_admin: { kpis: 3, charts: [], table: true },
   audit_log: { kpis: 0, charts: ["full"], table: true },

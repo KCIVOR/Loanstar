@@ -123,3 +123,36 @@ export function computeBriefingListKpis(
   }
   return { awaiting: rows.length, oldestWaitingDays };
 }
+
+/** Row shape from `GET /api/collector/briefings/history` — briefings the
+ * current user signed off. */
+export type BriefingHistoryRow = {
+  id: string;
+  releaseFileId: string;
+  acknowledgedAt: string;
+  checklistCount: number;
+  releaseStatus: string | null;
+  releasePaths: string[];
+  applicationNo: string | null;
+  segment: "sme" | "seafarer" | "individual" | null;
+  borrowerNo: string | null;
+  borrowerName: string;
+};
+
+/** KPIs over the briefer's full history (before filters). */
+export function computeBriefingHistoryKpis(
+  rows: Pick<BriefingHistoryRow, "acknowledgedAt">[],
+  asOf = new Date(),
+): { total: number; thisMonth: number; last7Days: number } {
+  const monthStart = new Date(asOf.getFullYear(), asOf.getMonth(), 1).getTime();
+  const weekAgo = asOf.getTime() - 7 * 86_400_000;
+  let thisMonth = 0;
+  let last7Days = 0;
+  for (const row of rows) {
+    const t = Date.parse(row.acknowledgedAt);
+    if (Number.isNaN(t)) continue;
+    if (t >= monthStart) thisMonth += 1;
+    if (t >= weekAgo) last7Days += 1;
+  }
+  return { total: rows.length, thisMonth, last7Days };
+}

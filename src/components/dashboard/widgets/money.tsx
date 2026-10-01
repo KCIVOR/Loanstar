@@ -2,6 +2,7 @@
 
 import type {
   ArWidgetData,
+  BriefingsWidgetData,
   CollectionWidgetData,
   ReleaseWidgetData,
   RemedialWidgetData,
@@ -123,6 +124,35 @@ export function RemedialWidget({ data }: { data: RemedialWidgetData }) {
             />
           ) : (
             <EmptyNote>No turnovers in the last 6 months.</EmptyNote>
+          )}
+        </ChartCard>
+      </CardGrid>
+    </>
+  );
+}
+
+export function BriefingsWidget({ data }: { data: BriefingsWidgetData }) {
+  return (
+    <>
+      <KpiRow>
+        <StatCard label="Awaiting briefing" value={data.awaiting} tone="gold" />
+        <StatCard label="Oldest waiting" value={days(data.oldestWaitingDays)} />
+        <StatCard label="Briefed by you this month" value={data.briefedByMeThisMonth} />
+        <StatCard label="Briefed by you (all time)" value={data.briefedByMeTotal} />
+      </KpiRow>
+      <CardGrid>
+        <ChartCard title="Weekly briefings signed" size="full">
+          {data.weekly.some((p) => p.team > 0) ? (
+            <BarMini
+              data={data.weekly}
+              xKey="label"
+              bars={[
+                { key: "mine", name: "By you", color: CHART.gold },
+                { key: "team", name: "All briefers", color: CHART.info },
+              ]}
+            />
+          ) : (
+            <EmptyNote>No briefings signed in the last 8 weeks.</EmptyNote>
           )}
         </ChartCard>
       </CardGrid>

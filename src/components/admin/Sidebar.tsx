@@ -318,7 +318,16 @@ const PORTAL_NAV_ITEMS: PortalNavItem[] = [
       { href: "/collector/closed-accounts", label: "Closed accounts" },
     ],
   },
-  { href: "/collector/briefings", label: "Briefings", icon: "collection", modules: ["briefings"] },
+  {
+    href: "/collector/briefings",
+    label: "Briefings",
+    icon: "collection",
+    modules: ["briefings"],
+    children: [
+      { href: "/collector/briefings", label: "Queue", exact: true },
+      { href: "/collector/briefings/history", label: "History" },
+    ],
+  },
   {
     href: "/remedial",
     label: "Remedial",

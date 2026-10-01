@@ -80,6 +80,15 @@ export type RemedialWidgetData = {
   totalUnderRemedial: number;
 };
 
+export type BriefingsWidgetData = {
+  awaiting: number;
+  oldestWaitingDays: number;
+  briefedByMeThisMonth: number;
+  briefedByMeTotal: number;
+  /** Weekly sign-offs: `team` = all briefers, `mine` = the viewing user. */
+  weekly: Array<{ label: string; team: number; mine: number }>;
+};
+
 export type ReportsWidgetData = Awaited<ReturnType<typeof buildExecutiveSummary>>;
 
 export type AuthAdminWidgetData = {
@@ -110,6 +119,7 @@ export type WidgetDataMap = {
   accounting_ar: ArWidgetData;
   collection: CollectionWidgetData;
   remedial: RemedialWidgetData;
+  briefings: BriefingsWidgetData;
   reports: ReportsWidgetData;
   auth_admin: AuthAdminWidgetData;
   audit_log: AuditWidgetData;

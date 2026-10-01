@@ -1,5 +1,5 @@
 import { handleApiError, jsonOk } from "@/lib/api/handler";
-import { buildLeadsWidget, WIDGET_BUILDERS } from "@/lib/dashboard/aggregates";
+import { buildBriefingsWidget, buildLeadsWidget, WIDGET_BUILDERS } from "@/lib/dashboard/aggregates";
 import { resolveDashboardScope } from "@/lib/dashboard/scope";
 import type { WidgetsResponse, WidgetSlug } from "@/lib/dashboard/types";
 import { getUserPermissions, requireAuth } from "@/lib/permissions/server";
@@ -22,7 +22,11 @@ export async function GET() {
         // `leads` is identity-sensitive (Agent-scoped analytics): call it
         // directly with the trusted, server-resolved scope instead of
         // routing it through the generic unscoped builder map.
-        slug === "leads" ? buildLeadsWidget(supabase, scope) : WIDGET_BUILDERS[slug](supabase),
+        slug === "leads"
+          ? buildLeadsWidget(supabase, scope)
+          : slug === "briefings"
+            ? buildBriefingsWidget(supabase, user.id)
+            : WIDGET_BUILDERS[slug](supabase),
       ),
     );
 
