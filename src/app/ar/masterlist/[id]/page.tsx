@@ -474,16 +474,17 @@ export default function ArMasterlistDetailPage() {
   const netReleased = Number(record.net_released ?? 0);
   const totalLoan = Number(record.total_loan ?? 0);
 
-  // 'rolled' installments are settled (their balance moved to the next
-  // installment) — exclude them from the denominator so a rollover doesn't
-  // permanently cap progress below 100%.
-  const rolledCount = schedules.filter(
-    (row) => String(row.status).toLowerCase() === "rolled",
-  ).length;
+  // 'rolled' and 'moved' installments are settled historical rows — their
+  // balance was transferred to another installment, so exclude them from the
+  // denominator rather than permanently capping progress below 100%.
+  const settledHistoryCount = schedules.filter((row) => {
+    const status = String(row.status).toLowerCase();
+    return status === "rolled" || status === "moved";
+  }).length;
   // `trackedCount` (raw row count) is intentionally kept separate below and
   // reused as-is for the "Terms X mo" display further down — do not fold
   // the billable-only filtering into it, that reuse is unrelated to this fix.
-  const trackedCount = schedules.length - rolledCount;
+  const trackedCount = schedules.length - settledHistoryCount;
   // Quarterly/Two-Monthly Special loans persist a $0 "principal" placeholder
   // row alongside every non-final period's real interest row (see
   // docs/quarterly-bimonthly-special-schedule-implementation-plan.md).
@@ -500,10 +501,12 @@ export default function ArMasterlistDetailPage() {
   const billableSchedules = schedules.filter(
     (row) => Number(row.amount_due) > 0,
   );
-  const billableRolledCount = billableSchedules.filter(
-    (row) => String(row.status).toLowerCase() === "rolled",
-  ).length;
-  const billableTrackedCount = billableSchedules.length - billableRolledCount;
+  const billableSettledHistoryCount = billableSchedules.filter((row) => {
+    const status = String(row.status).toLowerCase();
+    return status === "rolled" || status === "moved";
+  }).length;
+  const billableTrackedCount =
+    billableSchedules.length - billableSettledHistoryCount;
   const paidCount = billableSchedules.filter(
     (row) => String(row.status).toLowerCase() === "paid",
   ).length;
@@ -1027,8 +1030,8 @@ export default function ArMasterlistDetailPage() {
         </h2>
         <p className="mb-3 text-sm text-ink-500">
           {paidCount} of {billableTrackedCount} installments paid
-          {billableRolledCount > 0
-            ? ` (${billableRolledCount} rolled forward, excluded from count)`
+          {billableSettledHistoryCount > 0
+            ? ` (${billableSettledHistoryCount} historical replacement rows, excluded from count)`
             : ""}
           . Opening debit from total loan; credits are posted allocations and
           rounding write-offs.

@@ -260,7 +260,7 @@ export async function isAccountFullySettled(
     .from("amortization_schedules")
     .select("id")
     .eq("masterlist_id", masterlistId)
-    .not("status", "in", "(paid,rolled)")
+    .not("status", "in", "(paid,rolled,moved)")
     .limit(1);
 
   if (error) throw new Error(error.message);

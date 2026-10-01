@@ -69,6 +69,15 @@ test("canMarkPaidOff treats 'rolled' installments as settled, not blocking", () 
   assert.deepEqual(result, { ok: true });
 });
 
+test("canMarkPaidOff treats moved installments as settled history", () => {
+  const result = canMarkPaidOff({
+    applicationStatus: "loan_active",
+    outstandingBalance: 0,
+    scheduleStatuses: ["paid", "moved"],
+  });
+  assert.deepEqual(result, { ok: true });
+});
+
 test("canMarkPaidOff still rejects a genuinely unpaid installment alongside a rolled one", () => {
   const result = canMarkPaidOff({
     applicationStatus: "loan_active",

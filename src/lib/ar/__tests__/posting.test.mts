@@ -201,20 +201,23 @@ describe("recomputeOutstandingBalance", () => {
  * sitting open.
  */
 describe("isAccountFullySettled", () => {
-  function stubOpenIds(ids: string[]) {
+  function stubOpenIds(ids: string[], notArgs?: string[]) {
     return {
       from(table: string) {
         assert.equal(table, "amortization_schedules");
         return {
           select: () => ({
             eq: () => ({
-              not: () => ({
+              not: (...args: string[]) => {
+                if (notArgs) notArgs.push(...args);
+                return {
                 limit: () =>
                   Promise.resolve({
                     data: ids.map((id) => ({ id })),
                     error: null,
                   }),
-              }),
+                };
+              },
             }),
           }),
         };
@@ -230,6 +233,12 @@ describe("isAccountFullySettled", () => {
   it("is false when at least one row is still open, regardless of what it nets to", async () => {
     const settled = await isAccountFullySettled(stubOpenIds(["s1"]), "ml-1");
     assert.equal(settled, false);
+  });
+
+  it("excludes moved rows from the open-row query", async () => {
+    const notArgs: string[] = [];
+    await isAccountFullySettled(stubOpenIds([], notArgs), "ml-1");
+    assert.deepEqual(notArgs, ["status", "in", "(paid,rolled,moved)"]);
   });
 });
 

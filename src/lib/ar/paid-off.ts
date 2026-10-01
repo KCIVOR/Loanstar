@@ -43,7 +43,7 @@ export function canMarkPaidOff(
   // 'rolled' installments are settled — their balance was folded into the
   // installment they rolled into, which still has to reach 'paid' itself.
   const unpaid = input.scheduleStatuses.filter(
-    (s) => s !== "paid" && s !== "rolled",
+    (s) => s !== "paid" && s !== "rolled" && s !== "moved",
   );
   if (unpaid.length > 0) {
     return {
