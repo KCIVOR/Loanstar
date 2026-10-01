@@ -38,6 +38,7 @@ export async function POST(_request: Request, { params }: RouteParams) {
       action: "execute_trigger",
       entityType: "loan_application",
       entityId: id,
+      beforeData: { status: "for_verification" },
       afterData: { trigger: "submit_ci_report", status: "for_approval" },
     });
 

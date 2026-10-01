@@ -3,6 +3,7 @@ import { z } from "zod";
 import { formatZodError } from "@/lib/api/zod-error";
 
 import { handleApiError, jsonOk } from "@/lib/api/handler";
+import { writeAuditEvent } from "@/lib/audit/writer";
 import { notifyBorrowerForApplication } from "@/lib/notifications/write";
 import {
   canReviewAssignedPayment,
@@ -18,9 +19,15 @@ import { createClient } from "@/lib/supabase/server";
 
 type RouteParams = { params: Promise<{ id: string }> };
 
-const schema = z.object({
-  status: z.enum(["confirmed", "rejected"]),
-});
+const schema = z
+  .object({
+    status: z.enum(["confirmed", "rejected"]),
+    note: z.string().trim().max(500).optional(),
+  })
+  .refine((b) => b.status !== "rejected" || !!b.note, {
+    message: "A reason is required when rejecting a payment proof",
+    path: ["note"],
+  });
 
 export async function PATCH(request: Request, { params }: RouteParams) {
   try {
@@ -58,7 +65,7 @@ export async function PATCH(request: Request, { params }: RouteParams) {
       })
       .eq("id", id)
       .eq("status", "pending_verification")
-      .select("id")
+      .select("id, amount, reference_no, payment_date, channel")
       .maybeSingle();
 
     if (error) {
@@ -67,6 +74,29 @@ export async function PATCH(request: Request, { params }: RouteParams) {
     if (!data) {
       throw new Error("Payment is no longer pending review");
     }
+
+    await writeAuditEvent({
+      actorId: user.id,
+      // Reviewer acting only through the remedial desk is logged under it.
+      moduleSlug: !canCollect && canRemedial ? "remedial" : "collection",
+      action: "update",
+      entityType: "payment",
+      entityId: id,
+      applicationId: context.applicationId,
+      beforeData: { status: "pending_verification" },
+      afterData: {
+        trigger:
+          body.status === "confirmed"
+            ? "payment_proof_confirmed"
+            : "payment_proof_rejected",
+        status: body.status,
+        amount: data.amount,
+        referenceNo: data.reference_no,
+        paymentDate: data.payment_date,
+        channel: data.channel,
+        reason: body.note ?? null,
+      },
+    });
 
     await notifyBorrowerForApplication(context.applicationId, {
       title:

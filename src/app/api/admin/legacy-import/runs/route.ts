@@ -1,4 +1,5 @@
 import { handleApiError, jsonOk, ValidationError } from "@/lib/api/handler";
+import { writeAuditEvent } from "@/lib/audit/writer";
 import { requireSuperAdmin } from "@/lib/legacy-import/server";
 import { runSchema } from "@/lib/legacy-import/schemas";
 import { createClient } from "@/lib/supabase/server";
@@ -32,6 +33,22 @@ export async function POST(request: Request) {
       .select("id")
       .single();
     if (error) throw new Error(error.message);
+    await writeAuditEvent({
+      actorId: user.id,
+      moduleSlug: "system_config",
+      action: "create",
+      entityType: "legacy_import_run",
+      entityId: data.id,
+      afterData: {
+        trigger: "legacy_import_run",
+        fileName: parsed.data.file_name,
+        segment: parsed.data.segment,
+        rowCount: parsed.data.total_rows,
+        validRows: parsed.data.valid_rows,
+        warningRows: parsed.data.warning_rows,
+        errorRows: parsed.data.error_rows,
+      },
+    });
     return jsonOk({ run: data }, 201);
   } catch (error) {
     return handleApiError(error);

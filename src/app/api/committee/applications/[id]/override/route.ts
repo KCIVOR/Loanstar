@@ -142,6 +142,7 @@ export async function POST(request: Request, { params }: RouteParams) {
       action: "execute_trigger",
       entityType: "computation",
       entityId: saved.computation.id,
+      beforeData: { status: app.status },
       afterData: {
         applicationId: id,
         trigger: isPreDecision

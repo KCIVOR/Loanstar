@@ -475,32 +475,6 @@ export default function CollectorAccountsPage() {
             />
           </div>
 
-          <div className="flex flex-wrap gap-1.5">
-            {AGING_CHIPS.map((chip) => (
-              <button
-                key={chip.id}
-                type="button"
-                className={cn("fchip", agingFilter === chip.id && "is-on")}
-                onClick={() => setAgingFilter(chip.id)}
-              >
-                {chip.label}
-              </button>
-            ))}
-          </div>
-
-          <div className="flex flex-wrap gap-1.5">
-            {SEGMENT_CHIPS.map((chip) => (
-              <button
-                key={chip.id}
-                type="button"
-                className={cn("fchip", segmentFilter === chip.id && "is-on")}
-                onClick={() => setSegmentFilter(chip.id)}
-              >
-                {chip.label}
-              </button>
-            ))}
-          </div>
-
           <div className="active-pill-row">
             {agingFilter !== "all" ? (
               <span className="active-pill">
@@ -599,6 +573,36 @@ export default function CollectorAccountsPage() {
         </div>
 
         <div className={cn("filter-panel", filterPanelOpen && "is-open")}>
+          <div className="filter-group">
+            <span className="filter-group-label">Aging</span>
+            <div className="filter-bar">
+              {AGING_CHIPS.map((chip) => (
+                <button
+                  key={chip.id}
+                  type="button"
+                  className={cn("fchip", agingFilter === chip.id && "is-on")}
+                  onClick={() => setAgingFilter(chip.id)}
+                >
+                  {chip.label}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className="filter-group">
+            <span className="filter-group-label">Segment</span>
+            <div className="filter-bar">
+              {SEGMENT_CHIPS.map((chip) => (
+                <button
+                  key={chip.id}
+                  type="button"
+                  className={cn("fchip", segmentFilter === chip.id && "is-on")}
+                  onClick={() => setSegmentFilter(chip.id)}
+                >
+                  {chip.label}
+                </button>
+              ))}
+            </div>
+          </div>
           <div className="filter-group">
             <span className="filter-group-label">First payment date</span>
             <DateRangeFilter value={dateRange} onChange={setDateRange} />

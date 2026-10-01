@@ -9,6 +9,7 @@ import {
   getMasterlistQueueKpiCounts,
   type MasterlistQueueSortKey,
 } from "@/lib/ar/queue";
+import { writeAuditEvent } from "@/lib/audit/writer";
 import { requireModulePermission } from "@/lib/permissions/server";
 import { createClient, createServiceClient } from "@/lib/supabase/server";
 
@@ -95,7 +96,7 @@ export async function GET(request: Request) {
 
 export async function POST() {
   try {
-    await requireModulePermission("accounting_ar", "view");
+    const user = await requireModulePermission("accounting_ar", "view");
     const supabase = await createClient();
 
     const { data, error } = await supabase.from("masterlist").select("*");
@@ -103,6 +104,14 @@ export async function POST() {
     if (error) throw new Error(error.message);
 
     const csv = masterlistToCsv((data ?? []) as Array<Record<string, unknown>>);
+
+    await writeAuditEvent({
+      actorId: user.id,
+      moduleSlug: "accounting_ar",
+      action: "export",
+      entityType: "masterlist",
+      afterData: { trigger: "masterlist_export", rowCount: data?.length ?? 0 },
+    });
 
     return new NextResponse(csv, {
       headers: {

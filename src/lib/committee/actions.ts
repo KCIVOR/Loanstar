@@ -330,9 +330,11 @@ export async function executeFinalAction(
     action: "execute_trigger",
     entityType: "committee_action",
     entityId: actionRow.id,
+    beforeData: { status: application.status },
     afterData: {
       applicationId,
       action,
+      status: newStatus,
       newStatus,
       tally,
       votes,

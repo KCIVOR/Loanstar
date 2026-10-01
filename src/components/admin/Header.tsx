@@ -314,6 +314,12 @@ export function Header({
   }, [openMenu]);
 
   async function handleSignOut() {
+    // Log before signing out — the session identifies who signed out.
+    await fetch("/api/auth/session-event", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ event: "logout" }),
+    }).catch(() => {});
     const supabase = createClient();
     await supabase.auth.signOut();
     router.push("/login");

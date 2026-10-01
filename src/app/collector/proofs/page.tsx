@@ -20,6 +20,7 @@ import {
   Skeleton,
   Table,
   Td,
+  Textarea,
   Th,
 } from "@/components/ui";
 import {
@@ -165,6 +166,7 @@ export default function CollectorProofsPage() {
   const [pageSize, setPageSize] =
     useState<(typeof PAGE_SIZE_OPTIONS)[number]>(10);
   const [rejectId, setRejectId] = useState<string | null>(null);
+  const [rejectNote, setRejectNote] = useState("");
   const [viewingId, setViewingId] = useState<string | null>(null);
 
   const load = useCallback(async (opts?: { silent?: boolean }) => {
@@ -210,7 +212,11 @@ export default function CollectorProofsPage() {
     }
   }
 
-  async function reviewPayment(id: string, status: "confirmed" | "rejected") {
+  async function reviewPayment(
+    id: string,
+    status: "confirmed" | "rejected",
+    note?: string,
+  ) {
     setActing(true);
     setError(null);
     setMessage(null);
@@ -218,7 +224,7 @@ export default function CollectorProofsPage() {
       const res = await fetch(`/api/collector/payments/${id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status }),
+        body: JSON.stringify(note ? { status, note } : { status }),
       });
       if (!res.ok) {
         const body = (await res.json().catch(() => null)) as {
@@ -227,6 +233,7 @@ export default function CollectorProofsPage() {
         throw new Error(body?.error ?? "Review failed");
       }
       setRejectId(null);
+      setRejectNote("");
       setMessage(
         status === "confirmed" ? "Payment confirmed." : "Payment rejected.",
       );
@@ -704,15 +711,30 @@ export default function CollectorProofsPage() {
       <ConfirmDialog
         open={rejectId !== null}
         title="Reject payment proof?"
-        message="The borrower proof will be marked rejected."
+        message="The borrower proof will be marked rejected. The reason is saved in the activity log."
         confirmLabel="Reject"
         variant="danger"
         loading={acting}
+        confirmDisabled={!rejectNote.trim()}
         onConfirm={() => {
-          if (rejectId) void reviewPayment(rejectId, "rejected");
+          if (rejectId) {
+            void reviewPayment(rejectId, "rejected", rejectNote.trim());
+          }
         }}
-        onCancel={() => setRejectId(null)}
-      />
+        onCancel={() => {
+          setRejectId(null);
+          setRejectNote("");
+        }}
+      >
+        <Textarea
+          aria-label="Reason for rejecting"
+          placeholder="Reason for rejecting (required)"
+          maxLength={500}
+          rows={3}
+          value={rejectNote}
+          onChange={(e) => setRejectNote(e.target.value)}
+        />
+      </ConfirmDialog>
     </div>
   );
 }

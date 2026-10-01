@@ -55,10 +55,12 @@ export async function POST(request: Request, { params }: RouteParams) {
       action: "execute_trigger",
       entityType: "dcr_item",
       entityId: itemId,
+      beforeData: { status: "pending" },
       afterData: {
         trigger: "bounce_dcr_item",
         ...result,
         ...body,
+        status: "bounced",
       },
     });
 

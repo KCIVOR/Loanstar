@@ -1,3 +1,4 @@
+import { mergeApplicationLink } from "@/lib/audit/link";
 import { getRequestIp } from "@/lib/permissions/server";
 import type { ModuleSlug } from "@/lib/permissions/types";
 import { createServiceClient } from "@/lib/supabase/server";
@@ -21,6 +22,8 @@ export type WriteAuditEventInput = {
   beforeData?: Record<string, unknown> | null;
   afterData?: Record<string, unknown> | null;
   ipAddress?: string | null;
+  /** Loan the event concerns; stored as `after_data.applicationId`. */
+  applicationId?: string | null;
 };
 
 export type AuditEvent = WriteAuditEventInput & {
@@ -48,17 +51,34 @@ export async function writeAuditEvent(
     const supabase = createServiceClient();
     const ipAddress = input.ipAddress ?? (await getRequestIp());
 
+    // Callers rarely pass the role, so resolve it here: the log must show the
+    // role the actor held when they acted. Best-effort like the insert below.
+    let actorRoleId = input.actorRoleId ?? null;
+    if (input.actorRoleId === undefined && input.actorId) {
+      const { data: roleRow } = await supabase
+        .from("user_roles")
+        .select("role_id")
+        .eq("user_id", input.actorId)
+        .order("assigned_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      actorRoleId = (roleRow?.role_id as string | undefined) ?? null;
+    }
+
     const { data, error } = await supabase
       .from("audit_events")
       .insert({
         actor_id: input.actorId,
-        actor_role_id: input.actorRoleId ?? null,
+        actor_role_id: actorRoleId,
         module_slug: input.moduleSlug,
         action: input.action,
         entity_type: input.entityType ?? null,
         entity_id: input.entityId ?? null,
         before_data: input.beforeData ?? null,
-        after_data: input.afterData ?? null,
+        after_data: mergeApplicationLink(
+          input.afterData ?? null,
+          input.applicationId ?? null,
+        ),
         ip_address: ipAddress,
       })
       .select(

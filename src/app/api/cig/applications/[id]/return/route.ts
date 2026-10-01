@@ -35,6 +35,7 @@ export async function POST(request: Request, { params }: RouteParams) {
       action: "execute_trigger",
       entityType: "loan_application",
       entityId: id,
+      beforeData: { status: "for_verification" },
       afterData: {
         trigger: "cig_return_to_csa",
         status: "submitted",

@@ -135,7 +135,7 @@ export function ContactLogModal({
       <div className="mb-4">
         <Label>Contact history</Label>
         {historyLoading ? (
-          <p className="text-sm text-[var(--text-muted)]">Loading…</p>
+          <p className="text-sm text-[var(--text-muted)]">Loadingâ€¦</p>
         ) : historyError ? (
           <Alert>{historyError}</Alert>
         ) : history.length === 0 ? (
@@ -154,7 +154,7 @@ export function ContactLogModal({
               >
                 <div className="flex flex-wrap justify-between gap-2">
                   <span className="font-medium">
-                    {TYPE_LABEL[c.contactType] ?? c.contactType} ·{" "}
+                    {TYPE_LABEL[c.contactType] ?? c.contactType} Â·{" "}
                     {c.collectorName}
                   </span>
                   <span className="text-[var(--text-muted)]">

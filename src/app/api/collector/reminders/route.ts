@@ -3,6 +3,7 @@ import { z } from "zod";
 import { formatZodError } from "@/lib/api/zod-error";
 
 import { handleApiError, jsonOk } from "@/lib/api/handler";
+import { writeAuditEvent } from "@/lib/audit/writer";
 import { runPaymentDueReminders } from "@/lib/collector/reminders";
 import { requireModulePermission } from "@/lib/permissions/server";
 import { createClient } from "@/lib/supabase/server";
@@ -39,6 +40,20 @@ export async function POST(request: Request) {
       masterlistIds: ids,
       collectorUserId: user.id,
       resend,
+    });
+
+    await writeAuditEvent({
+      actorId: user.id,
+      moduleSlug: "collection",
+      action: "execute_trigger",
+      entityType: "masterlist",
+      afterData: {
+        trigger: "send_payment_reminder",
+        resend,
+        sent: result.sent,
+        skipped: result.skipped,
+        accounts: ids.length,
+      },
     });
 
     return jsonOk(result);

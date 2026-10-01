@@ -35,7 +35,8 @@ export async function POST(request: Request, { params }: RouteParams) {
       action: "execute_trigger",
       entityType: "application_cancellation",
       entityId: cancellationId,
-      afterData: { applicationId: id, reason: body.reason },
+      beforeData: { status: "for_verification" },
+      afterData: { applicationId: id, status: "cancelled", reason: body.reason },
     });
 
     return jsonOk({

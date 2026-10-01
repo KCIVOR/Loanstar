@@ -56,8 +56,10 @@ export async function POST(request: Request, { params }: RouteParams) {
       action: "execute_trigger",
       entityType: "dcr_item",
       entityId: itemId,
+      beforeData: { status: "pending" },
       afterData: {
         trigger: "reject_dcr_item",
+        status: "rejected",
         reason: body.reason,
         collectorUserId: result.collectorUserId,
         loanApplicationId: result.loanApplicationId,

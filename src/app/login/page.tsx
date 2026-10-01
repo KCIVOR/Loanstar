@@ -167,10 +167,22 @@ function LoginForm() {
     });
 
     if (signInError) {
+      // Activity Log: failed attempt (email + IP only). Never blocks the UI.
+      void fetch("/api/auth/login-failed", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: emailValue }),
+      }).catch(() => {});
       setError(authErrorMessage(signInError));
       setLoading(false);
       return;
     }
+
+    await fetch("/api/auth/session-event", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ event: "login" }),
+    }).catch(() => {});
 
     router.push(redirect ?? (await resolveLandingPath()));
     router.refresh();

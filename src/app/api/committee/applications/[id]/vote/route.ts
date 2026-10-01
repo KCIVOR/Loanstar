@@ -38,6 +38,14 @@ export async function POST(request: Request, { params }: RouteParams) {
       application.segment as string | null,
     );
 
+    // Previous vote (if re-voting) for the Activity Log's before/after.
+    const { data: previousVote } = await supabase
+      .from("committee_votes")
+      .select("vote, comment")
+      .eq("loan_application_id", id)
+      .eq("voter_id", user.id)
+      .maybeSingle();
+
     const votes = await castCommitteeVote(
       supabase,
       id,
@@ -53,6 +61,10 @@ export async function POST(request: Request, { params }: RouteParams) {
       action: "update",
       entityType: "committee_vote",
       entityId: id,
+      applicationId: id,
+      beforeData: previousVote
+        ? { vote: previousVote.vote, comment: previousVote.comment }
+        : null,
       afterData: { vote: body.vote, comment: body.comment ?? null, tally },
     });
 

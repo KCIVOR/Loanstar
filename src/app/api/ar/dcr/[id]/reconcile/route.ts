@@ -32,6 +32,7 @@ export async function POST(request: Request, { params }: RouteParams) {
       action: "execute_trigger",
       entityType: "dcr",
       entityId: id,
+      beforeData: { status: "submitted" },
       afterData: { trigger: "reconcile_post", ...result, ...body },
     });
 
