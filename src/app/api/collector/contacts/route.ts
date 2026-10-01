@@ -5,7 +5,8 @@ import { formatZodError } from "@/lib/api/zod-error";
 import { writeAuditEvent } from "@/lib/audit/writer";
 import { handleApiError, jsonOk } from "@/lib/api/handler";
 import { requireModulePermission } from "@/lib/permissions/server";
-import { createClient } from "@/lib/supabase/server";
+import { toContactHistoryRows } from "@/lib/collector/contact-history";
+import { createClient, createServiceClient } from "@/lib/supabase/server";
 
 const logSchema = z.object({
   masterlistId: z.string().uuid(),
@@ -35,7 +36,26 @@ export async function GET(request: Request) {
 
     if (error) throw new Error(error.message);
 
-    return jsonOk({ contacts: data ?? [] });
+    const rows = data ?? [];
+    const userIds = Array.from(
+      new Set(rows.map((r) => r.collector_user_id as string)),
+    );
+    const nameById = new Map<string, string>();
+    if (userIds.length > 0) {
+      const admin = createServiceClient();
+      const { data: profiles } = await admin
+        .from("profiles")
+        .select("id, full_name, email")
+        .in("id", userIds);
+      for (const p of profiles ?? []) {
+        nameById.set(
+          p.id as string,
+          (p.full_name as string) || (p.email as string),
+        );
+      }
+    }
+
+    return jsonOk({ contacts: toContactHistoryRows(rows, nameById) });
   } catch (error) {
     return handleApiError(error);
   }

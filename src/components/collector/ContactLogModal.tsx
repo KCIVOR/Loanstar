@@ -1,10 +1,25 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import { Alert, Button, Input, Label, Modal, Select } from "@/components/ui";
+import type { ContactHistoryRow } from "@/lib/collector/contact-history";
 
 type ContactType = "call" | "sms" | "email" | "visit";
+
+const TYPE_LABEL: Record<string, string> = {
+  call: "Call",
+  sms: "SMS",
+  email: "Email",
+  visit: "Visit",
+};
+
+function formatDateTime(iso: string) {
+  return new Date(iso).toLocaleString("en-PH", {
+    dateStyle: "medium",
+    timeStyle: "short",
+  });
+}
 
 type ContactLogModalProps = {
   open: boolean;
@@ -26,6 +41,35 @@ export function ContactLogModal({
   const [callbackAt, setCallbackAt] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [history, setHistory] = useState<ContactHistoryRow[]>([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const [historyError, setHistoryError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    let cancelled = false;
+    setHistoryLoading(true);
+    setHistoryError(null);
+    fetch(
+      `/api/collector/contacts?masterlistId=${encodeURIComponent(masterlistId)}`,
+    )
+      .then(async (res) => {
+        if (!res.ok) throw new Error("Could not load contact history");
+        const body = (await res.json()) as { contacts?: ContactHistoryRow[] };
+        if (!cancelled) setHistory(body.contacts ?? []);
+      })
+      .catch((err) => {
+        if (!cancelled) {
+          setHistoryError(err instanceof Error ? err.message : "Failed");
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setHistoryLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [open, masterlistId]);
 
   function reset() {
     setContactType("call");
@@ -88,6 +132,48 @@ export function ContactLogModal({
           <Alert>{error}</Alert>
         </div>
       ) : null}
+      <div className="mb-4">
+        <Label>Contact history</Label>
+        {historyLoading ? (
+          <p className="text-sm text-[var(--text-muted)]">Loading…</p>
+        ) : historyError ? (
+          <Alert>{historyError}</Alert>
+        ) : history.length === 0 ? (
+          <p className="text-sm text-[var(--text-muted)]">
+            No contacts logged yet.
+          </p>
+        ) : (
+          <ul
+            className="grid gap-2"
+            style={{ maxHeight: 220, overflowY: "auto" }}
+          >
+            {history.map((c) => (
+              <li
+                key={c.id}
+                className="rounded-md border border-[var(--border)] p-2 text-sm"
+              >
+                <div className="flex flex-wrap justify-between gap-2">
+                  <span className="font-medium">
+                    {TYPE_LABEL[c.contactType] ?? c.contactType} ·{" "}
+                    {c.collectorName}
+                  </span>
+                  <span className="text-[var(--text-muted)]">
+                    {formatDateTime(c.createdAt)}
+                  </span>
+                </div>
+                {c.notes ? (
+                  <p className="mt-1 whitespace-pre-wrap">{c.notes}</p>
+                ) : null}
+                {c.callbackAt ? (
+                  <p className="mt-1 text-[var(--text-muted)]">
+                    Callback: {formatDateTime(c.callbackAt)}
+                  </p>
+                ) : null}
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
       <div className="grid gap-3">
         <div>
           <Label>Contact type</Label>
