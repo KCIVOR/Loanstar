@@ -457,7 +457,7 @@ export async function assignMasterlist(
           kind: "account_assigned_collector",
           title: "New account assigned to you",
           body: (label) => `${label} was assigned to you for collection.`,
-          link: `/collector/accounts/${masterlistId}`,
+          link: `/collector/accounts/${masterlistId}/loan-file`,
         },
         { actorId: input.assignedBy },
       );
