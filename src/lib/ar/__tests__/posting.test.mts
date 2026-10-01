@@ -382,6 +382,29 @@ describe("addPaymentToDcr", () => {
           });
         }
 
+        if (table === "masterlist") {
+          return {
+            select: () => ({
+              eq: () => ({
+                single: async () => ({ data: { computation_id: "comp-1" }, error: null }),
+              }),
+            }),
+          };
+        }
+
+        if (table === "computations") {
+          return {
+            select: () => ({
+              eq: () => ({
+                single: async () => ({
+                  data: { total_interest: 2597.93, terms: 1, payment_frequency: "Monthly" },
+                  error: null,
+                }),
+              }),
+            }),
+          };
+        }
+
         if (table === "dcr_items") {
           return {
             select: () => ({
@@ -573,6 +596,145 @@ describe("addPaymentToDcr", () => {
       inst({ id: "s2", installmentNo: 2, amountDue: 1500 }),
     ]);
     assert.deepEqual(getInsertedAllocations(), expected);
+  });
+
+  describe("collector discount guards (collector-dcr-discount-logic-fix)", () => {
+    const twoRows = [
+      {
+        id: "s1",
+        masterlist_id: "ml-1",
+        status: "pending",
+        installment_no: 1,
+        amount_due: 21154.6,
+        penalty_amount: 0,
+        amount_paid: 0,
+      },
+      {
+        id: "s2",
+        masterlist_id: "ml-1",
+        status: "pending",
+        installment_no: 2,
+        amount_due: 21154.6,
+        penalty_amount: 0,
+        amount_paid: 0,
+      },
+    ];
+    const discount = (
+      nos: number[],
+      lines?: Array<{ installmentNo: number; amount: number }>,
+    ) => ({
+      interestDiscountAmount: halfUpLocal(
+        (lines ?? nos.map((n) => ({ installmentNo: n, amount: 2597.93 }))).reduce(
+          (s, l) => s + l.amount,
+          0,
+        ),
+      ),
+      interestDiscountedInstallmentNos: nos,
+      penaltyDiscountAmount: 0,
+      penaltyDiscountedInstallmentNos: [],
+      discountReason: "Approved by manager",
+      interestDiscountLines: lines,
+    });
+    function halfUpLocal(v: number) {
+      return Math.round(v * 100) / 100;
+    }
+
+    it("rejects a discount on an installment this payment is not allocated to", async () => {
+      const { supabase } = makeAddStub({ paymentAmount: 18556.67, schedules: twoRows });
+      await assert.rejects(
+        () =>
+          addPaymentToDcr(
+            supabase,
+            "dcr-1",
+            "pay-1",
+            "collector-1",
+            [{ amortizationScheduleId: "s1", amount: 18556.67 }],
+            discount([1, 2]),
+            makeDupServiceStub(),
+          ),
+        /installment 2, but this payment is not allocated to it/,
+      );
+    });
+
+    it("rejects a discount when the payment already covers the full amount due", async () => {
+      const { supabase } = makeAddStub({ paymentAmount: 21154.6, schedules: twoRows });
+      await assert.rejects(
+        () =>
+          addPaymentToDcr(
+            supabase,
+            "dcr-1",
+            "pay-1",
+            "collector-1",
+            [{ amortizationScheduleId: "s1", amount: 21154.6 }],
+            discount([1]),
+            makeDupServiceStub(),
+          ),
+        /already covers the full amount due on installment 1/,
+      );
+    });
+
+    it("rejects a breakdown that does not match the stored total", async () => {
+      const { supabase } = makeAddStub({ paymentAmount: 18556.67, schedules: twoRows });
+      await assert.rejects(
+        () =>
+          addPaymentToDcr(
+            supabase,
+            "dcr-1",
+            "pay-1",
+            "collector-1",
+            [{ amortizationScheduleId: "s1", amount: 18556.67 }],
+            {
+              ...discount([1]),
+              interestDiscountAmount: 2597.93,
+              interestDiscountLines: [{ installmentNo: 1, amount: 1000 }],
+            },
+            makeDupServiceStub(),
+          ),
+        /does not match its total/,
+      );
+    });
+
+    it("rejects a per-row penalty discount above that installment's unpaid fee", async () => {
+      const { supabase } = makeAddStub({ paymentAmount: 18556.67, schedules: twoRows });
+      await assert.rejects(
+        () =>
+          addPaymentToDcr(
+            supabase,
+            "dcr-1",
+            "pay-1",
+            "collector-1",
+            [{ amortizationScheduleId: "s1", amount: 18556.67 }],
+            {
+              interestDiscountAmount: 0,
+              interestDiscountedInstallmentNos: [],
+              penaltyDiscountAmount: 1,
+              penaltyDiscountedInstallmentNos: [1],
+              penaltyDiscountLines: [{ installmentNo: 1, amount: 1 }],
+              discountReason: "Approved by manager",
+            },
+            makeDupServiceStub(),
+          ),
+        /exceeds its unpaid late fee/,
+      );
+    });
+
+    it("allows an advance only after the discounted capacity is fully allocated", async () => {
+      const { supabase } = makeAddStub({ paymentAmount: 20000, schedules: [twoRows[0]] });
+      await assert.doesNotReject(() =>
+        addPaymentToDcr(
+          supabase,
+          "dcr-1",
+          "pay-1",
+          "collector-1",
+          [
+            { amortizationScheduleId: "s1", amount: 18556.67 },
+            { amortizationScheduleId: null, amount: 1443.33 },
+          ],
+          discount([1]),
+          makeDupServiceStub(),
+        ),
+      );
+    });
   });
 
   describe("receipt zero-out (UAT #60/#63, 2026-09-24)", () => {
@@ -1127,7 +1289,9 @@ describe("submitDcr — Task 4 duplicate backstop", () => {
                 }),
               }),
             }),
-            update: () => ({ eq: async () => ({ error: null }) }),
+            update: () => ({
+              eq: () => ({ eq: async () => ({ error: null }) }),
+            }),
           };
         }
         if (table === "dcr_items") {

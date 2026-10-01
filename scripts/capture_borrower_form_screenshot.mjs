@@ -5,6 +5,7 @@ import path from "node:path";
 const email = process.env.LOANSTAR_BORROWER_EMAIL;
 const password = process.env.LOANSTAR_BORROWER_PASSWORD;
 const baseUrl = process.env.LOANSTAR_BASE_URL ?? "http://localhost:3000";
+const applicationPath = process.env.LOANSTAR_BORROWER_APPLICATION_PATH;
 
 if (!email || !password) throw new Error("Borrower credentials were not supplied to the screenshot runner.");
 
@@ -20,13 +21,31 @@ try {
   await page.getByRole("textbox", { name: "Email or borrower ID *", exact: true }).fill(email);
   await page.getByRole("textbox", { name: "Password *", exact: true }).fill(password);
   await page.getByRole("button", { name: "Log in", exact: true }).click();
-  await page.waitForURL((url) => !url.pathname.startsWith("/login"), { timeout: 15_000 });
+  // Login transitions through a client-side route. Waiting for a full `load`
+  // event can time out even after the route has changed because development
+  // assets remain active, so only wait for the committed navigation.
+  await page.waitForURL((url) => !url.pathname.startsWith("/login"), {
+    timeout: 30_000,
+    waitUntil: "commit",
+  });
   console.log("Opening borrower portal");
   await page.goto(`${baseUrl}/borrower`, { waitUntil: "domcontentloaded", timeout: 15_000 });
+  // Do not capture the initial skeleton. Wait until the portal has rendered a
+  // confirmed empty state, an application progress card, or its own error.
+  await page.waitForFunction(
+    () => {
+      const text = document.body.innerText;
+      return text.includes("No active application") ||
+        text.includes("Application progress") ||
+        text.includes("Failed to load");
+    },
+    { timeout: 30_000 },
+  );
   const href = await page.locator('a[href^="/borrower/applications/"]').evaluateAll((els) =>
     els.map((el) => el.getAttribute("href")).find((value) => value && value !== "/borrower/applications/new"),
   );
-  if (!href) {
+  const selectedApplicationPath = applicationPath ?? href;
+  if (!selectedApplicationPath) {
     // The deployed account has no application to open. Capture the actual
     // borrower portal while suppressing account-specific display text.
     await page.addStyleTag({ content: `
@@ -38,13 +57,16 @@ try {
     process.exit(0);
   }
   console.log("Opening borrower application");
-  await page.goto(`${baseUrl}${href}`, { waitUntil: "domcontentloaded", timeout: 15_000 });
+  await page.goto(`${baseUrl}${selectedApplicationPath}`, { waitUntil: "domcontentloaded", timeout: 15_000 });
   await page.getByRole("button", { name: "Edit application form", exact: true }).click();
   await page.getByRole("heading", { name: "Application Form", exact: true }).last().waitFor({ state: "visible" });
 
   // Retain field labels and controls while preventing account-specific values
   // from being published into the end-user manual.
   await page.addStyleTag({ content: `
+    /* Keep the active form readable while obscuring the account-specific
+       application page behind its modal. */
+    .overlay { backdrop-filter: blur(14px) !important; }
     input, textarea, [contenteditable="true"] { color: transparent !important; text-shadow: 0 0 8px #667085 !important; }
     input::placeholder, textarea::placeholder { color: #667085 !important; text-shadow: none !important; }
   ` });

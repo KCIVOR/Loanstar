@@ -15,6 +15,13 @@ import {
   loadPendingAllocationsForAccount,
 } from "@/lib/ar/duplicate-dcr";
 import { isActiveDcrStatus } from "@/lib/collector/desk";
+import {
+  discountedRemainingDue,
+  grossRemainingDue,
+  lineAmountFor,
+  resolveDiscountLines,
+  type DiscountLine,
+} from "@/lib/ar/discount-lines";
 import { halfUp, netInstallmentDue } from "@/lib/computation/money";
 import { createServiceClient } from "@/lib/supabase/server";
 
@@ -271,6 +278,10 @@ async function validateAllocationLines(
    * lookup. Defaults to `createServiceClient()`; injectable so unit tests
    * can stub it, mirroring `addPaymentToDcr`'s own `serviceClient` param. */
   serviceClient?: SupabaseClient,
+  /** Discounted payments validate leftover capacity after their per-row
+   * discount lines are resolved below. All other callers retain the original
+   * immediate gross-capacity guard. */
+  deferLeftoverCapacityCheck = false,
 ): Promise<void> {
   const total = halfUp(
     allocations.reduce((sum, line) => sum + line.amount, 0),
@@ -290,7 +301,12 @@ async function validateAllocationLines(
   const leftoverLine = allocations.find(
     (line) => line.amortizationScheduleId === null,
   );
-  if (leftoverLine && leftoverLine.amount > 0 && !isSurcharge) {
+  if (
+    !deferLeftoverCapacityCheck &&
+    leftoverLine &&
+    leftoverLine.amount > 0 &&
+    !isSurcharge
+  ) {
     const [openInstallments, pendingRaw] = await Promise.all([
       fetchOpenInstallments(supabase, masterlistId),
       loadPendingAllocationsForAccount(
@@ -298,31 +314,12 @@ async function validateAllocationLines(
         masterlistId,
       ),
     ]);
-    const claimedByThisSubmission = new Map(
-      allocations
-        .filter((line) => line.amortizationScheduleId !== null)
-        .map((line) => [line.amortizationScheduleId as string, line.amount]),
+    validateLeftoverAllocation(
+      allocations,
+      isSurcharge,
+      openInstallments,
+      pendingRaw,
     );
-    let unusedCapacity = 0;
-    for (const inst of openInstallments) {
-      const remainingDue = netInstallmentDue({
-        amountDue: inst.amountDue,
-        discountAmount: inst.discountAmount,
-        penaltyAmount: inst.penaltyAmount,
-        amountPaid: inst.amountPaid,
-      });
-      const pendingElsewhere = pendingRaw[inst.id]?.amount ?? 0;
-      const freeCapacity = Math.max(0, halfUp(remainingDue - pendingElsewhere));
-      const usedByThisSubmission = claimedByThisSubmission.get(inst.id) ?? 0;
-      unusedCapacity = halfUp(
-        unusedCapacity + Math.max(0, halfUp(freeCapacity - usedByThisSubmission)),
-      );
-    }
-    if (unusedCapacity > 0) {
-      throw new Error(
-        `Allocation leaves ₱${leftoverLine.amount.toFixed(2)} unapplied while ₱${unusedCapacity.toFixed(2)} of open installment capacity is still available on this account — apply it to an open installment before adding to the DCRR.`,
-      );
-    }
   }
 
   const scheduleIds = allocations
@@ -352,6 +349,47 @@ async function validateAllocationLines(
         `Installment ${scheduleId} is not available for allocation (${schedule.status as string})`,
       );
     }
+  }
+}
+
+function validateLeftoverAllocation(
+  allocations: AllocationLine[],
+  isSurcharge: boolean,
+  openInstallments: OpenInstallment[],
+  pendingRaw: Record<string, { amount: number }>,
+  remainingDueByScheduleId?: Record<string, number>,
+): void {
+  const leftoverLine = allocations.find(
+    (line) => line.amortizationScheduleId === null,
+  );
+  if (!leftoverLine || leftoverLine.amount <= 0 || isSurcharge) return;
+
+  const claimedByThisSubmission = new Map(
+    allocations
+      .filter((line) => line.amortizationScheduleId !== null)
+      .map((line) => [line.amortizationScheduleId as string, line.amount]),
+  );
+  let unusedCapacity = 0;
+  for (const inst of openInstallments) {
+    const remainingDue =
+      remainingDueByScheduleId?.[inst.id] ??
+      netInstallmentDue({
+        amountDue: inst.amountDue,
+        discountAmount: inst.discountAmount,
+        penaltyAmount: inst.penaltyAmount,
+        amountPaid: inst.amountPaid,
+      });
+    const pendingElsewhere = pendingRaw[inst.id]?.amount ?? 0;
+    const freeCapacity = Math.max(0, halfUp(remainingDue - pendingElsewhere));
+    const usedByThisSubmission = claimedByThisSubmission.get(inst.id) ?? 0;
+    unusedCapacity = halfUp(
+      unusedCapacity + Math.max(0, halfUp(freeCapacity - usedByThisSubmission)),
+    );
+  }
+  if (unusedCapacity > 0) {
+    throw new Error(
+      `Allocation leaves ₱${leftoverLine.amount.toFixed(2)} unapplied while ₱${unusedCapacity.toFixed(2)} of open installment capacity is still available on this account — apply it to an open installment before adding to the DCRR.`,
+    );
   }
 }
 
@@ -1502,7 +1540,13 @@ export async function submitDcr(
   /** Service-role client for the Task-4 duplicate backstop; injectable for
    * tests. Defaults to `createServiceClient()`. */
   serviceClient?: SupabaseClient,
+  /** Client for the status writes below. The API route passes the service
+   * client — collectors can't UPDATE `dcr` directly (server-only writes, so
+   * a submitted DCRR can't be reopened from the browser). Defaults to
+   * `supabase` so unit-test stubs keep working. */
+  writeClient?: SupabaseClient,
 ) {
+  const writer = writeClient ?? supabase;
   const { data: dcr } = await supabase
     .from("dcr")
     .select("id, status, collector_user_id")
@@ -1577,13 +1621,15 @@ export async function submitDcr(
 
   const now = new Date().toISOString();
 
-  await supabase
+  const { error: submitError } = await writer
     .from("dcr")
     .update({
       status: "submitted",
       submitted_at: now,
     })
-    .eq("id", dcrId);
+    .eq("id", dcrId)
+    .eq("status", "draft");
+  if (submitError) throw new Error(submitError.message);
 
   const { data: items } = await supabase
     .from("dcr_items")
@@ -1591,7 +1637,7 @@ export async function submitDcr(
     .eq("dcr_id", dcrId);
 
   for (const item of items ?? []) {
-    await supabase
+    await writer
       .from("payments")
       .update({ status: "confirmed", reviewed_at: now })
       .eq("id", item.payment_id)
@@ -1624,6 +1670,10 @@ export type CollectorDiscountInput = {
   penaltyDiscountAmount: number;
   penaltyDiscountedInstallmentNos: number[];
   discountReason: string;
+  /** Per-installment breakdown (collector-dcr-discount-logic-fix plan).
+   * Optional for older clients — derived as the legacy even split if absent. */
+  interestDiscountLines?: DiscountLine[];
+  penaltyDiscountLines?: DiscountLine[];
 };
 
 /** Penalty breakdown Phase 4b — the collector's manual split of a payment into
@@ -1654,10 +1704,12 @@ async function validateCollectorDiscountInput(
   supabase: SupabaseClient,
   masterlistId: string,
   input: CollectorDiscountInput,
-): Promise<void> {
+  allocations: AllocationLine[],
+  openInstallments: OpenInstallment[],
+): Promise<{ interestLines: DiscountLine[]; penaltyLines: DiscountLine[] }> {
   const hasInterest = input.interestDiscountAmount > 0;
   const hasPenalty = input.penaltyDiscountAmount > 0;
-  if (!hasInterest && !hasPenalty) return;
+  if (!hasInterest && !hasPenalty) return { interestLines: [], penaltyLines: [] };
 
   if (hasInterest && input.interestDiscountedInstallmentNos.length === 0) {
     throw new Error(
@@ -1673,15 +1725,73 @@ async function validateCollectorDiscountInput(
     throw new Error("A reason is required when a Collector discount is entered");
   }
 
+  const interestLines = resolveDiscountLines(
+    "Interest",
+    input.interestDiscountAmount,
+    input.interestDiscountedInstallmentNos,
+    input.interestDiscountLines,
+  );
+  const penaltyLines = resolveDiscountLines(
+    "Penalty",
+    input.penaltyDiscountAmount,
+    input.penaltyDiscountedInstallmentNos,
+    input.penaltyDiscountLines,
+  );
+
+  // Every discounted installment must be open AND receive part of this
+  // payment — `post_single_dcr_item` only applies a discount inside its
+  // allocation loop, so a discount on any other row was silently dropped.
+  const openByNo = new Map(openInstallments.map((inst) => [inst.installmentNo, inst]));
+  const allocatedByScheduleId = new Map<string, number>();
+  for (const line of allocations) {
+    if (!line.amortizationScheduleId) continue;
+    allocatedByScheduleId.set(
+      line.amortizationScheduleId,
+      halfUp((allocatedByScheduleId.get(line.amortizationScheduleId) ?? 0) + line.amount),
+    );
+  }
+  const discountedNos = Array.from(
+    new Set([...interestLines, ...penaltyLines].map((line) => line.installmentNo)),
+  ).sort((a, b) => a - b);
+  for (const no of discountedNos) {
+    const inst = openByNo.get(no);
+    if (!inst) {
+      throw new Error(
+        `Installment ${no} is already paid or does not exist — it cannot be discounted`,
+      );
+    }
+    const allocated = allocatedByScheduleId.get(inst.id) ?? 0;
+    if (!(allocated > 0)) {
+      throw new Error(
+        `Discount selected on installment ${no}, but this payment is not allocated to it`,
+      );
+    }
+    // The posting RPC closes a row on its gross amount first (Pass A) and
+    // only then considers the discount — a payment already covering the
+    // gross makes the discount a silent no-op.
+    if (allocated >= grossRemainingDue(inst)) {
+      throw new Error(
+        `This payment already covers the full amount due on installment ${no} — remove the discount or reduce the payment`,
+      );
+    }
+  }
+
   if (hasInterest) {
     const interestPerRow = await deriveInterestPerRow(supabase, masterlistId);
-    const maxInterest = halfUp(
-      interestPerRow * input.interestDiscountedInstallmentNos.length,
-    );
-    if (input.interestDiscountAmount > maxInterest) {
-      throw new Error(
-        `Interest discount amount ${input.interestDiscountAmount.toFixed(2)} exceeds the real interest available on the selected installments (${maxInterest.toFixed(2)})`,
-      );
+    for (const line of interestLines) {
+      if (line.amount > interestPerRow) {
+        throw new Error(
+          `Interest discount on installment ${line.installmentNo} (${line.amount.toFixed(2)}) exceeds its interest (${interestPerRow.toFixed(2)})`,
+        );
+      }
+      // A Collector interest discount replaces the row's origination
+      // discount (never stacks); a smaller one would raise what's owed.
+      const existing = openByNo.get(line.installmentNo)?.discountAmount ?? 0;
+      if (existing > 0 && line.amount < existing) {
+        throw new Error(
+          `Installment ${line.installmentNo} already has a ${existing.toFixed(2)} discount — a smaller Collector interest discount would increase what is owed`,
+        );
+      }
     }
   }
 
@@ -1690,14 +1800,14 @@ async function validateCollectorDiscountInput(
       .from("amortization_schedules")
       .select("id, installment_no, penalty_amount, penalty_discount_amount")
       .eq("masterlist_id", masterlistId)
-      .in("installment_no", input.penaltyDiscountedInstallmentNos);
+      .in("installment_no", penaltyLines.map((line) => line.installmentNo));
 
     if (error) throw new Error(error.message);
 
     // Late fee already collected against these rows must not be waivable —
     // the Penalty column keeps the CHARGED figure after a fee is paid
     // (penalty-fee-paid-protection, 2026-09-09), so "still waivable" is
-    // charged − already-waived − already-paid.
+    // charged − already-waived − already-paid, checked per row.
     const scheduleIds = (rows ?? []).map((row) => row.id as string);
     const feePaidByScheduleId = new Map<string, number>();
     if (scheduleIds.length > 0) {
@@ -1715,25 +1825,29 @@ async function validateCollectorDiscountInput(
       }
     }
 
-    const maxPenalty = halfUp(
-      (rows ?? []).reduce(
-        (sum, row) =>
-          sum +
-          Math.max(
-            0,
-            Number(row.penalty_amount ?? 0) -
-              Number(row.penalty_discount_amount ?? 0) -
-              (feePaidByScheduleId.get(row.id as string) ?? 0),
-          ),
-        0,
-      ),
-    );
-    if (input.penaltyDiscountAmount > maxPenalty) {
-      throw new Error(
-        `Penalty discount amount ${input.penaltyDiscountAmount.toFixed(2)} exceeds the real penalty on the selected installments (${maxPenalty.toFixed(2)})`,
+    for (const line of penaltyLines) {
+      const row = (rows ?? []).find(
+        (r) => Number(r.installment_no) === line.installmentNo,
       );
+      const feeOwed = row
+        ? halfUp(
+            Math.max(
+              0,
+              Number(row.penalty_amount ?? 0) -
+                Number(row.penalty_discount_amount ?? 0) -
+                (feePaidByScheduleId.get(row.id as string) ?? 0),
+            ),
+          )
+        : 0;
+      if (line.amount > feeOwed) {
+        throw new Error(
+          `Penalty discount on installment ${line.installmentNo} (${line.amount.toFixed(2)}) exceeds its unpaid late fee (${feeOwed.toFixed(2)})`,
+        );
+      }
     }
   }
+
+  return { interestLines, penaltyLines };
 }
 
 export async function addPaymentToDcr(
@@ -1750,7 +1864,13 @@ export async function addPaymentToDcr(
    * Trailing param so every existing positional caller (incl. the Task-4
    * tests that inject `serviceClient`) is unaffected. */
   penaltyPaidInput?: CollectorPenaltyPaidInput,
+  /** Client used for the dcr_items / dcr_item_allocations INSERTs. The API
+   * route passes the service client: collectors have no direct write RLS on
+   * those tables (server-only writes, so every check below is enforced).
+   * Defaults to `supabase` so unit-test stubs keep working. */
+  writeClient?: SupabaseClient,
 ) {
+  const writer = writeClient ?? supabase;
   const { data: dcr } = await supabase
     .from("dcr")
     .select("id, status, collector_user_id")
@@ -1811,6 +1931,7 @@ export async function addPaymentToDcr(
       allocations,
       Boolean(payment.move_of_payment_batch_id),
       serviceClient,
+      Boolean(discountInput),
     );
     resolvedAllocations = allocations;
   } else {
@@ -1895,11 +2016,42 @@ export async function addPaymentToDcr(
     }
   }
 
+  let interestLines: DiscountLine[] = [];
+  let penaltyLines: DiscountLine[] = [];
   if (discountInput) {
-    await validateCollectorDiscountInput(supabase, masterlistId, discountInput);
+    const openForDiscount =
+      openInstallments ?? (await fetchOpenInstallments(supabase, masterlistId));
+    ({ interestLines, penaltyLines } = await validateCollectorDiscountInput(
+      supabase,
+      masterlistId,
+      discountInput,
+      resolvedAllocations,
+      openForDiscount,
+    ));
+
+    const remainingDueByScheduleId: Record<string, number> = {};
+    for (const inst of openForDiscount) {
+      remainingDueByScheduleId[inst.id] = discountedRemainingDue(
+        inst,
+        lineAmountFor(interestLines, inst.installmentNo),
+        lineAmountFor(penaltyLines, inst.installmentNo),
+      );
+    }
+    validateLeftoverAllocation(
+      resolvedAllocations,
+      Boolean(payment.move_of_payment_batch_id),
+      openForDiscount,
+      Object.fromEntries(
+        Object.entries(pendingByInstallment ?? {}).map(([id, amount]) => [
+          id,
+          { amount },
+        ]),
+      ),
+      remainingDueByScheduleId,
+    );
   }
 
-  const { data: dcrItem, error } = await supabase
+  const { data: dcrItem, error } = await writer
     .from("dcr_items")
     .insert({
       dcr_id: dcrId,
@@ -1914,6 +2066,10 @@ export async function addPaymentToDcr(
       penalty_discounted_installment_nos:
         discountInput?.penaltyDiscountedInstallmentNos ?? [],
       discount_reason: discountInput?.discountReason?.trim() || null,
+      // Per-installment amounts applied by post_single_dcr_item; NULL means
+      // "legacy row, even-split" there, so only write when a discount exists.
+      interest_discount_lines: interestLines.length > 0 ? interestLines : null,
+      penalty_discount_lines: penaltyLines.length > 0 ? penaltyLines : null,
       // Phase 4b — draft-time save only; applied by post_single_dcr_item at
       // posting, capped there at the fee actually owed. A ₱0 amount with a
       // non-empty installment list is a real instruction: "leave the fee
@@ -1933,7 +2089,7 @@ export async function addPaymentToDcr(
   }
 
   if (resolvedAllocations.length > 0) {
-    const { error: allocError } = await supabase
+    const { error: allocError } = await writer
       .from("dcr_item_allocations")
       .insert(
         resolvedAllocations.map((line) => ({

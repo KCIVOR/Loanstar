@@ -111,6 +111,21 @@ function isGroupable(row: AccountLedgerRow): boolean {
   return (row.kind === "payment" || row.kind === "bounced_check") && Boolean(row.scheduleId);
 }
 
+/** Candidate eligibility comes from the Move of Payment service, which
+ * includes open partial installments. A partial row with posted payment
+ * history renders as a payment/group row rather than a bare installment,
+ * but it must remain selectable for the same due date. */
+function isEligibleMoveOfPaymentRow(
+  row: AccountLedgerRow,
+  selection: LedgerSelection | undefined,
+): boolean {
+  return (
+    selection != null &&
+    row.dueDate != null &&
+    selection.eligibleDueDates.has(row.dueDate)
+  );
+}
+
 function groupRows(rows: AccountLedgerRow[]): DisplayItem[] {
   const items: DisplayItem[] = [];
   let i = 0;
@@ -202,11 +217,7 @@ export function AccountLedger({
             if (item.type === "row") {
               const row = item.row;
               const isTotals = row.kind === "totals";
-              const eligible =
-                selection != null &&
-                row.kind === "installment" &&
-                row.dueDate != null &&
-                selection.eligibleDueDates.has(row.dueDate);
+              const eligible = isEligibleMoveOfPaymentRow(row, selection);
               const checked = eligible && row.dueDate === selection?.selectedDueDate;
               return (
                 <tr
@@ -306,6 +317,9 @@ export function AccountLedger({
             const isOpen = expanded.has(item.scheduleId);
             const first = item.rows[0]!;
             const last = item.rows[item.rows.length - 1]!;
+            const groupEligible = isEligibleMoveOfPaymentRow(first, selection);
+            const groupChecked =
+              groupEligible && first.dueDate === selection?.selectedDueDate;
             // A bounced_check row posts debit === credit === the bounced
             // amount (a deliberate net-zero pair, not real money — see
             // pushBounce's comment), so the header's "real money collected"
@@ -347,11 +361,29 @@ export function AccountLedger({
             return (
               <Fragment key={`group:${item.scheduleId}`}>
                 <tr
-                  className="cursor-pointer hover:bg-surface-2/60"
-                  onClick={() => toggle(item.scheduleId)}
-                  aria-expanded={isOpen}
+                  className={cn(
+                    "cursor-pointer hover:bg-surface-2/60",
+                    groupChecked && "is-selected",
+                  )}
+                  onClick={
+                    groupEligible
+                      ? () => selection!.onSelect(first.dueDate!)
+                      : () => toggle(item.scheduleId)
+                  }
+                  aria-expanded={groupEligible ? undefined : isOpen}
                 >
-                  {selection ? <Td></Td> : null}
+                  {selection ? (
+                    <Td>
+                      {groupEligible ? (
+                        <input
+                          type="radio"
+                          name="ledger-move-of-payment"
+                          checked={groupChecked}
+                          onChange={() => selection.onSelect(first.dueDate!)}
+                        />
+                      ) : null}
+                    </Td>
+                  ) : null}
                   <Td className="mono">{formatLedgerTextCell(first.checkNo)}</Td>
                   <Td className="mono">{formatLedgerDateCell(first.dueDate)}</Td>
                   <Td num className="mono">
@@ -398,7 +430,15 @@ export function AccountLedger({
                       "—"
                     )}
                   </Td>
-                  {selection ? <Td num className="mono">—</Td> : null}
+                  {selection ? (
+                    <Td num className="mono">
+                      {groupEligible
+                        ? moneyCell(
+                            selection.surchargeByDueDate.get(first.dueDate!) ?? null,
+                          )
+                        : "—"}
+                    </Td>
+                  ) : null}
                 </tr>
                 {isOpen
                   ? item.rows.map((r) => (

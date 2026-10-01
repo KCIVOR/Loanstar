@@ -15,7 +15,7 @@ import {
   hasModulePermission,
   requireAuth,
 } from "@/lib/permissions/server";
-import { createClient } from "@/lib/supabase/server";
+import { createClient, createServiceClient } from "@/lib/supabase/server";
 
 const createSchema = z.object({ action: z.literal("create") });
 
@@ -39,6 +39,24 @@ const addItemSchema = z.object({
   penaltyDiscountAmount: z.number().min(0).optional(),
   penaltyDiscountedInstallmentNos: z.array(z.number().int().positive()).optional(),
   discountReason: z.string().optional(),
+  // Per-installment breakdown of the two totals above — applied row by row
+  // at posting instead of an even split (collector-dcr-discount-logic-fix).
+  interestDiscountLines: z
+    .array(
+      z.object({
+        installmentNo: z.number().int().positive(),
+        amount: z.number().positive(),
+      }),
+    )
+    .optional(),
+  penaltyDiscountLines: z
+    .array(
+      z.object({
+        installmentNo: z.number().int().positive(),
+        amount: z.number().positive(),
+      }),
+    )
+    .optional(),
   // Penalty breakdown Phase 4b — collector's manual "of this payment, ₱X is
   // late-fee money" split. Not a discount: no permission gate, no reason.
   penaltyPaidAmount: z.number().min(0).optional(),
@@ -122,6 +140,8 @@ export async function POST(request: Request) {
         penaltyDiscountAmount,
         penaltyDiscountedInstallmentNos,
         discountReason,
+        interestDiscountLines,
+        penaltyDiscountLines,
         penaltyPaidAmount,
         penaltyPaidInstallmentNos,
       } = addParsed.data;
@@ -165,6 +185,8 @@ export async function POST(request: Request) {
               penaltyDiscountedInstallmentNos:
                 penaltyDiscountedInstallmentNos ?? [],
               discountReason: discountReason ?? "",
+              interestDiscountLines,
+              penaltyDiscountLines,
             }
           : undefined,
         undefined, // serviceClient — use the default
@@ -174,6 +196,9 @@ export async function POST(request: Request) {
               penaltyPaidInstallmentNos: penaltyPaidInstallmentNos ?? [],
             }
           : undefined,
+        // Server-only writes: collectors have no direct write RLS on
+        // dcr_items / dcr_item_allocations; this runs after every check.
+        createServiceClient(),
       );
       return jsonOk({ added: true });
     }
@@ -184,6 +209,8 @@ export async function POST(request: Request) {
         supabase,
         submitParsed.data.dcrId,
         user.id,
+        undefined, // serviceClient — use the default
+        createServiceClient(),
       );
 
       await writeAuditEvent({

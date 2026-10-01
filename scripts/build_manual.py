@@ -12,9 +12,21 @@ ACCENT = RGBColor(0x4F, 0x81, 0xBD)
 MUTED = RGBColor(0x5A, 0x5A, 0x5A)
 
 SCREENSHOTS = {
+    "Sign in and recover access": (
+        "output/manual-screenshots/login.png",
+        "LoanStar sign-in page. Use the email and password fields, or select Forgot password when you need access recovery.",
+    ),
+    "Your account and notifications": (
+        "output/manual-screenshots/account.png",
+        "Account page opened with a seeded administrator account. Use this page to review account settings and notifications.",
+    ),
+    "Dashboard and role based navigation": (
+        "output/manual-screenshots/dashboard.png",
+        "Role dashboard opened with a seeded administrator account. The available navigation reflects the signed-in role's permissions.",
+    ),
     "Borrower portal and loan application": (
-        "output/manual-screenshots/borrower-portal.png",
-        "Seeded Borrower Portal workspace. The Start application button is in the upper-right area.",
+        "output/manual-screenshots/borrower-portal-account-redacted.png",
+        "Redacted Application Form opened from the supplied borrower's active application. Personal details, form values, and background loan details are obscured.",
     ),
     "Agent leads": (
         "output/manual-screenshots/agent-leads.png",
@@ -24,6 +36,14 @@ SCREENSHOTS = {
         "output/manual-screenshots/csa-intake.png",
         "Seeded CSA Intake queue. Use the navigation and queue controls shown to open intake work.",
     ),
+    "CSA computation calculator and origination discounts": (
+        "output/manual-screenshots/csa-computation.png",
+        "CSA application computation section. Use the calculator controls and the visible Origination discount area for the file being processed.",
+    ),
+    "CSA settlement deductions and early settlement discounts": (
+        "output/manual-screenshots/csa-computation.png",
+        "CSA computation section, which contains Other deductions and the applicable early-settlement discount controls for an eligible settlement.",
+    ),
     "Verification and CIG review": (
         "output/manual-screenshots/cig-verification.png",
         "Seeded CIG Verification queue. Open a queued application from this module.",
@@ -32,6 +52,10 @@ SCREENSHOTS = {
         "output/manual-screenshots/committee-review.png",
         "Seeded Committee queue. Use this module to open a file for review and voting.",
     ),
+    "Committee offers counteroffers and approved computation": (
+        "output/manual-screenshots/committee-computation.png",
+        "Committee application computation view. Review the calculation and any available override or counteroffer controls before recording a decision.",
+    ),
     "Release and LRA processing": (
         "output/manual-screenshots/lra-release.png",
         "Seeded LRA Release queue. Open a queued file to begin release processing.",
@@ -39,6 +63,14 @@ SCREENSHOTS = {
     "Collections accounts and borrower contact": (
         "output/manual-screenshots/collector-accounts.png",
         "Seeded Collector Assigned accounts module. Open an account from this queue to access its loan and case files.",
+    ),
+    "Collector payment review and move of payment calculator": (
+        "output/manual-screenshots/collector-move-of-payment.png",
+        "Collector Move of payment page. Use this view to select an eligible installment, review the surcharge, and prepare the move when permitted.",
+    ),
+    "Daily collection report register": (
+        "output/manual-screenshots/collector-dcrr.png",
+        "Collector DCRR builder. Start a report here, add eligible payments, review totals, and submit when the report is ready.",
     ),
     "Accounting masterlist and payment review": (
         "output/manual-screenshots/ar-masterlist.png",
@@ -52,13 +84,33 @@ SCREENSHOTS = {
         "output/manual-screenshots/admin.png",
         "Seeded Administration workspace. Use the Administration navigation to reach Users and Roles.",
     ),
+    "Administration configuration and loan types": (
+        "output/manual-screenshots/admin-config.png",
+        "Administration configuration page. This screen is restricted to users with the applicable configuration permission.",
+    ),
+    "Administration checklists and checks": (
+        "output/manual-screenshots/admin-checklists.png",
+        "Administration checklist page. Review workflow-stage items and use the visible controls to manage their requirements.",
+    ),
+    "Administration document templates": (
+        "output/manual-screenshots/admin-document-templates.png",
+        "Document Templates administration page. Use the visible search, filter, and New template controls to manage templates.",
+    ),
+    "Administration audit and legacy import": (
+        "output/manual-screenshots/admin-audit.png",
+        "Administration audit screen. The separate Legacy Import page is available only to super administrators.",
+    ),
+    "Reports and management insights": (
+        "output/manual-screenshots/reports.png",
+        "Reports dashboard opened with a seeded administrator account. Use the report navigation and visible filters for the permitted report area.",
+    ),
 }
 
 VISUAL_WALKTHROUGHS = {
     "Borrower portal and loan application": [
-        "You should see the Borrower Portal heading, your application status cards, and a Start application button at the upper right.",
-        "Select Start application to open the application flow; after saving, the new or existing application appears in this same portal.",
-        "Use the portal cards to return to an application, documents, or loan status when those options appear for its current stage.",
+        "You should see the Application Form window over the borrower application details, with the Agent, Date Applied, Loan Desired, and Sales Agent fields at the top.",
+        "Select Edit application form from the application details to open this window. Complete the applicable fields, then select Save application form.",
+        "Scroll inside the Application Form window to complete the sections that apply to your loan type, including the Business Application details shown in the screenshot.",
     ],
     "Agent leads": [
         "You should see the Lead pipeline heading, stage counters, a search field, and filter controls.",
@@ -106,6 +158,74 @@ VISUAL_WALKTHROUGHS = {
         "Use search and filters on the destination page before opening or changing a record.",
     ],
 }
+
+VISUAL_WALKTHROUGHS.update({
+    "Sign in and recover access": [
+        "You should see the email and password fields and the Log in button.",
+        "Enter your credentials, then select Log in.",
+        "Select Forgot password before entering a new password when you need recovery.",
+    ],
+    "Your account and notifications": [
+        "You should see the account settings area and the notification controls.",
+        "Update only the fields you are allowed to change, then select Save account.",
+        "Use the notification controls to review or mark notices as read.",
+    ],
+    "Dashboard and role based navigation": [
+        "You should see dashboard cards and only the menu sections your role allows.",
+        "Select a left-navigation work area to open its queue or supporting page.",
+        "If a module is not visible, request the needed permission from an administrator.",
+    ],
+    "CSA computation calculator and origination discounts": [
+        "You should see the computation panel for the open CSA application.",
+        "Enter or confirm the calculator inputs, then select Compute or Recalculate.",
+        "Open the Origination discount controls only after reviewing the computed breakdown.",
+    ],
+    "CSA settlement deductions and early settlement discounts": [
+        "You should see the computation panel where Other deductions is available for an eligible file.",
+        "Select Offset full settlement, then choose the active loan to settle.",
+        "Apply an early-settlement discount only to the eligible future installments shown by the screen.",
+    ],
+    "Committee offers counteroffers and approved computation": [
+        "You should see the Committee computation and the application evidence in the open file.",
+        "Review the shown terms and counteroffer details before recording a vote or decision.",
+        "Use an override only when the file shows that control and the committee has approved the change.",
+    ],
+    "Collector payment review and move of payment calculator": [
+        "You should see the Move of payment screen for the selected collection account.",
+        "Choose an eligible installment and review the displayed one-month-interest surcharge.",
+        "Offer the move only after confirming the revised details; record surcharge payment separately afterward.",
+    ],
+    "Daily collection report register": [
+        "You should see the DCRR builder and its report actions.",
+        "Start a new report, add the eligible payment records, then review the totals.",
+        "Select Submit DCRR only after confirming the included payments and allocations.",
+    ],
+    "Administration configuration and loan types": [
+        "You should see the restricted configuration workspace and its settings controls.",
+        "Open Loan Types from Administration when you need to maintain loan type details.",
+        "Save or test a setting only after confirming it is approved for production use.",
+    ],
+    "Administration checklists and checks": [
+        "You should see checklist items grouped for a workflow stage.",
+        "Use the add or requirement controls shown for the specific item you are changing.",
+        "Confirm an item is not required by an active process before using Remove.",
+    ],
+    "Administration document templates": [
+        "You should see the template list, search and filter controls, and New template action.",
+        "Open an existing template or select New template, then edit the available content and fields.",
+        "Preview the draft before publishing it for operational use.",
+    ],
+    "Administration audit and legacy import": [
+        "You should see Audit search and filter controls for recorded system activity.",
+        "Open Legacy Import only with super-administrator access.",
+        "Validate a mapping with a dry run before proceeding with an import.",
+    ],
+    "Reports and management insights": [
+        "You should see the Reports dashboard and the available report navigation.",
+        "Open the needed report, then set its visible period or segment filters.",
+        "Use Export CSV or Print Export PDF only when the action appears for the report.",
+    ],
+})
 
 BORROWER_FORM_GUIDE = [
     ("Start with the application details", [

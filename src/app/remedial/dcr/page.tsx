@@ -26,6 +26,14 @@ import {
   formatMoney,
   paymentStatusVariant,
 } from "@/lib/collector/format";
+import {
+  buildDiscountLines,
+  discountedRemainingDue,
+  fillAllocationAmounts,
+  grossRemainingDue,
+  lineAmountFor,
+  type DiscountLine,
+} from "@/lib/ar/discount-lines";
 import { computeCollectorDiscount } from "@/lib/computation/collector-discount";
 import { halfUp } from "@/lib/computation/money";
 import { usePermissions } from "@/hooks/usePermissions";
@@ -164,6 +172,51 @@ function installmentRemainingDue(inst: PreviewInstallment): number {
   );
 }
 
+/** Per-installment discount amounts from the percent selections
+ * (collector-dcr-discount-logic-fix) — sent to the server and applied row by
+ * row at posting, instead of one total that posting used to even-split. */
+function discountLinesFor(
+  modal: AllocationModalState,
+  kind: "interest" | "penalty",
+  selections: Map<number, string>,
+): DiscountLine[] {
+  const pct = new Map<number, number>();
+  for (const [no, pctStr] of selections.entries()) {
+    const value = Number(pctStr);
+    if (!isNaN(value)) pct.set(no, value);
+  }
+  const base =
+    kind === "interest"
+      ? modal.interestEligible.map((inst) => ({
+          installmentNo: inst.installmentNo,
+          amount: inst.interestPortion,
+        }))
+      : modal.penaltyEligible.map((inst) => ({
+          installmentNo: inst.installmentNo,
+          amount: inst.feeOwed,
+        }));
+  return buildDiscountLines(base, pct);
+}
+
+/** What this row can still take once its selected discount applies, net of
+ * what another unposted DCRR has already spoken for. */
+function discountedRowCapacity(
+  row: AllocationRow,
+  interestLines: DiscountLine[],
+  penaltyLines: DiscountLine[],
+): number {
+  return Math.max(
+    0,
+    halfUp(
+      discountedRemainingDue(
+        row,
+        lineAmountFor(interestLines, row.installmentNo),
+        lineAmountFor(penaltyLines, row.installmentNo),
+      ) - row.pendingElsewhere,
+    ),
+  );
+}
+
 export default function RemedialDcrPage() {
   const [payments, setPayments] = useState<Payment[]>([]);
   const [draftPaymentIds, setDraftPaymentIds] = useState<string[]>([]);
@@ -242,21 +295,64 @@ export default function RemedialDcrPage() {
   const hasDiscount = interestDiscountTotal > 0 || penaltyDiscountTotal > 0;
   const discountReasonMissing = hasDiscount && discountReason.trim() === "";
 
+  /** Re-fill the allocation net of the discount whenever the selection
+   * changes, so each discounted row receives exactly what closes it —
+   * posting only applies a discount to a row this payment brings to its
+   * discounted amount (collector-dcr-discount-logic-fix). The server's
+   * allocation preview stands until a discount is touched. */
+  function refillForDiscount(
+    nextInterest: Map<number, string>,
+    nextPenalty: Map<number, string>,
+  ) {
+    setAllocationModal((prev) => {
+      if (!prev || prev.isSurcharge) return prev;
+      const interestLines = canDiscount
+        ? discountLinesFor(prev, "interest", nextInterest)
+        : [];
+      const penaltyLines = canDiscount
+        ? discountLinesFor(prev, "penalty", nextPenalty)
+        : [];
+      const amounts = fillAllocationAmounts(
+        prev.paymentAmount,
+        prev.rows.map((row) =>
+          discountedRowCapacity(row, interestLines, penaltyLines),
+        ),
+      );
+      return {
+        ...prev,
+        rows: prev.rows.map((row, i) => ({
+          ...row,
+          amount: amounts[i],
+          checked: amounts[i] > 0,
+        })),
+      };
+    });
+  }
+
+  function setDiscountSelection(
+    kind: "interest" | "penalty",
+    next: Map<number, string>,
+  ) {
+    if (kind === "interest") {
+      setInterestDiscountSelections(next);
+      refillForDiscount(next, penaltyDiscountSelections);
+    } else {
+      setPenaltyDiscountSelections(next);
+      refillForDiscount(interestDiscountSelections, next);
+    }
+  }
+
   function toggleDiscountInstallment(
     kind: "interest" | "penalty",
     installmentNo: number,
     checked: boolean,
   ) {
-    const setter =
-      kind === "interest"
-        ? setInterestDiscountSelections
-        : setPenaltyDiscountSelections;
-    setter((prev) => {
-      const next = new Map(prev);
-      if (checked) next.set(installmentNo, "100");
-      else next.delete(installmentNo);
-      return next;
-    });
+    const next = new Map(
+      kind === "interest" ? interestDiscountSelections : penaltyDiscountSelections,
+    );
+    if (checked) next.set(installmentNo, "100");
+    else next.delete(installmentNo);
+    setDiscountSelection(kind, next);
   }
 
   function updateDiscountPercent(
@@ -264,15 +360,11 @@ export default function RemedialDcrPage() {
     installmentNo: number,
     percent: string,
   ) {
-    const setter =
-      kind === "interest"
-        ? setInterestDiscountSelections
-        : setPenaltyDiscountSelections;
-    setter((prev) => {
-      const next = new Map(prev);
-      next.set(installmentNo, percent);
-      return next;
-    });
+    const next = new Map(
+      kind === "interest" ? interestDiscountSelections : penaltyDiscountSelections,
+    );
+    next.set(installmentNo, percent);
+    setDiscountSelection(kind, next);
   }
 
   // Every ticked "Late fee paid" installment. A ticked row left at ₱0 means
@@ -377,6 +469,65 @@ export default function RemedialDcrPage() {
 
   const allocationMismatch = allocationLeftover < 0;
 
+  // Per-installment discount amounts (collector-dcr-discount-logic-fix) —
+  // sent to the server and applied row by row at posting, instead of one
+  // total that posting used to even-split across the selected rows.
+  const interestDiscountLines = useMemo(
+    () =>
+      allocationModal
+        ? discountLinesFor(allocationModal, "interest", interestDiscountSelections)
+        : [],
+    [allocationModal, interestDiscountSelections],
+  );
+  const penaltyDiscountLines = useMemo(
+    () =>
+      allocationModal
+        ? discountLinesFor(allocationModal, "penalty", penaltyDiscountSelections)
+        : [],
+    [allocationModal, penaltyDiscountSelections],
+  );
+  const discountActive =
+    canDiscount && (interestDiscountLines.length > 0 || penaltyDiscountLines.length > 0);
+
+  const rowCapacity = useCallback(
+    (row: AllocationRow) =>
+      discountedRowCapacity(
+        row,
+        discountActive ? interestDiscountLines : [],
+        discountActive ? penaltyDiscountLines : [],
+      ),
+    [discountActive, interestDiscountLines, penaltyDiscountLines],
+  );
+
+  // Mirrors the server's discount guards so the problem shows before Add is
+  // clicked (the server re-checks regardless).
+  const discountProblems = useMemo(() => {
+    if (!allocationModal || !discountActive) return [] as string[];
+    const nos = Array.from(
+      new Set(
+        [...interestDiscountLines, ...penaltyDiscountLines].map(
+          (line) => line.installmentNo,
+        ),
+      ),
+    ).sort((a, b) => a - b);
+    const problems: string[] = [];
+    for (const no of nos) {
+      const row = allocationModal.rows.find((r) => r.installmentNo === no);
+      if (!row) {
+        problems.push(`Installment ${no} is no longer open and cannot be discounted.`);
+      } else if (!row.checked || row.amount <= 0) {
+        problems.push(
+          `Installment ${no} has a discount but none of this payment is allocated to it.`,
+        );
+      } else if (row.amount >= grossRemainingDue(row)) {
+        problems.push(
+          `This payment already covers the full amount due on installment ${no} — remove the discount or reduce the payment.`,
+        );
+      }
+    }
+    return problems;
+  }, [allocationModal, discountActive, interestDiscountLines, penaltyDiscountLines]);
+
   // Receipt zero-out (UAT #60/#63, 2026-09-24) — mirrors the server-side
   // capacity check in validateAllocationLines: sum how much free capacity
   // (installmentFreeToAllocate, net of what's already checked here) remains
@@ -387,12 +538,12 @@ export default function RemedialDcrPage() {
     if (!allocationModal || allocationModal.isSurcharge) return 0;
     return halfUp(
       allocationModal.rows.reduce((sum, row) => {
-        const free = installmentFreeToAllocate(row);
+        const free = rowCapacity(row);
         const used = row.checked ? row.amount : 0;
         return sum + Math.max(0, halfUp(free - used));
       }, 0),
     );
-  }, [allocationModal]);
+  }, [allocationModal, rowCapacity]);
 
   const allocationBlocked = allocationLeftover > 0 && allocationUnusedCapacity > 0;
 
@@ -529,7 +680,7 @@ export default function RemedialDcrPage() {
             const available = halfUp(prev.paymentAmount - othersTotal);
             next.amount = Math.max(
               0,
-              Math.min(installmentRemainingDue(row), available),
+              Math.min(rowCapacity(row), available),
             );
           }
           return next;
@@ -571,6 +722,7 @@ export default function RemedialDcrPage() {
         : {};
 
     if (discountReasonMissing) return;
+    if (discountProblems.length > 0) return;
 
     // Penalty / interest waiver — only sent when the permission is actually
     // held and a nonzero amount exists. The route re-checks the field rule.
@@ -578,13 +730,15 @@ export default function RemedialDcrPage() {
       canDiscount && hasDiscount
         ? {
             interestDiscountAmount: interestDiscountTotal,
-            interestDiscountedInstallmentNos: Array.from(
-              interestSelectionMap.keys(),
+            interestDiscountedInstallmentNos: interestDiscountLines.map(
+              (line) => line.installmentNo,
             ),
+            interestDiscountLines,
             penaltyDiscountAmount: penaltyDiscountTotal,
-            penaltyDiscountedInstallmentNos: Array.from(
-              penaltySelectionMap.keys(),
+            penaltyDiscountedInstallmentNos: penaltyDiscountLines.map(
+              (line) => line.installmentNo,
             ),
+            penaltyDiscountLines,
             discountReason: discountReason.trim(),
           }
         : {};
@@ -924,7 +1078,12 @@ export default function RemedialDcrPage() {
             <Button
               onClick={() => void confirmAddToDcr()}
               loading={acting}
-              disabled={allocationMismatch || allocationBlocked || discountReasonMissing}
+              disabled={
+                allocationMismatch ||
+                allocationBlocked ||
+                discountReasonMissing ||
+                discountProblems.length > 0
+              }
             >
               Add to DCRR
             </Button>
@@ -964,6 +1123,13 @@ export default function RemedialDcrPage() {
               </div>
             </div>
 
+            {discountProblems.length > 0 ? (
+              <Alert variant="warning">
+                {discountProblems.map((problem) => (
+                  <div key={problem}>{problem}</div>
+                ))}
+              </Alert>
+            ) : null}
             {allocationMismatch ? (
               <Alert variant="danger">
                 Checked amounts exceed the payment by ₱
