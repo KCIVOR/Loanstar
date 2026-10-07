@@ -58,6 +58,14 @@ const BellIcon = (
   </Icon>
 );
 
+const BugIcon = (
+  <Icon size={16}>
+    <path d="M8 6 6 4M16 6l2-2M4 11h3m10 0h3M4 17h4m8 0h4" />
+    <rect x="7" y="6" width="10" height="14" rx="5" />
+    <path d="M7 12h10" />
+  </Icon>
+);
+
 const ChevronDownIcon = (
   <Icon size={13}>
     <polyline points="6 9 12 15 18 9" />
@@ -377,8 +385,19 @@ export function Header({
         ) : null}
       </div>
 
-      {/* Right — notifications + profile */}
+      {/* Right — bug reports, notifications + profile */}
       <div ref={menusRef} className="flex shrink-0 items-center gap-1">
+        <Link
+          href="/bug-reports"
+          aria-label="Report a bug"
+          title="Report a bug"
+          className={cn(
+            "flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-ink-700 transition-colors hover:bg-surface-2",
+            pathname.startsWith("/bug-reports") && "bg-surface-2 text-ink-900",
+          )}
+        >
+          {BugIcon}
+        </Link>
         {/* Notification bell */}
         <div className="relative">
           <Button
