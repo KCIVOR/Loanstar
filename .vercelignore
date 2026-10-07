@@ -1,0 +1,5 @@
+# Local-only workspaces and generated verification artifacts
+tmp/
+test-results/
+output/
+outputs/

@@ -54,3 +54,6 @@ _snapshots/
 scripts/.uat-seed-log.json
 
 tmp/document-fidelity/
+
+# Local verification workspaces and generated artifacts
+tmp/
