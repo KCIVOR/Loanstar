@@ -37,3 +37,9 @@ export function masterlistSecondaryIdentity(row: {
     .filter(Boolean);
   return parts.length ? parts.join(" · ") : null;
 }
+
+/** Fully settled at import, not a loan settled later by real postings. */
+export function isImportedSettlementSnapshot(row: Record<string, unknown>): boolean {
+  return row.is_legacy_import === true && row.account_status === "paid"
+    && Array.isArray(row.amortization_schedules) && row.amortization_schedules.length === 0;
+}

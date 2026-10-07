@@ -136,6 +136,12 @@ export async function GET(_request: Request, { params }: RouteParams) {
     // Read-only; the caller is already gated by requireModulePermission
     // above.
     const serviceClient = createServiceClient();
+    const { data: importedAccount, error: importedAccountError } = await serviceClient
+      .from("masterlist")
+      .select("is_legacy_import")
+      .eq("loan_application_id", id)
+      .maybeSingle();
+    if (importedAccountError) throw new Error(importedAccountError.message);
     const [eligibleAgents, assignedAgentName] = await Promise.all([
       listEligibleAgents(serviceClient),
       resolveAssignedAgentName(
@@ -184,6 +190,7 @@ export async function GET(_request: Request, { params }: RouteParams) {
             ? application.payment_schedule
             : "monthly",
         isReloan: application.is_reloan,
+        isLegacyImport: importedAccount?.is_legacy_import === true,
         agentUserId: (application.agent_user_id as string | null) ?? null,
         assignedAgentName,
         endorsedAt: application.endorsed_at,

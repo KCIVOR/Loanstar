@@ -39,6 +39,7 @@
     "html-to-docx": "^1.8.0",
     "html-to-pdfmake": "^2.5.33",
     "jsdom": "25.0.0",
+    "jszip": "^3.10.2",
     "next": "16.2.10",
     "nodemailer": "^9.0.3",
     "pdfmake": "^0.2.20",

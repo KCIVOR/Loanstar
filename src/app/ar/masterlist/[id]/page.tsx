@@ -22,6 +22,7 @@ import { DocumentChecklist } from "@/components/DocumentChecklist";
 import {
   masterlistEmploymentLabels,
   masterlistSecondaryIdentity,
+  isImportedSettlementSnapshot,
 } from "@/lib/ar/masterlist-display";
 import { canMarkPaidOff } from "@/lib/ar/paid-off";
 import { canWriteOffAccountRounding } from "@/lib/ar/rounding-writeoff";
@@ -663,6 +664,7 @@ export default function ArMasterlistDetailPage() {
       />
 
       <div className="mb-6 flex flex-wrap items-center gap-2">
+        {record.is_legacy_import === true ? <Badge variant="navy">Imported</Badge> : null}
         <Badge variant={segment === "sme" ? "navy" : segment === "individual" ? "warning" : "teal"} dot>
           {segment === "sme" ? "SME" : segment === "individual" ? "Individual" : "Seafarer"}
         </Badge>
@@ -1028,7 +1030,9 @@ export default function ArMasterlistDetailPage() {
         <h2 className="mb-1 font-display text-lg font-semibold text-navy-900">
           Account ledger
         </h2>
-        <p className="mb-3 text-sm text-ink-500">
+        {isImportedSettlementSnapshot(record) ? (
+          <p className="mb-3 text-sm text-ink-500">This loan was fully paid before import. Outstanding balance is zero. Historical receipts were not imported, so no transaction ledger is reconstructed.</p>
+        ) : <><p className="mb-3 text-sm text-ink-500">
           {paidCount} of {billableTrackedCount} installments paid
           {billableSettledHistoryCount > 0
             ? ` (${billableSettledHistoryCount} historical replacement rows, excluded from count)`
@@ -1036,7 +1040,7 @@ export default function ArMasterlistDetailPage() {
           . Opening debit from total loan; credits are posted allocations and
           rounding write-offs.
         </p>
-        <AccountLedger rows={ledgerRows} className="mb-4" />
+        <AccountLedger rows={ledgerRows} className="mb-4" /></>}
         {allWriteOffCandidates.length > 0 ? (
             <div className="rounded-[var(--r-md)] border border-line-soft bg-surface px-4 py-3">
             <p className="mb-2 text-sm font-medium text-ink-800">

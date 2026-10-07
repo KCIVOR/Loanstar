@@ -17,6 +17,7 @@ import {
 } from "recharts";
 
 import { AXIS_TICK, CATEGORY_COLORS, CHART, TOOLTIP_STYLE } from "./theme";
+import { rankedBarCellKey } from "./row-identity";
 
 type SeriesDef = { key: string; name: string; color: string };
 
@@ -143,12 +144,15 @@ export function RankedBarMini({
   data,
   yKey,
   valueKey,
+  rowIdKey,
   color = CHART.gold,
   height = 140,
 }: {
   data: Array<Datum & { color?: string }>;
   yKey: string;
   valueKey: string;
+  /** Stable row identity, separate from the visible category label. */
+  rowIdKey?: string;
   color?: string;
   height?: number;
 }) {
@@ -176,8 +180,8 @@ export function RankedBarMini({
           maxBarSize={18}
           label={{ position: "right", fontSize: 11, fill: CHART.ink, formatter: formatValue }}
         >
-          {data.map((row) => (
-            <Cell key={String(row[yKey])} fill={row.color ?? color} />
+          {data.map((row, index) => (
+            <Cell key={rankedBarCellKey(row, yKey, index, rowIdKey)} fill={row.color ?? color} />
           ))}
         </Bar>
       </ComposedChart>

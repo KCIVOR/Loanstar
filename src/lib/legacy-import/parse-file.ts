@@ -1,54 +1,12 @@
 /**
  * Browser-side file parsing for the legacy import dry run.
- * .xlsx/.xlsm via exceljs (reads cell values only; VBA is never executed),
- * .csv via the local RFC-4180 parser.
+ * Excel files are opened by the authenticated server route; CSV remains local.
  */
 import { parseCsv } from "./csv";
 import type { CellValue } from "./normalize";
+import { trimGrid } from "./workbook-grid";
 
-function pad(n: number) {
-  return String(n).padStart(2, "0");
-}
-
-export function cellToValue(v: unknown): CellValue {
-  if (v === null || v === undefined) return null;
-  if (typeof v === "string" || typeof v === "number" || typeof v === "boolean") return v;
-  if (v instanceof Date) {
-    if (Number.isNaN(v.getTime())) return null;
-    return `${v.getUTCFullYear()}-${pad(v.getUTCMonth() + 1)}-${pad(v.getUTCDate())}`;
-  }
-  if (typeof v === "object") {
-    const o = v as Record<string, unknown>;
-    if ("result" in o) return cellToValue(o.result);
-    if (Array.isArray(o.richText)) {
-      return (o.richText as { text?: string }[]).map((t) => t.text ?? "").join("");
-    }
-    if ("text" in o) return cellToValue(o.text);
-    if ("error" in o) return null;
-  }
-  return String(v);
-}
-
-/** Trim trailing blank rows and trailing all-blank columns. */
-export function trimGrid(rows: CellValue[][]): CellValue[][] {
-  let last = rows.length;
-  while (last > 0 && rows[last - 1].every((v) => v === null || v === "")) last--;
-  const kept = rows.slice(0, last);
-  let width = 0;
-  for (const r of kept) {
-    for (let c = r.length - 1; c >= width; c--) {
-      if (r[c] !== null && r[c] !== "") {
-        width = c + 1;
-        break;
-      }
-    }
-  }
-  return kept.map((r) => {
-    const out = r.slice(0, width);
-    while (out.length < width) out.push(null);
-    return out;
-  });
-}
+export { cellToValue, trimGrid } from "./workbook-grid";
 
 export type LoadedWorkbook = {
   sheetNames: string[];
@@ -67,30 +25,20 @@ export async function parseLegacyFile(file: File): Promise<LoadedWorkbook> {
   if (!lower.endsWith(".xlsx") && !lower.endsWith(".xlsm")) {
     throw new Error("Unsupported file type. Use .xlsx, .xlsm or .csv.");
   }
-  const ExcelJS = (await import("exceljs")).default;
-  const wb = new ExcelJS.Workbook();
-  await wb.xlsx.load(await file.arrayBuffer());
-  const cache = new Map<string, CellValue[][]>();
+  const formData = new FormData();
+  formData.set("file", file);
+  const response = await fetch("/api/admin/legacy-import/parse", { method: "POST", body: formData });
+  const payload = (await response.json().catch(() => null)) as
+    | { error?: string; sheetNames?: string[]; sheets?: Record<string, CellValue[][]> }
+    | null;
+  if (!response.ok) {
+    throw new Error(payload?.error ?? "Unable to read the uploaded workbook.");
+  }
+  if (!payload?.sheetNames || !payload.sheets) {
+    throw new Error("The workbook could not be read.");
+  }
   return {
-    sheetNames: wb.worksheets.map((ws) => ws.name),
-    readSheet: (name) => {
-      const hit = cache.get(name);
-      if (hit) return hit;
-      const ws = wb.getWorksheet(name);
-      if (!ws) return [];
-      const rows: CellValue[][] = [];
-      ws.eachRow({ includeEmpty: false }, (row, rowNumber) => {
-        const cells: CellValue[] = [];
-        row.eachCell({ includeEmpty: false }, (cell, col) => {
-          cells[col - 1] = cellToValue(cell.value);
-        });
-        for (let i = 0; i < cells.length; i++) if (cells[i] === undefined) cells[i] = null;
-        rows[rowNumber - 1] = cells;
-      });
-      for (let i = 0; i < rows.length; i++) if (!rows[i]) rows[i] = [];
-      const grid = trimGrid(rows);
-      cache.set(name, grid);
-      return grid;
-    },
+    sheetNames: payload.sheetNames,
+    readSheet: (name) => payload.sheets?.[name] ?? [],
   };
 }

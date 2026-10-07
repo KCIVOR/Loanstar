@@ -74,6 +74,7 @@ export async function GET(request: Request) {
         agingFilter,
         birStatusFilter,
         segmentFilter,
+        sourceFilter: searchParams.get("source") ?? "all",
         from,
         to,
         sortKey,

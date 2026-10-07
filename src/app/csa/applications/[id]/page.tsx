@@ -93,6 +93,7 @@ type ApplicationWorkspace = {
       | "quarterly_special"
       | "two_monthly_special";
     isReloan: boolean;
+    isLegacyImport: boolean;
     agentUserId: string | null;
     assignedAgentName: string | null;
     createdAt: string;
@@ -1352,14 +1353,18 @@ export default function CsaApplicationPage() {
           </>
         ) : null}
 
-        {!data.borrower?.userId ? (
+        {data.application.isLegacyImport ? (
+          <Alert>Imported loans are AR-only. Borrower account connection is unavailable.</Alert>
+        ) : null}
+
+        {!data.application.isLegacyImport && !data.borrower?.userId ? (
           <ConnectBorrowerAccountPanel
             applicationId={applicationId}
             onConnected={() => void load({ silent: true })}
           />
         ) : null}
 
-        {data.borrower?.userId && canChangeOwner(data.application.status) ? (
+        {!data.application.isLegacyImport && data.borrower?.userId && canChangeOwner(data.application.status) ? (
           <ChangeOwnerPanel
             applicationId={applicationId}
             currentBorrowerId={data.borrower.id}

@@ -41,7 +41,7 @@ export type ExistingKeys = {
 
 export const EMPTY_EXISTING: ExistingKeys = { borrowerNos: new Set(), loanNos: new Set() };
 
-function parseByField(key: string, v: CellValue): Parsed<unknown> {
+export function parseByField(key: string, v: CellValue): Parsed<unknown> {
   const f = FIELD_BY_KEY.get(key);
   if (!f) return { ok: true, value: cleanText(v) };
   if (key === "atm_card_last4") return parseCardLast4(v);

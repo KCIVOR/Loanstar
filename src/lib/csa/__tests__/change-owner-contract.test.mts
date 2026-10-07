@@ -37,7 +37,7 @@ test("stage list exports exactly the approved statuses", async () => {
 
 test("lib calls the atomic reassign RPC, no sequential writes", () => {
   assert.match(lib, /rpc\(\s*"reassign_application_borrower_account"/);
-  assert.doesNotMatch(lib, /from\("masterlist"\)/);
+  assert.doesNotMatch(lib, /from\("masterlist"\)\s*\.update\(/);
   assert.doesNotMatch(lib, /from\("documents"\)/);
   assert.doesNotMatch(lib, /from\("payments"\)/);
 });

@@ -11,7 +11,22 @@ import {
   portfolioFilterSpec,
   statusFilterSpec,
   sumOutstandingBalances,
+  getMasterlistQueue,
 } from "../queue";
+import type { SupabaseClient } from "@supabase/supabase-js";
+
+it("applies source filters before pagination, independently of paid status", async () => {
+  for (const [sourceFilter, expected] of [["imported", true], ["system", false], ["all", null], ["invalid", null]] as const) {
+    const calls: unknown[][] = [];
+    const query = { from: (...args: unknown[]) => { calls.push(["from", ...args]); return query; },
+      select: () => query, eq: (...args: unknown[]) => { calls.push(["eq", ...args]); return query; },
+      order: () => query, range: () => { calls.push(["range"]); return Promise.resolve({ data: [], count: 0, error: null }); } };
+    await getMasterlistQueue(query as unknown as SupabaseClient, { sourceFilter, statusFilter: "paid", page: 1, pageSize: 10 });
+    assert.deepEqual(calls.filter(c => c[1] === "is_legacy_import"), expected === null ? [] : [["eq", "is_legacy_import", expected]]);
+    assert.ok(calls.some(c => c[1] === "account_status" && c[2] === "paid"));
+    assert.equal(calls.at(-1)?.[0], "range");
+  }
+});
 
 describe("MASTERLIST_QUEUE_PAGE_SIZES / OUTSTANDING_BALANCE_FETCH_PAGE", () => {
   it("exposes the allowlisted page sizes used by the queue route", () => {

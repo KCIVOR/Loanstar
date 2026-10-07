@@ -75,7 +75,7 @@ export type RiskSeries = {
   /** Ordered severity buckets, colored on the sequential ramp light→dark. */
   aging: Array<{ bucket: string; label: string; outstanding: number; color: string }>;
   /** Largest 10 accounts by outstanding balance. */
-  top10: Array<{ masterlistId: string; name: string; outstanding: number }>;
+  top10: Array<{ masterlistId: string; loanAccountNo: string | null; name: string; outstanding: number }>;
   /** Concentration by segment — the only dimension with full coverage today. */
   concentrationBySegment: Array<{ name: string; value: number; color?: string }>;
   /**
@@ -188,6 +188,7 @@ export async function computeRiskMetrics(supabase: SupabaseClient): Promise<Risk
 
   const top10 = top10Rows.map((r) => ({
     masterlistId: r.id,
+    loanAccountNo: r.loan_account_no,
     name: r.borrower_name ?? r.loan_account_no ?? "Unnamed",
     outstanding: r.outstanding_balance,
   }));

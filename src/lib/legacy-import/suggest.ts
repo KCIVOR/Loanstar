@@ -22,6 +22,19 @@ export function normalizeHeader(header: unknown): string {
  * template (SF/SME tabs) and both calculator `Data` headers.
  */
 const RAW_ALIASES: Record<string, readonly string[]> = {
+  "Date of Birth": ["date_of_birth"],
+  "Present Address": ["address"],
+  "Release Date": ["release_date"],
+  "First Payment Date": ["first_payment_date"],
+  Principal: ["principal"],
+  "Total Loan": ["total_loan"],
+  "Net Released": ["net_released"],
+  "Monthly Amortization": ["monthly_amortization"],
+  "Doc Stamp": ["doc_stamp"],
+  "Total Deductions": ["total_deductions"],
+  "PF Rate": ["pf_rate"],
+  "Manning Agency": ["manning_agency"],
+  Vessel: ["vessel_name"],
   "Borrower Number": ["legacy_borrower_no"],
   "Legacy Borrower No.": ["legacy_borrower_no"],
   "Loan Number": ["legacy_loan_no"],

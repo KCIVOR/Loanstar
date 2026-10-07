@@ -1,6 +1,26 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
+import { ValidationError } from "@/lib/api/errors";
 import { createServiceClient } from "@/lib/supabase/server";
+
+/** Imported accounts stay in AR until the borrower portal supports their history. */
+export async function assertApplicationCanConnectBorrowerAccount(
+  supabase: SupabaseClient,
+  applicationId: string,
+): Promise<void> {
+  const { data, error } = await supabase
+    .from("masterlist")
+    .select("is_legacy_import")
+    .eq("loan_application_id", applicationId)
+    .maybeSingle();
+
+  if (error) throw new Error(error.message);
+  if (data?.is_legacy_import === true) {
+    throw new ValidationError(
+      "Imported loans are AR-only and cannot be connected to a borrower account yet.",
+    );
+  }
+}
 
 export type BorrowerAccountResult = {
   id: string;
@@ -65,6 +85,7 @@ export async function connectApplicationToBorrowerAccount(
   actorId: string,
 ): Promise<{ borrowerId: string; borrowerUserId: string }> {
   const admin = createServiceClient();
+  await assertApplicationCanConnectBorrowerAccount(admin, applicationId);
   const { data, error } = await admin.rpc(
     "connect_application_to_borrower_account",
     {
@@ -107,6 +128,7 @@ export async function reassignApplicationBorrowerAccount(
   previousUserId: string;
 }> {
   const admin = createServiceClient();
+  await assertApplicationCanConnectBorrowerAccount(admin, applicationId);
   const { data, error } = await admin.rpc(
     "reassign_application_borrower_account",
     {

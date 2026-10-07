@@ -19,7 +19,7 @@ test("connect-borrower calls the atomic RPC", () => {
 });
 
 test("connect-borrower no longer does sequential re-link writes", () => {
-  assert.doesNotMatch(lib, /from\("masterlist"\)/);
+  assert.doesNotMatch(lib, /from\("masterlist"\)\s*\.update\(/);
   assert.doesNotMatch(lib, /from\("documents"\)/);
   assert.doesNotMatch(lib, /from\("payments"\)/);
   assert.doesNotMatch(lib, /appendStatusHistory/);

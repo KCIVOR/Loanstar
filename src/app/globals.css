@@ -2701,6 +2701,32 @@ table.tbl {
   white-space: nowrap;
 }
 
+/* Legacy import mapping: imported columns read left-to-right like a worksheet. */
+.table-wrap.is-mapping-sheet {
+  min-width: 0;
+  max-width: 100%;
+}
+.table-wrap.is-mapping-sheet table.tbl {
+  width: max-content;
+  min-width: max-content;
+}
+.table-wrap.is-mapping-sheet .mapping-sheet-label {
+  min-width: 148px;
+  padding: 11px 16px;
+  background: var(--surface-2);
+  text-align: left;
+  vertical-align: top;
+  white-space: nowrap;
+}
+.table-wrap.is-mapping-sheet .mapping-sheet-cell {
+  min-width: 224px;
+  max-width: 224px;
+  vertical-align: top;
+}
+.table-wrap.is-mapping-sheet .mapping-sheet-cell .select {
+  width: 100%;
+}
+
 /* ---- advanced forms ---- */
 .otp {
   display: flex;

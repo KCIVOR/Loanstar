@@ -48,6 +48,7 @@ type SortKey = "priority" | "balance" | "borrower" | "status";
 type StatusFilter = "all" | "active" | "paid" | "default" | "remedial";
 type AgingFilter = "all" | "current" | "1-30" | "31-60" | "61-90" | "91+";
 type SegmentFilter = "all" | "seafarer" | "sme" | "individual";
+type SourceFilter = "all" | "imported" | "system";
 
 const PAGE_SIZE_OPTIONS = MASTERLIST_QUEUE_PAGE_SIZES;
 
@@ -236,6 +237,7 @@ function buildQueueQuery(params: {
   agingFilter: AgingFilter;
   birStatusFilter: string;
   segmentFilter: SegmentFilter;
+  sourceFilter: SourceFilter;
   dateRange: DateRangeValue;
   sortKey: SortKey;
   sortDir: "asc" | "desc";
@@ -248,6 +250,7 @@ function buildQueueQuery(params: {
   qs.set("aging", params.agingFilter);
   qs.set("birStatus", params.birStatusFilter);
   qs.set("segment", params.segmentFilter);
+  qs.set("source", params.sourceFilter);
   qs.set("range", params.dateRange.preset);
   if (params.dateRange.preset === "custom") {
     if (params.dateRange.from) qs.set("from", params.dateRange.from);
@@ -280,6 +283,7 @@ export default function ArDashboardPage() {
     {},
   );
   const [segmentFilter, setSegmentFilter] = useState<SegmentFilter>("all");
+  const [sourceFilter, setSourceFilter] = useState<SourceFilter>("all");
   const [dateRange, setDateRange] = useState<DateRangeValue>(DEFAULT_DATE_RANGE);
   const [viewMode, setViewMode] = useState<HistoryViewMode>("list");
   const [pageSize, setPageSize] =
@@ -302,6 +306,7 @@ export default function ArDashboardPage() {
     agingFilter,
     birStatusFilter,
     segmentFilter,
+    sourceFilter,
     dateRange,
     pageSize,
     sortKey,
@@ -318,6 +323,7 @@ export default function ArDashboardPage() {
         agingFilter,
         birStatusFilter,
         segmentFilter,
+        sourceFilter,
         dateRange,
         sortKey,
         sortDir,
@@ -345,6 +351,7 @@ export default function ArDashboardPage() {
     agingFilter,
     birStatusFilter,
     segmentFilter,
+    sourceFilter,
     dateRange,
     sortKey,
     sortDir,
@@ -415,6 +422,7 @@ export default function ArDashboardPage() {
     (agingFilter !== "all" ? 1 : 0) +
     (birStatusFilter !== "all" ? 1 : 0) +
     (segmentFilter !== "all" ? 1 : 0) +
+    (sourceFilter !== "all" ? 1 : 0) +
     (dateIsDefault ? 0 : 1);
 
   const summaryStart = displayRows.length
@@ -438,6 +446,7 @@ export default function ArDashboardPage() {
       <>
         <div className="flex flex-wrap items-center gap-1.5">
           <span className="font-medium text-ink-900">{row.borrower_name}</span>
+          {row.is_legacy_import ? <Badge variant="navy">Imported</Badge> : null}
         </div>
         {secondary ? (
           <div className="text-xs text-ink-500">{secondary}</div>
@@ -593,6 +602,12 @@ export default function ArDashboardPage() {
                 </button>
               </span>
             ) : null}
+            {sourceFilter !== "all" ? (
+              <span className="active-pill">
+                Source: {sourceFilter === "imported" ? "Imported" : "System-created"}
+                <button type="button" aria-label="Clear source filter" onClick={() => setSourceFilter("all")}>×</button>
+              </span>
+            ) : null}
             {activeFilterCount > 0 ? (
               <button
                 type="button"
@@ -601,6 +616,7 @@ export default function ArDashboardPage() {
                   setStatusFilter("all");
                   setAgingFilter("all");
                   setSegmentFilter("all");
+                  setSourceFilter("all");
                   setDateRange(DEFAULT_DATE_RANGE);
                 }}
               >
@@ -655,6 +671,14 @@ export default function ArDashboardPage() {
         </div>
 
         <div className={cn("filter-panel", filterPanelOpen && "is-open")}>
+          <div className="filter-group">
+            <span className="filter-group-label">Source</span>
+            <div className="filter-bar">
+              {([{ id: "all", label: "All" }, { id: "imported", label: "Imported" }, { id: "system", label: "System-created" }] as const).map(chip => (
+                <button key={chip.id} type="button" className={cn("fchip", sourceFilter === chip.id && "is-on")} onClick={() => setSourceFilter(chip.id)}>{chip.label}</button>
+              ))}
+            </div>
+          </div>
           <div className="filter-group">
             <span className="filter-group-label">Status</span>
             <div className="filter-bar">
@@ -792,7 +816,7 @@ export default function ArDashboardPage() {
                     {row.account_status}
                   </Badge>
                 </div>
-                <div className="gcard-name">{row.borrower_name}</div>
+                <div className="gcard-name">{row.borrower_name} {row.is_legacy_import ? <Badge variant="navy">Imported</Badge> : null}</div>
                 <div className="gcard-meta">
                   <div className="row">
                     <span className="k">Segment</span>

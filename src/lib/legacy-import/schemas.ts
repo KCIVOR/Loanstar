@@ -2,7 +2,7 @@ import { z } from "zod";
 
 export const MAX_ROWS_PER_REQUEST = 2000;
 
-export const segmentSchema = z.enum(["seafarer", "sme"]);
+export const segmentSchema = z.enum(["seafarer", "sme", "individual"]);
 
 export const columnMappingSchema = z.object({
   index: z.number().int().min(0).max(1000),
@@ -28,6 +28,11 @@ export const presetSchema = z.object({
   header_row: z.number().int().min(1).max(1000),
   mapping: mappingSchema,
 });
+
+export const activeImportRequestSchema = validateRequestSchema.extend({
+  file_name: z.string().trim().min(1).max(300),
+  installments: z.array(z.array(cellSchema).max(30)).max(25001),
+}).refine(value => value.rows.length > 0 && value.rows.length <= 25, "Import 1 to 25 accounts per request");
 
 export const runSchema = z.object({
   file_name: z.string().trim().min(1).max(300),

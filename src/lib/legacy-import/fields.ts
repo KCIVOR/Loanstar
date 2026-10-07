@@ -10,9 +10,9 @@
  * one requirement (e.g. full name OR first+last name).
  */
 
-export type LegacySegment = "seafarer" | "sme";
+export type LegacySegment = "seafarer" | "sme" | "individual";
 
-export const LEGACY_SEGMENTS: readonly LegacySegment[] = ["seafarer", "sme"];
+export const LEGACY_SEGMENTS: readonly LegacySegment[] = ["seafarer", "sme", "individual"];
 
 export type LegacyFieldType =
   | "text"
@@ -43,7 +43,7 @@ export type LegacyField = {
   segments: readonly LegacySegment[];
 };
 
-const BOTH: readonly LegacySegment[] = ["seafarer", "sme"];
+const BOTH: readonly LegacySegment[] = ["seafarer", "sme", "individual"];
 const SF: readonly LegacySegment[] = ["seafarer"];
 const SME: readonly LegacySegment[] = ["sme"];
 
@@ -83,6 +83,21 @@ function propertyFields(n: number): LegacyField[] {
 }
 
 export const LEGACY_FIELDS: readonly LegacyField[] = [
+  { key: "outstanding_balance", label: "Outstanding Balance", target: "masterlist.outstanding_balance", type: "number", segments: BOTH },
+  { key: "balance_as_of", label: "Balance As Of", target: "legacy import snapshot date", type: "date", segments: BOTH },
+  { key: "mobile_phone", label: "Mobile Phone", target: "borrowers.mobile_phone", type: "text", segments: BOTH },
+  { key: "loan_type_name", label: "Loan Type Name", target: "computations.loan_type_name", type: "text", segments: BOTH },
+  { key: "payment_frequency", label: "Payment Frequency", target: "computations.payment_frequency", type: "text", segments: BOTH },
+  { key: "payment_schedule", label: "Payment Schedule", target: "loan_applications.payment_schedule", type: "text", segments: BOTH },
+  { key: "schedule_type", label: "Schedule Type", target: "loan_applications.schedule_type", type: "text", segments: BOTH },
+  { key: "due_day", label: "Due Day", target: "computations.due_day", type: "integer", segments: BOTH },
+  { key: "security_fee_rate", label: "Security Fee Rate", target: "computations.security_fee_rate", type: "number", segments: BOTH },
+  { key: "other_deductions_total", label: "Other Deductions Total", target: "computations.other_deductions_total", type: "number", segments: BOTH },
+  { key: "account_status", label: "Account Status", target: "masterlist.account_status", type: "text", segments: BOTH },
+  { key: "closed_at", label: "Closed At", target: "masterlist.closed_at (paid accounts only)", type: "date", segments: BOTH },
+  { key: "business_name", label: "Business Name", target: "borrowers.business_info.companyName", type: "text", segments: SME },
+  { key: "entity_type", label: "Entity Type", target: "loan_applications.entity_type", type: "text", segments: SME },
+  { key: "individual_loan_type", label: "Individual Loan Type", target: "loan_applications.individual_loan_type", type: "text", segments: ["individual"] },
   // Identity / keys
   { key: "legacy_borrower_no", label: "Legacy Borrower No.", target: "borrowers.borrower_no", type: "text", segments: BOTH },
   { key: "legacy_loan_no", label: "Legacy Loan No.", target: "loan_applications.application_no / masterlist.loan_account_no", type: "text", segments: BOTH },
@@ -93,7 +108,7 @@ export const LEGACY_FIELDS: readonly LegacyField[] = [
   { key: "suffix", label: "Suffix", target: "borrowers.suffix", type: "text", segments: BOTH },
   { key: "email", label: "Email", target: "borrowers.email", type: "text", required: true, requiredPolicy: "warn", segments: BOTH },
   { key: "address", label: "Address (single line)", target: "borrowers.present_address", type: "text", segments: BOTH },
-  { key: "date_of_birth", label: "Birthday", target: "borrowers.date_of_birth", type: "date", segments: SF },
+  { key: "date_of_birth", label: "Birthday", target: "borrowers.date_of_birth", type: "date", segments: BOTH },
   { key: "co_borrower_name", label: "Co-Borrower / Representative Name", target: "loan_applications.co_borrowers[0].fullName", type: "text", segments: BOTH },
   { key: "co_borrower_address", label: "Co-Borrower Address", target: "loan_applications.co_borrowers[0].address", type: "text", segments: SME },
   { key: "representative_position", label: "Representative Position", target: "borrowers.business_info.companyOfficers[0].position", type: "text", segments: SME },

@@ -24,6 +24,10 @@ const nextConfig: NextConfig = {
     // UMD CJS bundle (jszip + zlib) for the .docx export path — same treatment
     // as pdfmake so Turbopack doesn't rewrite its internal requires.
     "html-to-docx",
+    // ExcelJS reads uploaded workbooks in the legacy-import route. Its Node
+    // package must run directly so Turbopack does not rewrite its ZIP readers.
+    "exceljs",
+    "jszip",
   ],
   images: {
     remotePatterns: [

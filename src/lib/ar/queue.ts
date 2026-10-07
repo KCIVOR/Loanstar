@@ -29,6 +29,7 @@ export type MasterlistQueueQueryParams = {
   birStatusFilter?: string;
   segmentFilter?: "all" | "seafarer" | "sme" | "individual";
   portfolioFilter?: string;
+  sourceFilter?: string;
   from?: string | null;
   to?: string | null;
   sortKey?: MasterlistQueueSortKey;
@@ -39,6 +40,7 @@ export type MasterlistQueueQueryParams = {
 
 export type MasterlistQueueRow = Record<string, unknown> & {
   id: string;
+  is_legacy_import?: boolean;
   loan_account_no: string | null;
   borrower_name: string;
   borrower_no: string;
@@ -195,6 +197,7 @@ export async function getMasterlistQueue(
     birStatusFilter = "all",
     segmentFilter = "all",
     portfolioFilter = "all",
+    sourceFilter = "all",
     from = null,
     to = null,
     sortKey,
@@ -214,6 +217,9 @@ export async function getMasterlistQueue(
     .select(MASTERLIST_QUEUE_SELECT, { count: "exact" });
 
   const statusSpec = statusFilterSpec(statusFilter);
+  if (sourceFilter === "imported" || sourceFilter === "system") {
+    query = query.eq("is_legacy_import", sourceFilter === "imported");
+  }
   if (statusSpec.mode === "eq") {
     query = query.eq("account_status", statusSpec.status);
   }

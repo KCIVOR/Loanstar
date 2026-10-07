@@ -108,9 +108,10 @@ export function parseLoanEntryType(v: CellValue): Parsed<boolean> {
 }
 
 /** SEAMAN / SEAFARER / ALLOTTEE → seafarer; SME / BUSINESS / CORPORATE → sme. */
-export function parseBorrowerType(v: CellValue): Parsed<"seafarer" | "sme"> {
+export function parseBorrowerType(v: CellValue): Parsed<"seafarer" | "sme" | "individual"> {
   if (isBlank(v)) return { ok: true, value: null };
   const s = String(v).trim().toUpperCase();
+  if (s === "INDIVIDUAL") return { ok: true, value: "individual" };
   if (/^(SEAMAN|SEAMEN|SEAFARER|ALLOTTEE|ALLOTEE|SF)\b/.test(s)) return { ok: true, value: "seafarer" };
   if (/^(SME|BUSINESS|CORPORATE|CORPORATION|SOLE PROP)/.test(s)) return { ok: true, value: "sme" };
   return { ok: false, error: `unknown borrower type: "${String(v)}"` };

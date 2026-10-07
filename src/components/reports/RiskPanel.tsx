@@ -60,7 +60,8 @@ export function RiskPanel({
     color: row.color,
   }));
   const top10Data = series.top10.map((row) => ({
-    name: row.name,
+    id: row.masterlistId,
+    label: row.loanAccountNo ? `${row.name} · ${row.loanAccountNo}` : row.name,
     outstanding: row.outstanding,
   }));
   const concentrationData = series.concentrationBySegment.map((row, i) => ({
@@ -86,7 +87,7 @@ export function RiskPanel({
           onClick={() =>
             downloadCsv("risk-aging-and-top10", [
               ...series.aging.map((r) => ({ section: "aging", label: r.label, outstanding: r.outstanding })),
-              ...series.top10.map((r) => ({ section: "top10", label: r.name, outstanding: r.outstanding })),
+              ...series.top10.map((r) => ({ section: "top10", label: r.name, loanAccountNo: r.loanAccountNo, outstanding: r.outstanding })),
             ])
           }
         >
@@ -127,8 +128,9 @@ export function RiskPanel({
             <>
               <RankedBarMini
                 data={top10Data}
-                yKey="name"
+                yKey="label"
                 valueKey="outstanding"
+                rowIdKey="id"
                 color={CHART.info}
                 height={220}
               />
@@ -139,7 +141,7 @@ export function RiskPanel({
                       href={`/ar/masterlist/${row.masterlistId}`}
                       className="text-teal-700 hover:underline"
                     >
-                      {row.name}
+                      {row.name}{row.loanAccountNo ? ` · ${row.loanAccountNo}` : ""}
                     </Link>
                   </li>
                 ))}

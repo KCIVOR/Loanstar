@@ -18,6 +18,8 @@ import {
   type StepperStep,
 } from "@/components/ui";
 import { toCsv } from "@/lib/legacy-import/csv";
+import { buildActiveImport, type ImportOutcome } from "@/lib/legacy-import/active-import";
+import { submitImport } from "@/lib/legacy-import/submit-import";
 import {
   type ColumnMapping,
   type LegacySegment,
@@ -32,11 +34,11 @@ import {
   applyOverrides,
   flaggedColumns,
   mergeResults,
-  templateCsv,
 } from "@/lib/legacy-import/fixes";
 import { type CellValue, isBlankRow } from "@/lib/legacy-import/normalize";
 import { type LoadedWorkbook, parseLegacyFile } from "@/lib/legacy-import/parse-file";
 import { suggestMapping } from "@/lib/legacy-import/suggest";
+import { templateDownloadPath } from "@/lib/legacy-import/template-files";
 import {
   type InputRow,
   type RowResult,
@@ -78,10 +80,10 @@ async function readError(res: Response, fallback: string) {
 function downloadText(text: string, name: string) {
   const blob = new Blob([text], { type: "text/csv;charset=utf-8" });
   const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = name;
-  a.click();
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = name;
+  link.click();
   URL.revokeObjectURL(url);
 }
 
@@ -98,7 +100,11 @@ export default function LegacyImportPage() {
   const [presetName, setPresetName] = useState("");
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+
   const [notice, setNotice] = useState<string | null>(null);
+  const [importOutcomes, setImportOutcomes] = useState<ImportOutcome[]>([]);
+  const [importAttempted, setImportAttempted] = useState(false);
+  const importInFlight = useRef(false);
 
   // Review: raw per-row results (before the file-wide duplicate pass), cell fixes, exclusions.
   const [rawResults, setRawResults] = useState<RowResult[] | null>(null);
@@ -137,6 +143,8 @@ export default function LegacyImportPage() {
     setOverrides({});
     setExcluded(new Set());
     setEditing(null);
+    setImportOutcomes([]);
+    setImportAttempted(false);
   };
 
   const pendingPreset = useRef<Preset | null>(null);
@@ -166,7 +174,7 @@ export default function LegacyImportPage() {
   }, []);
 
   useEffect(() => {
-    void loadPresets();
+    void Promise.resolve().then(loadPresets);
   }, [loadPresets]);
 
   const onFile = async (file: File | undefined) => {
@@ -187,6 +195,7 @@ export default function LegacyImportPage() {
       setSheetName(preferred ?? "");
       const hint = `${preferred ?? ""} ${file.name}`;
       if (/sme/i.test(hint)) setSegment("sme");
+      else if (/individual/i.test(hint)) setSegment("individual");
       else if (/sf|seafarer/i.test(hint)) setSegment("seafarer");
       setHeaderRow(preferred && /import$/i.test(preferred) ? 2 : 1);
     } catch (err) {
@@ -307,6 +316,45 @@ export default function LegacyImportPage() {
     return flagDuplicateLoanNos(rawResults.filter((r) => !excluded.has(r.rowNumber)));
   }, [rawResults, excluded]);
   const summary = useMemo(() => (results ? summarize(results) : null), [results]);
+  const activePreflight = useMemo(() => {
+    if (step !== "import" || !workbook || !results) return null;
+    const installmentSheet = workbook.sheetNames.find((name) => name.trim().toLowerCase() === "installments");
+    if (!installmentSheet) return { accounts: [], errors: ["Upload an Excel workbook with an Installments sheet to verify the opening balance."] };
+    const today = new Intl.DateTimeFormat("en-CA", {
+      timeZone: "Asia/Manila", year: "numeric", month: "2-digit", day: "2-digit",
+    }).formatToParts(new Date());
+    const part = (type: string) => today.find((p) => p.type === type)?.value;
+    return buildActiveImport(
+      dataRows.filter((row) => !excluded.has(row.rowNumber)).map((row) => applyOverrides(row, overrides)),
+      mapping, segment, workbook.readSheet(installmentSheet), `${part("year")}-${part("month")}-${part("day")}`,
+    );
+  }, [step, workbook, results, dataRows, excluded, overrides, mapping, segment]);
+
+  const saveImportedLoans = async () => {
+    if (importInFlight.current || importAttempted || busy || !activePreflight || activePreflight.errors.length || !activePreflight.accounts.length || !workbook) return;
+    if (!window.confirm(`Save ${activePreflight.accounts.length} legacy loan(s)? This creates real borrower and Masterfile records. Historical receipts will not be created.`)) return;
+    importInFlight.current = true;
+    setImportAttempted(true);
+    setError(null);
+    setNotice(null);
+    setBusy("Saving legacy loans…");
+    try {
+      const name = workbook.sheetNames.find((n) => n.trim().toLowerCase() === "installments")!;
+      const response = await submitImport({ file_name: fileName ?? "unknown", segment, mapping,
+        rows: dataRows.filter((r) => !excluded.has(r.rowNumber)).map((r) => applyOverrides(r, overrides)),
+        installments: workbook.readSheet(name) }, fetch, (outcomes, sent) => {
+        setImportOutcomes(outcomes); setBusy(`Processed ${sent} of ${activePreflight.accounts.length} loans…`);
+      });
+      setImportOutcomes(response.outcomes);
+      if (response.error) setError(response.error);
+      else setNotice(`Imported ${response.outcomes.filter((r) => r.status === "imported").length} loan(s); ${response.outcomes.filter((r) => r.status === "failed").length} failed. Review the results below.`);
+    } finally { importInFlight.current = false; setBusy(null); }
+  };
+
+  const downloadImportResults = () => downloadText(toCsv([
+    ["Source Row", "Legacy Loan No.", "Result", "Message", "Masterfile ID"],
+    ...importOutcomes.map((r) => [r.rowNumber, r.loanNo, r.status, r.message, r.masterlistId ?? ""]),
+  ]), "legacy-import-results.csv");
 
   const runValidation = async () => {
     setError(null);
@@ -451,7 +499,7 @@ export default function LegacyImportPage() {
     <div>
       <PageHeader
         title="Legacy Data Import"
-        description="Upload a legacy SF/SME sheet, map its columns, then review and fix rows before import. Nothing is written to borrowers or loans yet."
+        description="Import Seafarer, SME or Individual loans. Upload, map and review first; borrower and Masterfile records are saved only when you confirm Import."
       />
 
       <Card className="mb-6">
@@ -472,13 +520,16 @@ export default function LegacyImportPage() {
                 Any .xlsx, .xlsm or .csv. You will match its columns to system fields in the next step.
               </p>
             </div>
-            <div className="flex gap-2">
-              <Button type="button" variant="outline" size="sm" onClick={() => downloadText(templateCsv("seafarer"), "legacy-import-template-sf.csv")}>
-                SF template
-              </Button>
-              <Button type="button" variant="outline" size="sm" onClick={() => downloadText(templateCsv("sme"), "legacy-import-template-sme.csv")}>
-                SME template
-              </Button>
+            <div className="flex flex-wrap gap-2">
+              <a className="btn btn-outline btn-sm" href={templateDownloadPath("seafarer")} download onClick={() => setError(null)}>
+                Seafarer Excel template
+              </a>
+              <a className="btn btn-outline btn-sm" href={templateDownloadPath("sme")} download onClick={() => setError(null)}>
+                SME Excel template
+              </a>
+              <a className="btn btn-outline btn-sm" href={templateDownloadPath("individual")} download onClick={() => setError(null)}>
+                Individual Excel template
+              </a>
             </div>
           </div>
 
@@ -533,6 +584,7 @@ export default function LegacyImportPage() {
                 <Select value={segment} onChange={(e) => setSegment(e.target.value as LegacySegment)}>
                   <option value="seafarer">Seafarer (SF)</option>
                   <option value="sme">SME</option>
+                  <option value="individual">Individual</option>
                 </Select>
               </label>
             </div>
@@ -612,33 +664,39 @@ export default function LegacyImportPage() {
               </div>
             ) : null}
             <div className="max-h-[60vh] overflow-auto">
-              <Table>
-                <thead>
-                  <tr>
-                    <Th>#</Th>
-                    <Th>File header</Th>
-                    <Th>Sample values</Th>
-                    <Th>Maps to</Th>
-                  </tr>
-                </thead>
+              <Table className="is-mapping-sheet">
                 <tbody>
-                  {mapping.map((m) => (
-                    <tr key={m.index}>
-                      <Td>{m.index + 1}</Td>
-                      <Td>{m.header || <span className="text-slate-400">(blank)</span>}</Td>
-                      <Td className="max-w-xs truncate text-xs text-slate-600">
+                  <tr>
+                    <Th className="mapping-sheet-label">Source column</Th>
+                    {mapping.map((m) => (
+                      <Td key={m.index} className="mapping-sheet-cell">
+                        <span className="mb-1 block text-xs text-slate-500">Column {m.index + 1}</span>
+                        {m.header || <span className="text-slate-400">(blank)</span>}
+                      </Td>
+                    ))}
+                  </tr>
+                  <tr>
+                    <Th className="mapping-sheet-label">Sample values</Th>
+                    {mapping.map((m) => (
+                      <Td key={m.index} className="mapping-sheet-cell text-xs text-slate-600">
                         {dataRows
                           .slice(0, 3)
                           .map((r) => r.cells[m.index])
                           .filter((v) => v !== null && v !== undefined && v !== "")
                           .map(String)
-                          .join(" · ")}
+                          .join(" · ") || <span className="text-slate-400">—</span>}
                       </Td>
-                      <Td>
+                    ))}
+                  </tr>
+                  <tr>
+                    <Th className="mapping-sheet-label">Maps to</Th>
+                    {mapping.map((m) => (
+                      <Td key={m.index} className="mapping-sheet-cell">
                         <Select
                           value={m.target ?? ""}
                           onChange={(e) => setTarget(m.index, e.target.value || null)}
                           className={m.target && dupes.has(m.target) ? "border-red-500" : undefined}
+                          aria-label={`Map ${m.header || `column ${m.index + 1}`} to a LoanStar field`}
                         >
                           <option value="">Ignore</option>
                           {segmentFields.map((f) => (
@@ -648,8 +706,8 @@ export default function LegacyImportPage() {
                           ))}
                         </Select>
                       </Td>
-                    </tr>
-                  ))}
+                    ))}
+                  </tr>
                 </tbody>
               </Table>
             </div>
@@ -861,13 +919,13 @@ export default function LegacyImportPage() {
         </Card>
       ) : null}
 
-      {/* ── Step 4: Import (locked) ────────────────────────────────────── */}
+      {/* ── Step 4: Import ─────────────────────────────────────────────── */}
       {step === "import" && summary ? (
         <Card className="mb-6">
           <h2 className="mb-3 font-display text-lg font-semibold text-navy-900">Import</h2>
           <div className="mb-4 grid grid-cols-2 gap-3 md:grid-cols-4">
             {[
-              { label: "Ready to import", value: summary.total },
+              { label: "Balances verified", value: activePreflight?.accounts.length ?? 0 },
               { label: "With warnings", value: summary.warning },
               { label: "Fixed in review", value: fixedCount },
               { label: "Excluded", value: excluded.size },
@@ -879,21 +937,43 @@ export default function LegacyImportPage() {
             ))}
           </div>
           <div className="mb-4">
-            <Alert variant="warning">
-              Import is locked pending client confirmation on outstanding balances and payments. The legacy files carry
-              no balance data, so imported accounts would show the full loan as unpaid. Your mapping can be saved and
-              this validation report downloaded in the meantime.
+            <Alert variant="info">
+              Import creates real borrower and Masterfile records with the verified unpaid installments and original due dates.
+              Historical Payments and PDC Checks sheets are reference only and are not saved as receipts or checks.
+              Older balance dates may accrue new penalties after that date under the normal collection rules.
+              Imported loans appear in AR Masterfile, not the LRA new-release queue.
+              Fully paid imports are saved as Paid off, with zero balance and no collectible installments.
             </Alert>
           </div>
+          {activePreflight?.errors.length ? (
+            <div className="mb-4">
+              <Alert variant="warning">
+                <p className="mb-2 font-semibold">Opening balance checks need attention ({activePreflight.errors.length})</p>
+                <ul className="list-disc space-y-1 pl-5">
+                  {activePreflight.errors.slice(0, 20).map((message, index) => <li key={index}>{message}</li>)}
+                </ul>
+                {activePreflight.errors.length > 20 ? <p className="mt-2">Correct these issues and recheck to see the remaining errors.</p> : null}
+              </Alert>
+            </div>
+          ) : null}
+          {importOutcomes.length ? (
+            <div className="mb-4 overflow-x-auto">
+              <Table><thead><tr><Th>Legacy loan</Th><Th>Result</Th><Th>Details</Th></tr></thead>
+                <tbody>{importOutcomes.map((r) => <tr key={r.rowNumber}><Td>{r.loanNo}</Td><Td>{r.status}</Td><Td>{r.message}</Td></tr>)}</tbody>
+              </Table>
+              <Button type="button" variant="outline" onClick={downloadImportResults}>Download import results (CSV)</Button>
+            </div>
+          ) : null}
+          {importAttempted && !busy ? <p className="mb-4 text-sm text-slate-600">This submission is finished. Check Masterfile before uploading again. Successfully imported loan numbers cannot be duplicated.</p> : null}
           <div className="flex flex-wrap justify-between gap-3">
-            <Button type="button" variant="outline" onClick={() => setStep("review")}>
+            <Button type="button" variant="outline" disabled={Boolean(busy) || importAttempted} onClick={() => setStep("review")}>
               ← Back to review
             </Button>
             <div className="flex gap-2">
               <Button type="button" variant="outline" onClick={downloadReport}>
                 Download report (CSV)
               </Button>
-              <Button type="button" disabled title="Pending client confirmation on balances">
+              <Button type="button" onClick={saveImportedLoans} disabled={Boolean(busy) || importAttempted || !activePreflight?.accounts.length || Boolean(activePreflight?.errors.length)}>
                 Import {summary.total} row(s)
               </Button>
             </div>
