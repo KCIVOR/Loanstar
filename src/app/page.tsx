@@ -347,7 +347,6 @@ export default async function HomePage() {
           </div>
           <div className="landing-foot-btm">
             <span>© 2026 LOAN STAR LENDING GROUP CORP.</span>
-            <span>MERIDIAN DS V1.1</span>
           </div>
         </div>
       </footer>

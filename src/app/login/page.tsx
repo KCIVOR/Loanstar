@@ -227,7 +227,6 @@ function LoginForm() {
             </div>
           </div>
         </div>
-        <div className="foot-note">MERIDIAN · SECURE PORTAL · LOANSTAR 2026</div>
       </div>
 
       <div className="login-panel">
