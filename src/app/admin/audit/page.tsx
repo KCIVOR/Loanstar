@@ -149,6 +149,7 @@ export default function AuditPage() {
             <span className="mb-1 block text-ink-3">Area</span>
             <Select value={moduleSlug} onChange={(e) => changeFilter(() => setModuleSlug(e.target.value))}>
               <option value="">All areas</option>
+              <option value="account_settings">Account settings</option>
               {MODULES.map((m) => (
                 <option key={m.slug} value={m.slug}>
                   {m.name}

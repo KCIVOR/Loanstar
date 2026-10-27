@@ -34,21 +34,6 @@ function authErrorMessage(error: { message: string; code?: string }): string {
   return error.message;
 }
 
-const SEED_ACCOUNTS = [
-  { label: "Super Admin", email: "super_admin@loanstar.local" },
-  { label: "Agent", email: "agent@loanstar.local" },
-  { label: "CSA", email: "csa@loanstar.local" },
-  { label: "CIG", email: "cig@loanstar.local" },
-  { label: "Committee", email: "committee@loanstar.local" },
-  { label: "LRA", email: "lra@loanstar.local" },
-  { label: "AR", email: "ar@loanstar.local" },
-  { label: "Collector", email: "collector@loanstar.local" },
-  { label: "Briefer", email: "collection_head@loanstar.local" },
-  { label: "Remedial", email: "remedial@loanstar.local" },
-  { label: "Borrower", email: "borrower@loanstar.local" },
-];
-const SEED_PASSWORD = "Loanstar2026";
-
 async function resolveLandingPath(): Promise<string> {
   try {
     const res = await fetch("/api/permissions/me", { credentials: "include" });
@@ -193,12 +178,6 @@ function LoginForm() {
     void signIn(email, password);
   }
 
-  function handleQuickLogin(accountEmail: string) {
-    setEmail(accountEmail);
-    setPassword(SEED_PASSWORD);
-    void signIn(accountEmail, SEED_PASSWORD);
-  }
-
   return (
     <div className="login-shell">
       <div className="login-brand">
@@ -255,6 +234,7 @@ function LoginForm() {
             <>
           <h3>Welcome back</h3>
           <p className="s">Log in to your LoanStar portal.</p>
+          {searchParams.get("reauth") === "email-change" && <div className="mb-4"><Alert variant="info">Sign in with your updated email address and existing password.</Alert></div>}
 
           <form onSubmit={(e) => void handleSubmit(e)}>
             {error ? (
@@ -358,27 +338,6 @@ function LoginForm() {
             </Link>
           </div>
 
-          {process.env.NODE_ENV !== "production" ||
-          process.env.NEXT_PUBLIC_ENABLE_SEED_LOGIN === "true" ? (
-            <div className="mt-6 border-t border-line-soft pt-4">
-              <p className="side-grp mb-2 text-center" style={{ padding: 0, opacity: 0.6 }}>
-                Quick login (seed accounts)
-              </p>
-              <div className="grid grid-cols-2 gap-1.5">
-                {SEED_ACCOUNTS.map((account) => (
-                  <button
-                    key={account.email}
-                    type="button"
-                    disabled={loading}
-                    onClick={() => handleQuickLogin(account.email)}
-                    className="rounded-md border border-line px-2 py-1.5 text-xs font-semibold text-ink-500 transition-colors hover:border-teal-600/40 hover:bg-teal-50 hover:text-navy-900 disabled:cursor-not-allowed disabled:opacity-50"
-                  >
-                    {account.label}
-                  </button>
-                ))}
-              </div>
-            </div>
-          ) : null}
             </>
           )}
         </div>

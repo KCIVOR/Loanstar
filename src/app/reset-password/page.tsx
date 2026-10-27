@@ -2,10 +2,11 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, useEffect, useRef, useState } from "react";
 
 import { Alert, Button, Input, Label, LoanStarLogo } from "@/components/ui";
 import { createClient } from "@/lib/supabase/client";
+import { finishAuthCallback } from "@/lib/auth/callback";
 
 export default function ResetPasswordPage() {
   const router = useRouter();
@@ -14,12 +15,15 @@ export default function ResetPasswordPage() {
   const [error, setError] = useState<string | null>(null);
   const [ready, setReady] = useState(false);
   const [loading, setLoading] = useState(false);
+  const started = useRef(false);
 
   useEffect(() => {
-    const supabase = createClient();
-    void supabase.auth.getSession().then(({ data }) => {
-      setReady(Boolean(data.session));
-    });
+    if (started.current) return;
+    started.current = true;
+    const url = new URL(window.location.href);
+    void finishAuthCallback(createClient().auth, url).then(setReady).catch((error: unknown) => {
+      setError(error instanceof Error ? error.message : "Unable to open the reset link");
+    }).finally(() => window.history.replaceState(null, "", "/reset-password"));
   }, []);
 
   async function handleSubmit(e: FormEvent) {
@@ -101,6 +105,7 @@ export default function ResetPasswordPage() {
 
           {!ready ? (
             <div className="mt-6">
+              {error ? <Alert>{error}</Alert> : null}
               <Alert variant="info">
                 Open this page from the reset link in your email, or sign in first.
               </Alert>

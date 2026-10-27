@@ -177,7 +177,7 @@ const ACTION_VERBS: Record<string, { verb: string; outcome: AuditOutcome }> = {
   execute_trigger: { verb: "Completed a step on", outcome: "completed" },
 };
 
-const AREA_EXTRA: Record<string, string> = { auth: "Sign-in" };
+const AREA_EXTRA: Record<string, string> = { auth: "Sign-in", account_settings: "Account settings" };
 
 export function areaLabel(slug: string): string {
   return (
@@ -204,6 +204,18 @@ function describeCore(row: AuditRowInput): Label {
 
   if (row.action === "login") return { summary: "Signed in", outcome: "signed_in" };
   if (row.action === "logout") return { summary: "Signed out", outcome: "signed_out" };
+  if (row.module_slug === "account_settings") {
+    const security: Record<string, Label> = {
+      password_change_attempt: { summary: "Requested a password change", outcome: "created" },
+      email_change_attempt: { summary: "Submitted a login email change", outcome: "created" },
+      password_changed: { summary: "Account password changed", outcome: "changed" },
+      email_change_requested: { summary: "Requested verification of a new login email", outcome: "created" },
+      email_changed: { summary: "Login email changed after confirmation", outcome: "changed" },
+      email_change_current_completed: { summary: "Login email changed after approval from the current address", outcome: "changed" },
+      password_reset_requested: { summary: "Requested a password reset email", outcome: "created" },
+    };
+    if (security[row.action]) return security[row.action];
+  }
   if (row.action === "login_failed") {
     const email = str(after.email);
     return {
@@ -272,6 +284,8 @@ function describeCore(row: AuditRowInput): Label {
 type FieldKind = "text" | "money" | "date" | "status" | "bool" | "count";
 
 const FIELD_LABELS: Record<string, { label: string; kind: FieldKind }> = {
+  requestedEmail: { label: "Requested login email", kind: "text" },
+  accountEmail: { label: "Account email", kind: "text" },
   status: { label: "Status", kind: "status" },
   reason: { label: "Reason", kind: "text" },
   note: { label: "Note", kind: "text" },

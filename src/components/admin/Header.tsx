@@ -586,7 +586,8 @@ export function Header({
                   Account
                 </Link>
                 <Link
-                  href="/account#preferences"
+                  href="/settings"
+                  onClick={() => setOpenMenu(null)}
                   className="mi flex items-center gap-2.5"
                 >
                   {SettingsIcon}

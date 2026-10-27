@@ -5,6 +5,7 @@ import {
   resolveAuthenticatedRedirectPath,
 } from "@/lib/permissions/navigation";
 import { updateSession } from "@/lib/supabase/middleware";
+import { shouldRedirectAuthenticatedUser } from "@/lib/auth/routes";
 
 const ADMIN_PREFIX = "/admin";
 const BORROWER_PREFIX = "/borrower";
@@ -55,7 +56,7 @@ export async function proxy(request: NextRequest) {
   const isRemedialRoute = pathname.startsWith(REMEDIAL_PREFIX);
   const isReportsRoute = pathname.startsWith(REPORTS_PREFIX);
   const isDashboardRoute = pathname.startsWith(DASHBOARD_PREFIX);
-  const isAccountRoute = pathname.startsWith(ACCOUNT_PREFIX);
+  const isAccountRoute = pathname.startsWith(ACCOUNT_PREFIX) || pathname === "/settings" || pathname.startsWith("/settings/");
   const isAccessDeniedRoute = pathname.startsWith(ACCESS_DENIED_PREFIX);
   const isProtectedPortal =
     isDashboardRoute ||
@@ -104,7 +105,7 @@ export async function proxy(request: NextRequest) {
     }
   }
 
-  if (isAuthRoute(pathname) && user) {
+  if (isAuthRoute(pathname) && shouldRedirectAuthenticatedUser(pathname) && user) {
     const { data: borrower, error } = await supabase
       .from("borrowers")
       .select("id")
