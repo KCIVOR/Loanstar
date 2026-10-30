@@ -6,6 +6,8 @@ type PageAccessRule = {
 };
 
 const PAGE_ACCESS_RULES: readonly PageAccessRule[] = [
+  { prefix: "/admin/website", modules: ["website_content"] },
+  { prefix: "/website-preview", modules: ["website_content"] },
   { prefix: "/admin/audit", modules: ["audit_log"] },
   { prefix: "/admin/roles", modules: ["auth_admin"] },
   { prefix: "/admin/users", modules: ["auth_admin"] },

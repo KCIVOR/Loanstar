@@ -36,6 +36,7 @@ function isAuthRoute(pathname: string) {
 export async function proxy(request: NextRequest) {
   const { supabase, supabaseResponse, user } = await updateSession(request);
   const { pathname } = request.nextUrl;
+  const isWebsitePreview = pathname === "/website-preview" || pathname.startsWith("/website-preview/");
 
   if (pathname === "/signup" || pathname === "/borrower/register") {
     const registerUrl = request.nextUrl.clone();
@@ -72,7 +73,8 @@ export async function proxy(request: NextRequest) {
     isArRoute ||
     isCollectorRoute ||
     isRemedialRoute ||
-    isReportsRoute;
+    isReportsRoute ||
+    isWebsitePreview;
 
   if (isProtectedPortal && !user) {
     const loginUrl = request.nextUrl.clone();
@@ -125,6 +127,11 @@ export async function proxy(request: NextRequest) {
     return NextResponse.redirect(destUrl);
   }
 
+  if (isWebsitePreview) {
+    supabaseResponse.headers.set("Cache-Control", "private, no-store, max-age=0");
+    supabaseResponse.headers.set("X-Robots-Tag", "noindex, nofollow");
+    supabaseResponse.headers.set("X-Frame-Options", "SAMEORIGIN");
+  }
   return supabaseResponse;
 }
 

@@ -19,6 +19,7 @@ export const MODULE_HOME_PATHS: Record<ModuleSlug, string> = {
   reports: "/reports",
   system_config: "/admin/config",
   audit_log: "/admin/audit",
+  website_content: "/admin/website",
 };
 
 /** Returns the portal a user should land on after signing in.

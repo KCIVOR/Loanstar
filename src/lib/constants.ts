@@ -1,4 +1,4 @@
-/** All 15 LoanStar module slugs, matching seeded `modules` table rows. */
+/** LoanStar module slugs, matching seeded `modules` table rows. */
 export const MODULE_SLUGS = [
   "auth_admin",
   "borrower_portal",
@@ -16,6 +16,7 @@ export const MODULE_SLUGS = [
   "system_config",
   "audit_log",
   "briefings",
+  "website_content",
 ] as const;
 
 export type ModuleSlug = (typeof MODULE_SLUGS)[number];
@@ -27,7 +28,7 @@ export type ModuleDefinition = {
   sortOrder: number;
 };
 
-/** All 15 LoanStar modules with display metadata. */
+/** LoanStar modules with display metadata. */
 export const MODULES: readonly ModuleDefinition[] = [
   {
     slug: "auth_admin",
@@ -124,6 +125,12 @@ export const MODULES: readonly ModuleDefinition[] = [
     name: "Briefings",
     description: "Pre-release borrower briefing sign-off",
     sortOrder: 16,
+  },
+  {
+    slug: "website_content",
+    name: "Website Content",
+    description: "Public website drafts and releases",
+    sortOrder: 17,
   },
 ] as const;
 

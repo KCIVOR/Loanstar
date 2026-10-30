@@ -196,6 +196,7 @@ const NAV_ITEMS: Array<{
   { href: "/admin/roles", label: "Roles", icon: "roles", module: "auth_admin" },
   { href: "/admin/users", label: "Users", icon: "users", module: "auth_admin" },
   { href: "/admin/config", label: "Config", icon: "config", module: "system_config" },
+  { href: "/admin/website", label: "Website Content", icon: "config", module: "website_content" },
   { href: "/admin/loan-types", label: "Loan Types", icon: "loanTypes", module: "system_config" },
   { href: "/admin/checklists", label: "Checklists", icon: "checklists", module: "system_config" },
   { href: "/admin/document-templates", label: "Doc Templates", icon: "docTemplates", module: "system_config" },

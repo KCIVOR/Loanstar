@@ -1,0 +1,262 @@
+import type { AuthPageContent, WebsiteContent } from "./schema";
+const testimonial = {
+  enabled: true,
+  quote:
+    "Na-approve yung loan ko bago pa ako sumakay. Kitang-kita ko rin lahat ng bawas at schedule — walang gulat.",
+  initials: "JD",
+  name: "Juan D.",
+  role: "Able Seaman · MV Pacific Star",
+};
+const auth = (register: boolean): AuthPageContent => ({
+  seo: {
+    title: register ? "Create your account — LoanStar" : "Log in — LoanStar",
+    description: register
+      ? "Create a borrower account to apply online."
+      : "Log in to your LoanStar portal.",
+  },
+  marketing: {
+    enabled: true,
+    title: register
+      ? "Start your loan, charted clearly — before you sail."
+      : "Your loan, charted clearly — wherever you sail.",
+    emphasis: "charted clearly",
+    body: register
+      ? "Create a borrower account to apply online, upload documents, and track every step from verification to release."
+      : "Track your application, view your payment schedule, and download your statement of account from any port in the world.",
+    testimonial: { ...testimonial },
+  },
+  greeting: register ? "Create your account" : "Welcome back",
+  subtitle: register
+    ? "Create your borrower account. You can start a loan application after you sign in."
+    : "Log in to your LoanStar portal.",
+  backLabel: "Back to home",
+  submitLabel: register ? "Create account" : "Log in",
+  footerPrompt: register ? "Already have an account?" : "New borrower?",
+  footerLinkLabel: register ? "Log in" : "Create an account",
+  forgotLabel: "Forgot password?",
+  staffTitle: "Staff?",
+  staffHint:
+    "CSA, CIG, LRA, Committee, and Collections accounts use the same login — you'll land on your role's workspace.",
+});
+export const DEFAULT_WEBSITE: WebsiteContent = {
+  schemaVersion: 1,
+  site: {
+    companyName: "LoanStar",
+    logoAssetId: null,
+    iconAssetId: null,
+    logoAlt: "Loan Star Lending Group",
+  },
+  landing: {
+    seo: {
+      title: "LoanStar — Lending, charted clearly",
+      description:
+        "Trusted lending for Filipino seafarers — apply, track, and repay in one transparent portal.",
+    },
+    navigation: [
+      { id: "products", label: "Products", href: "#products" },
+      { id: "how", label: "How it works", href: "#how" },
+      { id: "why", label: "Why LoanStar", href: "#why" },
+    ],
+    loginLabel: "Log in",
+    applyLabel: "Apply now",
+    sections: [
+      {
+        id: "hero",
+        type: "hero",
+        enabled: true,
+        kicker: "Seafarer lending · Est. Manila",
+        title: "Lending, charted clearly for Filipino seafarers.",
+        emphasis: "charted clearly",
+        description:
+          "Apply before you board, get verified fast, and track every peso of your loan — from committee approval to final payment — in one transparent portal.",
+        buttons: [
+          { id: "apply", label: "Start your application", href: "/register" },
+          { id: "how", label: "See how it works", href: "#how" },
+        ],
+      },
+      {
+        id: "products",
+        type: "products",
+        enabled: true,
+        kicker: "Products",
+        title: "Built around the seafarer's contract cycle.",
+        emphasis: "",
+        description:
+          "Every product is designed to align repayment with allotment schedules — so payments happen while you earn, not after.",
+        items: [
+          {
+            id: "sf",
+            title: "SF Loan",
+            body: "Our standard seafarer loan. Up to ₱300,000, released before deployment, repaid through allotment deductions across your contract.",
+            icon: "globe",
+          },
+          {
+            id: "advance",
+            title: "Allotment Advance",
+            body: "Bridge the gap between boarding and your first allotment. Smaller amounts, shorter terms, same-week release.",
+            icon: "money",
+          },
+          {
+            id: "reloan",
+            title: "Reloan",
+            body: "Good payment history unlocks faster reloans — pre-verified documents, higher limits, and committee fast-tracking.",
+            icon: "repeat",
+          },
+        ],
+      },
+      {
+        id: "how",
+        type: "process",
+        enabled: true,
+        kicker: "How it works",
+        title: "From application to release in four charted steps.",
+        emphasis: "",
+        description: "",
+        items: [
+          {
+            id: "apply",
+            title: "Apply online",
+            body: "Complete the form and upload your contract, seafarer's book, and allotment slip.",
+            tag: "~15 mins",
+          },
+          {
+            id: "verify",
+            title: "Get verified",
+            body: "Our credit team confirms your contract directly with your manning agency.",
+            tag: "1 business day",
+          },
+          {
+            id: "approve",
+            title: "Committee approval",
+            body: "Your application is reviewed and voted on — you can track the status live in your portal.",
+            tag: "~24 hrs",
+          },
+          {
+            id: "funds",
+            title: "Receive funds",
+            body: "Proceeds are transferred to your nominated bank account, with a full statement of account.",
+            tag: "Same day",
+          },
+        ],
+      },
+      {
+        id: "why",
+        type: "benefits",
+        enabled: true,
+        kicker: "Why LoanStar",
+        title: "No surprises. Every peso accounted for.",
+        emphasis: "",
+        description:
+          "Your portal shows the same ledger our officers see — the full computation, every fee, every payment posted.",
+        items: [
+          {
+            id: "computation",
+            text: "Transparent computation — see interest, fees, and net proceeds before you sign",
+          },
+          {
+            id: "status",
+            text: "Live status tracking through verification, committee, and release",
+          },
+          {
+            id: "schedule",
+            text: "Payment schedule aligned to your allotment dates",
+          },
+          {
+            id: "reminders",
+            text: "SMS and email reminders before every due date",
+          },
+        ],
+        statementTitle: "Sample statement",
+        statementReference: "LN-2026-004518",
+        statement: [
+          {
+            id: "principal",
+            label: "Principal",
+            value: "₱150,000.00",
+            highlight: false,
+          },
+          {
+            id: "interest",
+            label: "Interest (4.50% × 10 mo)",
+            value: "₱67,500.00",
+            highlight: false,
+          },
+          {
+            id: "service",
+            label: "Service fee",
+            value: "₱7,250.00",
+            highlight: false,
+          },
+          {
+            id: "net",
+            label: "Net proceeds",
+            value: "₱142,750.00",
+            highlight: true,
+          },
+          {
+            id: "amortization",
+            label: "Monthly amortization",
+            value: "₱21,750.00",
+            highlight: true,
+          },
+          {
+            id: "posted",
+            label: "Payments posted",
+            value: "4 of 10 · on time",
+            highlight: false,
+          },
+        ],
+      },
+      {
+        id: "closing-cta",
+        type: "closing",
+        enabled: true,
+        kicker: "Ready when you are",
+        title: "Set your course before you sail.",
+        emphasis: "",
+        description:
+          "Apply today and have your proceeds released before your next deployment.",
+        buttons: [
+          { id: "apply", label: "Start your application", href: "/register" },
+          { id: "login", label: "Log in to your portal", href: "/login" },
+        ],
+      },
+    ],
+    footer: {
+      description:
+        "Loan Star Lending Group Corp. — trusted lending for Filipino seafarers and their families.",
+      copyright: "© 2026 LOAN STAR LENDING GROUP CORP.",
+      columns: [
+        {
+          id: "products",
+          title: "Products",
+          links: [
+            { id: "sf", label: "SF Loan", href: "#products" },
+            { id: "advance", label: "Allotment Advance", href: "#products" },
+            { id: "reloan", label: "Reloan", href: "#products" },
+          ],
+        },
+        {
+          id: "company",
+          title: "Company",
+          links: [
+            { id: "about", label: "About us", href: "#why" },
+            { id: "how", label: "How it works", href: "#how" },
+            { id: "login", label: "Portal login", href: "/login" },
+          ],
+        },
+        {
+          id: "legal",
+          title: "Legal",
+          links: [
+            { id: "privacy", label: "Privacy policy", href: null },
+            { id: "terms", label: "Terms of service", href: null },
+            { id: "disclosure", label: "Disclosure statement", href: null },
+          ],
+        },
+      ],
+    },
+  },
+  login: auth(false),
+  register: auth(true),
+};

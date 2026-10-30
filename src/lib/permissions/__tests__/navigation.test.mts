@@ -21,6 +21,9 @@ test("uses the briefings permission for the collector briefings route", () => {
 });
 
 test("keeps each admin page family behind its own module", () => {
+  assert.deepEqual(getRequiredPageModules("/admin/website"), ["website_content"]);
+  assert.deepEqual(getRequiredPageModules("/website-preview/register"), ["website_content"]);
+  assert.equal(getRequiredPageModules("/website-preview-unrelated"), null);
   assert.deepEqual(getRequiredPageModules("/admin/users"), ["auth_admin"]);
   assert.deepEqual(getRequiredPageModules("/admin/roles/abc"), ["auth_admin"]);
   assert.deepEqual(getRequiredPageModules("/admin/config"), ["system_config"]);

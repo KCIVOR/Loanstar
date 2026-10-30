@@ -202,6 +202,27 @@ function describeCore(row: AuditRowInput): Label {
   const trigger = str(after.trigger);
   const entity = row.entity_type ?? "";
 
+  if (row.module_slug === "website_content") {
+    const websiteActions: Record<string, string> = {
+      website_draft_saved: "Saved website draft",
+      website_published: "Published landing, login and registration",
+      website_restored: "Restored a website release",
+      website_draft_reconciled: "Reconciled website draft",
+      website_asset_uploaded: "Uploaded a website image",
+      website_save_draft: "Saved website draft",
+      website_publish: "Published landing, login and registration",
+      website_restore: "Restored a website release",
+      website_reconcile: "Reconciled website draft",
+      website_upload: "Uploaded a website image",
+      save_draft: "Saved website draft",
+      publish: "Published landing, login and registration",
+      restore: "Restored a website release",
+      reconcile_draft: "Reconciled website draft",
+      asset_upload: "Uploaded a website image",
+    };
+    return { summary: websiteActions[row.action] ?? humanize(row.action), outcome: "changed" };
+  }
+
   if (row.action === "login") return { summary: "Signed in", outcome: "signed_in" };
   if (row.action === "logout") return { summary: "Signed out", outcome: "signed_out" };
   if (row.module_slug === "account_settings") {
