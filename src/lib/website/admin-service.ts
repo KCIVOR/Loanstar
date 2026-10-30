@@ -13,7 +13,9 @@ export const restoreRequestSchema = publishRequestSchema.omit({ summary: true })
 export const reconcileRequestSchema = publishRequestSchema.omit({ requestId: true, summary: true }).extend({ mode: z.enum(['reset', 'rebase']) }).strict();
 
 export function websiteServiceClient() {
-  if (process.env.NEXT_PUBLIC_SUPABASE_URL !== 'https://ddsvqjaknuniekygpbdr.supabase.co') throw new WebsiteError(503, 'Website CMS staging target mismatch');
+  // Only the verified staging and production projects have the CMS migrations.
+  const allowedTargets = ['https://ddsvqjaknuniekygpbdr.supabase.co', 'https://acopcwlhkovssjnrqygk.supabase.co'];
+  if (!allowedTargets.includes(process.env.NEXT_PUBLIC_SUPABASE_URL ?? '')) throw new WebsiteError(503, 'Website CMS database target mismatch');
   return createServiceClient();
 }
 
