@@ -38,7 +38,7 @@ formatBorrowerName({ firstName, lastName, middleName }): string
 ### Batch 1 — Shared formatter ✅ DONE
 - `src/lib/borrower-name.ts` — commit `0dc08cb`.
 
-### Batch 2 — CSA
+### Batch 2 — CSA ✅ DONE (commit `c26e20f`)
 Files:
 - [src/lib/csa/queue.ts:231](../src/lib/csa/queue.ts) — add `middle_name` to the `borrowers` select; thread through the returned type.
 - [src/app/csa/page.tsx:174](../src/app/csa/page.tsx) — `queueBorrowerName()` → use `formatBorrowerName`.
