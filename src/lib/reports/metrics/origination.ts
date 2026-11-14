@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { approvalRatePct } from "@/lib/reports/approval-rate";
+import { formatBorrowerName } from "@/lib/borrower-name";
 import {
   computeSlaBreachesFromHistories,
   computeTatFromHistories,
@@ -318,7 +319,7 @@ export async function computeOriginationMetrics(
     // module's METRIC_DEFS, e.g. via the registry.
     const { data: withBorrowers } = await supabase
       .from("loan_applications")
-      .select("id, borrowers ( first_name, last_name )")
+      .select("id, borrowers ( first_name, middle_name, last_name )")
       .in(
         "id",
         stuckApps.map((a) => a.id),
@@ -326,12 +327,18 @@ export async function computeOriginationMetrics(
     const nameById = new Map<string, string>();
     for (const row of withBorrowers ?? []) {
       const raw = row.borrowers as
-        | { first_name: string | null; last_name: string | null }
-        | { first_name: string | null; last_name: string | null }[]
+        | { first_name: string | null; middle_name: string | null; last_name: string | null }
+        | { first_name: string | null; middle_name: string | null; last_name: string | null }[]
         | null;
       const b = Array.isArray(raw) ? raw[0] : raw;
-      const name = [b?.first_name, b?.last_name].filter(Boolean).join(" ").trim();
-      if (name) nameById.set(row.id as string, name);
+      const name = b
+        ? formatBorrowerName({
+            firstName: b.first_name ?? "",
+            middleName: b.middle_name ?? null,
+            lastName: b.last_name ?? "",
+          })
+        : "";
+      if (name && name !== "Unknown borrower") nameById.set(row.id as string, name);
     }
 
     for (const app of stuckApps) {

@@ -1,5 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
+import { formatBorrowerName } from "@/lib/borrower-name";
+
 export type SmeDuplicationMatch = {
   source: "borrower" | "lead";
   id: string;
@@ -20,6 +22,20 @@ export function normalizePersonName(
   last?: string | null,
 ): string {
   return normalizeCompanyName(`${first ?? ""} ${last ?? ""}`);
+}
+
+/** Display label only — matching stays on first/last via normalizePersonName. */
+function displayOwnerName(
+  first: string | null,
+  middle: string | null,
+  last: string | null,
+): string | null {
+  const formatted = formatBorrowerName({
+    firstName: first ?? "",
+    middleName: middle,
+    lastName: last ?? "",
+  });
+  return formatted === "Unknown borrower" ? null : formatted;
 }
 
 /**
@@ -45,6 +61,7 @@ export async function findSmeDuplicationMatches(
       borrowers (
         id,
         first_name,
+        middle_name,
         last_name,
         business_info
       )
@@ -63,11 +80,13 @@ export async function findSmeDuplicationMatches(
     companyName?: string;
   };
   const companyName = businessInfo.companyName?.trim() || null;
-  const ownerName =
-    [borrower?.first_name, borrower?.last_name]
-      .filter(Boolean)
-      .join(" ")
-      .trim() || null;
+  const ownerName = borrower
+    ? displayOwnerName(
+        borrower.first_name as string | null,
+        borrower.middle_name as string | null,
+        borrower.last_name as string | null,
+      )
+    : null;
 
   const companyKey = normalizeCompanyName(companyName);
   const ownerKey = normalizePersonName(
@@ -110,6 +129,7 @@ export async function findSmeDuplicationMatches(
         `
         id,
         first_name,
+        middle_name,
         last_name,
         business_info,
         loan_applications ( id, application_no, segment )
@@ -130,8 +150,11 @@ export async function findSmeDuplicationMatches(
           source: "borrower",
           id: row.id as string,
           companyName: info.companyName ?? null,
-          ownerName:
-            [row.first_name, row.last_name].filter(Boolean).join(" ") || null,
+          ownerName: displayOwnerName(
+            row.first_name as string | null,
+            row.middle_name as string | null,
+            row.last_name as string | null,
+          ),
         });
         continue;
       }
@@ -141,8 +164,11 @@ export async function findSmeDuplicationMatches(
           source: "borrower",
           id: row.id as string,
           companyName: info.companyName ?? null,
-          ownerName:
-            [row.first_name, row.last_name].filter(Boolean).join(" ") || null,
+          ownerName: displayOwnerName(
+            row.first_name as string | null,
+            row.middle_name as string | null,
+            row.last_name as string | null,
+          ),
           applicationId: (la as { id: string }).id,
           applicationNo:
             ((la as { application_no?: string }).application_no as string) ??
@@ -178,6 +204,7 @@ export async function findSmeDuplicationMatches(
         `
         id,
         first_name,
+        middle_name,
         last_name,
         business_info,
         loan_applications ( id, application_no )
@@ -208,8 +235,11 @@ export async function findSmeDuplicationMatches(
           source: "borrower",
           id: row.id as string,
           companyName: info.companyName ?? null,
-          ownerName:
-            [row.first_name, row.last_name].filter(Boolean).join(" ") || null,
+          ownerName: displayOwnerName(
+            row.first_name as string | null,
+            row.middle_name as string | null,
+            row.last_name as string | null,
+          ),
           applicationId: la ? (la as { id: string }).id : null,
           applicationNo: la
             ? ((la as { application_no?: string }).application_no as string) ??

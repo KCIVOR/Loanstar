@@ -7,6 +7,7 @@ import {
   type AuditOutcome,
 } from "@/lib/audit/labels";
 import { childLookupTable, directApplicationId } from "@/lib/audit/link";
+import { formatBorrowerName } from "@/lib/borrower-name";
 
 export type AuditEventRow = {
   id: string;
@@ -157,19 +158,28 @@ export async function resolveAuditRows(
   if (appIds.length) {
     const { data: apps } = await service
       .from("loan_applications")
-      .select("id, application_no, borrowers ( first_name, last_name )")
+      .select("id, application_no, borrowers ( first_name, middle_name, last_name )")
       .in("id", appIds);
     for (const a of (apps ?? []) as Array<{
       id: string;
       application_no: string | null;
       borrowers:
-        | { first_name: string | null; last_name: string | null }
-        | Array<{ first_name: string | null; last_name: string | null }>
+        | { first_name: string | null; middle_name: string | null; last_name: string | null }
+        | Array<{ first_name: string | null; middle_name: string | null; last_name: string | null }>
         | null;
     }>) {
       const b = firstOf(a.borrowers);
-      const name = b ? [b.first_name, b.last_name].filter(Boolean).join(" ").trim() : "";
-      loanById.set(a.id, { applicationNo: a.application_no, borrowerName: name || null });
+      const name = b
+        ? formatBorrowerName({
+            firstName: b.first_name ?? "",
+            middleName: b.middle_name ?? null,
+            lastName: b.last_name ?? "",
+          })
+        : "";
+      loanById.set(a.id, {
+        applicationNo: a.application_no,
+        borrowerName: name && name !== "Unknown borrower" ? name : null,
+      });
     }
   }
 
