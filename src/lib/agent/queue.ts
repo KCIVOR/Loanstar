@@ -5,6 +5,7 @@ import {
   leadPipelineStage,
   type LeadPipelineStage,
 } from "@/lib/agent/pipeline";
+import { resolveBorrowerName } from "@/lib/borrower-name";
 
 /**
  * Param-driven agent leads queue over `leads`.
@@ -94,7 +95,8 @@ const LEAD_SELECT = `
   status,
   created_at,
   updated_at,
-  loan_applications ( segment )
+  loan_applications ( segment ),
+  borrowers ( first_name, middle_name, last_name )
 `;
 
 type FlagRow = {
@@ -114,6 +116,10 @@ type RawLeadRow = {
   loan_applications?:
     | { segment: string | null }
     | { segment: string | null }[]
+    | null;
+  borrowers?:
+    | { first_name: string | null; middle_name: string | null; last_name: string | null }
+    | { first_name: string | null; middle_name: string | null; last_name: string | null }[]
     | null;
 };
 
@@ -224,10 +230,24 @@ function mapEnrichedLead(
     segmentRaw === "sme" || segmentRaw === "seafarer" || segmentRaw === "individual"
       ? segmentRaw
       : null;
+  const borrowerRaw = row.borrowers;
+  const linkedBorrower = Array.isArray(borrowerRaw) ? borrowerRaw[0] : borrowerRaw;
 
   return {
     id: row.id,
-    borrowerName: row.borrower_name,
+    // Linked lead: resolve from the live borrower record (middle name,
+    // edits). Free-form/unlinked lead: show the raw typed string as-is --
+    // it can't be reliably split into first/middle/last.
+    borrowerName: resolveBorrowerName(
+      linkedBorrower
+        ? {
+            firstName: linkedBorrower.first_name ?? "",
+            middleName: linkedBorrower.middle_name,
+            lastName: linkedBorrower.last_name ?? "",
+          }
+        : null,
+      row.borrower_name,
+    ),
     businessName: row.business_name,
     borrowerId: row.borrower_id,
     applicationId,

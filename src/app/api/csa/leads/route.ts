@@ -51,6 +51,10 @@ export async function GET() {
       }
     }
 
+    // Note: borrowerName here also seeds the "Start application" link's
+    // ?name= prefill (parseBorrowerNameParts splits on whitespace), so it
+    // stays the raw stored string even for linked leads -- a resolved
+    // "Last, First Middle" string would corrupt that split.
     const leads = rows.map((row) => ({
       id: row.id,
       borrowerName: row.borrower_name,
