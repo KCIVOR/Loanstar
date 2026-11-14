@@ -62,7 +62,12 @@ Files:
 - [src/app/cig/denials/page.tsx:120](../src/app/cig/denials/page.tsx) — including confirmation dialog label.
 - [src/app/cig/applications/[id]/page.tsx:743](../src/app/cig/applications/[id]/page.tsx) — borrower name only. The two-field **bank-account label** in this same file is a separate, unrelated format — do not touch it in this batch.
 
-### Batch 4 — Committee
+### Batch 4 — Committee ✅ DONE (commit `3b3f7c9`)
+Approval/denial emails needed `middle_name` threaded from
+`getApplicationForStaff` (already selected it, just wasn't passed) through
+the three call sites (action, approve-without-sign, decision-email/resend
+routes) into `ApprovalBorrower`/`DenialBorrower`.
+
 Files:
 - [src/app/committee/page.tsx:169](../src/app/committee/page.tsx)
 - [src/app/committee/history/page.tsx:124](../src/app/committee/history/page.tsx)
