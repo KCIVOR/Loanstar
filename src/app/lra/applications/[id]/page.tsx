@@ -54,6 +54,7 @@ import {
   isPostSignForPdcCollect,
 } from "@/lib/lra/pdc-collect";
 import { releaseStageForPath, type ReleasePath } from "@/lib/lra/constants";
+import { formatBorrowerName } from "@/lib/borrower-name";
 import {
   canShowMarkAllSigned,
   unsignedGeneratedDocumentIds,
@@ -230,6 +231,7 @@ type LraWorkspace = {
     id?: string;
     borrower_no?: string;
     first_name?: string;
+    middle_name?: string | null;
     last_name?: string;
     business_info?: BusinessInfo | null;
   } | null;
@@ -1047,7 +1049,11 @@ export default function LraApplicationPage() {
   const companyName = data.borrower?.business_info?.companyName?.trim();
   const personalName =
     data.borrower?.first_name || data.borrower?.last_name
-      ? `${data.borrower.first_name ?? ""} ${data.borrower.last_name ?? ""}`.trim()
+      ? formatBorrowerName({
+          firstName: data.borrower.first_name ?? "",
+          middleName: data.borrower.middle_name ?? null,
+          lastName: data.borrower.last_name ?? "",
+        })
       : "Borrower";
   const borrowerLabel =
     data.application.segment === "sme" && companyName

@@ -49,6 +49,7 @@ export type LraQueueItem = {
   borrower: {
     borrowerNo: string;
     firstName: string;
+    middleName: string | null;
     lastName: string;
   } | null;
   releaseFile: {
@@ -108,6 +109,7 @@ const QUEUE_SELECT = `
     borrowers (
       borrower_no,
       first_name,
+      middle_name,
       last_name
     ),
     release_files (
@@ -234,6 +236,7 @@ async function findLoanApplicationIdsForSearch(
 type NestedBorrower = {
   borrower_no: string;
   first_name: string;
+  middle_name: string | null;
   last_name: string;
 };
 
@@ -289,6 +292,7 @@ function mapQueueRow(row: RawQueueRow): LraQueueItem {
       ? {
           borrowerNo: borrower.borrower_no,
           firstName: borrower.first_name,
+          middleName: borrower.middle_name ?? null,
           lastName: borrower.last_name,
         }
       : null,

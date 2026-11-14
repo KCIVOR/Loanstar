@@ -24,6 +24,7 @@ import {
   cn,
 } from "@/components/ui";
 import { formatDate, formatMoney } from "@/lib/lra/format";
+import { formatBorrowerName } from "@/lib/borrower-name";
 import type { ReleasePath, ReleasedLoanRow } from "@/lib/lra/history";
 
 type HistoryKpi = {
@@ -67,7 +68,7 @@ const EMPTY_KPI: HistoryKpi = {
 
 function borrowerName(row: ReleasedLoanRow): string {
   if (!row.borrower) return "Unknown borrower";
-  return `${row.borrower.firstName} ${row.borrower.lastName}`;
+  return formatBorrowerName(row.borrower);
 }
 
 function borrowerSortKey(row: ReleasedLoanRow): string {
