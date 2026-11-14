@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { ValidationError } from "@/lib/api/errors";
+import { formatBorrowerName } from "@/lib/borrower-name";
 import { createServiceClient } from "@/lib/supabase/server";
 
 /** Imported accounts stay in AR until the borrower portal supports their history. */
@@ -58,9 +59,11 @@ export async function searchBorrowerAccounts(
   return (data ?? []).map((row) => ({
     id: row.id as string,
     borrowerNo: (row.borrower_no as string) ?? null,
-    fullName: [row.first_name, row.middle_name, row.last_name]
-      .filter(Boolean)
-      .join(" "),
+    fullName: formatBorrowerName({
+      firstName: (row.first_name as string) ?? "",
+      middleName: row.middle_name as string | null,
+      lastName: (row.last_name as string) ?? "",
+    }),
     email: row.email as string,
     mobilePhone: (row.mobile_phone as string) ?? null,
   }));

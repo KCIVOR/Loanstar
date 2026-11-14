@@ -131,19 +131,36 @@ export function cleanText(v: CellValue): string | null {
 }
 
 /**
- * "DELA CRUZ, JUAN P." → last "DELA CRUZ", first "JUAN P."; otherwise the last
- * token is the last name ("Juan Dela Cruz" → first "Juan Dela", last "Cruz").
+ * "DELA CRUZ, JUAN P." → last "DELA CRUZ", first "JUAN", middle "P." -- the
+ * comma format has an unambiguous "Last, First Middle" structure, so the
+ * middle name is split out too. Otherwise the last token is the last name
+ * ("Juan Dela Cruz" → first "Juan Dela", last "Cruz") -- no comma means no
+ * reliable way to tell a middle name from a compound surname, so that case
+ * is left exactly as before (no middle extracted).
  * Company names (single token) put everything in last_name and first_name.
  */
-export function splitFullName(v: CellValue): { first: string; last: string } | null {
+export function splitFullName(
+  v: CellValue,
+): { first: string; middle: string | null; last: string } | null {
   const s = cleanText(v);
   if (!s) return null;
   if (s.includes(",")) {
     const [last, ...rest] = s.split(",");
-    const first = rest.join(",").trim();
-    if (last.trim() && first) return { first, last: last.trim() };
+    const given = rest.join(",").trim();
+    if (last.trim() && given) {
+      const givenParts = given.split(" ");
+      return {
+        first: givenParts[0],
+        middle: givenParts.length > 1 ? givenParts.slice(1).join(" ") : null,
+        last: last.trim(),
+      };
+    }
   }
   const parts = s.split(" ");
-  if (parts.length === 1) return { first: s, last: s };
-  return { first: parts.slice(0, -1).join(" "), last: parts[parts.length - 1] };
+  if (parts.length === 1) return { first: s, middle: null, last: s };
+  return {
+    first: parts.slice(0, -1).join(" "),
+    middle: null,
+    last: parts[parts.length - 1],
+  };
 }
