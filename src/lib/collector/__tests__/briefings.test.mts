@@ -37,6 +37,7 @@ function item(
         ? {
             borrowerNo: "BRW-001",
             firstName: "Rovick",
+            middleName: null,
             lastName: "Romasanta",
           }
         : overrides.borrower,

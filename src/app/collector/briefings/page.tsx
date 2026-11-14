@@ -34,6 +34,7 @@ import {
   type BriefingWaitingBucket,
 } from "@/lib/collector/briefings";
 import { formatDateTime } from "@/lib/collector/format";
+import { formatBorrowerName } from "@/lib/borrower-name";
 
 type SegmentFilter = "all" | "seafarer" | "sme" | "individual";
 
@@ -145,7 +146,7 @@ function formatWaitingDays(days: number | null): string {
 
 function borrowerName(item: BriefingItem): string {
   return item.borrower
-    ? `${item.borrower.firstName} ${item.borrower.lastName}`
+    ? formatBorrowerName(item.borrower)
     : "Unknown borrower";
 }
 
@@ -643,7 +644,7 @@ export default function CollectorBriefingsPage() {
             Confirm you have briefed{" "}
             <span className="font-medium text-ink-900">
               {confirmItem?.borrower
-                ? `${confirmItem.borrower.firstName} ${confirmItem.borrower.lastName}`
+                ? formatBorrowerName(confirmItem.borrower)
                 : "the borrower"}
             </span>{" "}
             on the items below. This unlocks release and cannot be undone.

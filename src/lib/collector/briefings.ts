@@ -11,6 +11,7 @@ export type BriefingQueueItem = {
   borrower: {
     borrowerNo: string;
     firstName: string;
+    middleName: string | null;
     lastName: string;
   } | null;
   briefing: {

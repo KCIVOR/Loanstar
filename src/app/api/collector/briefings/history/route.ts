@@ -1,4 +1,5 @@
 import { handleApiError, jsonOk } from "@/lib/api/handler";
+import { formatBorrowerName } from "@/lib/borrower-name";
 import type { BriefingHistoryRow } from "@/lib/collector/briefings";
 import { requireModulePermission } from "@/lib/permissions/server";
 import { createClient } from "@/lib/supabase/server";
@@ -27,6 +28,7 @@ export async function GET() {
             borrowers (
               borrower_no,
               first_name,
+              middle_name,
               last_name
             )
           )
@@ -58,6 +60,7 @@ export async function GET() {
       const borrower = one(app?.borrowers) as {
         borrower_no: string;
         first_name: string;
+        middle_name: string | null;
         last_name: string;
       } | null;
 
@@ -71,7 +74,13 @@ export async function GET() {
         applicationNo: app?.application_no ?? null,
         segment: app?.segment ?? null,
         borrowerNo: borrower?.borrower_no ?? null,
-        borrowerName: borrower ? `${borrower.first_name} ${borrower.last_name}` : "—",
+        borrowerName: borrower
+          ? formatBorrowerName({
+              firstName: borrower.first_name,
+              middleName: borrower.middle_name,
+              lastName: borrower.last_name,
+            })
+          : "—",
       };
     });
 
