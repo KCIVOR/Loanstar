@@ -50,6 +50,7 @@ import {
   listInterviewRecordPrerequisites,
 } from "@/lib/csa/initial-interview";
 import { daysInQueue } from "@/lib/csa/queue";
+import { formatBorrowerName } from "@/lib/borrower-name";
 import type { OpenRevisitNotice } from "@/lib/committee/revisit-notices";
 import {
   buildCsaWorkspaceSteps,
@@ -633,7 +634,7 @@ export default function CsaApplicationPage() {
     segment: data.application.segment ?? "seafarer",
   });
   const borrowerTitle = data.borrower
-    ? `${data.borrower.firstName} ${data.borrower.lastName}`
+    ? formatBorrowerName(data.borrower)
     : "Application";
   const docs = csaDocsSummary(data.checklist);
   const docsComplete =
@@ -858,7 +859,7 @@ export default function CsaApplicationPage() {
                 size="lg"
               />
               <div className="nm">
-                {data.borrower.firstName} {data.borrower.lastName}
+                {formatBorrowerName(data.borrower)}
               </div>
               <div className="rl">
                 {[
@@ -1368,9 +1369,7 @@ export default function CsaApplicationPage() {
           <ChangeOwnerPanel
             applicationId={applicationId}
             currentBorrowerId={data.borrower.id}
-            currentBorrowerName={[data.borrower.firstName, data.borrower.lastName]
-              .filter(Boolean)
-              .join(" ")}
+            currentBorrowerName={formatBorrowerName(data.borrower)}
             onChanged={() => void load({ silent: true })}
           />
         ) : null}

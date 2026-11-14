@@ -28,6 +28,7 @@ import {
   statusBadgeVariant,
 } from "@/lib/applications/status";
 import { formatDate } from "@/lib/csa/format";
+import { formatBorrowerName } from "@/lib/borrower-name";
 import {
   csaNeedsAttention,
   daysInQueue,
@@ -49,6 +50,7 @@ type QueueItem = {
   borrower: {
     borrowerNo: string;
     firstName: string;
+    middleName: string | null;
     lastName: string;
     email: string;
   } | null;
@@ -173,7 +175,7 @@ const SEGMENT_CHIPS: Array<{
 
 function queueBorrowerName(app: QueueItem): string {
   return app.borrower
-    ? `${app.borrower.firstName} ${app.borrower.lastName}`
+    ? formatBorrowerName(app.borrower)
     : "Unknown borrower";
 }
 

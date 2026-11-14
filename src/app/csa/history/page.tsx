@@ -25,6 +25,7 @@ import {
 } from "@/components/ui";
 import { formatStatusLabel } from "@/lib/applications/status";
 import { formatDate, formatMoney } from "@/lib/csa/format";
+import { formatBorrowerName } from "@/lib/borrower-name";
 
 type CsaHistoryStatusGroup = "in_progress" | "denied" | "released";
 
@@ -37,6 +38,7 @@ type HistoryRow = {
   borrower: {
     borrowerNo: string;
     firstName: string;
+    middleName: string | null;
     lastName: string;
     email: string;
   } | null;
@@ -111,7 +113,7 @@ function statusVariant(
 
 function borrowerName(row: HistoryRow): string {
   if (!row.borrower) return "Unknown borrower";
-  return `${row.borrower.firstName} ${row.borrower.lastName}`;
+  return formatBorrowerName(row.borrower);
 }
 
 function segmentBadge(segment: "sme" | "seafarer" | "individual" | null) {
