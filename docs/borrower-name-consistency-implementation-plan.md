@@ -48,7 +48,13 @@ Files:
 
 Constraint: do not touch `connect-borrower.ts` search matching/sort logic — only the displayed label.
 
-### Batch 3 — CIG
+### Batch 3 — CIG ✅ DONE (commit `996f611`)
+Returned-to-CSA history tab stays two-field: its view
+(`cig_return_to_csa_events`) does not expose `middle_name` — flagged in
+code, not migrated. Also updated two test fixtures broken by the new
+required `middleName` field (unrelated pre-existing fixture bugs around
+`segment`/`VerificationRecord` left untouched).
+
 Files:
 - [src/app/cig/page.tsx:216](../src/app/cig/page.tsx)
 - [src/app/cig/history/page.tsx:112](../src/app/cig/history/page.tsx)
