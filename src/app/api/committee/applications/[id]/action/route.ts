@@ -59,6 +59,7 @@ export async function POST(request: Request, { params }: RouteParams) {
           ? {
               email: borrower.email as string | null,
               first_name: borrower.first_name as string | null,
+              middle_name: borrower.middle_name as string | null,
               last_name: borrower.last_name as string | null,
               user_id: borrower.user_id as string | null,
             }
@@ -80,6 +81,7 @@ export async function POST(request: Request, { params }: RouteParams) {
           ? {
               email: borrower.email as string | null,
               first_name: borrower.first_name as string | null,
+              middle_name: borrower.middle_name as string | null,
               last_name: borrower.last_name as string | null,
               user_id: borrower.user_id as string | null,
             }

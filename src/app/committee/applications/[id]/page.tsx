@@ -74,6 +74,7 @@ import {
   type RemInspection,
 } from "@/lib/cig/collateral-inspection";
 import type { BorrowerProfile } from "@/lib/borrowers/types";
+import { formatBorrowerName } from "@/lib/borrower-name";
 import { halfUp } from "@/lib/computation/money";
 import { CSA_ONLY_INTAKE_SLUGS } from "@/lib/documents/csa-only-intake";
 
@@ -710,7 +711,7 @@ export default function CommitteeApplicationPage() {
     data.application.segment === "sme" && companyName
       ? companyName
       : data.borrower
-        ? `${data.borrower.firstName} ${data.borrower.lastName}`
+        ? formatBorrowerName(data.borrower)
         : "Application";
   // Vote casting & 4 Cs stay available while ballots fill in; final action
   // alone waits for canDecide (all 3 votes — Phase 2).

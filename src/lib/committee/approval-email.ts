@@ -3,10 +3,12 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { writeAuditEvent } from "@/lib/audit/writer";
 import { sendEmail } from "@/lib/email/send";
 import { shouldSendChannel } from "@/lib/notifications/should-send-channel";
+import { formatBorrowerName } from "@/lib/borrower-name";
 
 export type ApprovalBorrower = {
   email?: string | null;
   first_name?: string | null;
+  middle_name?: string | null;
   last_name?: string | null;
   user_id?: string | null;
 };
@@ -24,10 +26,13 @@ export function buildApplicationApprovedEmail(
   const email = borrower?.email?.trim();
   if (!email) return null;
 
-  const borrower_name = [borrower?.first_name, borrower?.last_name]
-    .filter((part): part is string => Boolean(part?.trim()))
-    .join(" ")
-    .trim();
+  const formattedName = formatBorrowerName({
+    firstName: borrower?.first_name ?? "",
+    middleName: borrower?.middle_name ?? null,
+    lastName: borrower?.last_name ?? "",
+  });
+  const borrower_name =
+    formattedName === "Unknown borrower" ? "" : formattedName;
 
   return {
     to: email,
