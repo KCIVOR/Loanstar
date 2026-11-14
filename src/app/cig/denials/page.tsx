@@ -34,6 +34,7 @@ import {
   type DenialWaitingBucket,
 } from "@/lib/cig/denials";
 import { formatDate } from "@/lib/cig/format";
+import { formatBorrowerName } from "@/lib/borrower-name";
 
 const PAGE_SIZE_OPTIONS = DENIAL_LIST_PAGE_SIZES;
 
@@ -117,7 +118,7 @@ function formatWaitingDays(days: number | null): string {
 
 function borrowerName(call: DenialCallItem): string {
   return call.borrower
-    ? `${call.borrower.firstName} ${call.borrower.lastName}`
+    ? formatBorrowerName(call.borrower)
     : "Unknown borrower";
 }
 
@@ -615,7 +616,7 @@ export default function CigDenialsPage() {
             Confirm you called{" "}
             <span className="font-medium text-ink-900">
               {informTarget?.borrower
-                ? `${informTarget.borrower.firstName} ${informTarget.borrower.lastName}`
+                ? formatBorrowerName(informTarget.borrower)
                 : "the borrower"}
             </span>{" "}
             and informed them of the denial without disclosing the reason. The

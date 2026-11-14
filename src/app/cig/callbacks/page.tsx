@@ -23,6 +23,7 @@ import {
   Th,
 } from "@/components/ui";
 import { formatDateTime } from "@/lib/cig/format";
+import { formatBorrowerName } from "@/lib/borrower-name";
 import {
   CALLBACK_LIST_PAGE_SIZES,
   callbackStatusFilterSpec,
@@ -108,9 +109,7 @@ function statusChipLabel(filter: CallbackStatusFilter): string {
 }
 
 function borrowerName(cb: CigScheduledCallback): string {
-  return cb.borrower
-    ? `${cb.borrower.firstName} ${cb.borrower.lastName}`
-    : "Unknown borrower";
+  return cb.borrower ? formatBorrowerName(cb.borrower) : "Unknown borrower";
 }
 
 function StatusBadgeForCallback({ isOverdue }: { isOverdue: boolean }) {
@@ -627,7 +626,7 @@ export default function CigCallbacksPage() {
             Confirm you completed the scheduled follow-up with{" "}
             <span className="font-medium text-ink-900">
               {resolveTarget?.borrower
-                ? `${resolveTarget.borrower.firstName} ${resolveTarget.borrower.lastName}`
+                ? formatBorrowerName(resolveTarget.borrower)
                 : "the borrower"}
             </span>
             . This only records that the callback was handled — it does not

@@ -29,6 +29,7 @@ function row(
         ? {
             borrowerNo: "B-001",
             firstName: "Borrower",
+            middleName: null,
             lastName: "Name",
             email: "borrower@example.com",
           }
@@ -143,6 +144,7 @@ describe("cigQueueSearchPredicate", () => {
     borrower: {
       borrowerNo: "B-100",
       firstName: "Juan",
+      middleName: null,
       lastName: "Cruz",
       email: "juan.cruz@example.com",
     },

@@ -78,6 +78,7 @@ import {
   cigWaitingLabel,
 } from "@/lib/cig/workspace";
 import type { CigSequenceState } from "@/lib/cig/sequence";
+import { formatBorrowerName } from "@/lib/borrower-name";
 import type {
   PicDemeanorTag,
   PicPaymentPreference,
@@ -739,9 +740,7 @@ export default function CigApplicationPage() {
   if (loading) return <Spinner />;
   if (!verification) return <Alert>Application not found.</Alert>;
 
-  const title = borrower
-    ? `${borrower.firstName} ${borrower.lastName}`.trim()
-    : "Verification";
+  const title = borrower ? formatBorrowerName(borrower) : "Verification";
 
   const formMissing = completeness.missing.filter(
     (item) => !item.endsWith(" check not recorded"),
@@ -1283,7 +1282,7 @@ export default function CigApplicationPage() {
                     size="lg"
                   />
                   <div className="nm">
-                    {borrower.firstName} {borrower.lastName}
+                    {formatBorrowerName(borrower)}
                   </div>
                   <div className="rl">
                     {[

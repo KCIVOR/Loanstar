@@ -27,6 +27,7 @@ export type CigScheduledCallback = {
   borrower: {
     borrowerNo: string;
     firstName: string;
+    middleName: string | null;
     lastName: string;
     email: string;
   } | null;
@@ -43,6 +44,8 @@ export type CigRecentFindingFilter = "all" | "positive" | "negative";
 export type CigHistoryBorrower = {
   borrowerNo: string;
   firstName: string;
+  /** Null for the Returned-to-CSA tab: that view does not expose it. */
+  middleName: string | null;
   lastName: string;
   email: string;
 };
@@ -207,6 +210,7 @@ const APPLICATION_BORROWER_EMBED = `
     borrowers (
       borrower_no,
       first_name,
+      middle_name,
       last_name,
       email
     )
@@ -305,6 +309,7 @@ function mapBorrower(raw: unknown): CigHistoryBorrower | null {
   return {
     borrowerNo: row.borrower_no as string,
     firstName: row.first_name as string,
+    middleName: (row.middle_name as string | null) ?? null,
     lastName: row.last_name as string,
     email: row.email as string,
   };
@@ -528,6 +533,7 @@ export async function getCigScheduledCallbacks(
         borrowers (
           borrower_no,
           first_name,
+          middle_name,
           last_name,
           email
         )
@@ -577,6 +583,7 @@ export async function getCigScheduledCallbacks(
           ? {
               borrowerNo: borrower.borrower_no as string,
               firstName: borrower.first_name as string,
+              middleName: (borrower.middle_name as string | null) ?? null,
               lastName: borrower.last_name as string,
               email: borrower.email as string,
             }
@@ -870,6 +877,8 @@ export async function getCigReturnedHistory(
           ? {
               borrowerNo: (row.borrower_no as string) ?? "",
               firstName: (row.first_name as string) ?? "",
+              // cig_return_to_csa_events view does not expose middle_name.
+              middleName: null,
               lastName: (row.last_name as string) ?? "",
               email: (row.email as string) ?? "",
             }
@@ -958,6 +967,7 @@ export async function getCigDenialCallsHistory(
         borrowers (
           borrower_no,
           first_name,
+          middle_name,
           last_name,
           email
         )
@@ -1102,6 +1112,7 @@ export async function getCigCancellationsHistory(
         borrowers (
           borrower_no,
           first_name,
+          middle_name,
           last_name,
           email
         )
@@ -1241,6 +1252,7 @@ export async function getCigCallbacksResolvedHistory(
         borrowers (
           borrower_no,
           first_name,
+          middle_name,
           last_name,
           email
         )

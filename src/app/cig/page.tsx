@@ -34,6 +34,7 @@ import {
   type CigWorkFilter,
 } from "@/lib/cig/desk";
 import { formatDate } from "@/lib/cig/format";
+import { formatBorrowerName } from "@/lib/borrower-name";
 import {
   CIG_QUEUE_PAGE_SIZES,
   type CigQueueItem,
@@ -213,7 +214,7 @@ function buildQueueQuery(params: {
 
 function borrowerDisplayName(app: CigQueueItem): string {
   return app.borrower
-    ? `${app.borrower.firstName} ${app.borrower.lastName}`
+    ? formatBorrowerName(app.borrower)
     : "Unknown borrower";
 }
 

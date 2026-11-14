@@ -31,6 +31,7 @@ function item(
       overrides.borrower === undefined
         ? {
             firstName: "Rovick",
+            middleName: null,
             lastName: "Romasanta",
             email: "rovick@example.com",
             mobilePhone: null,
