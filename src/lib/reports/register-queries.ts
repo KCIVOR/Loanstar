@@ -15,6 +15,7 @@ import {
   type PastDueRow,
 } from "./registers";
 import { asCollateralType, asLoanSegment } from "./segments";
+import { resolveBorrowerName } from "@/lib/borrower-name";
 
 async function resolveNames(
   supabase: SupabaseClient,
@@ -44,7 +45,7 @@ export async function fetchLoanRegister(
       supabase
         .from("masterlist")
         .select(
-          "id, loan_application_id, borrower_id, loan_account_no, borrower_name, segment, account_status, aging_bucket, outstanding_balance, total_loan, release_date",
+          "id, loan_application_id, borrower_id, loan_account_no, borrower_name, segment, account_status, aging_bucket, outstanding_balance, total_loan, release_date, borrowers ( first_name, middle_name, last_name )",
         ),
       supabase.from("assignments").select("masterlist_id, collector_user_id, remedial_user_id"),
     ]);
@@ -91,11 +92,25 @@ export async function fetchLoanRegister(
   return (masterlist ?? []).map((row) => {
     const assignment = assignmentByMasterlist.get(row.id as string);
     const applicationId = (row.loan_application_id as string | null) ?? null;
+    const borrowerRaw = row.borrowers as
+      | { first_name: string | null; middle_name: string | null; last_name: string | null }
+      | Array<{ first_name: string | null; middle_name: string | null; last_name: string | null }>
+      | null;
+    const linkedBorrower = Array.isArray(borrowerRaw) ? borrowerRaw[0] : borrowerRaw;
     return {
       masterlistId: row.id as string,
       loanAccountNo: (row.loan_account_no as string | null) ?? null,
       borrowerId: row.borrower_id as string,
-      borrowerName: (row.borrower_name as string) || "",
+      borrowerName: resolveBorrowerName(
+        linkedBorrower
+          ? {
+              firstName: linkedBorrower.first_name ?? "",
+              middleName: linkedBorrower.middle_name,
+              lastName: linkedBorrower.last_name ?? "",
+            }
+          : null,
+        row.borrower_name as string | null,
+      ),
       segment: asLoanSegment(row.segment),
       collateralType: applicationId
         ? (collateralByApplication.get(applicationId) ?? "none")

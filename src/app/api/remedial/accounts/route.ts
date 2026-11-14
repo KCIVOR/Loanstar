@@ -20,6 +20,7 @@ import {
   type RemedialQueueSortKey,
 } from "@/lib/remedial/queue";
 import { createClient, createServiceClient } from "@/lib/supabase/server";
+import { resolveBorrowerName } from "@/lib/borrower-name";
 
 const RANGE_PRESETS = new Set(["30d", "90d", "all", "custom"]);
 const SEGMENT_FILTERS = new Set(["all", "seafarer", "sme", "individual"]);
@@ -109,6 +110,7 @@ export async function GET(request: Request) {
         principal,
         total_loan,
         updated_at,
+        borrowers ( first_name, middle_name, last_name ),
         assignments!inner (
           remedial_user_id,
           collector_user_id,
@@ -252,9 +254,24 @@ export async function GET(request: Request) {
         ? assignmentRaw[0]
         : assignmentRaw;
 
+      const borrowerRaw = row.borrowers as
+        | { first_name: string | null; middle_name: string | null; last_name: string | null }
+        | Array<{ first_name: string | null; middle_name: string | null; last_name: string | null }>
+        | null;
+      const linkedBorrower = Array.isArray(borrowerRaw) ? borrowerRaw[0] : borrowerRaw;
+
       return {
         id: row.id,
-        borrowerName: row.borrower_name,
+        borrowerName: resolveBorrowerName(
+          linkedBorrower
+            ? {
+                firstName: linkedBorrower.first_name ?? "",
+                middleName: linkedBorrower.middle_name,
+                lastName: linkedBorrower.last_name ?? "",
+              }
+            : null,
+          row.borrower_name as string | null,
+        ),
         borrowerNo: row.borrower_no,
         loanAccountNo: row.loan_account_no,
         segment:

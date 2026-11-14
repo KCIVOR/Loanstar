@@ -18,7 +18,7 @@ export async function GET() {
         loan_applications (
           application_no,
           status,
-          borrowers ( borrower_no, first_name, last_name )
+          borrowers ( borrower_no, first_name, middle_name, last_name )
         )
       `,
       )
