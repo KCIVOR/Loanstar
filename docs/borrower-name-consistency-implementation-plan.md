@@ -93,30 +93,45 @@ Files:
 
 Constraint: BLRI/release-document output may have its own formatting contract with the generated document — verify the document template still accepts the new string before changing it (per the audit's note on generated-document review).
 
-### Batch 6 — Collector Briefings
+### Batch 6 — Collector Briefings ✅ DONE (commit `1ecba65`)
 Files:
 - [src/app/collector/briefings/page.tsx:148](../src/app/collector/briefings/page.tsx) — queue + confirmation dialog.
 - [src/app/api/collector/briefings/history/route.ts:74](../src/app/api/collector/briefings/history/route.ts) — currently formats the label server-side before sending; switch to `formatBorrowerName`, preserve the API response shape otherwise.
 
-### Batch 7 — Reports / Audit / Notifications / SME duplication
+### Batch 7 — Reports / Audit / Notifications / SME duplication ✅ DONE (commit `d6e7a47`)
+`sme-duplication.ts` got a local `displayOwnerName()` helper so match-result
+labels use the shared formatter while `normalizePersonName`/`ownerKey`
+matching stays on first/last only. Lead `ownerName` (free-form
+`leads.borrower_name`) untouched — Phase 2 territory.
+
 Files:
 - [src/lib/reports/metrics/origination.ts:321](../src/lib/reports/metrics/origination.ts)
 - [src/lib/audit/resolve.ts:160](../src/lib/audit/resolve.ts)
 - [src/lib/notifications/workflow-events.ts:51](../src/lib/notifications/workflow-events.ts)
 - [src/lib/csa/sme-duplication.ts:67](../src/lib/csa/sme-duplication.ts) — match-result labels only; do not touch matching/scoring logic.
 
-### Batch 8 — Generated documents
-Files:
+### Batch 8 — Generated documents — ⏸ DEFERRED, not implemented
+Evidence against reformatting: [promissory-note-preview.ts:74,81](../src/lib/documents/fidelity/promissory-note-preview.ts)
+prints `{{borrowerName}}` directly above "Signature Over Borrower's Name"
+on a signed legal document — this strongly implies the generated-document
+family expects natural order (First Middle Last), not the UI's
+`Last, First Middle` format. Applying the UI format here risks garbling
+signed promissory notes, bank authorizations, computation sheets, and
+receipts. User decision (2026-11-15): defer the entire batch rather than
+guess; untouched for now. If this batch is revisited, the fix shape is
+likely "add middle name, keep natural order" rather than the UI format —
+confirm against each actual printed template first.
+
+Files (none changed):
 - [src/lib/documents/generators/application-form-context.ts:171](../src/lib/documents/generators/application-form-context.ts)
 - [src/lib/documents/generators/bank-authorization.ts:20](../src/lib/documents/generators/bank-authorization.ts)
 - [src/lib/documents/generators/final-computation-sheet.ts:152](../src/lib/documents/generators/final-computation-sheet.ts)
-- [src/lib/documents/generators/payment-receipt.ts:124](../src/lib/documents/generators/payment-receipt.ts) — currently middle-name-included, first-name-first; confirm the physical document template/legal format tolerates `Last, First Middle` before changing — if the template requires first-name-first, flag it and skip rather than guess.
+- [src/lib/documents/generators/payment-receipt.ts:124](../src/lib/documents/generators/payment-receipt.ts) — already middle-name-included, first-name-first; left as-is.
 - [src/lib/lra/blri-data.ts:179](../src/lib/lra/blri-data.ts) — deferred from Batch 5 for the same reason; feeds `template-context.ts:383,629` (BLRI/bank-authorization merge context).
 
 **Gate before Phase 2:** Retest using the CSA seed borrowers (one with a
 recorded middle name, one blank) across every surface touched in Batches
-2–8, and verify generated-document output for Batch 8 specifically, since
-documents may have external formatting contracts.
+2–7 (Batch 8 deferred, not in scope for this retest).
 
 ## Phase 2 — Shared data sources (requires decisions first, do not start blind)
 
