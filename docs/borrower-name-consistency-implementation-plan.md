@@ -77,7 +77,13 @@ Files:
 
 Constraint: email templates — change only the name token's value, not subject lines, surrounding copy, or send logic.
 
-### Batch 5 — LRA
+### Batch 5 — LRA ✅ DONE (commit `088e7db`), with one deferral
+`blri-data.ts`'s release-document `borrowerName` was **not** changed: it
+feeds generated legal/financial documents via docxtemplater merge tags
+(`template-context.ts:383,629`), and the actual `.docx` template's
+required name order can't be verified from the repo (stored in Supabase
+storage). Deferred to Batch 8 review rather than guessed.
+
 Files:
 - [src/app/lra/page.tsx:173](../src/app/lra/page.tsx)
 - [src/app/lra/history/page.tsx:70](../src/app/lra/history/page.tsx)
@@ -105,6 +111,7 @@ Files:
 - [src/lib/documents/generators/bank-authorization.ts:20](../src/lib/documents/generators/bank-authorization.ts)
 - [src/lib/documents/generators/final-computation-sheet.ts:152](../src/lib/documents/generators/final-computation-sheet.ts)
 - [src/lib/documents/generators/payment-receipt.ts:124](../src/lib/documents/generators/payment-receipt.ts) — currently middle-name-included, first-name-first; confirm the physical document template/legal format tolerates `Last, First Middle` before changing — if the template requires first-name-first, flag it and skip rather than guess.
+- [src/lib/lra/blri-data.ts:179](../src/lib/lra/blri-data.ts) — deferred from Batch 5 for the same reason; feeds `template-context.ts:383,629` (BLRI/bank-authorization merge context).
 
 **Gate before Phase 2:** Retest using the CSA seed borrowers (one with a
 recorded middle name, one blank) across every surface touched in Batches
