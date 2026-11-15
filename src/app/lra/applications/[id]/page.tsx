@@ -32,6 +32,7 @@ import { AutofillOverlay } from "@/components/dev/AutofillOverlay";
 import { fakePdcDetails, fakeRemark } from "@/lib/dev/fake-data";
 import { GeneratedDocPanel } from "@/components/documents/GeneratedDocPanel";
 import { GenerateDocumentsModal } from "@/components/lra/GenerateDocumentsModal";
+import { LraCalculatorCard } from "@/components/lra/LraCalculatorCard";
 import { addScheduleMonths, advanceSemiMonthly } from "@/lib/computation/release-date";
 import { halfUp } from "@/lib/computation/money";
 import { computeInvoiceLoan } from "@/lib/computation/invoice";
@@ -1143,6 +1144,14 @@ export default function LraApplicationPage() {
           <Link href="/lra">Back to LRA queue</Link>
         </div>
       )}
+
+      {rf && rf.status !== "released" && rf.status !== "closed" ? (
+        <LraCalculatorCard
+          applicationId={applicationId}
+          releasePaths={rf.release_paths ?? []}
+          onUpdated={() => void load({ silent: true })}
+        />
+      ) : null}
 
       {data.computation ? (
         <Card variant="gradient" className="mb-6">

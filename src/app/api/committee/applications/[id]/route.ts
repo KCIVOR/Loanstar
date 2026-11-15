@@ -250,6 +250,16 @@ export async function GET(_request: Request, { params }: RouteParams) {
       latestAction?.actedAt ?? null,
     );
 
+    const { data: recomputations, error: historyError } = await admin
+      .from("audit_events")
+      .select("id, actor_id, created_at, before_data, after_data")
+      .eq("module_slug", "release_lra")
+      .eq("entity_type", "computation")
+      .contains("after_data", { applicationId: id, trigger: "lra_recompute_at_release" })
+      .order("created_at", { ascending: false })
+      .order("id", { ascending: false });
+    if (historyError) throw new Error(historyError.message);
+
     // Vote/action/CSA-recorded rows only store actor UUIDs — resolve to names
     // for display. `profiles` RLS only allows reading your own row, so Committee
     // can't otherwise see who on CSA recorded these (same gap fixed on CIG's page).
@@ -257,6 +267,7 @@ export async function GET(_request: Request, { params }: RouteParams) {
       new Set(
         [
           ...votes.map((v) => v.voterId),
+          ...(recomputations ?? []).map((event) => event.actor_id as string | null),
           latestAction?.actedBy,
           application.privacy_orientation_by as string | null,
           application.initial_interview_by as string | null,
@@ -336,6 +347,13 @@ export async function GET(_request: Request, { params }: RouteParams) {
     };
 
     return jsonOk({
+      lraComputationHistory: (recomputations ?? []).map((event) => ({
+        id: event.id,
+        actorName: nameById.get(event.actor_id) || "Unknown LRA user",
+        createdAt: event.created_at,
+        before: event.before_data ?? {},
+        after: event.after_data ?? {},
+      })),
       application: {
         id: application.id,
         applicationNo: application.application_no,
@@ -376,6 +394,11 @@ export async function GET(_request: Request, { params }: RouteParams) {
           (application.status === "for_approval" ||
             application.status === "committee_hold") &&
           votes.length >= committeeSize,
+        // Notice to Revisit returns the file instead of deciding it, so it is
+        // available as soon as the file is pending, regardless of votes cast.
+        canRevisit:
+          application.status === "for_approval" ||
+          application.status === "committee_hold",
         votesNeeded: Math.max(0, committeeSize - votes.length),
         committeeSize,
         canOverride: application.status === "negotiating_terms",

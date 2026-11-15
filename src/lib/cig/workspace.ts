@@ -145,6 +145,25 @@ export function buildCigWorkspaceSteps(input: {
   }));
 }
 
+/**
+ * A file counts as forwarded to Committee only if `forwarded_at` is not older
+ * than the latest CSA endorse. `forwarded_at` is never cleared, so a file that
+ * CSA re-endorses to CIG after a Committee return is a new verification round,
+ * not an already-submitted one. No endorse date means older rows: keep the
+ * plain "forwarded_at is set" behaviour.
+ */
+export function isVerificationForwarded(
+  forwardedAt: string | null | undefined,
+  endorsedAt: string | null | undefined,
+): boolean {
+  if (!forwardedAt) return false;
+  if (!endorsedAt) return true;
+  const forwarded = new Date(forwardedAt).getTime();
+  const endorsed = new Date(endorsedAt).getTime();
+  if (Number.isNaN(forwarded) || Number.isNaN(endorsed)) return true;
+  return forwarded >= endorsed;
+}
+
 export function cigForwardReady(input: {
   checksComplete: boolean;
   formComplete: boolean;

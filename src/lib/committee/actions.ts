@@ -207,7 +207,9 @@ export async function executeFinalAction(
   // no way to cast a missing vote from that status (committee_votes_insert
   // RLS only allows new rows while status = 'for_approval'). See the plan's
   // Open Questions section.
-  if (action !== "clear_hold") {
+  // revisit (Notice to Revisit) sends the file back to CSA/CIG rather than
+  // deciding it, so it must work before the full ballot is in.
+  if (action !== "clear_hold" && action !== "revisit") {
     assertAllVotesCast(votes, committeeSize);
   }
   const tally = computeVoteTally(votes, committeeSize);

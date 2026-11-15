@@ -449,6 +449,19 @@ export async function POST(request: Request, { params }: RouteParams) {
       );
     }
 
+    // Any schedule type: a provided release date must be a real YYYY-MM-DD.
+    // (Daily has its own stricter rules below.)
+    if (
+      body.releaseDate !== undefined &&
+      (!/^\d{4}-\d{2}-\d{2}$/.test(body.releaseDate) ||
+        Number.isNaN(Date.parse(body.releaseDate)))
+    ) {
+      return NextResponse.json(
+        { error: "Release date must be a valid date (YYYY-MM-DD)" },
+        { status: 400 },
+      );
+    }
+
     if (paymentSchedule === "daily") {
       // Daily interest is computed over releaseDate → paymentDate (matching the
       // SME calculator), so both are required and the release must come first.

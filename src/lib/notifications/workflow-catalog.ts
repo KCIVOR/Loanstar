@@ -34,6 +34,7 @@ export type WorkflowEventKey =
   | "queued_for_lra"
   | "release_awaiting_briefing"
   | "release_ready_for_release"
+  | "lra_recompute_at_release"
   | "loan_released"
   | "release_closed_to_ar"
   | "loan_active"
@@ -212,6 +213,12 @@ export const WORKFLOW_EVENTS: Record<WorkflowEventKey, WorkflowEventDef> = {
     body: (label) =>
       `${label}: the briefing was acknowledged. The file is ready for disbursement.`,
     link: (id) => `/lra/applications/${id}`,
+  },
+  lra_recompute_at_release: {
+    audience: { roles: ["committee"] },
+    title: "LRA changed a loan computation",
+    body: (label) => `${label}: LRA saved a revised computation. Review the changes in Committee.`,
+    link: (id) => `/committee/applications/${id}#lra-computation-history`,
   },
   loan_released: {
     audience: { borrower: true },
