@@ -44,6 +44,7 @@ function queueItem(overrides: {
     borrower: {
       borrowerNo: "B-001",
       firstName: "Juan",
+      middleName: null,
       lastName: "Dela Cruz",
     },
     releaseFile: releaseFileStatus

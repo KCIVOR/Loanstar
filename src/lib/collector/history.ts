@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { firstJoin } from "./format";
+import { resolveBorrowerName } from "@/lib/borrower-name";
 
 export type CollectorClosedAccountRow = {
   id: string;
@@ -137,6 +138,7 @@ export async function getCollectorClosedAccountsHistory(
       segment,
       outstanding_balance,
       closed_at,
+      borrowers ( first_name, middle_name, last_name ),
       assignments!inner ( collector_user_id )
     `,
       { count: "exact" },
@@ -190,11 +192,26 @@ export async function getCollectorClosedAccountsHistory(
         ? segmentRaw
         : null;
 
+    const borrowerRaw = row.borrowers as
+      | { first_name: string | null; middle_name: string | null; last_name: string | null }
+      | Array<{ first_name: string | null; middle_name: string | null; last_name: string | null }>
+      | null;
+    const linkedBorrower = Array.isArray(borrowerRaw) ? borrowerRaw[0] : borrowerRaw;
+
     return [
       {
         id: row.id as string,
         loanAccountNo: (row.loan_account_no as string | null) ?? null,
-        borrowerName: row.borrower_name as string,
+        borrowerName: resolveBorrowerName(
+          linkedBorrower
+            ? {
+                firstName: linkedBorrower.first_name ?? "",
+                middleName: linkedBorrower.middle_name,
+                lastName: linkedBorrower.last_name ?? "",
+              }
+            : null,
+          row.borrower_name as string | null,
+        ),
         borrowerNo: row.borrower_no as string,
         segment,
         outstandingBalance: Number(row.outstanding_balance),

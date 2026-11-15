@@ -7,6 +7,7 @@ import {
 } from "@/lib/notifications/workflow-events";
 import type { BusinessInfo } from "@/lib/borrowers/business-info";
 import { mapBorrowerRow } from "@/lib/borrowers/types";
+import { formatBorrowerName } from "@/lib/borrower-name";
 import { getActiveComputation } from "@/lib/csa/computation";
 import {
   canMarkPaidOff,
@@ -200,9 +201,7 @@ export async function initializeArAccount(
       computation_id: computation.id,
       loan_account_no: app.application_no,
       borrower_no: borrower?.borrowerNo ?? "",
-      borrower_name: borrower
-        ? `${borrower.firstName} ${borrower.lastName}`.trim()
-        : "Unknown",
+      borrower_name: borrower ? formatBorrowerName(borrower) : "Unknown",
       segment,
       loan_amount: computation.principal,
       principal: computation.principal,

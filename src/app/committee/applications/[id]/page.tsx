@@ -22,6 +22,7 @@ import {
   Modal,
 } from "@/components/ui";
 import { DocumentChecklist } from "@/components/DocumentChecklist";
+import { LraComputationHistory, type LraComputationChange } from "@/components/committee/LraComputationHistory";
 import {
   ComputationPanel,
   type ComputationPanelHandle,
@@ -74,10 +75,12 @@ import {
   type RemInspection,
 } from "@/lib/cig/collateral-inspection";
 import type { BorrowerProfile } from "@/lib/borrowers/types";
+import { formatBorrowerName } from "@/lib/borrower-name";
 import { halfUp } from "@/lib/computation/money";
 import { CSA_ONLY_INTAKE_SLUGS } from "@/lib/documents/csa-only-intake";
 
 type CommitteeDetail = {
+  lraComputationHistory: LraComputationChange[];
   application: {
     id: string;
     applicationNo: string | null;
@@ -103,6 +106,7 @@ type CommitteeDetail = {
     collateralType: "none" | "car_refinancing" | "real_estate";
     statusHistory: StatusHistoryEntry[] | null;
     canDecide: boolean;
+    canRevisit: boolean;
     votesNeeded: number;
     committeeSize: number;
     canOverride: boolean;
@@ -710,7 +714,7 @@ export default function CommitteeApplicationPage() {
     data.application.segment === "sme" && companyName
       ? companyName
       : data.borrower
-        ? `${data.borrower.firstName} ${data.borrower.lastName}`
+        ? formatBorrowerName(data.borrower)
         : "Application";
   // Vote casting & 4 Cs stay available while ballots fill in; final action
   // alone waits for canDecide (all 3 votes — Phase 2).
@@ -2314,6 +2318,8 @@ export default function CommitteeApplicationPage() {
         </Card>
       ) : null}
 
+      <LraComputationHistory events={data.lraComputationHistory ?? []} />
+
       {data.negotiation ? (
         <NegotiationLog
           messages={data.negotiationMessages}
@@ -2721,8 +2727,25 @@ export default function CommitteeApplicationPage() {
               ) : null}
             </ConfirmDialog>
 
+          </Card>
+      ) : canVote ? (
+        <Card className="mb-6">
+          <h2 className="mb-2 font-display text-lg font-semibold text-navy-900">
+            Final action
+          </h2>
+          <p className="text-sm text-ink-500">
+            Waiting for votes ({votesCast}/{data.application.committeeSize} cast)
+            {data.application.votesNeeded > 0
+              ? ` — ${data.application.votesNeeded} more needed before a decision.`
+              : "."}
+          </p>
+        </Card>
+      ) : null}
+
+      {data.application.canRevisit ? (
+        <Card className="mb-6">
             <form
-              className="mt-6 space-y-3 border-t border-line-soft pt-4"
+              className="space-y-3"
               onSubmit={(e) => {
                 e.preventDefault();
                 setConfirmRevisit(true);
@@ -2785,18 +2808,6 @@ export default function CommitteeApplicationPage() {
                 </div>
               </div>
             </ConfirmDialog>
-          </Card>
-      ) : canVote ? (
-        <Card className="mb-6">
-          <h2 className="mb-2 font-display text-lg font-semibold text-navy-900">
-            Final action
-          </h2>
-          <p className="text-sm text-ink-500">
-            Waiting for votes ({votesCast}/{data.application.committeeSize} cast)
-            {data.application.votesNeeded > 0
-              ? ` — ${data.application.votesNeeded} more needed before a decision.`
-              : "."}
-          </p>
         </Card>
       ) : null}
 

@@ -111,8 +111,21 @@ describe("legacy import — value normalization", () => {
   });
 
   it("splits full names", () => {
-    assert.deepEqual(splitFullName("DELA CRUZ, JUAN P."), { first: "JUAN P.", last: "DELA CRUZ" });
-    assert.deepEqual(splitFullName("Juan Santos"), { first: "Juan", last: "Santos" });
+    assert.deepEqual(splitFullName("DELA CRUZ, JUAN P."), {
+      first: "JUAN",
+      middle: "P.",
+      last: "DELA CRUZ",
+    });
+    assert.deepEqual(splitFullName("DELA CRUZ, JUAN"), {
+      first: "JUAN",
+      middle: null,
+      last: "DELA CRUZ",
+    });
+    assert.deepEqual(splitFullName("Juan Santos"), {
+      first: "Juan",
+      middle: null,
+      last: "Santos",
+    });
   });
 
   it("round-trips CSV with quotes and neutralizes formulas", () => {

@@ -11,7 +11,7 @@ type RouteParams = { params: Promise<{ id: string }> };
 
 /**
  * Read-only intake checklist for the CIG workspace. CIG can view borrower
- * attachments (RLS: intake view) but never uploads or confirms here.
+ * attachments through verification view.
  */
 export async function GET(_request: Request, { params }: RouteParams) {
   try {

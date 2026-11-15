@@ -35,7 +35,7 @@ export async function GET(_request: Request, { params }: RouteParams) {
         co_borrower_completed_at,
         segment,
         entity_type,
-        borrowers ( id, borrower_no, first_name, last_name, email, business_info )
+        borrowers ( id, borrower_no, first_name, middle_name, last_name, email, business_info )
       `,
       )
       .eq("id", id)

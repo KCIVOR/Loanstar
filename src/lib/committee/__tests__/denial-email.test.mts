@@ -11,13 +11,14 @@ describe("buildApplicationDeniedEmail (Phase 4)", () => {
     const borrower: DenialBorrower = {
       email: "borrower@example.com",
       first_name: "Ana",
+      middle_name: "Reyes",
       last_name: "Santos",
     };
     const payload = buildApplicationDeniedEmail(borrower);
     assert.ok(payload);
     assert.equal(payload.to, "borrower@example.com");
     assert.equal(payload.templateSlug, "application_denied");
-    assert.deepEqual(payload.variables, { borrower_name: "Ana Santos" });
+    assert.deepEqual(payload.variables, { borrower_name: "Santos, Ana Reyes" });
     assert.equal(Object.keys(payload.variables).length, 1);
   });
 
@@ -26,7 +27,8 @@ describe("buildApplicationDeniedEmail (Phase 4)", () => {
       buildApplicationDeniedEmail({
         email: null,
         first_name: "Ana",
-        last_name: "Santos",
+        middle_name: "Reyes",
+      last_name: "Santos",
       }),
       null,
     );

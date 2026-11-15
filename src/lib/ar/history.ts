@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { createServiceClient } from "@/lib/supabase/server";
+import { resolveBorrowerName } from "@/lib/borrower-name";
 
 export type ClosedAccountRow = {
   id: string;
@@ -137,7 +138,8 @@ export async function getClosedAccountsHistory(
       segment,
       outstanding_balance,
       closed_at,
-      portfolios ( name )
+      portfolios ( name ),
+      borrowers ( first_name, middle_name, last_name )
     `,
       { count: "exact" },
     )
@@ -188,6 +190,12 @@ export async function getClosedAccountsHistory(
       ? portfolioRaw[0]
       : portfolioRaw;
 
+    const borrowerRaw = row.borrowers as
+      | { first_name: string | null; middle_name: string | null; last_name: string | null }
+      | Array<{ first_name: string | null; middle_name: string | null; last_name: string | null }>
+      | null;
+    const linkedBorrower = Array.isArray(borrowerRaw) ? borrowerRaw[0] : borrowerRaw;
+
     const segmentRaw = row.segment as string | null | undefined;
     const segment: "sme" | "seafarer" | "individual" | null =
       segmentRaw === "sme" || segmentRaw === "seafarer" || segmentRaw === "individual"
@@ -198,7 +206,16 @@ export async function getClosedAccountsHistory(
       {
         id: row.id as string,
         loanAccountNo: (row.loan_account_no as string | null) ?? null,
-        borrowerName: row.borrower_name as string,
+        borrowerName: resolveBorrowerName(
+          linkedBorrower
+            ? {
+                firstName: linkedBorrower.first_name ?? "",
+                middleName: linkedBorrower.middle_name,
+                lastName: linkedBorrower.last_name ?? "",
+              }
+            : null,
+          row.borrower_name as string | null,
+        ),
         borrowerNo: row.borrower_no as string,
         segment,
         outstandingBalance: Number(row.outstanding_balance),

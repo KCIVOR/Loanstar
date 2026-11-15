@@ -23,6 +23,7 @@ export async function GET() {
           borrowers (
             borrower_no,
             first_name,
+            middle_name,
             last_name
           )
         ),
@@ -61,6 +62,7 @@ export async function GET() {
           ? {
               borrowerNo: borrower.borrower_no as string,
               firstName: borrower.first_name as string,
+              middleName: (borrower.middle_name as string | null) ?? null,
               lastName: borrower.last_name as string,
             }
           : null,

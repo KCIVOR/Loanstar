@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { netInstallmentDue } from "@/lib/computation/money";
+import { resolveBorrowerName } from "@/lib/borrower-name";
 import { buildExecutiveSummary } from "@/lib/reports/aggregates";
 
 import { averageDays, bucketByDay, bucketByMonth, bucketByWeek, daysAgoIso } from "./buckets";
@@ -226,7 +227,9 @@ export async function buildLeadsWidget(
 ): Promise<LeadsWidgetData> {
   let leadsQuery = supabase
     .from("leads")
-    .select("id, borrower_name, status, created_at, application_id")
+    .select(
+      "id, borrower_name, status, created_at, application_id, borrowers ( first_name, middle_name, last_name )",
+    )
     .order("created_at", { ascending: false });
   // Exclude 'draft' — a borrower's own pre-submission application isn't
   // part of the lead-conversion funnel (drafts aren't linked to leads).
@@ -264,12 +267,28 @@ export async function buildLeadsWidget(
     conversionRate:
       rows.length > 0 ? Math.round((converted / rows.length) * 1000) / 10 : null,
     funnel: Object.entries(funnelCounts).map(([status, count]) => ({ status, count })),
-    recentLeads: rows.slice(0, 5).map((r) => ({
-      id: r.id as string,
-      borrowerName: r.borrower_name as string,
-      converted: r.application_id != null,
-      createdAt: r.created_at as string,
-    })),
+    recentLeads: rows.slice(0, 5).map((r) => {
+      const borrowerRaw = r.borrowers as
+        | { first_name: string | null; middle_name: string | null; last_name: string | null }
+        | Array<{ first_name: string | null; middle_name: string | null; last_name: string | null }>
+        | null;
+      const linkedBorrower = Array.isArray(borrowerRaw) ? borrowerRaw[0] : borrowerRaw;
+      return {
+        id: r.id as string,
+        borrowerName: resolveBorrowerName(
+          linkedBorrower
+            ? {
+                firstName: linkedBorrower.first_name ?? "",
+                middleName: linkedBorrower.middle_name,
+                lastName: linkedBorrower.last_name ?? "",
+              }
+            : null,
+          r.borrower_name as string | null,
+        ),
+        converted: r.application_id != null,
+        createdAt: r.created_at as string,
+      };
+    }),
   };
 }
 

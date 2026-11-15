@@ -494,8 +494,8 @@ async function persistOverrideComputation(
 
   const resolvedPaymentDate =
     input.paymentDate ?? (existingComp?.first_payment_date as string | null) ?? undefined;
-  // Daily interest accrual anchor — explicit override wins, else the value the
-  // active computation already carried. Never falls back to "now".
+  // Release date — explicit override wins, else the value the active
+  // computation already carried. Never falls back to "now" here.
   const resolvedReleaseDate =
     input.releaseDate ?? (existingComp?.release_date as string | null) ?? undefined;
   if (resolvedPaymentSchedule === "daily" && !resolvedPaymentDate) {
@@ -555,12 +555,12 @@ async function persistOverrideComputation(
     dueDay: resolvedDueDay,
     paymentSchedule: resolvedPaymentSchedule,
     manualPaymentDate: resolvedPaymentDate,
-    // Only Daily uses an explicit release date (its interest accrual anchor).
-    // For every other schedule type persistComputation must keep its own
-    // "release_date = today" behaviour on a recompute — so do NOT forward this
-    // unless the loan is daily.
-    releaseDate:
-      resolvedPaymentSchedule === "daily" ? resolvedReleaseDate : undefined,
+    // The release date staff set in the calculator, for every schedule type:
+    // an explicit value wins, else the active computation's own date is kept,
+    // so a Committee adjustment never resets it to today. (Daily also uses it
+    // as its interest accrual anchor.) When neither exists, persistComputation
+    // falls back to today.
+    releaseDate: resolvedReleaseDate,
     originationDiscounts: resolvedOriginationDiscounts,
     securityFeeRate:
       segment === "sme"
@@ -644,6 +644,24 @@ export async function committeeAdjustPreDecision(
   input: OverrideInput,
 ) {
   return persistOverrideComputation(supabase, applicationId, actorId, input);
+}
+
+export type LraRecomputeInput = OverrideInput;
+
+/**
+ * LRA recompute at the release stage — the same calculator path Committee
+ * uses (explicit values win, omitted values keep the active computation's).
+ * The caller (`recomputeAtRelease`) checks the LRA permission and the release
+ * stage first and passes a service-role client, because the computations
+ * INSERT policy does not cover the LRA role.
+ */
+export async function lraRecomputeComputation(
+  admin: SupabaseClient,
+  applicationId: string,
+  actorId: string,
+  input: LraRecomputeInput,
+) {
+  return persistOverrideComputation(admin, applicationId, actorId, input);
 }
 
 export async function queueForLra(

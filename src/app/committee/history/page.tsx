@@ -24,6 +24,7 @@ import {
   cn,
 } from "@/components/ui";
 import { formatDate, formatMoney } from "@/lib/committee/format";
+import { formatBorrowerName } from "@/lib/borrower-name";
 import type { CommitteeDecisionAction } from "@/lib/committee/history";
 import { formatStatusLabel, statusBadgeVariant } from "@/lib/applications/status";
 
@@ -35,6 +36,7 @@ type HistoryRow = {
   borrower: {
     borrowerNo: string;
     firstName: string;
+    middleName: string | null;
     lastName: string;
     email: string;
   } | null;
@@ -121,7 +123,7 @@ function voteLabel(vote: "approve" | "deny" | null): string {
 
 function borrowerName(row: HistoryRow): string {
   if (!row.borrower) return "Unknown borrower";
-  return `${row.borrower.firstName} ${row.borrower.lastName}`;
+  return formatBorrowerName(row.borrower);
 }
 
 function segmentBadge(segment: "sme" | "seafarer" | "individual" | null) {

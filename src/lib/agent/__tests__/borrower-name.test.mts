@@ -4,7 +4,7 @@ import { describe, it } from "node:test";
 import { formatBorrowerDisplayName } from "../borrower-name";
 
 describe("formatBorrowerDisplayName", () => {
-  it("joins name parts and skips empty middle/suffix", () => {
+  it("renders Last, First Middle and skips empty middle/suffix", () => {
     assert.equal(
       formatBorrowerDisplayName({
         firstName: "Juan",
@@ -12,7 +12,7 @@ describe("formatBorrowerDisplayName", () => {
         lastName: "Cruz",
         suffix: null,
       }),
-      "Juan Dela Cruz",
+      "Cruz, Juan Dela",
     );
     assert.equal(
       formatBorrowerDisplayName({
@@ -21,7 +21,7 @@ describe("formatBorrowerDisplayName", () => {
         lastName: "Santos",
         suffix: "Jr",
       }),
-      "Ana Santos Jr",
+      "Santos Jr, Ana",
     );
   });
 });

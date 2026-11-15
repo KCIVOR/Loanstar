@@ -10,6 +10,7 @@ export type DenialCallItem = {
   deniedAt: string;
   borrower: {
     firstName: string;
+    middleName: string | null;
     lastName: string;
     email: string;
     mobilePhone: string | null;
@@ -56,6 +57,7 @@ export async function getPendingDenialCalls(
         segment,
         borrowers (
           first_name,
+          middle_name,
           last_name,
           email,
           mobile_phone
@@ -92,6 +94,7 @@ export async function getPendingDenialCalls(
       borrower: borrower
         ? {
             firstName: borrower.first_name as string,
+            middleName: (borrower.middle_name as string | null) ?? null,
             lastName: borrower.last_name as string,
             email: borrower.email as string,
             mobilePhone: (borrower.mobile_phone as string) ?? null,

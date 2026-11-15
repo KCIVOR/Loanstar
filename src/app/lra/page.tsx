@@ -28,6 +28,7 @@ import {
   statusBadgeVariant,
 } from "@/lib/applications/status";
 import { formatDate } from "@/lib/lra/format";
+import { formatBorrowerName } from "@/lib/borrower-name";
 import type { LraQueueItem, LraQueueKpiCounts, LraQueueScope } from "@/lib/lra/queue";
 import {
   isCompletedLraQueueItem,
@@ -170,7 +171,7 @@ function formatDateTime(value: string) {
 
 function queueBorrowerName(item: LraQueueItem): string {
   return item.borrower
-    ? `${item.borrower.firstName} ${item.borrower.lastName}`
+    ? formatBorrowerName(item.borrower)
     : "Unknown borrower";
 }
 

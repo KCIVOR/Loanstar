@@ -12,6 +12,7 @@ export type ReleasedLoanRow = {
   borrower: {
     borrowerNo: string;
     firstName: string;
+    middleName: string | null;
     lastName: string;
     email: string;
   } | null;
@@ -135,6 +136,7 @@ const HISTORY_SELECT = `
     borrowers (
       borrower_no,
       first_name,
+      middle_name,
       last_name,
       email
     )
@@ -179,6 +181,7 @@ function mapHistoryRow(row: Record<string, unknown>): ReleasedLoanRow | null {
     | {
         borrower_no: string;
         first_name: string;
+        middle_name: string | null;
         last_name: string;
         email: string;
       }
@@ -217,6 +220,7 @@ function mapHistoryRow(row: Record<string, unknown>): ReleasedLoanRow | null {
       ? {
           borrowerNo: borrower.borrower_no,
           firstName: borrower.first_name,
+          middleName: borrower.middle_name,
           lastName: borrower.last_name,
           email: borrower.email,
         }

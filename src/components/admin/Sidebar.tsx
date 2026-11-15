@@ -13,7 +13,7 @@ import {
   type NavChildMatch,
 } from "@/lib/nav/active-nav";
 import { resolveHomePath } from "@/lib/permissions/home";
-import type { ModuleSlug } from "@/lib/permissions/types";
+import { getRequiredPageModules } from "@/lib/permissions/navigation";
 
 /* ── Icons (Lucide-style, stroke = currentColor) ────────────────────────── */
 
@@ -189,22 +189,21 @@ const NAV_ITEMS: Array<{
   label: string;
   icon: string;
   exact?: boolean;
-  module?: ModuleSlug;
   superAdminOnly?: boolean;
 }> = [
   { href: "/dashboard", label: "Dashboard", icon: "dashboard", exact: true },
-  { href: "/admin/roles", label: "Roles", icon: "roles", module: "auth_admin" },
-  { href: "/admin/users", label: "Users", icon: "users", module: "auth_admin" },
-  { href: "/admin/config", label: "Config", icon: "config", module: "system_config" },
-  { href: "/admin/website", label: "Website Content", icon: "config", module: "website_content" },
-  { href: "/admin/loan-types", label: "Loan Types", icon: "loanTypes", module: "system_config" },
-  { href: "/admin/checklists", label: "Checklists", icon: "checklists", module: "system_config" },
-  { href: "/admin/document-templates", label: "Doc Templates", icon: "docTemplates", module: "system_config" },
-  { href: "/admin/checks", label: "Checks", icon: "checks", module: "system_config" },
-  { href: "/admin/audit", label: "Audit", icon: "audit", module: "audit_log" },
-  { href: "/reports", label: "Reports", icon: "reports", module: "reports" },
-  { href: "/admin/email-test", label: "Email Test", icon: "emailTest", module: "system_config" },
-  { href: "/admin/email-templates", label: "Decision Emails", icon: "emailTest", module: "system_config" },
+  { href: "/admin/roles", label: "Roles", icon: "roles" },
+  { href: "/admin/users", label: "Users", icon: "users" },
+  { href: "/admin/config", label: "Config", icon: "config" },
+  { href: "/admin/website", label: "Website Content", icon: "config" },
+  { href: "/admin/loan-types", label: "Loan Types", icon: "loanTypes" },
+  { href: "/admin/checklists", label: "Checklists", icon: "checklists" },
+  { href: "/admin/document-templates", label: "Doc Templates", icon: "docTemplates" },
+  { href: "/admin/checks", label: "Checks", icon: "checks" },
+  { href: "/admin/audit", label: "Audit", icon: "audit" },
+  { href: "/reports", label: "Reports", icon: "reports" },
+  { href: "/admin/email-test", label: "Email Test", icon: "emailTest" },
+  { href: "/admin/email-templates", label: "Decision Emails", icon: "emailTest" },
   { href: "/admin/legacy-import", label: "Legacy Import", icon: "config", superAdminOnly: true },
 ];
 
@@ -216,17 +215,15 @@ type PortalNavItem = {
   href: string;
   label: string;
   icon: string;
-  modules: ModuleSlug[];
   children?: PortalNavChild[];
 };
 
 const PORTAL_NAV_ITEMS: PortalNavItem[] = [
-  { href: "/borrower", label: "Borrower Portal", icon: "borrower", modules: ["borrower_portal"] },
+  { href: "/borrower", label: "Borrower Portal", icon: "borrower" },
   {
     href: "/agent",
     label: "Leads",
     icon: "leads",
-    modules: ["leads"],
     children: [
       {
         href: "/agent",
@@ -242,7 +239,6 @@ const PORTAL_NAV_ITEMS: PortalNavItem[] = [
     href: "/csa",
     label: "Intake",
     icon: "intake",
-    modules: ["intake", "computation", "negotiation"],
     children: [
       {
         href: "/csa",
@@ -258,7 +254,6 @@ const PORTAL_NAV_ITEMS: PortalNavItem[] = [
     href: "/cig",
     label: "Verification",
     icon: "verification",
-    modules: ["verification"],
     children: [
       {
         href: "/cig",
@@ -275,7 +270,6 @@ const PORTAL_NAV_ITEMS: PortalNavItem[] = [
     href: "/committee",
     label: "Committee",
     icon: "committee",
-    modules: ["committee"],
     children: [
       { href: "/committee", label: "Voting queue", exact: true },
       { href: "/committee/history", label: "Decision history" },
@@ -285,7 +279,6 @@ const PORTAL_NAV_ITEMS: PortalNavItem[] = [
     href: "/lra",
     label: "Release (LRA)",
     icon: "release",
-    modules: ["release_lra"],
     children: [
       { href: "/lra", label: "Release queue", exact: true, matchPrefixes: ["/lra/applications"] },
       { href: "/lra/history", label: "Released loans" },
@@ -295,7 +288,6 @@ const PORTAL_NAV_ITEMS: PortalNavItem[] = [
     href: "/ar",
     label: "Accounting (AR)",
     icon: "accounting",
-    modules: ["accounting_ar"],
     children: [
       { href: "/ar", label: "Masterlist", exact: true, matchPrefixes: ["/ar/masterlist"] },
       { href: "/ar/dcr", label: "DCRR queue" },
@@ -308,7 +300,6 @@ const PORTAL_NAV_ITEMS: PortalNavItem[] = [
     href: "/collector",
     label: "Collection",
     icon: "collection",
-    modules: ["collection"],
     children: [
       { href: "/collector", label: "Overview", exact: true },
       { href: "/collector/accounts", label: "Accounts" },
@@ -323,7 +314,6 @@ const PORTAL_NAV_ITEMS: PortalNavItem[] = [
     href: "/collector/briefings",
     label: "Briefings",
     icon: "collection",
-    modules: ["briefings"],
     children: [
       { href: "/collector/briefings", label: "Queue", exact: true },
       { href: "/collector/briefings/history", label: "History" },
@@ -333,7 +323,6 @@ const PORTAL_NAV_ITEMS: PortalNavItem[] = [
     href: "/remedial",
     label: "Remedial",
     icon: "remedial",
-    modules: ["remedial"],
     children: [
       {
         href: "/remedial",
@@ -456,16 +445,24 @@ function SidebarContent({
   const pathname = usePathname();
   const { can, loading, permissions } = usePermissions();
 
+  function canViewPage(href: string) {
+    const modules = getRequiredPageModules(href);
+    return modules === null || modules.some((module) => can(module, "view"));
+  }
+
   const visibleItems = NAV_ITEMS.filter(
     (item) =>
-      (!item.module || can(item.module, "view")) &&
+      canViewPage(item.href) &&
       (!item.superAdminOnly || permissions?.isSuperAdmin === true) &&
       !(item.href === "/dashboard" && resolveHomePath(permissions) === "/borrower"),
   );
 
-  const visiblePortalItems = PORTAL_NAV_ITEMS.filter((item) =>
-    item.modules.some((mod) => can(mod, "view")),
-  );
+  const visiblePortalItems = PORTAL_NAV_ITEMS
+    .filter((item) => canViewPage(item.href))
+    .map((item) => ({
+      ...item,
+      children: item.children?.filter((child) => canViewPage(child.href)),
+    }));
 
   return (
     /* Fixed inner width so collapse only clips — no per-frame text reflow. */

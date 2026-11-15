@@ -28,6 +28,7 @@ import {
   statusBadgeVariant,
 } from "@/lib/applications/status";
 import { formatDate, formatDateTime } from "@/lib/cig/format";
+import { formatBorrowerName } from "@/lib/borrower-name";
 import {
   CIG_HISTORY_PAGE_SIZES,
   type CigCallbacksResolvedHistoryRow,
@@ -109,8 +110,7 @@ function segmentBadge(segment: "sme" | "seafarer" | "individual" | null) {
 
 function borrowerName(borrower: CigHistoryBorrower | null): string {
   if (!borrower) return "Unknown borrower";
-  const name = `${borrower.firstName} ${borrower.lastName}`.trim();
-  return name || "Unknown borrower";
+  return formatBorrowerName(borrower);
 }
 
 function borrowerSortValue(borrower: CigHistoryBorrower | null): string {

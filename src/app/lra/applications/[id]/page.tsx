@@ -32,6 +32,7 @@ import { AutofillOverlay } from "@/components/dev/AutofillOverlay";
 import { fakePdcDetails, fakeRemark } from "@/lib/dev/fake-data";
 import { GeneratedDocPanel } from "@/components/documents/GeneratedDocPanel";
 import { GenerateDocumentsModal } from "@/components/lra/GenerateDocumentsModal";
+import { LraCalculatorCard } from "@/components/lra/LraCalculatorCard";
 import { addScheduleMonths, advanceSemiMonthly } from "@/lib/computation/release-date";
 import { halfUp } from "@/lib/computation/money";
 import { computeInvoiceLoan } from "@/lib/computation/invoice";
@@ -54,6 +55,7 @@ import {
   isPostSignForPdcCollect,
 } from "@/lib/lra/pdc-collect";
 import { releaseStageForPath, type ReleasePath } from "@/lib/lra/constants";
+import { formatBorrowerName } from "@/lib/borrower-name";
 import {
   canShowMarkAllSigned,
   unsignedGeneratedDocumentIds,
@@ -230,6 +232,7 @@ type LraWorkspace = {
     id?: string;
     borrower_no?: string;
     first_name?: string;
+    middle_name?: string | null;
     last_name?: string;
     business_info?: BusinessInfo | null;
   } | null;
@@ -1047,7 +1050,11 @@ export default function LraApplicationPage() {
   const companyName = data.borrower?.business_info?.companyName?.trim();
   const personalName =
     data.borrower?.first_name || data.borrower?.last_name
-      ? `${data.borrower.first_name ?? ""} ${data.borrower.last_name ?? ""}`.trim()
+      ? formatBorrowerName({
+          firstName: data.borrower.first_name ?? "",
+          middleName: data.borrower.middle_name ?? null,
+          lastName: data.borrower.last_name ?? "",
+        })
       : "Borrower";
   const borrowerLabel =
     data.application.segment === "sme" && companyName
@@ -1137,6 +1144,14 @@ export default function LraApplicationPage() {
           <Link href="/lra">Back to LRA queue</Link>
         </div>
       )}
+
+      {rf && rf.status !== "released" && rf.status !== "closed" ? (
+        <LraCalculatorCard
+          applicationId={applicationId}
+          releasePaths={rf.release_paths ?? []}
+          onUpdated={() => void load({ silent: true })}
+        />
+      ) : null}
 
       {data.computation ? (
         <Card variant="gradient" className="mb-6">

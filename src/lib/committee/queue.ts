@@ -22,6 +22,7 @@ export type CommitteeQueueItem = {
   borrower: {
     borrowerNo: string;
     firstName: string;
+    middleName: string | null;
     lastName: string;
     email: string;
   } | null;
@@ -185,6 +186,7 @@ export async function getCommitteeQueue(
       borrowers (
         borrower_no,
         first_name,
+        middle_name,
         last_name,
         email
       ),
@@ -270,6 +272,7 @@ export async function getCommitteeQueue(
         ? {
             borrowerNo: borrower.borrower_no as string,
             firstName: borrower.first_name as string,
+            middleName: (borrower.middle_name as string | null) ?? null,
             lastName: borrower.last_name as string,
             email: borrower.email as string,
           }

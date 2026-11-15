@@ -57,8 +57,14 @@ const overrideSchema = z.object({
     .optional(),
   /** Daily Interest only — manual payment date. */
   paymentDate: z.string().optional(),
-  /** Daily Interest only — planned release date (interest accrual anchor). */
-  releaseDate: z.string().optional(),
+  /** Planned release date (YYYY-MM-DD); Daily uses it as its interest anchor. */
+  releaseDate: z
+    .string()
+    .refine(
+      (v) => /^\d{4}-\d{2}-\d{2}$/.test(v) && !Number.isNaN(Date.parse(v)),
+      "Release date must be a valid date (YYYY-MM-DD)",
+    )
+    .optional(),
   message: z.string().trim().max(2000).optional(),
   otherDeductions: z
     .object({

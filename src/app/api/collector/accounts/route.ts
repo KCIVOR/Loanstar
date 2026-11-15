@@ -19,6 +19,7 @@ import {
 } from "@/lib/collector/queue";
 import { requireModulePermission } from "@/lib/permissions/server";
 import { createClient } from "@/lib/supabase/server";
+import { resolveBorrowerName } from "@/lib/borrower-name";
 
 const RANGE_PRESETS = new Set(["30d", "90d", "all", "custom"]);
 const SEGMENT_FILTERS = new Set(["all", "seafarer", "sme", "individual"]);
@@ -121,6 +122,7 @@ export async function GET(request: Request) {
         outstanding_balance,
         aging_bucket,
         first_payment_date,
+        borrowers ( first_name, middle_name, last_name ),
         amortization_schedules (
           installment_no,
           due_date,
@@ -200,10 +202,24 @@ export async function GET(request: Request) {
       const next = nextOpenInstallment(schedules);
       const outstandingBalance = Number(row.outstanding_balance ?? 0);
       const pendingTotal = pendingTotalByMasterlist.get(row.id as string) ?? 0;
+      const borrowerRaw = row.borrowers as
+        | { first_name: string | null; middle_name: string | null; last_name: string | null }
+        | Array<{ first_name: string | null; middle_name: string | null; last_name: string | null }>
+        | null;
+      const linkedBorrower = Array.isArray(borrowerRaw) ? borrowerRaw[0] : borrowerRaw;
       return {
         id: row.id,
         borrowerId: row.borrower_id as string,
-        borrowerName: row.borrower_name,
+        borrowerName: resolveBorrowerName(
+          linkedBorrower
+            ? {
+                firstName: linkedBorrower.first_name ?? "",
+                middleName: linkedBorrower.middle_name,
+                lastName: linkedBorrower.last_name ?? "",
+              }
+            : null,
+          row.borrower_name as string | null,
+        ),
         borrowerNo: row.borrower_no,
         loanAccountNo: row.loan_account_no,
         segment:

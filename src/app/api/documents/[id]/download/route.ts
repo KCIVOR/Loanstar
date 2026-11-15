@@ -14,17 +14,19 @@ type RouteParams = { params: Promise<{ id: string }> };
 const STAFF_DOCUMENT_VIEW_MODULES = ["intake", "release_lra", "committee"] as const;
 
 async function requireStaffDocumentView(userId: string) {
-  if (await isSuperAdmin(userId)) return;
+  if (await isSuperAdmin(userId)) return "staff";
 
   for (const moduleSlug of STAFF_DOCUMENT_VIEW_MODULES) {
     if (await hasModulePermission(moduleSlug, "view", userId)) {
-      return;
+      return "staff";
     }
   }
 
-  throw new ForbiddenError(
-    "Missing document view permission (intake or release_lra)",
-  );
+  if (await hasModulePermission("verification", "view", userId)) {
+    return "verification";
+  }
+
+  throw new ForbiddenError("Missing staff document view permission");
 }
 
 /**
@@ -34,16 +36,19 @@ async function requireStaffDocumentView(userId: string) {
 export async function GET(_request: Request, { params }: RouteParams) {
   try {
     const user = await requireAuth();
-    await requireStaffDocumentView(user.id);
+    const access = await requireStaffDocumentView(user.id);
 
     const { id } = await params;
     const supabase = await createClient();
 
-    const { data: document, error } = await supabase
+    const query = supabase
       .from("documents")
       .select("id, storage_path, file_name, mime_type, status")
-      .eq("id", id)
-      .single();
+      .eq("id", id);
+    if (access === "verification") {
+      query.eq("stage", "intake").not("loan_application_id", "is", null);
+    }
+    const { data: document, error } = await query.single();
 
     if (error || !document) {
       throw new ForbiddenError("Document not found");

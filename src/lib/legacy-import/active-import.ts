@@ -31,7 +31,11 @@ export function buildActiveImport(rows: readonly InputRow[], mapping: readonly C
     }
     if (!values.first_name || !values.last_name) {
       const split = splitFullName((values.full_name ?? null) as CellValue);
-      if (split) { values.first_name = split.first; values.last_name = split.last; }
+      if (split) {
+        values.first_name = split.first;
+        values.last_name = split.last;
+        if (!values.middle_name && split.middle) values.middle_name = split.middle;
+      }
     }
     const loanNo = String(values.legacy_loan_no ?? "");
     if (!loanNo) fail("Legacy Loan No. is required.");

@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { createServiceClient } from "@/lib/supabase/server";
+import { formatBorrowerName } from "@/lib/borrower-name";
 
 import {
   formatApplicationLabel,
@@ -48,19 +49,24 @@ async function loadLabel(
 ): Promise<{ label: string; endorsedBy: string | null }> {
   const { data } = await client
     .from("loan_applications")
-    .select("application_no, endorsed_by, borrowers ( first_name, last_name )")
+    .select("application_no, endorsed_by, borrowers ( first_name, middle_name, last_name )")
     .eq("id", applicationId)
     .maybeSingle();
 
   const raw = data?.borrowers as
-    | { first_name?: string | null; last_name?: string | null }
-    | Array<{ first_name?: string | null; last_name?: string | null }>
+    | { first_name?: string | null; middle_name?: string | null; last_name?: string | null }
+    | Array<{ first_name?: string | null; middle_name?: string | null; last_name?: string | null }>
     | null
     | undefined;
   const borrower = Array.isArray(raw) ? raw[0] : raw;
-  const name = [borrower?.first_name, borrower?.last_name]
-    .filter(Boolean)
-    .join(" ");
+  const formattedName = borrower
+    ? formatBorrowerName({
+        firstName: borrower.first_name ?? "",
+        middleName: borrower.middle_name ?? null,
+        lastName: borrower.last_name ?? "",
+      })
+    : "";
+  const name = formattedName === "Unknown borrower" ? "" : formattedName;
 
   return {
     label: formatApplicationLabel(

@@ -17,6 +17,7 @@ import {
 } from "@/lib/computation/discount-units";
 import { fakeComputationInputs } from "@/lib/dev/fake-data";
 import { halfUp } from "@/lib/computation/money";
+import { formatDateLocal } from "@/lib/computation/release-date";
 import { computeOffsetDiscount } from "@/lib/computation/offset-discount";
 import {
   Alert,
@@ -169,7 +170,11 @@ type ComputationPanelProps = {
    * to the committee override endpoint instead — same UI, different backend,
    * inheriting Override's existing status gate/audit trail/negotiation
    * side-effects rather than opening a new editing path. */
-  mode?: "csa" | "committee";
+  mode?: "csa" | "committee" | "lra";
+  /** Optional gate run after the form validates and before the compute
+   * request is sent. Resolve `false` to cancel. Used by LRA mode to confirm
+   * what a recompute will clear; CSA and Committee do not pass it. */
+  beforeCompute?: () => Promise<boolean>;
   /** Extra fields merged into the POST body — e.g. committee mode's optional
    * `message` (logged as a negotiation offer note), which this shared panel
    * has no UI of its own for. */
@@ -537,6 +542,7 @@ export const ComputationPanel = forwardRef<ComputationPanelHandle, ComputationPa
       interviewComplete = true,
       interviewBlockReason = null,
       mode = "csa",
+      beforeCompute,
       extraFields,
       paymentSchedule: paymentScheduleProp = "monthly",
     }: ComputationPanelProps,
@@ -611,12 +617,13 @@ export const ComputationPanel = forwardRef<ComputationPanelHandle, ComputationPa
   // Daily Interest only — manual payment date (single payment, not a
   // recurring schedule). Required when the schedule type is "daily".
   const [paymentDate, setPaymentDate] = useState("");
-  // Daily Interest only — the planned release date. Interest is
-  // principal × rate ÷ (days in this month) × (paymentDate − releaseDate),
-  // matching the SME calculator. Defaults to today; the encoder sets the
-  // real disbursement date. Not sent for any other schedule type.
-  const [releaseDate, setReleaseDate] = useState(
-    new Date().toISOString().slice(0, 10),
+  // The release date for every loan type. The first payment date and the
+  // schedule count from it, so staff set the real (or planned) release day,
+  // like the Excel calculator. Defaults to today's LOCAL date; any date is
+  // allowed. For Daily Interest it is also the interest anchor: interest =
+  // principal × rate ÷ (days in this month) × (paymentDate − releaseDate).
+  const [releaseDate, setReleaseDate] = useState(() =>
+    formatDateLocal(new Date()),
   );
   const [selectedLoanTypeId, setSelectedLoanTypeId] = useState(loanTypeId ?? "");
   // sme/individual free-text rates — percent-typed (e.g. "8" for 8%), converted
@@ -690,7 +697,9 @@ export const ComputationPanel = forwardRef<ComputationPanelHandle, ComputationPa
   const activeLoansSourceUrl =
     mode === "committee"
       ? `/api/committee/applications/${applicationId}`
-      : `/api/csa/applications/${applicationId}/computation`;
+      : mode === "lra"
+        ? `/api/lra/applications/${applicationId}/computation`
+        : `/api/csa/applications/${applicationId}/computation`;
 
   useEffect(() => {
     void fetch(activeLoansSourceUrl)
@@ -764,7 +773,7 @@ export const ComputationPanel = forwardRef<ComputationPanelHandle, ComputationPa
       if (computation.paymentFrequency === "daily" && computation.firstPaymentDate) {
         setPaymentDate(computation.firstPaymentDate);
       }
-      if (computation.paymentFrequency === "daily" && computation.releaseDate) {
+      if (computation.releaseDate) {
         setReleaseDate(computation.releaseDate);
       }
     }
@@ -1379,6 +1388,10 @@ export const ComputationPanel = forwardRef<ComputationPanelHandle, ComputationPa
       setError("Release date is required for Daily Interest loans");
       return;
     }
+    if (!releaseDate) {
+      setError("Release date is required");
+      return;
+    }
     if (
       selectedScheduleType === "daily" &&
       releaseDate &&
@@ -1386,6 +1399,9 @@ export const ComputationPanel = forwardRef<ComputationPanelHandle, ComputationPa
       releaseDate >= paymentDate
     ) {
       setError("Daily Interest release date must be before the payment date");
+      return;
+    }
+    if (beforeCompute && !(await beforeCompute())) {
       return;
     }
     setComputing(true);
@@ -1426,7 +1442,9 @@ export const ComputationPanel = forwardRef<ComputationPanelHandle, ComputationPa
       const computeUrl =
         mode === "committee"
           ? `/api/committee/applications/${applicationId}/override`
-          : `/api/csa/applications/${applicationId}/computation`;
+          : mode === "lra"
+            ? `/api/lra/applications/${applicationId}/computation`
+            : `/api/csa/applications/${applicationId}/computation`;
 
       const res = await fetch(
         computeUrl,
@@ -1451,9 +1469,8 @@ export const ComputationPanel = forwardRef<ComputationPanelHandle, ComputationPa
             ...(segment === "sme" || segment === "individual"
               ? { paymentSchedule: selectedScheduleType }
               : {}),
-            ...(selectedScheduleType === "daily"
-              ? { paymentDate, releaseDate }
-              : {}),
+            releaseDate,
+            ...(selectedScheduleType === "daily" ? { paymentDate } : {}),
             originationDiscounts: originationDiscountsPayload,
             ...(otherLoansPayload.length > 0 || offsetsPayload.length > 0
               ? {
@@ -1740,21 +1757,25 @@ export const ComputationPanel = forwardRef<ComputationPanelHandle, ComputationPa
           )}
         </div>
       )}
-      {selectedScheduleType === "daily" && (
-        <div className="sm:col-span-2">
-          <Label htmlFor="releaseDate" required>
-            Release date
-          </Label>
-          <Input
-            id="releaseDate"
-            type="date"
-            required
-            value={releaseDate}
-            max={paymentDate || undefined}
-            onChange={(e) => setReleaseDate(e.target.value)}
-          />
-        </div>
-      )}
+      <div className="sm:col-span-2">
+        <Label htmlFor="releaseDate" required>
+          Release date
+        </Label>
+        <Input
+          id="releaseDate"
+          type="date"
+          required
+          value={releaseDate}
+          max={selectedScheduleType === "daily" ? paymentDate || undefined : undefined}
+          onChange={(e) => setReleaseDate(e.target.value)}
+        />
+        {selectedScheduleType !== "daily" && (
+          <p className="text-xs text-ink-500 mt-1">
+            The first payment date and schedule count from this date. Change it
+            if the loan is released on a different day.
+          </p>
+        )}
+      </div>
       {selectedScheduleType === "daily" && (
         <div className="sm:col-span-2">
           <Label htmlFor="paymentDate" required>
