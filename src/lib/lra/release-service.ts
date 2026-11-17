@@ -1,3 +1,5 @@
+import { createHash } from "node:crypto";
+
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { ValidationError } from "@/lib/api/errors";
@@ -27,6 +29,10 @@ import {
 import { uploadDocumentBytes } from "@/lib/documents/storage";
 import { downloadTemplateAssetBytes } from "@/lib/documents/template-storage";
 import { getPublishedTemplate } from "@/lib/documents/templates/service";
+import {
+  lraRecomputeComputation,
+  type LraRecomputeInput,
+} from "@/lib/negotiation/service";
 import { createServiceClient } from "@/lib/supabase/server";
 
 import { syncApplicationBlocker, mapReleaseFileRow } from "./blockers";
@@ -1515,6 +1521,242 @@ export async function resolveSignedVoucherDocumentId(
   return bySlug.get("signed_check_voucher") ?? null;
 }
 
+/**
+ * Pure — where a release file goes after LRA recomputes the loan. PDC checks
+ * and generated documents are cleared, so the file returns to the first step
+ * that depends on the figures: PDC encoding (with-PDC path) or document
+ * generation. A file still choosing its path stays there.
+ */
+export function releaseStatusAfterRecompute(
+  status: ReleaseFileStatus,
+  releasePaths: readonly string[],
+): ReleaseFileStatus {
+  if (status === "released" || status === "closed") {
+    throw new ValidationError(
+      "This loan is already released — the calculator is no longer available",
+    );
+  }
+  if (status === "awaiting_path") return "awaiting_path";
+  return releasePaths.includes("with_pdc") ? "pdc_encoding" : "ready_generate";
+}
+
+const RECOMPUTE_AUDIT_FIELDS = [
+  "loanTypeName",
+  "inputMode",
+  "inputAmount",
+  "principal",
+  "terms",
+  "addonMonths",
+  "netReleased",
+  "totalInterest",
+  "totalLoan",
+  "monthlyAmortization",
+  "totalDeductions",
+  "otherDeductionsTotal",
+  "otherDeductions",
+  "originationDiscounts",
+  "interestRate",
+  "pfRate",
+  "adminRate",
+  "chattelRate",
+  "releaseDate",
+  "firstPaymentDate",
+  "dueDay",
+  "paymentFrequency",
+] as const;
+
+/** Pure — the audit snapshot of a computation (the fields LRA can change). */
+export function recomputeAuditSnapshot(
+  computation: Record<string, unknown> | null | undefined,
+): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  if (!computation) return out;
+  for (const key of RECOMPUTE_AUDIT_FIELDS) {
+    out[key] = computation[key] ?? null;
+  }
+  return out;
+}
+
+/**
+ * LRA recomputes the loan at the release stage (any time before the loan is
+ * marked released). No signing step: the new computation is auto-approved
+ * under the LRA user's name, and the change is written to the audit log with
+ * a required reason. PDC checks and generated documents carry the old
+ * figures, so they are cleared and the file goes back to that step.
+ *
+ * The caller must have checked `release_lra:edit`. Writes use the service
+ * role: the computations policies do not cover LRA, release_queue has no LRA
+ * UPDATE policy, and a late recompute must clear past the point where a
+ * single document can normally be removed (briefing acknowledged).
+ */
+export async function recomputeAtRelease(
+  supabase: SupabaseClient,
+  applicationId: string,
+  actorId: string,
+  input: LraRecomputeInput,
+  reason: string,
+) {
+  const trimmedReason = reason.trim();
+  if (!trimmedReason) {
+    throw new ValidationError("A reason is required to change the computation");
+  }
+
+  const { data: row, error: rowError } = await supabase
+    .from("release_files")
+    .select("*")
+    .eq("loan_application_id", applicationId)
+    .maybeSingle();
+  if (rowError) throw new Error(rowError.message);
+  if (!row) {
+    throw new ValidationError("Open the release file before using the calculator");
+  }
+
+  const file = mapReleaseFileRow(row);
+  const priorStatus = row.status as ReleaseFileStatus;
+  const nextStatus = releaseStatusAfterRecompute(priorStatus, file.releasePaths);
+
+  const before = await getActiveComputation(supabase, applicationId);
+  const admin = createServiceClient();
+
+  // 1. New computation (switches the old one off).
+  const saved = await lraRecomputeComputation(admin, applicationId, actorId, input);
+  const computation = saved.computation;
+  const now = new Date().toISOString();
+
+  // 2. Auto-approve under the LRA user's name (same columns in-branch signing
+  //    uses; no borrower signature is recorded).
+  const signatureHash = createHash("sha256")
+    .update(JSON.stringify(computation))
+    .digest("hex");
+  const { error: stampError } = await admin
+    .from("computations")
+    .update({
+      signed_at: now,
+      signed_by: null,
+      witnessed_by: actorId,
+      signature_hash: signatureHash,
+    })
+    .eq("id", computation.id);
+  if (stampError) throw new Error(stampError.message);
+
+  // 3. Clear what carries the old figures.
+  const { data: docs } = await admin
+    .from("generated_documents")
+    .select("id, storage_path")
+    .eq("release_file_id", file.id);
+  const storagePaths = (docs ?? [])
+    .map((d) => d.storage_path as string | null)
+    .filter((p): p is string => Boolean(p));
+  if (storagePaths.length > 0) {
+    try {
+      await admin.storage.from(DOCUMENT_BUCKET).remove(storagePaths);
+    } catch {
+      // Storage cleanup is best-effort — a stray object must not block this.
+    }
+  }
+  const { error: docsError } = await admin
+    .from("generated_documents")
+    .delete()
+    .eq("release_file_id", file.id);
+  if (docsError) {
+    throw new Error(
+      `Computation was updated but generated documents could not be cleared: ${docsError.message}`,
+    );
+  }
+
+  const { data: deletedChecks, error: pdcError } = await admin
+    .from("pdc_checks")
+    .delete()
+    .eq("release_file_id", file.id)
+    .select("id");
+  if (pdcError) {
+    throw new Error(
+      `Computation was updated but PDC checks could not be cleared: ${pdcError.message}`,
+    );
+  }
+
+  const { data: briefing } = await admin
+    .from("briefings")
+    .select("id, acknowledged_at")
+    .eq("release_file_id", file.id)
+    .maybeSingle();
+  const briefingReset = Boolean(briefing?.acknowledged_at);
+  if (briefing && briefingReset) {
+    await admin
+      .from("briefings")
+      .update({ acknowledged_at: null, acknowledged_by: null })
+      .eq("id", briefing.id as string);
+  }
+
+  // 4. Repoint the pins and send the file back to the right step.
+  const { error: fileError } = await admin
+    .from("release_files")
+    .update({
+      computation_id: computation.id,
+      status: nextStatus,
+      ...(nextStatus === "pdc_encoding"
+        ? { blank_check_from: null, blank_check_to: null }
+        : {}),
+      updated_at: now,
+    })
+    .eq("id", file.id);
+  if (fileError) throw new Error(fileError.message);
+
+  await admin
+    .from("release_queue")
+    .update({ computation_id: computation.id })
+    .eq("loan_application_id", applicationId);
+  await admin
+    .from("negotiations")
+    .update({ active_computation_id: computation.id, updated_at: now })
+    .eq("loan_application_id", applicationId);
+
+  // Briefing / ready-for-release files drop back to the signing stage.
+  const movedBackFromBriefing =
+    priorStatus === "awaiting_briefing" || priorStatus === "ready_release";
+  await syncApplicationBlocker(
+    admin,
+    applicationId,
+    nextStatus,
+    movedBackFromBriefing
+      ? { actorId, applicationStatus: "release_signing" }
+      : { actorId },
+  );
+
+  const cleared = {
+    generatedDocuments: docs?.length ?? 0,
+    pdcChecks: deletedChecks?.length ?? 0,
+    briefingReset,
+  };
+
+  // 5. Log.
+  await writeAuditEvent({
+    actorId,
+    moduleSlug: "release_lra",
+    action: "execute_trigger",
+    entityType: "computation",
+    entityId: computation.id,
+    beforeData: {
+      computationId: before?.id ?? null,
+      releaseFileStatus: priorStatus,
+      ...recomputeAuditSnapshot(before as unknown as Record<string, unknown>),
+    },
+    afterData: {
+      applicationId,
+      trigger: "lra_recompute_at_release",
+      reason: trimmedReason,
+      autoApprovedBy: actorId,
+      releaseFileStatus: nextStatus,
+      cleared,
+      ...recomputeAuditSnapshot(computation as unknown as Record<string, unknown>),
+    },
+  });
+
+  await notifyWorkflowEvent("lra_recompute_at_release", applicationId, { actorId });
+
+  return { computation, cleared, status: nextStatus, previousStatus: priorStatus };
+}
+
 export async function recordRelease(
   supabase: SupabaseClient,
   releaseFileId: string,
@@ -1573,30 +1815,9 @@ export async function recordRelease(
     })
     .eq("id", releaseFileId);
 
-  // Overwrite the CSA-time estimate with the actual release day — service
-  // role since the computation is already signed by this point, and CSA's
-  // own RLS cannot update a signed row (see persistComputation's identical
-  // deactivate-prior-actives comment).
-  //
-  // EXCEPTION — Daily Interest: the CSA-entered release date is the accrual
-  // basis the borrower signed (interest = principal × rate ÷ days-in-release-
-  // month × (paymentDate − releaseDate), matching the SME calculator).
-  // Overwriting it here would silently change the signed figure's basis
-  // without recomputing it, so daily loans keep the entered date. A released
-  // daily loan therefore reports under its planned month, not the actual
-  // disbursement day (accepted — see task-03-daily-interest-FINAL-plan.md).
-  const admin = createServiceClient();
-  const { data: compRow } = await admin
-    .from("computations")
-    .select("payment_frequency")
-    .eq("id", file.computationId)
-    .maybeSingle();
-  if (compRow?.payment_frequency !== "daily") {
-    await admin
-      .from("computations")
-      .update({ release_date: new Date().toISOString().slice(0, 10) })
-      .eq("id", file.computationId);
-  }
+  // The computation's release date is NOT overwritten here. Staff set it in
+  // the calculator (the date the borrower signed and the documents print), and
+  // the AR schedule is built from the same value, so it stays as entered.
 
   await syncApplicationBlocker(supabase, file.loanApplicationId, "released", {
     actorId,

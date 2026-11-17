@@ -467,7 +467,11 @@ export async function persistComputation(
     coverage = { ...base, otherMonthlyAmortization };
   }
 
-  const releaseDate = input.releaseDate ? new Date(input.releaseDate) : new Date();
+  // Local calendar date: the day staff chose (or today), not a UTC-midnight
+  // instant, so first-payment dates count from the same day that is stored.
+  const releaseDate = input.releaseDate
+    ? parseLocalDate(input.releaseDate)
+    : new Date();
   const dueDay = input.dueDay ?? 10;
 
   // Unified schedule choice — SME or Individual, any of the 8 values,
@@ -656,7 +660,7 @@ export async function persistComputation(
       gross_total_interest: isDaily ? null : grossTotalInterest,
       total_loan: effectiveTotalLoan,
       monthly_amortization: effectiveMonthlyAmortization,
-      release_date: releaseDate.toISOString().slice(0, 10),
+      release_date: formatDateLocal(releaseDate),
       first_payment_date: formatDateLocal(firstPayment),
       due_day: dueDay,
       origination_discounts: input.originationDiscounts ?? null,

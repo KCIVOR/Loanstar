@@ -9,7 +9,8 @@ import {
 } from "@/lib/applications/status";
 import { writeAuditEvent } from "@/lib/audit/writer";
 import { handleApiError, jsonOk } from "@/lib/api/handler";
-import { assertCigVerificationStage } from "@/lib/cig/queue-guards";
+import { assertCigEditStage } from "@/lib/cig/queue-guards";
+import { isCigEditableStage } from "@/lib/cig/edit-stage";
 import { getOpenRevisitNotice } from "@/lib/committee/revisit-notices";
 import { saveVerificationPatch } from "@/lib/cig/forward";
 import { getReceiptReadiness } from "@/lib/cig/receipt";
@@ -384,6 +385,11 @@ export async function GET(_request: Request, { params }: RouteParams) {
       label: formatStatusLabel(entry.status),
     }));
 
+    const cigRevisit =
+      application.status === "for_revision"
+        ? await getOpenRevisitNotice(supabase, id)
+        : null;
+
     return jsonOk({
       application: {
         id: application.id,
@@ -393,11 +399,8 @@ export async function GET(_request: Request, { params }: RouteParams) {
         endorsedAt: application.endorsed_at,
         endorsedByName,
         blocker: application.blocker,
-        revisit:
-          application.status === "for_revision"
-            ? await getOpenRevisitNotice(supabase, id)
-            : null,
-        editable: application.status === "for_verification",
+        revisit: cigRevisit,
+        editable: isCigEditableStage(application.status, cigRevisit),
         segment: scope.segment,
         entityType:
           application.entity_type === "individual" ||
@@ -445,7 +448,7 @@ export async function PATCH(request: Request, { params }: RouteParams) {
     const { id } = await params;
     const body = patchSchema.parse(await request.json());
     const supabase = await createClient();
-    await assertCigVerificationStage(supabase, id);
+    await assertCigEditStage(supabase, id);
     const application = await getApplicationForStaff(supabase, id);
 
     if (body.borrower) {

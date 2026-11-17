@@ -35,6 +35,7 @@ export default function LoanTypesPage() {
   const [filter, setFilter] = useState<"all" | "active" | "inactive">("all");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [enrollmentError, setEnrollmentError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -69,12 +70,12 @@ export default function LoanTypesPage() {
   async function handleEnroll(e: FormEvent) {
     e.preventDefault();
     setSaving(true);
-    setError(null);
+    setEnrollmentError(null);
     setMessage(null);
 
     const pf = Number(pfRate);
     if (segment !== "sme" && segment !== "individual" && pf < MIN_PF_RATE) {
-      setError(
+      setEnrollmentError(
         `PF rate must be at least ${(MIN_PF_RATE * 100).toFixed(3)}% (G2 guard)`,
       );
       setSaving(false);
@@ -102,7 +103,7 @@ export default function LoanTypesPage() {
       setShowForm(false);
       await load();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to enroll");
+      setEnrollmentError(err instanceof Error ? err.message : "Failed to enroll");
     } finally {
       setSaving(false);
     }
@@ -131,7 +132,12 @@ export default function LoanTypesPage() {
               <option value="active">Active only</option>
               <option value="inactive">Inactive only</option>
             </Select>
-            <Button onClick={() => setShowForm(true)}>Enroll rate</Button>
+            <Button onClick={() => {
+              setEnrollmentError(null);
+              setShowForm(true);
+            }}>
+              Enroll rate
+            </Button>
           </div>
         }
       />
@@ -171,6 +177,7 @@ export default function LoanTypesPage() {
           onSubmit={(e) => void handleEnroll(e)}
           className="space-y-4"
         >
+          {enrollmentError ? <Alert>{enrollmentError}</Alert> : null}
           <div>
             <Label htmlFor="lt-name" required>
               Loan type name
@@ -199,39 +206,47 @@ export default function LoanTypesPage() {
               <option value="individual">Individual</option>
             </Select>
           </div>
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div>
-              <Label htmlFor="lt-interest" required>
-                Interest rate (decimal)
-              </Label>
-              <Input
-                id="lt-interest"
-                type="number"
-                step="0.0001"
-                required
-                value={interestRate}
-                onChange={(e) => setInterestRate(e.target.value)}
-                className="mono"
-              />
+          <div className="space-y-2">
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div>
+                <Label htmlFor="lt-interest" required>
+                  Interest rate (decimal)
+                </Label>
+                <Input
+                  id="lt-interest"
+                  aria-describedby="lt-rate-format"
+                  type="number"
+                  step="0.0001"
+                  required
+                  value={interestRate}
+                  onChange={(e) => setInterestRate(e.target.value)}
+                  className="mono"
+                />
+              </div>
+              <div>
+                <Label htmlFor="lt-pf" required>
+                  PF rate (decimal)
+                </Label>
+                <Input
+                  id="lt-pf"
+                  aria-describedby={segment === "seafarer" ? "lt-rate-format lt-pf-minimum" : "lt-rate-format"}
+                  type="number"
+                  step="0.0001"
+                  required
+                  value={pfRate}
+                  onChange={(e) => setPfRate(e.target.value)}
+                  className="mono"
+                />
+              </div>
             </div>
-            <div>
-              <Label htmlFor="lt-pf" required>
-                PF rate (decimal
-                {segment === "sme" || segment === "individual"
-                  ? "; G2 floor does not apply"
-                  : `, min ${(MIN_PF_RATE * 100).toFixed(3)}%`}
-                )
-              </Label>
-              <Input
-                id="lt-pf"
-                type="number"
-                step="0.0001"
-                required
-                value={pfRate}
-                onChange={(e) => setPfRate(e.target.value)}
-                className="mono"
-              />
-            </div>
+            <p id="lt-rate-format" className="text-sm text-slate-600">
+              To enter a percentage as a decimal, divide it by 100 (5% = 0.05).
+            </p>
+            {segment === "seafarer" ? (
+              <p id="lt-pf-minimum" className="text-sm text-slate-600">
+                Seafarer PF minimum is {(MIN_PF_RATE * 100).toFixed(3)}% ({MIN_PF_RATE}).
+              </p>
+            ) : null}
           </div>
           <div>
             <Label htmlFor="lt-effective" required>

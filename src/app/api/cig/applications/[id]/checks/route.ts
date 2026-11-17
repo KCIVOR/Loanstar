@@ -4,7 +4,7 @@ import { formatZodError } from "@/lib/api/zod-error";
 
 import { writeAuditEvent } from "@/lib/audit/writer";
 import { handleApiError, jsonOk } from "@/lib/api/handler";
-import { assertCigVerificationStage } from "@/lib/cig/queue-guards";
+import { assertCigEditStage } from "@/lib/cig/queue-guards";
 import {
   assertChecksRecordingAllowed,
   CigSequenceError,
@@ -114,7 +114,7 @@ export async function POST(request: Request, { params }: RouteParams) {
     const { id } = await params;
     const body = checkSchema.parse(await request.json());
     const supabase = await createClient();
-    await assertCigVerificationStage(supabase, id);
+    await assertCigEditStage(supabase, id);
 
     const verification = await getOrCreateVerification(supabase, id);
     const checksBefore = await getCigChecksComplete(supabase, id);

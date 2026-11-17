@@ -18,6 +18,7 @@ import {
   type VerificationChecklist,
   type VerificationRecord,
 } from "./verification";
+import { isVerificationForwarded } from "./workspace";
 
 /**
  * Explicit "Submit CI report" trigger — replaces the old silent auto-forward.
@@ -35,15 +36,20 @@ export async function forwardToCommittee(
 ): Promise<{ forwarded: boolean; missing: string[] }> {
   const verification = await getOrCreateVerification(supabase, applicationId);
 
-  if (verification.forwardedAt) {
-    return { forwarded: false, missing: ["CI report already submitted"] };
-  }
-
   const { data: appRow } = await supabase
     .from("loan_applications")
-    .select("segment, is_reloan, collateral_type")
+    .select("segment, is_reloan, collateral_type, endorsed_at")
     .eq("id", applicationId)
     .maybeSingle();
+
+  if (
+    isVerificationForwarded(
+      verification.forwardedAt,
+      appRow?.endorsed_at as string | null | undefined,
+    )
+  ) {
+    return { forwarded: false, missing: ["CI report already submitted"] };
+  }
 
   const checks = await getCigChecksComplete(supabase, applicationId);
   const completeness = assessVerificationCompleteness(

@@ -76,6 +76,7 @@ import {
   cigNextStep,
   cigSequenceLockedHint,
   cigWaitingLabel,
+  isVerificationForwarded,
 } from "@/lib/cig/workspace";
 import type { CigSequenceState } from "@/lib/cig/sequence";
 import { formatBorrowerName } from "@/lib/borrower-name";
@@ -753,7 +754,10 @@ export default function CigApplicationPage() {
     : "flex h-full flex-col lg:min-h-[32rem] lg:max-h-[32rem]";
   const formComplete = cigFormComplete(completeness.missing);
   const hasFinding = cigHasFinding(verification.finding);
-  const forwarded = Boolean(verification.forwardedAt);
+  const forwarded = isVerificationForwarded(
+    verification.forwardedAt,
+    endorsedAt,
+  );
   const forwardReady = cigForwardReady({
     checksComplete: checksSummary.complete,
     formComplete,
@@ -1253,7 +1257,7 @@ export default function CigApplicationPage() {
         </Card>
       ) : null}
 
-      {verification.forwardedAt ? (
+      {forwarded && verification.forwardedAt ? (
         <div className="mb-6">
           <Alert variant="success">
             Forwarded to Committee on{" "}

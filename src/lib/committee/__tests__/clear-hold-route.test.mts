@@ -51,8 +51,21 @@ describe("committee actions library — clear_hold vote-check skip (Open Questio
     // rows while status = 'for_approval'). clear_hold re-queues rather than
     // re-decides, so it must not call assertAllVotesCast.
     const guardedCall =
-      /if\s*\(\s*action\s*!==\s*"clear_hold"\s*\)\s*\{[^}]*assertAllVotesCast\(/s;
+      /if\s*\(\s*action\s*!==\s*"clear_hold"\s*&&\s*action\s*!==\s*"revisit"\s*\)\s*\{[^}]*assertAllVotesCast\(/;
     assert.match(actionsSrc, guardedCall);
+  });
+
+  it("skips assertAllVotesCast for revisit but keeps it for approve, deny and hold", () => {
+    // Notice to Revisit returns the file to CSA/CIG without deciding it, so it
+    // must be allowed before all votes are cast. The guard only excludes
+    // clear_hold and revisit — approve/deny/hold are never named in it, so
+    // they still require the full ballot.
+    const guard = actionsSrc.match(
+      /if\s*\(([^)]*)\)\s*\{[^}]*assertAllVotesCast\(/,
+    );
+    assert.ok(guard, "vote guard not found");
+    assert.match(guard[1], /"revisit"/);
+    assert.doesNotMatch(guard[1], /"approve"|"deny"|"hold"/);
   });
 
   it("does not run approval-only side effects (negotiations/denial/revisit notices) for clear_hold", () => {
