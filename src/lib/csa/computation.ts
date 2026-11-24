@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { resolveSeafarerBorrowerType } from "@/lib/computation/seafarer-borrower-type";
 
 import {
   checkCoverageRatio,
@@ -6,6 +7,7 @@ import {
   skipCoverageForSegment,
 } from "@/lib/computation/coverage";
 import {
+  addCalendarMonths,
   computeFirstPaymentDate,
   computeSalaryFirstPaymentDate,
   computeSmeFirstPaymentDate,
@@ -19,8 +21,9 @@ import {
   type ScheduleType,
 } from "@/lib/computation/discount-units";
 import { computeSfLoan } from "@/lib/computation/sf";
+import { computeDocumentaryStamp, documentaryStampTermDays } from "@/lib/computation/documentary-stamp";
 import { computeSmeLoan } from "@/lib/computation/sme";
-import { halfUp } from "@/lib/computation/money";
+import { fromCentavos, halfUp, toCentavos } from "@/lib/computation/money";
 import type {
   InputMode,
   OtherDeductions,
@@ -85,6 +88,7 @@ export type PersistComputationInput = {
   otherDeductions?: OtherDeductions;
   releaseDate?: string | null;
   dueDay?: number;
+  seafarerBorrowerType?: import("@/lib/computation/seafarer-borrower-type").SeafarerBorrowerType | null;
   monthlyIncome?: number | null;
   /** Proposed per-installment discount percentages for this loan's own
    * future schedule, set by CSA/Committee at computation time — applied to
@@ -103,9 +107,8 @@ export type OriginationDiscount = {
   percent: number;
 };
 
-/** Seafarer's due date must be the borrower's actual payday — one of 5, 15,
- * or 25, never a free-typed number and never silently defaulted (the old
- * default of 10 was never a valid payday). SME/Individual are unrestricted.
+/** Seafarer's due date must be an explicitly selected calendar day (1–31).
+ * Short months use their last day. SME/Individual are unrestricted here.
  * Returns an error message if invalid, `null` if OK. Shared by the CSA
  * computation route and the Committee override path so the rule can't drift
  * between them — pure so it's testable without a Supabase client. */
@@ -114,8 +117,8 @@ export function validateSeafarerDueDay(
   dueDay: number | undefined,
 ): string | null {
   if (segment !== "seafarer") return null;
-  if (dueDay === undefined || ![5, 15, 25].includes(dueDay)) {
-    return "Due date must be 5, 15, or 25 for Seafarer loans";
+  if (dueDay === undefined || !Number.isInteger(dueDay) || dueDay < 1 || dueDay > 31) {
+    return "Due date must be a whole day from 1 to 31 for Seafarer loans";
   }
   return null;
 }
@@ -306,6 +309,7 @@ export function mapComputationRow(row: Record<string, unknown>) {
     loanApplicationId: row.loan_application_id as string,
     version: row.version as number,
     inputMode: row.input_mode as InputMode,
+    seafarerBorrowerType: (row.seafarer_borrower_type ?? null) as import("@/lib/computation/seafarer-borrower-type").SeafarerBorrowerType | null,
     inputAmount: Number(row.input_amount),
     terms: row.terms as number,
     addonMonths: row.addon_months as number,
@@ -375,6 +379,7 @@ export async function persistComputation(
       ? input.segment
       : "seafarer";
 
+  const seafarerBorrowerType = resolveSeafarerBorrowerType(segment, input.seafarerBorrowerType);
   const hasCollateral =
     input.collateralType === "car_refinancing" ||
     input.collateralType === "real_estate";
@@ -519,6 +524,20 @@ export async function persistComputation(
         ? computeSmeFirstPaymentDate(releaseDate, result.addonMonths)
         : computeFirstPaymentDate(releaseDate, result.addonMonths, dueDay);
 
+  if (segment === "seafarer") {
+    // SF workbook M10/F11: DAYS(final scheduled payment, release), capped
+    // at one year. Apply once dates are resolved, before saving any changes.
+    // The SF PF bundle stays fixed: Admin Cost is its residual, so stamp
+    // proration reallocates the bundle without changing net-mode solving.
+    const maturity = addCalendarMonths(firstPayment, result.terms - 1, dueDay);
+    const days = documentaryStampTermDays(releaseDate, maturity);
+    const stamp = computeDocumentaryStamp(result.principal, days);
+    result.adminCost = fromCentavos(
+      toCentavos(result.adminCost) + toCentavos(result.docStamp) - toCentavos(stamp),
+    );
+    result.docStamp = stamp;
+  }
+
   // Deactivate prior actives with service role: CSA RLS cannot update rows
   // that already have signed_at set, which left multiple is_active=true rows
   // and broke detail GET (.maybeSingle()).
@@ -590,6 +609,7 @@ export async function persistComputation(
     effectiveMonthlyAmortization = daily.totalDue;
   } else if (input.originationDiscounts && input.originationDiscounts.length > 0) {
     const units = buildDiscountUnits({
+      segment,
       paymentFrequency,
       terms: result.terms,
       principal: result.principal,
@@ -635,6 +655,7 @@ export async function persistComputation(
       loan_application_id: input.loanApplicationId,
       version: (count ?? 0) + 1,
       input_mode: input.inputMode,
+      seafarer_borrower_type: seafarerBorrowerType,
       input_amount: input.amount,
       terms: input.terms,
       addon_months: result.addonMonths,

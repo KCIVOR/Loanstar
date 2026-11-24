@@ -162,9 +162,14 @@ export function advanceSemiMonthly(anchorDate: string, index: number): string {
  * reaching real PDC checks, not intentional; see
  * docs/date-schedule-overflow-bug-fix-plan.md.
  */
-export function addScheduleMonths(anchorDate: string, index: number): string {
+export function addScheduleMonths(anchorDate: string, index: number, selectedDueDay?: number | null, segment?: string | null): string {
   const date = new Date(anchorDate);
-  return formatDateLocal(addCalendarMonths(date, index));
+  // Retain an explicitly selected 29th–31st when the first month clamped it.
+  // Other anchors (including non-Seafarer segment dates) remain authoritative.
+  const lastDay = new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate();
+  const day = segment === "seafarer" && selectedDueDay != null && selectedDueDay >= 29 && selectedDueDay <= 31
+    && date.getDate() === Math.min(selectedDueDay, lastDay) ? selectedDueDay : undefined;
+  return formatDateLocal(addCalendarMonths(date, index, day));
 }
 
 /**

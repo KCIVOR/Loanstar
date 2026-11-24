@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 
 import {
   buildDeductionRows,
+  buildBorrowerTypeRow,
   buildFinalComputationRows,
   type ComputationFigures,
 } from "../final-computation-sheet";
@@ -26,6 +27,12 @@ const RENEGOTIATED: ComputationFigures = {
   terms: 10,
   interestRate: 0.021,
 };
+
+test("classification row distinguishes legacy unknown, Allottee and Seafarer", () => {
+  assert.deepEqual(buildBorrowerTypeRow(null,"ALLOTTEE"),{label:"Borrower Type",original:"Not recorded",renegotiated:"Allottee"});
+  assert.deepEqual(buildBorrowerTypeRow("SEAFARER"),{label:"Borrower Type",original:"Seafarer",renegotiated:""});
+  assert.equal(buildBorrowerTypeRow("ALLOTTEE",null).renegotiated,"Not recorded");
+});
 
 test("pairs original vs renegotiated with formatted figures", () => {
   const rows = buildFinalComputationRows(ORIGINAL, RENEGOTIATED);

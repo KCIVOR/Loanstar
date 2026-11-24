@@ -450,6 +450,7 @@ export async function GET(_request: Request, { params }: RouteParams) {
         ? {
             id: computation.id,
             inputMode: computation.inputMode,
+            seafarerBorrowerType: computation.seafarerBorrowerType,
             inputAmount: computation.inputAmount,
             principal: computation.principal,
             netReleased: computation.netReleased,

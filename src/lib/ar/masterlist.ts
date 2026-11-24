@@ -270,6 +270,7 @@ export async function initializeArAccount(
             } satisfies AmortizationInstallment,
           ]
         : generateAmortizationSchedule({
+          segment,
           terms: computation.terms,
           monthlyAmortization: grossMonthlyAmortization,
           releaseDate,
@@ -297,6 +298,7 @@ export async function initializeArAccount(
   // above, so amount_due and discount_amount are computed from the same
   // baseline and never double-discount.
   const discountUnits = buildDiscountUnits({
+    segment,
     paymentFrequency: computation.paymentFrequency,
     terms: computation.terms,
     principal: computation.principal,

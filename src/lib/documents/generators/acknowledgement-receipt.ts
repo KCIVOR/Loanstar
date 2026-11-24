@@ -70,6 +70,7 @@ export async function generateAcknowledgementReceipt(
       addonMonths: computation.addonMonths,
       interestRate: computation.interestRate,
       loanTypeName: computation.loanTypeName,
+      seafarerBorrowerType: computation.seafarerBorrowerType,
       processingFee: computation.processingFee,
       securityFee: computation.securityFee,
       docStamp: computation.docStamp,

@@ -8,7 +8,7 @@ import {
 } from "../ar/schedule";
 import { computeInvoiceLoan } from "./invoice";
 import { halfUp } from "./money";
-import { addCalendarMonths, formatDateLocal } from "./release-date";
+import { addScheduleMonths, formatDateLocal } from "./release-date";
 
 export type ScheduleType =
   | "monthly"
@@ -95,6 +95,8 @@ function unitLabel(paymentFrequency: ScheduleType, unitNo: number): string {
  * selection, so they now get their own real-schedule-based units below
  * instead (matching how Quarterly/Two-monthly/Invoice already work). */
 function flatMonthlyUnits(input: {
+  segment?: string | null;
+  dueDay?: number | null;
   paymentFrequency: ScheduleType;
   terms: number;
   totalInterest: number;
@@ -110,7 +112,7 @@ function flatMonthlyUnits(input: {
     const unitNo = i + 1;
     let dueDate: string | null = null;
     if (anchor) {
-      dueDate = formatDateLocal(addCalendarMonths(anchor, i));
+      dueDate = addScheduleMonths(formatDateLocal(anchor), i, input.dueDay, input.segment);
     }
     return {
       unitNo,
@@ -137,6 +139,7 @@ function flatMonthlyUnits(input: {
  * (ar/masterlist.ts).
  */
 export function buildDiscountUnits(input: {
+  segment?: string | null;
   paymentFrequency: ScheduleType;
   terms: number;
   principal: number;

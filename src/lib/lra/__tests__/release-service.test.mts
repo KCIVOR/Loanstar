@@ -20,6 +20,7 @@ import {
 } from "../release-service";
 
 type StubOpts = {
+  segment?: "seafarer" | "sme" | "individual";
   terms: number;
   monthlyAmortization: number;
   releasePath?: string;
@@ -183,7 +184,9 @@ function makeSavePdcStub(opts: StubOpts) {
         };
       }
       if (table === "loan_applications") {
+        const read = { eq: () => read, maybeSingle: async () => ({data:{segment:opts.segment ?? "seafarer"},error:null}) };
         return {
+          select: () => read,
           update: () => ({
             eq: async () => ({ error: null }),
           }),
@@ -201,6 +204,15 @@ function makeSavePdcStub(opts: StubOpts) {
 }
 
 describe("savePdcChecks hard lock", () => {
+  for (const segment of ["seafarer", "sme", "individual"] as const) {
+    it(`${segment}: monthly PDCs respect the segment's anchor after February`, async () => {
+      const stub = makeSavePdcStub({terms:3,monthlyAmortization:1000,firstPaymentDate:"2026-02-28",dueDay:31,segment});
+      const dates = segment === "seafarer" ? ["2026-02-28","2026-03-31","2026-04-30"] : ["2026-02-28","2026-03-28","2026-04-28"];
+      const rows = dates.map((checkDate,i)=>({...makeCheckRow(1000,i),checkDate}));
+      await savePdcChecks(stub.supabase,"rf-1",rows,undefined,"actor-1");
+      assert.equal(stub.getInsertedChecks()?.length,3);
+    });
+  }
   it("throws when check count is below loan term", async () => {
     const stub = makeSavePdcStub({ terms: 12, monthlyAmortization: 5000 });
 
