@@ -124,6 +124,7 @@ export type Computation = {
   releaseDate?: string | null;
   firstPaymentDate?: string | null;
   dueDay?: number | null;
+  seafarerBorrowerType?: "SEAFARER" | "ALLOTTEE" | null;
   paymentFrequency?: string | null;
   originationDiscounts?: Array<{ installmentNo: number; percent: number }> | null;
   adminRate?: number | null;
@@ -220,7 +221,7 @@ export function pct(rate: number) {
 }
 
 const INPUT_MODE_LABEL: Record<string, string> = {
-  NET_SARADO: "Net sarado",
+  NET_SARADO: "Net Desired",
   NET_LESS_SECURITY: "Net less security",
   PRINCIPAL: "Principal",
 };
@@ -397,7 +398,7 @@ export function buildDetailedComputationBreakdown(
       title: "Step 2 — Fee bundle",
       rows: [
         { label: "Processing fee", formula: `Sized so the bundle totals ${pct(c.pfRate)} of principal`, value: money(c.processingFee) },
-        { label: "Doc stamp", formula: `Fixed rate on principal (≈ ${pct(c.principal ? c.docStamp / c.principal : 0)})`, value: money(c.docStamp) },
+        { label: "Doc stamp", formula: `Applied stamp rate on principal (≈ ${pct(c.principal ? c.docStamp / c.principal : 0)})`, value: money(c.docStamp) },
         { label: "Notary fee", formula: `Fixed rate on principal (≈ ${pct(c.principal ? c.notaryFee / c.principal : 0)})`, value: money(c.notaryFee) },
         { label: "Admin cost", formula: "Processing + Doc stamp + Notary + Admin cost", value: money(c.adminCost) },
         { label: "Fee bundle total", formula: `≈ ${pct(c.pfRate)} of principal (${money(c.principal)})`, value: money(pfBundle) },
@@ -578,9 +579,9 @@ export const ComputationPanel = forwardRef<ComputationPanelHandle, ComputationPa
   const [amount, setAmount] = useState("");
   const [terms, setTerms] = useState("6");
   const [addonMonths, setAddonMonths] = useState("2");
-  // Seafarer only — one of "5" / "15" / "25" (the borrower's actual payday).
-  // No default: the old silent default of 10 was never a valid payday.
+  // Seafarer only — explicitly selected calendar day (1–31); no silent default.
   const [dueDay, setDueDay] = useState("");
+  const [seafarerBorrowerType, setSeafarerBorrowerType] = useState("");
   // Unified schedule/product choice — SME or Individual, decided at intake
   // (see the `paymentSchedule` prop doc). Editable via the Select further
   // below in either mode. Seeded from the prop, then re-seeded from the
@@ -743,6 +744,7 @@ export const ComputationPanel = forwardRef<ComputationPanelHandle, ComputationPa
     ) {
       setInputMode(computation.inputMode);
     }
+    setSeafarerBorrowerType(computation.seafarerBorrowerType ?? "");
     setAmount(String(computation.inputAmount));
     setTerms(String(computation.terms));
     setAddonMonths(String(computation.addonMonths));
@@ -845,6 +847,7 @@ export const ComputationPanel = forwardRef<ComputationPanelHandle, ComputationPa
   }, [
     computation?.id,
     computation?.inputMode,
+    computation?.seafarerBorrowerType,
     computation?.inputAmount,
     computation?.terms,
     computation?.addonMonths,
@@ -1034,6 +1037,7 @@ export const ComputationPanel = forwardRef<ComputationPanelHandle, ComputationPa
     let units: ReturnType<typeof buildDiscountUnits>;
     try {
       units = buildDiscountUnits({
+        segment,
         paymentFrequency: derivedPaymentFrequency,
         terms: termsN,
         principal,
@@ -1064,6 +1068,7 @@ export const ComputationPanel = forwardRef<ComputationPanelHandle, ComputationPa
     selectedLoanTypeId,
     derivedPaymentFrequency,
     dueDay,
+    segment,
   ]);
 
   function openOriginationDiscountModal() {
@@ -1361,8 +1366,12 @@ export const ComputationPanel = forwardRef<ComputationPanelHandle, ComputationPa
   async function handleCompute(e: FormEvent) {
     e.preventDefault();
     if (!editable || !interviewComplete) return;
-    if (isSeafarer && !["5", "15", "25"].includes(dueDay)) {
-      setError("Due date must be 5, 15, or 25 for Seafarer loans");
+    if (isSeafarer && !["SEAFARER", "ALLOTTEE"].includes(seafarerBorrowerType)) {
+      setError("Select whether the borrower is the Seafarer or an Allottee");
+      return;
+    }
+    if (isSeafarer && (!dueDay || !Number.isInteger(Number(dueDay)) || Number(dueDay) < 1 || Number(dueDay) > 31)) {
+      setError("Due date must be a whole day from 1 to 31 for Seafarer loans");
       return;
     }
     if (
@@ -1461,7 +1470,7 @@ export const ComputationPanel = forwardRef<ComputationPanelHandle, ComputationPa
             terms: selectedScheduleType === "daily" ? 1 : Number(terms),
             addonMonths: selectedScheduleType === "daily" ? 0 : Number(addonMonths),
             loanTypeId: selectedLoanTypeId || loanTypeId,
-            ...(isSeafarer ? { dueDay: Number(dueDay) } : {}),
+            ...(isSeafarer ? { dueDay: Number(dueDay), seafarerBorrowerType } : {}),
             // Schedule choice defaults to the application's own intake value
             // server-side when omitted — sending it explicitly here (CSA or
             // Committee) overrides that default for this computation only,
@@ -1674,7 +1683,7 @@ export const ComputationPanel = forwardRef<ComputationPanelHandle, ComputationPa
             )
           }
         >
-          <option value="NET_SARADO">Net sarado</option>
+          <option value="NET_SARADO">Net Desired</option>
           <option value="NET_LESS_SECURITY">Net less security</option>
           <option value="PRINCIPAL">Principal</option>
         </Select>
@@ -1851,6 +1860,17 @@ export const ComputationPanel = forwardRef<ComputationPanelHandle, ComputationPa
       )}
       {isSeafarer ? (
         <div>
+          <Label htmlFor="seafarerBorrowerType" required>Borrower type</Label>
+          <Select id="seafarerBorrowerType" required value={seafarerBorrowerType}
+            onChange={(e) => setSeafarerBorrowerType(e.target.value)}>
+            <option value="">Select borrower type</option>
+            <option value="SEAFARER">Seafarer</option>
+            <option value="ALLOTTEE">Allottee</option>
+          </Select>
+        </div>
+      ) : null}
+      {isSeafarer ? (
+        <div>
           <Label htmlFor="dueDay" required>
             Due date
           </Label>
@@ -1861,10 +1881,15 @@ export const ComputationPanel = forwardRef<ComputationPanelHandle, ComputationPa
             onChange={(e) => setDueDay(e.target.value)}
           >
             <option value="">Select payday</option>
-            <option value="5">5th</option>
-            <option value="15">15th</option>
-            <option value="25">25th</option>
+            {Array.from({ length: 31 }, (_, index) => {
+              const day = index + 1;
+              const suffix = day >= 11 && day <= 13 ? "th" : day % 10 === 1 ? "st" : day % 10 === 2 ? "nd" : day % 10 === 3 ? "rd" : "th";
+              return <option key={day} value={day}>{day}{suffix}</option>;
+            })}
           </Select>
+          <p className="mt-1 text-xs text-ink-500">
+            Months without the selected day use their last day.
+          </p>
         </div>
       ) : null}
       <div className="sm:col-span-2">
@@ -2597,6 +2622,7 @@ export const ComputationPanel = forwardRef<ComputationPanelHandle, ComputationPa
             <p className="text-sm text-ink-500">
               {computation.loanTypeName ?? "Loan"} ·{" "}
               {computation.inputMode.replace(/_/g, " ")}
+              {isSeafarer ? ` · Borrower type: ${computation.seafarerBorrowerType === "ALLOTTEE" ? "Allottee" : computation.seafarerBorrowerType === "SEAFARER" ? "Seafarer" : "Not recorded"}` : ""}
             </p>
           </div>
           {error ? (
@@ -2673,6 +2699,12 @@ export const ComputationPanel = forwardRef<ComputationPanelHandle, ComputationPa
             <div className="ov" style={{ color: "var(--teal-400)" }}>
               ₱{formatMoney(computation.monthlyAmortization)}
             </div>
+          </div>
+          <div className="row2">
+            <span>Principal Amount</span>
+            <b style={{ color: "var(--teal-400)" }}>
+              {formatMoney(computation.principal)}
+            </b>
           </div>
           {breakdown.map((item) => {
             const isKey = KEY_AMOUNT_KEYS.has(item.key);

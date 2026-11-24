@@ -102,6 +102,7 @@ type PdcComputation = {
 function buildPdcRows(
   computation: PdcComputation,
   pdcDate: string,
+  segment: string,
 ): Array<{ checkDate: string; amount: number }> {
   // Gross (pre-discount) basis — mirrors buildExpectedPdcSchedule /
   // initializeArAccount exactly, so a discounted loan's client-side preview
@@ -211,7 +212,7 @@ function buildPdcRows(
 
   // Monthly (Seafarer/SME/MPL) — gross basis (see comment above).
   return Array.from({ length: computation.terms }, (_, index) => ({
-    checkDate: addScheduleMonths(pdcDate, index),
+    checkDate: addScheduleMonths(pdcDate, index, computation.dueDay, segment),
     amount: grossMonthlyAmortization,
   }));
 }
@@ -428,7 +429,7 @@ export default function LraApplicationPage() {
   // the summary fields below read off this instead of the raw `terms`/
   // `monthlyAmortization` fields, which would otherwise show a misleading
   // number (e.g. "3" for a 3-month Invoice loan that actually needs 13 checks).
-  const expectedPdcRows = data?.computation ? buildPdcRows(data.computation, pdcDate) : [];
+  const expectedPdcRows = data?.computation ? buildPdcRows(data.computation, pdcDate, data.application.segment) : [];
   const isFlatSchedule =
     data?.computation?.paymentFrequency === "monthly" ||
     data?.computation?.paymentFrequency === "semi_monthly" ||
@@ -578,7 +579,7 @@ export default function LraApplicationPage() {
       return;
     }
     setError(null);
-    const expected = buildPdcRows(data.computation, pdcDate);
+    const expected = buildPdcRows(data.computation, pdcDate, data.application.segment);
     const rows: PdcDraftRow[] = expected.map(({ checkDate, amount }, i) => ({
       checkNumber: pdcDraft[i]?.checkNumber ?? "",
       amount,
@@ -614,7 +615,7 @@ export default function LraApplicationPage() {
       return;
     }
     const computation = data.computation;
-    const expected = buildPdcRows(computation, pdcDate);
+    const expected = buildPdcRows(computation, pdcDate, data.application.segment);
     if (pdcDraft.length !== expected.length) {
       setError("Build the complete PDC schedule before saving.");
       return;

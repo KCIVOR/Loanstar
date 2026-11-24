@@ -165,6 +165,7 @@ type CommitteeDetail = {
   computation: {
     id: string;
     inputMode: string;
+    seafarerBorrowerType?: "SEAFARER" | "ALLOTTEE" | null;
     inputAmount: number;
     principal: number;
     netReleased: number;
@@ -2082,6 +2083,7 @@ export default function CommitteeApplicationPage() {
           <p className="mb-3 text-sm text-ink-500">
             {data.computation.loanTypeName ?? "Loan"} ·{" "}
             {data.computation.inputMode.replace(/_/g, " ")}
+            {data.application.segment === "seafarer" ? ` · Borrower type: ${data.computation.seafarerBorrowerType === "ALLOTTEE" ? "Allottee" : data.computation.seafarerBorrowerType === "SEAFARER" ? "Seafarer" : "Not recorded"}` : ""}
           </p>
           <div className="card emi !max-w-none" style={{ gridTemplateColumns: "1fr" }}>
             <div className="out">
@@ -2090,6 +2092,12 @@ export default function CommitteeApplicationPage() {
                 <div className="ov" style={{ color: "var(--teal-400)" }}>
                   ₱{formatMoney(data.computation.monthlyAmortization)}
                 </div>
+              </div>
+              <div className="row2">
+                <span>Principal Amount</span>
+                <b style={{ color: "var(--teal-400)" }}>
+                  {formatMoney(data.computation.principal)}
+                </b>
               </div>
               {data.computation.lineItems
                 .filter((item) => !AMORT_KEYS.has(item.key))

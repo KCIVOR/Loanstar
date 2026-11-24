@@ -1,5 +1,6 @@
 import {
   addCalendarMonths,
+  addScheduleMonths,
   advanceSemiMonthly,
   computeFirstPaymentDate,
 } from "../computation/release-date";
@@ -19,6 +20,7 @@ export type AmortizationInstallment = {
 };
 
 export function generateAmortizationSchedule(input: {
+  segment?: string | null;
   terms: number;
   monthlyAmortization: number;
   releaseDate: string | Date;
@@ -163,7 +165,7 @@ export function generateAmortizationSchedule(input: {
   const installments: AmortizationInstallment[] = [];
 
   for (let i = 0; i < input.terms; i += 1) {
-    const due = addCalendarMonths(firstPayment, i);
+    const dueDate = addScheduleMonths(formatDateLocal(firstPayment), i, input.dueDay, input.segment);
     let amountDue = monthly;
     if (i === input.terms - 1 && input.totalLoan != null) {
       const prior = halfUp(monthly * (input.terms - 1));
@@ -172,7 +174,7 @@ export function generateAmortizationSchedule(input: {
     }
     installments.push({
       installmentNo: i + 1,
-      dueDate: formatDateLocal(due),
+      dueDate,
       amountDue,
     });
   }

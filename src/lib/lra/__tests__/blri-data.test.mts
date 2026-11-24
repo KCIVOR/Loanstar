@@ -100,6 +100,20 @@ function computationRow(overrides: Record<string, unknown> = {}) {
   });
 }
 
+test("Seafarer day 31 clamps February and returns to 31 in March in document PDC rows", () => {
+  const blri = buildBlriData({ applicationNo: "QA", borrower: BORROWER, segment:"seafarer",
+    computation: computationRow({release_date:"2026-01-20",addon_months:1,due_day:31,terms:3}) });
+  assert.deepEqual(blri.pdcSchedule.map(x=>x.checkDate),["02/28/26","03/31/26","04/30/26"]);
+  assert.equal(blri.installmentDayOrdinal,"31st");
+});
+
+for (const segment of ["sme","individual"] as const) test(`${segment}: document PDCs retain a release-based anchor despite legacy due_day 31`,()=>{
+  const blri=buildBlriData({applicationNo:"QA",borrower:BORROWER,segment,
+    computation:computationRow({release_date:"2026-01-28",addon_months:0,due_day:31,terms:3})});
+  assert.deepEqual(blri.pdcSchedule.map(x=>x.checkDate),["02/28/26","03/28/26","04/28/26"]);
+  assert.equal(blri.installmentDayOrdinal,"28th");
+});
+
 test("particulars still show the 4 original fees when everything else is zero (no regression)", () => {
   const blri = buildBlriData({
     applicationNo: "LA900001",

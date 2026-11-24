@@ -50,6 +50,7 @@ export function resolveApplicationFormSlug(input: {
 
 export type ApplicationFormComputationSlice = {
   loanTypeName?: string | null;
+  seafarerBorrowerType?: "SEAFARER" | "ALLOTTEE" | null;
   principal?: number | null;
   terms?: number | null;
   interestRate?: number | null;
@@ -183,6 +184,7 @@ export function buildApplicationFormContext(
     borrowerNo: borrower.borrowerNo,
     address: joinAddress(borrower.presentAddress),
     loanType: computation?.loanTypeName ?? "",
+    seafarerBorrowerType: !isSme ? computation?.seafarerBorrowerType ?? "" : "",
     loanAmount: computation?.principal != null ? formatMoney(computation.principal) : "",
     terms: computation?.terms != null ? String(computation.terms) : "",
     interestRate:

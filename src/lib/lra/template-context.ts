@@ -243,6 +243,7 @@ function joinAddress(a: BorrowerProfile["presentAddress"]): string {
 }
 
 export type ReleaseComputation = {
+  seafarerBorrowerType?: import("@/lib/computation/seafarer-borrower-type").SeafarerBorrowerType | null;
   netReleased: number;
   releaseDate: string | null;
   addonMonths?: number | null;
@@ -388,6 +389,8 @@ export function buildReleaseTemplateContext(
 
     loanAccountNo: blri.loanAccountNo,
     loanType: computation.loanTypeName ?? "",
+    seafarerBorrowerType: scope?.segment === "sme" || scope?.segment === "individual"
+      ? "" : computation.seafarerBorrowerType ?? "",
     principal: formatMoney(blri.principal),
     principalInWords: pesosInWords(blri.principal),
     loanAmount: formatMoney(blri.principal),

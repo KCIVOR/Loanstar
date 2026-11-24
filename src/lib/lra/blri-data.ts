@@ -2,7 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { getActiveComputation } from "@/lib/csa/computation";
 import { buildDeductionBreakdownRows } from "@/lib/computation/deduction-breakdown";
-import { addCalendarMonths, computeFirstPaymentDate } from "@/lib/computation/release-date";
+import { addScheduleMonths, computeFirstPaymentDate, formatDateLocal } from "@/lib/computation/release-date";
 import { halfUp } from "@/lib/computation/money";
 import type { BorrowerRow } from "@/lib/borrowers/types";
 import { mapBorrowerRow } from "@/lib/borrowers/types";
@@ -63,6 +63,7 @@ function ordinalDay(day: number): string {
 }
 
 export function buildBlriData(input: {
+  segment?: string | null;
   applicationNo: string | null;
   borrower: ReturnType<typeof mapBorrowerRow>;
   computation: NonNullable<Awaited<ReturnType<typeof getActiveComputation>>>;
@@ -167,7 +168,7 @@ export function buildBlriData(input: {
       // docs/date-schedule-overflow-bug-fix-plan.md.
       pdcSchedule.push({
         checkNumber: null,
-        checkDate: formatDate(addCalendarMonths(firstPayment, i)),
+        checkDate: formatDate(new Date(`${addScheduleMonths(formatDateLocal(firstPayment), i, input.computation.dueDay, input.segment)}T00:00:00`)),
         amount: grossMonthlyAmortization,
         bankName: "",
       });
@@ -183,7 +184,11 @@ export function buildBlriData(input: {
     monthlyAmortization: input.computation.monthlyAmortization,
     terms: input.computation.terms,
     firstPaymentDate: formatDate(firstPayment),
-    installmentDayOrdinal: ordinalDay(firstPayment.getDate()),
+    installmentDayOrdinal: ordinalDay(
+      input.segment === "seafarer" && input.computation.dueDay != null && input.computation.dueDay >= 29
+        && firstPayment.getDate() === Math.min(input.computation.dueDay, new Date(firstPayment.getFullYear(), firstPayment.getMonth() + 1, 0).getDate())
+        ? input.computation.dueDay : firstPayment.getDate(),
+    ),
     particulars,
     pdcSchedule,
   };
@@ -196,7 +201,7 @@ export async function loadBlriContext(
 ) {
   const { data: app, error: appError } = await supabase
     .from("loan_applications")
-    .select("application_no, borrowers (*)")
+    .select("application_no, segment, borrowers (*)")
     .eq("id", applicationId)
     .single();
 
@@ -233,6 +238,7 @@ export async function loadBlriContext(
   }
 
   return buildBlriData({
+    segment: app.segment === "sme" || app.segment === "individual" ? app.segment : "seafarer",
     applicationNo: app.application_no as string | null,
     borrower: mapBorrowerRow(borrowerRow),
     computation,

@@ -36,6 +36,7 @@ export const FIELD_GROUPS: FieldGroup[] = [
     label: "Borrower",
     fields: [
       { key: "borrowerName", label: "Borrower name", sample: "Jonathan Hipolito Del Poso" },
+      { key: "seafarerBorrowerType", label: "Seafarer borrower type", sample: "ALLOTTEE" },
       { key: "coBorrowerName", label: "Co-borrower name", sample: "" },
       { key: "coBorrowerAddress", label: "Co-borrower address", sample: "" },
       { key: "spouseName", label: "Spouse name", sample: "" },

@@ -151,7 +151,7 @@ async function loadMoveOfPaymentContext(
 ): Promise<MoveOfPaymentContext> {
   const { data: masterlist, error: mlError } = await supabase
     .from("masterlist")
-    .select("id, computation_id, move_of_payment_used_at, loan_application_id")
+    .select("id, computation_id, move_of_payment_used_at, loan_application_id, segment")
     .eq("id", masterlistId)
     .single();
 
@@ -255,6 +255,7 @@ async function loadMoveOfPaymentContext(
   const grossTotalLoan = halfUp(principal + grossTotalInterest);
 
   const discountUnits = buildDiscountUnits({
+    segment: (masterlist.segment as string | null) ?? "seafarer",
     paymentFrequency: computation.payment_frequency as
       | "monthly"
       | "semi_monthly"

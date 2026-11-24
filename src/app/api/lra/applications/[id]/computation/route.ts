@@ -29,7 +29,8 @@ const recomputeSchema = z.object({
   adminRate: z.number().min(0).optional(),
   chattelRate: z.number().min(0).optional(),
   withDsAndNotary: z.boolean().optional(),
-  dueDay: z.number().int().min(1).max(28).optional(),
+  dueDay: z.number().int().min(1).max(31).optional(),
+  seafarerBorrowerType: z.enum(["SEAFARER", "ALLOTTEE"]).nullable().optional(),
   /** SME or Individual — unified schedule/product choice. Defaults to the
    * application's own payment_schedule (set at intake); Committee may
    * override it here. */

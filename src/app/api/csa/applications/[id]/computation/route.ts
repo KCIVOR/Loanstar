@@ -90,7 +90,8 @@ const computeSchema = z.object({
     })
     .optional(),
   releaseDate: z.string().optional(),
-  dueDay: z.number().int().min(1).max(28).optional(),
+  dueDay: z.number().int().min(1).max(31).optional(),
+  seafarerBorrowerType: z.enum(["SEAFARER", "ALLOTTEE"]).nullable().optional(),
   originationDiscounts: z
     .array(
       z.object({
@@ -481,6 +482,9 @@ export async function POST(request: Request, { params }: RouteParams) {
       }
     }
 
+    const priorClassification = body.seafarerBorrowerType === undefined
+      ? (await getActiveComputation(supabase, id))?.seafarerBorrowerType ?? null
+      : body.seafarerBorrowerType;
     const saved = await persistComputation(supabase, {
       loanApplicationId: id,
       segment,
@@ -510,6 +514,7 @@ export async function POST(request: Request, { params }: RouteParams) {
       otherDeductions: body.otherDeductions,
       releaseDate: body.releaseDate,
       dueDay: body.dueDay,
+      seafarerBorrowerType: priorClassification,
       paymentSchedule,
       originationDiscounts: body.originationDiscounts,
       manualPaymentDate: body.paymentDate,

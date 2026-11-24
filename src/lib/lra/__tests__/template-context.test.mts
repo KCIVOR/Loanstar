@@ -75,6 +75,16 @@ const BORROWER = {
 
 const COMPUTATION = { netReleased: 90000, releaseDate: "2026-06-11" };
 
+test("printing context uses the saved prorated stamp and reconciled fee components", () => {
+  const ctx = buildReleaseTemplateContext(BLRI, {
+    ...COMPUTATION, processingFee: 6000, docStamp: 184.93,
+    adminCost: 2805.98, notaryFee: 100, securityFee: 1990,
+  }, BORROWER, "with_pdc");
+  assert.equal(ctx.docStamp, "184.93");
+  assert.equal(ctx.adminCost, "2,805.98");
+  assert.equal(ctx.nonFinanceCharges, "11,080.91");
+});
+
 test("with_pdc context disburses via Bank (check)", () => {
   const ctx = buildReleaseTemplateContext(BLRI, COMPUTATION, BORROWER, "with_pdc");
   assert.equal(ctx.isCheck, true);
@@ -96,6 +106,17 @@ test("without_pdc context disburses via CASH", () => {
   const entries = ctx.accountingEntries as Array<{ accountCode: string }>;
   assert.ok(entries.find((e) => e.accountCode === "1100110"), "expected CASH (1100110)");
   assert.ok(!entries.find((e) => e.accountCode === "1100115"), "no Bank line for cash");
+});
+
+test("borrower classification reaches templates without replacing people or amounts", () => {
+  const seafarer = buildReleaseTemplateContext(BLRI, {...COMPUTATION,seafarerBorrowerType:"SEAFARER"}, BORROWER, "with_pdc");
+  const allottee = buildReleaseTemplateContext(BLRI, {...COMPUTATION,seafarerBorrowerType:"ALLOTTEE"}, BORROWER, "with_pdc");
+  const {seafarerBorrowerType:a,...first}=seafarer;
+  const {seafarerBorrowerType:b,...second}=allottee;
+  assert.equal(a,"SEAFARER");assert.equal(b,"ALLOTTEE");
+  assert.deepEqual(first,second);
+  assert.equal(buildReleaseTemplateContext(BLRI,COMPUTATION,BORROWER,"with_pdc").seafarerBorrowerType,"");
+  assert.equal(buildReleaseTemplateContext(BLRI,{...COMPUTATION,seafarerBorrowerType:"ALLOTTEE"},BORROWER,"with_pdc",{segment:"sme"}).seafarerBorrowerType,"");
 });
 
 test("particulars and money fields are formatted", () => {

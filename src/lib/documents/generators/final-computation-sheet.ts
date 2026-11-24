@@ -5,6 +5,7 @@ import { mapBorrowerRow, type BorrowerRow } from "@/lib/borrowers/types";
 import { mapComputationRow } from "@/lib/csa/computation";
 import { buildDeductionBreakdownRows } from "@/lib/computation/deduction-breakdown";
 import type { OtherDeductions } from "@/lib/computation/types";
+import { seafarerBorrowerTypeLabel, type SeafarerBorrowerType } from "@/lib/computation/seafarer-borrower-type";
 import { renderAndStore, type RenderedDocumentResult } from "@/lib/documents/render-store";
 
 import { COMPANY_NAME, formatDate, formatMoney, joinAddress } from "./shared";
@@ -21,6 +22,11 @@ export type ComputationFigures = {
 };
 
 type Row = { label: string; original: string; renegotiated: string };
+
+export function buildBorrowerTypeRow(original: SeafarerBorrowerType | null | undefined, renegotiated?: SeafarerBorrowerType | null): Row {
+  return {label:"Borrower Type",original:seafarerBorrowerTypeLabel(original),
+    renegotiated:renegotiated === undefined ? "" : seafarerBorrowerTypeLabel(renegotiated)};
+}
 
 function pct(rate: number): string {
   return `${(rate * 100).toFixed(2)}%`;
@@ -128,10 +134,11 @@ export async function generateFinalComputationSheet(
 
   const { data: app, error: appError } = await supabase
     .from("loan_applications")
-    .select("application_no, borrowers (*)")
+    .select("application_no, segment, borrowers (*)")
     .eq("id", applicationId)
     .single();
   if (appError || !app) throw new Error("Application not found");
+  const isSeafarer = app.segment !== "sme" && app.segment !== "individual";
 
   const borrowerRaw = app.borrowers;
   const borrower = mapBorrowerRow(
@@ -154,11 +161,14 @@ export async function generateFinalComputationSheet(
     address: joinAddress(borrower.presentAddress),
     loanAccountNo: (app.application_no as string) ?? "",
     loanType: active.loanTypeName ?? "",
+    seafarerBorrowerType: isSeafarer ? active.seafarerBorrowerType ?? "" : "",
     todayDate: formatDate(new Date()),
     preparedBy: active.computedBy ? (performerNames.get(active.computedBy) ?? "") : "",
     checkedBy: "",
     approvedBy: active.signedBy ? (performerNames.get(active.signedBy) ?? "") : "",
     computationRows: [
+      ...(isSeafarer ? [buildBorrowerTypeRow(original.seafarerBorrowerType,
+        renegotiated ? renegotiated.seafarerBorrowerType : undefined)] : []),
       ...buildFinalComputationRows(
         toFigures(original),
         renegotiated ? toFigures(renegotiated) : null,

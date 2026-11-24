@@ -347,10 +347,11 @@ type OverrideInput = {
   adminRate?: number;
   chattelRate?: number;
   withDsAndNotary?: boolean;
-  /** Seafarer only — must be 5, 15, or 25 (the borrower's actual payday).
+  /** Seafarer only — a calendar day from 1 to 31 (the borrower's actual payday).
    * Same explicit-wins/omission-preserves-existing rule as the fields above.
    * SME/Individual ignore this (optional, unrestricted 1-28, defaults to 10). */
   dueDay?: number;
+  seafarerBorrowerType?: import("@/lib/computation/seafarer-borrower-type").SeafarerBorrowerType | null;
   /** SME or Individual — the loan's unified schedule/product choice.
    * Defaults to the application's own payment_schedule (set at intake);
    * Committee retains full authority to override it here, unlike
@@ -389,7 +390,7 @@ async function persistOverrideComputation(
   const { data: existingComp } = await supabase
     .from("computations")
     .select(
-      "loan_type_id, pf_rate, interest_rate, security_fee_rate, terms, addon_months, input_mode, other_deductions, admin_rate, chattel_rate, with_ds_and_notary, due_day, origination_discounts, payment_frequency, first_payment_date, release_date",
+      "loan_type_id, pf_rate, interest_rate, security_fee_rate, terms, addon_months, input_mode, other_deductions, admin_rate, chattel_rate, with_ds_and_notary, due_day, seafarer_borrower_type, origination_discounts, payment_frequency, first_payment_date, release_date",
     )
     .eq("loan_application_id", applicationId)
     .eq("is_active", true)
@@ -553,6 +554,8 @@ async function persistOverrideComputation(
     withDsAndNotary:
       input.withDsAndNotary ?? existingComp?.with_ds_and_notary ?? undefined,
     dueDay: resolvedDueDay,
+    seafarerBorrowerType: input.seafarerBorrowerType === undefined
+      ? existingComp?.seafarer_borrower_type ?? null : input.seafarerBorrowerType,
     paymentSchedule: resolvedPaymentSchedule,
     manualPaymentDate: resolvedPaymentDate,
     // The release date staff set in the calculator, for every schedule type:
@@ -562,12 +565,17 @@ async function persistOverrideComputation(
     // falls back to today.
     releaseDate: resolvedReleaseDate,
     originationDiscounts: resolvedOriginationDiscounts,
+    // Seafarer security is one month's interest at the CURRENT loan-type
+    // rate. Reusing a prior snapshot's rate leaves fees/net proceeds stale
+    // when LRA or Committee changes the loan type during recomputation.
     securityFeeRate:
       segment === "sme"
         ? 0
-        : existingComp?.security_fee_rate != null
-          ? Number(existingComp.security_fee_rate)
-          : Number(loanType.interest_rate),
+        : segment === "seafarer"
+          ? Number(loanType.interest_rate)
+          : existingComp?.security_fee_rate != null
+            ? Number(existingComp.security_fee_rate)
+            : Number(loanType.interest_rate),
     // Explicit input wins (Committee actively setting/changing deductions);
     // omission preserves the CSA-entered value — an override that only
     // touches amount/terms/mode must not silently drop them.

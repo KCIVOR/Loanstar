@@ -409,6 +409,15 @@ export async function savePdcChecks(
   // Two-Monthly/Daily each build a full expected schedule via
   // buildExpectedPdcSchedule instead — their count/amount/date shapes don't
   // fit the flat-monthly or halved-semi-monthly patterns at all.
+  // Only Seafarer uses an explicitly selected monthly due day. SME and
+  // Individual retain their release-based anchor even in legacy imports.
+  let monthlySegment: string | null = null;
+  if (computation.paymentFrequency === "monthly" && (computation.dueDay ?? 0) >= 29) {
+    const { data: app, error: appError } = await supabase.from("loan_applications")
+      .select("segment").eq("id", file.loanApplicationId).maybeSingle();
+    if (appError || !app) throw new ValidationError("Cannot verify the loan segment for the PDC schedule");
+    monthlySegment = app.segment === "sme" || app.segment === "individual" ? app.segment : "seafarer";
+  }
   const isSemiMonthly = computation.paymentFrequency === "semi_monthly";
   const isNewScheduleType =
     computation.paymentFrequency === "weekly" ||
@@ -498,7 +507,7 @@ export async function savePdcChecks(
       ? expectedSchedule[index].date
       : isSemiMonthly
         ? advanceSemiMonthly(computation.firstPaymentDate!, index)
-        : addScheduleMonths(computation.firstPaymentDate!, index);
+        : addScheduleMonths(computation.firstPaymentDate!, index, computation.dueDay, monthlySegment);
     if (row.checkDate !== expectedDate) {
       throw new ValidationError(
         `PDC #${index + 1} date must be ${expectedDate} (got ${row.checkDate}) — dates must follow the computed payment schedule`,
@@ -716,6 +725,7 @@ async function loadReleaseGenerationContext(
     addonMonths: computation.addonMonths,
     interestRate: computation.interestRate,
     loanTypeName: computation.loanTypeName,
+    seafarerBorrowerType: computation.seafarerBorrowerType,
     paymentFrequency: computation.paymentFrequency,
     processingFee: computation.processingFee,
     securityFee: computation.securityFee,
@@ -1542,6 +1552,7 @@ export function releaseStatusAfterRecompute(
 
 const RECOMPUTE_AUDIT_FIELDS = [
   "loanTypeName",
+  "seafarerBorrowerType",
   "inputMode",
   "inputAmount",
   "principal",
